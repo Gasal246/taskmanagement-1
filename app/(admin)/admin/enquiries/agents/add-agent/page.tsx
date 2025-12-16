@@ -15,6 +15,7 @@ import { useAddNewAgent } from '@/query/user/queries';
 import { useSelector } from 'react-redux';
 import { RootState } from '@/redux/store';
 import { toast } from 'sonner';
+import { Loader2 } from 'lucide-react';
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
@@ -53,7 +54,12 @@ const AddAgentPage = () => {
     const res = await AddAgent(values);
 
     if(res?.status == 201){
-      return toast.success(res?.message || "Agent Added");
+      toast.success(res?.message || "Agent Added");
+      const agentId = res?.agent?._id || res?.agentId;
+      if(agentId){
+        router.push(`/admin/enquiries/agents/${agentId}/docs`);
+      }
+      return;
     } else {
       return toast.error(res?.message || "Failed to add agent");
     }
@@ -169,7 +175,9 @@ const AddAgentPage = () => {
                   type="submit"
                   whileTap={{ scale: 0.98 }}
                   whileHover={{ scale: 1.02 }}
-                  className='bg-gradient-to-tr from-cyan-950/60 to-cyan-900/60 p-2 px-4 rounded-lg border border-cyan-700 hover:border-cyan-400 text-sm font-semibold'>
+                  disabled={isPending}
+                  className='bg-gradient-to-tr from-cyan-950/60 to-cyan-900/60 p-2 px-4 rounded-lg border border-cyan-700 hover:border-cyan-400 text-sm font-semibold disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2'>
+                  {isPending && <Loader2 size={16} className="animate-spin" />}
                   Save & Continue
                 </motion.button>
               </Tooltip>

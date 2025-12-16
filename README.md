@@ -48,8 +48,9 @@ Designed for internal use, it ensures transparency, efficiency, and accountabili
 ## 🛠️ Installation & Setup
 
 ```bash
-git clone https://github.com/DevLogifex/TaskManager.git
-cd TaskManager
+mkdir taskmanagement
+cd taskmanagement
+git clone https://github.com/DevLogifex/taskmanagement.git .
 npm install --legacy-peer-deps
 npm run dev
 ```

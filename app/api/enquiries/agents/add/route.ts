@@ -45,7 +45,7 @@ export async function POST(req:NextRequest){
 
         await newAgentRole.save();
 
-        return NextResponse.json({message: "New Agent Registered", status: 201}, {status: 201});
+        return NextResponse.json({message: "New Agent Registered", status: 201, agent: savedAgent, agentId: savedAgent?._id}, {status: 201});
     }catch(err){
         console.log("Error while adding new Agent: ", err);
         return NextResponse.json({message: "Internal Server Error", status: 500}, {status: 500});

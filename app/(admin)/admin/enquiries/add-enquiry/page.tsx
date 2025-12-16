@@ -61,8 +61,8 @@ const enquirySchema = z.object({
     latitude: z.string(),
     longitude: z.string(),
 
-    camp_capacity: z.string(),
-    camp_occupancy: z.string(),
+    camp_capacity: z.string().optional(),
+    camp_occupancy: z.string().optional(),
 
     contacts: z.array(z.object({
         name: z.string().min(1, "Contact name required"),
@@ -110,6 +110,37 @@ const enquirySchema = z.object({
 
     images: z.any().optional(),
 
+}).superRefine((values, ctx) => {
+    const needsCampDetails = values.area_input_mode === "new" || values.camp_input_mode === "new";
+
+    if (needsCampDetails && !values.camp_capacity) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["camp_capacity"],
+            message: "Camp capacity is required for a new camp",
+        });
+    }
+
+    if (needsCampDetails && !values.camp_occupancy) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["camp_occupancy"],
+            message: "Camp occupancy is required for a new camp",
+        });
+    }
+
+    if (values.camp_capacity && values.camp_occupancy) {
+        const limit = capacityLimits[values.camp_capacity];
+        const occupancy = Number(values.camp_occupancy);
+
+        if (!Number.isNaN(occupancy) && limit && occupancy > limit) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["camp_occupancy"],
+                message: "Camp occupancy cannot exceed Camp Capacity",
+            });
+        }
+    }
 });
 
 /* =========== COMPONENT =========== */

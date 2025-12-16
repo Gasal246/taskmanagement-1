@@ -158,7 +158,7 @@ export async function POST(req:NextRequest){
 
         if(body.camp){
             const is_existing = await Eq_enquiry.find({camp_id: body.camp});
-            if(is_existing) return NextResponse.json({message: "Enquiry already added for camp", status: 400}, {status: 200})
+            if(is_existing && is_existing.length > 0) return NextResponse.json({message: "Enquiry already added for camp", status: 400}, {status: 200})
         }
 
         if(body.area_input_mode == "new"){
