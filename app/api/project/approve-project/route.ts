@@ -1,0 +1,42 @@
+import connectDB from "@/lib/mongo";
+import Business_Project from "@/models/business_project.model";
+import { getServerSession } from "next-auth";
+import { NextRequest, NextResponse } from "next/server";
+import { authOptions } from "../../auth/[...nextauth]/route";
+import Flow_Log from "@/models/Flow_Log.model";
+import Users from "@/models/users.model";
+
+connectDB();
+
+export async function PUT(req:NextRequest){
+    try{
+
+        const session: any = await getServerSession(authOptions);
+        if(!session) return new NextResponse("Un Authorized Access", { status: 401 });
+
+        const user = await Users.findById(session?.user?.id);
+
+        const {searchParams} = new URL(req.url);
+        const project_id = searchParams.get("project_id");
+        if(!project_id) return NextResponse.json({message:"Please Provide project_id"}, {status: 400});
+
+        const projectToApprove = await Business_Project.findByIdAndUpdate(project_id, {
+            $set: {is_approved: true, approved_by:session?.user?.id, status: "approved"}
+        }, {new:true})
+
+        const flowLog = new Flow_Log({
+            user_id: session?.user?.id,
+            Log: `Project Approved by BUSINESS ADMIN - ${user?.name}`,
+            description: "Project marked as approved",
+            project_id: project_id
+        });
+
+        await flowLog.save();
+
+        return NextResponse.json({message: "Project marked as Approved"}, {status: 200});
+
+    }catch(err){
+        console.log("project approval failed", err);
+        return NextResponse.json({message: "Internal Server Error"}, {status:500});
+    }
+}

@@ -1,0 +1,492 @@
+import axios from "axios";
+
+//Get Countries
+export async function GetEqCountries(){
+    try{
+        const res = await axios.get("/api/enquiries/agent-side/get/get-countries");
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+//Get Regions
+export async function GetEqRegionsByCountry(country_id: string){
+    try{
+        const res = await axios.get(`/api/enquiries/agent-side/get/get-regions-by-country?country_id=${country_id}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+//Get Provinces
+export async function GetEqProvincesByRegion(region_id: string){
+    try{
+        const res = await axios.get(`/api/enquiries/agent-side/get/get-province-by-region?region_id=${region_id}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+//Get Cities
+export async function GetEqCitiesByProvince(province_id: string){
+    try{
+        const res = await axios.get(`/api/enquiries/agent-side/get/get-city-by-province?province_id=${province_id}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+//Get Areas
+export async function GetEqAreasByCity(city_id: string){
+    try{
+        const res = await axios.get(`/api/enquiries/agent-side/get/get-area-by-city?city_id=${city_id}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+//Get Camps by area
+export async function GetEqCampsByArea(area_id: string){
+    try{
+        const res = await axios.get(`/api/enquiries/agent-side/get/get-camp-by-area?area_id=${area_id}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+//Get Areas Filtered
+export async function GetEqAreasFiltered(queryParams: any){
+    try{
+        const queryString = new URLSearchParams(queryParams).toString();
+        const res = await axios.get(`/api/enquiries/get/area/filtered?${queryString}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+//Add New Area
+export async function AddNewEqArea(payload: any){
+    try{
+        const res = await axios.post("/api/enquiries/post/add-area", payload);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+//Get Camps filtered
+export async function GetEqCampsFiltered(queryParams:any){
+    try{
+        const queryString = new URLSearchParams(queryParams).toString();
+        const res = await axios.get(`/api/enquiries/get/camps/filtered?${queryString}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+//Add new camp
+export async function AddNewEqCamp(payload: any){
+    try{
+        const res = await axios.post("/api/enquiries/post/add-camp", payload);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+//Add new enquiry
+export async function AddNewEnquiry(payload: any){
+    try{
+        const res = await axios.post("/api/enquiries/agent-side/post/add-new-enquiry", payload);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+//Get enquiries by agent
+export async function GetAgentEnquiries(){
+    try{
+        const res = await axios.get("/api/enquiries/agent-side/get/get-enquiries-by-agent");
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+//Get agents for admin
+export async function GetAgentsByBusiness(business_id: string, search: string){
+    try{
+        const res = await axios.get(`/api/enquiries/agents/get/get-agents-by-business?business_id=${business_id}&search=${search}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+//Get Enquiries with filters
+export async function GetEnquiriesWithFilters(queryParams: any) {
+  try {
+    const safeParams: any = {};
+
+    // Only include keys that have a value
+    for (const key in queryParams) {
+      const val = queryParams[key];
+
+      if (val !== "" && val !== null && val !== undefined) {
+        safeParams[key] = val; // keep only real filters
+      }
+    }
+
+    const queryString = new URLSearchParams(safeParams).toString();
+
+    const res = await axios.get(
+      `/api/enquiries/get/enquiries/filtered?${queryString}`
+    );
+
+    return res.data || { data: [] };
+  } catch (err) {
+    console.log(err);
+    return { data: [], status: 500 };
+  }
+}
+
+//Get Enquiry by iD
+export async function GetEnquiryById(enquiry_id:string){
+    try{
+        const res = await axios.get(`/api/enquiries/get/enquiries/by-id?enquiry_id=${enquiry_id}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+//Add History
+export async function ForwardHistory(payload: any) {
+    try{
+        const res = await axios.post("/api/enquiries/post/forward-history", payload);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+//Get Enquiry Users
+export async function GetEqUsers (business_id: string, user_type: string) {
+    try{
+        const res = await axios.get(`/api/enquiries/users/get?business_id=${business_id}&user_type=${user_type}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+//Add Enquiry Users
+export async function AddEqUser(payload: any){
+    try{
+        const res = await axios.post("/api/enquiries/users/add", payload);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+//Get All Enquiry histories
+export async function GetEnquiryHistories(enquiry_id: string){
+    try{
+        const res = await axios.get(`/api/enquiries/get/enquiries/history/get-all?enquiry_id=${enquiry_id}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+//Get Enquiry History by ID
+export async function GetEnquiryHistoryById(history_id: string) {
+    try{
+        const res = await axios.get(`/api/enquiries/get/enquiries/history/by-id?history_id=${history_id}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+//Get Access Enquries for Staffs
+export async function GetAccessEnquiriesForStaffs(queryParams: any) {
+    try{
+        const queryString = new URLSearchParams(queryParams).toString();
+        const res = await axios.get(`/api/enquiries/staff-side/get/user-enquiries?${queryString}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+//Get Enquiry By ID for staff
+export async function GetEnquiryByIdForStaffs(enquiry_id: string){
+    try{
+        const res = await axios.get(`/api/enquiries/staff-side/get/enquiry-by-id?enquiry_id=${enquiry_id}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+//Get Enquiry all history for staff
+export async function GetAllEnquiryHistoryForStaffs(enquiry_id: string){
+    try{
+        const res = await axios.get(`/api/enquiries/staff-side/get/history/get-all?enquiry_id=${enquiry_id}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+//Get User Assigned Enquiries with Filters
+export async function GetUserAssignedEnquiries(queryParams: any){
+    try{
+        const queryString = new URLSearchParams(queryParams).toString();
+        const res = await axios.get(`/api/enquiries/staff-side/get/user-assigned-enquiry?${queryString}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+//Update / Activate Area
+export async function UpdateEqArea(payload: any) {
+    try{
+        const res = await axios.put("/api/enquiries/update/area", payload);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+//Update Camp
+export async function UpdateEqCamp(payload: any) {
+    try{
+        const res = await axios.put("/api/enquiries/update/camp", payload);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+//Activate Camp
+export async function ActivateEqCamp(payload:any){
+    try{
+        const res = await axios.put("/api/enquiries/update/activate-camp", payload);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+//Get Area by ID
+export async function GetEqAreaById(area_id: string){
+    try{
+        const res = await axios.get(`/api/enquiries/get/area/by-id?area_id=${area_id}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+//Get Agent by ID
+export async function GetEqAgentByID(agent_id:string){
+    try{
+        const res = await axios.get(`/api/enquiries/get/agents/by-id?agent_id=${agent_id}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+//Forward Enquiry By User / Staff
+export async function ForwardEnquiryByStaff(payload: any) {
+    try{
+        const res = await axios.post("/api/enquiries/staff-side/post/forward-enquiry", payload);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+//Get Latest Action for staff
+export async function GetEqLatestActionForStaff(enquiry_id: string){
+    try{
+        const res = await axios.get(`/api/enquiries/staff-side/get/latest-action?enquiry_id=${enquiry_id}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+//Get User profile
+export async function GetEqUserProfile(user_id: string){
+    try{
+        const res = await axios.get(`/api/enquiries/get/users/user-profile?user_id=${user_id}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+//Get User logs
+export async function GetEqUserLogs(user_id: string){
+    try{
+        const res = await axios.get(`/api/enquiries/get/users/logs?user_id=${user_id}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+//Get Camps by Enquiry
+export async function GetEqCampsByEnquiry(enquiry_id: string, is_new: boolean){
+    try{
+        const res = await axios.get(`/api/enquiries/get/camps/get-camp-by-enquiry?enquiry_id=${enquiry_id}&is_new=${is_new}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+//Assign camp to enquiry
+export async function AssignEqCamptoEnquiry(payload: any){
+    try{
+        const res = await axios.put("/api/enquiries/update/assign-camp-to-enquiry", payload);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+//Get EQ camps by ID
+export async function GetEqCampsById(camp_id: string){
+    try{
+        const res = await axios.get(`/api/enquiries/get/camps/by-id?camp_id=${camp_id}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+//Get Eq Area Profile
+export async function GetEqAreaProfile(area_id: string){
+    try{
+        const res = await axios.get(`/api/enquiries/get/area/profile-by-id?area_id=${area_id}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+//Activate / Deactivate Eq Agents
+export async function ActivateDeactivateEqAgents(agent_id: string){
+    try{
+        const res = await axios.put(`/api/enquiries/update/agents/activate-deactivate?user_id=${agent_id}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+//Update Eq Camp contact
+export async function UpdateEqCampContact(payload: any){
+    try{
+        const res = await axios.put("/api/enquiries/update/camp/update-contact", payload);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+//Get Enquiry Contacts
+export async function GetEnquiryContacts(enquiry_id: string){
+    try{
+        const res = await axios.get(`/api/enquiries/get/enquiries/contacts/get-all?enquiry_id=${enquiry_id}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+//Enquiry Edit Request
+export async function PutEnquiryEditReq(payload:any){
+    try{
+        const res = await axios.put("/api/enquiries/agent-side/update/enquiry", payload);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+//Get Enquiry Edit
+export async function GetEqEdit(enquiry_id: string){
+    try{
+        const res = await axios.get(`/api/enquiries/get/enquiries/edited?enquiry_id=${enquiry_id}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+//Accept Enquiry Edit
+export async function AcceptEnquiryEdits(payload: any){
+    try{
+        const res = await axios.put("/api/enquiries/update/enquiry/accept-edits", payload);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+//Add New Contacts
+export async function AddNewCampContact (payload: any) {
+    try{
+        const res = await axios.post("/api/enquiries/post/contact", payload);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+//Add New Contact (Agent Side)
+export async function AddNewContactAgent (payload: any) {
+    try{
+        const res = await axios.post("/api/enquiries/agent-side/post/contact", payload);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+//Convert Enquiry to Project
+export async function EnquiryToProject(payload: any){
+    try{
+        const res = await axios.post("/api/enquiries/post/enquiry/convert-to-project", payload);
+        return res.data;
+    } catch(err){
+        console.log(err);
+    }
+}
+
+//Close Enquiry
+export async function CloseEqnuiry(payload: any){
+    try{
+        const res = await axios.put("/api/enquiries/update/enquiry/close-enquiry", payload);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}

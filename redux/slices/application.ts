@@ -1,0 +1,85 @@
+import { createSlice, PayloadAction } from "@reduxjs/toolkit";
+
+interface ApplicationState {
+    businessAdded: any;
+    businessPlan: any;
+    businessAdmins: any[];
+    businessDocs: any[];
+    businessStaff: any;
+    regionData: any;
+    departmentData: any;
+    areaData: any;
+    locationData: any;
+    filteredStaffs: any[] | null;
+    staffFilterValues: any;
+};
+
+const initialState: ApplicationState = {
+    businessAdded: null,
+    businessPlan: null,
+    businessAdmins: [],
+    businessDocs: [],
+    businessStaff: null,
+    regionData: null,
+    departmentData: null,
+    areaData: null,
+    locationData: null,
+    filteredStaffs: null,
+    staffFilterValues: null,
+};
+
+const applicationSlice = createSlice({
+    name: "application",
+    initialState,
+    reducers: {
+        loadAdminBusiness: (state, action: PayloadAction<any>) => {
+            state.businessAdded = action.payload
+        },
+        loadAdminBusinessPlan: (state, action: PayloadAction<any>) => {
+            state.businessPlan = action.payload
+        },
+        loadAdminBusinessAdmins: (state, action: PayloadAction<any[]>) => {
+            state.businessAdmins = action.payload
+        },
+        loadAdminBusinessDocs: (state, action: PayloadAction<any[]>) => {
+            state.businessDocs = action.payload
+        },
+        loadAdminBusinessStaff: (state, action: PayloadAction<any>) => {
+            state.businessStaff = action.payload
+        },
+        loadRegionData: (state, action: PayloadAction<any>) => {
+            state.regionData = action.payload
+        },
+        loadDepartmentData: (state, action: PayloadAction<any>) => {
+            state.departmentData = action.payload
+        },
+        loadAreaData: (state, action: PayloadAction<any>) => {
+            state.areaData = action.payload
+        },
+        loadLocationData: (state, action: PayloadAction<any>) => {
+            state.locationData = action.payload
+        },
+        loadFilteredStaffs: (state, action: PayloadAction<any[]>) => {
+            state.filteredStaffs = action.payload
+        },
+        loadStaffFilterValues: (state, action: PayloadAction<any>) => {
+            state.staffFilterValues = action.payload
+        }
+    }
+});
+
+export const { 
+    loadAdminBusiness,
+    loadAdminBusinessPlan,
+    loadAdminBusinessAdmins,
+    loadAdminBusinessDocs,
+    loadAdminBusinessStaff,
+    loadRegionData,
+    loadDepartmentData,
+    loadAreaData,
+    loadLocationData,
+    loadFilteredStaffs,
+    loadStaffFilterValues
+} = applicationSlice.actions
+export default applicationSlice.reducer
+

@@ -1,0 +1,68 @@
+import mongoose, { Decimal128, ObjectId, Schema } from "mongoose";
+
+export interface IEq_enquiries extends Document{
+    _id: ObjectId,
+    country_id: ObjectId,
+    region_id: ObjectId,
+    province_id: ObjectId,
+    city_id: ObjectId,
+    area_id: ObjectId,
+    camp_id: ObjectId,
+    createdBy: ObjectId,
+    enquiry_uuid: String,
+    is_active: Boolean,
+    status: String,
+    priority: String,
+    alert_date: Date,
+    due_date: Date,
+    wifi_type: String,
+    expected_wifi_cost: Decimal128,
+    lease_expiry_due: Date,
+    competition_status: Boolean,
+    competition_notes: String,
+    next_action: String,
+    next_action_due: Date,
+    rent_terms: String,
+    wifi_available: Boolean,
+    latitude: String,
+    longitude: String,
+    is_edit_req: Boolean,
+    wifi_setup: String,
+    is_converted: Boolean,
+    createdAt: Date,
+    updatedAt: Date
+}
+
+const Eq_enquiriesSchema:Schema = new Schema({
+    country_id: {type: Schema.Types.ObjectId, ref:"eq_countries"},
+    region_id: {type: Schema.Types.ObjectId, ref: "eq_region"},
+    province_id: {type: Schema.Types.ObjectId, ref: "eq_province"},
+    city_id: {type: Schema.Types.ObjectId, ref: "eq_city"},
+    area_id: {type: Schema.Types.ObjectId, ref: "eq_area"},
+    camp_id: {type: Schema.Types.ObjectId, ref: "eq_camps"},
+    createdBy: {type: Schema.Types.ObjectId, ref: "users"},
+    enquiry_uuid: {type: String},
+    is_active: {type:Boolean, default: false},
+    status: {type: String},
+    priority: {type: String},
+    alert_date: {type: Date},
+    due_date: {type: Date},
+    wifi_type: {type: String},
+    expected_wifi_cost: {type: Schema.Types.Decimal128},
+    lease_expiry_due: {type:Date},
+    competition_status: {type:Boolean},
+    competition_notes: {type: String},
+    next_action: {type: String},
+    next_action_due: {type: Date},
+    rent_terms: {type: String},
+    wifi_available: {type:Boolean},
+    latitude: {type: String},
+    longitude: {type: String},
+    is_edit_req: {type: Boolean},
+    wifi_setup: {type: String},
+    is_converted: {type: Boolean, default: false}
+}, {timestamps: true});
+
+const Eq_enquiry = mongoose.models?.eq_enquiry || mongoose.model<IEq_enquiries>("eq_enquiry", Eq_enquiriesSchema);
+
+export default Eq_enquiry;
