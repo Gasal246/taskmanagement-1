@@ -1,4 +1,5 @@
 import connectDB from "@/lib/mongo";
+import Eq_agents_details from "@/models/eq_agents_details.model";
 import Roles from "@/models/roles.model";
 import User_roles from "@/models/user_roles.model";
 import Users from "@/models/users.model";
@@ -15,6 +16,9 @@ interface IBody {
     city: string,
     dob: string,
     gender: string,
+    contract_no: string,
+    country_id: string,
+    region_id: string,
     business_id: string
 };
 
@@ -42,6 +46,15 @@ export async function POST(req:NextRequest){
             business_id: body.business_id,
             status: 1
         });
+
+        const agentDetails = new Eq_agents_details({
+            country_id: body.country_id,
+            region_id: body.region_id,
+            contract_no: body.contract_no,
+            user_id: savedAgent?._id
+        });
+
+        await agentDetails.save();
 
         await newAgentRole.save();
 
