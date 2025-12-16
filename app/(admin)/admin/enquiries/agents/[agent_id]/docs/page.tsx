@@ -200,7 +200,8 @@ export default function AgentDocumentsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete document</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to remove "{docToDelete?.doc_name}"? This will delete it from the collection and
+              Are you sure you want to remove &quot;{docToDelete?.doc_name}&quot;? This will delete it from the
+              collection and
               Firebase storage.
             </AlertDialogDescription>
           </AlertDialogHeader>
