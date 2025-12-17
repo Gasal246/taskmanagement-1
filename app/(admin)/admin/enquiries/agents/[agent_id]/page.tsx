@@ -46,6 +46,9 @@ export default function AgentDetailsPage() {
             </h2>
             <p className="text-sm text-slate-400">{agent?.agent?.email}</p>
             <p className="text-sm text-slate-400">{agent?.agent?.phone}</p>
+            <p className="text-sm text-slate-400">Contract Number: {agent?.agentDetails?.contract_no}</p>
+            <p className="text-sm text-slate-400">Country: {agent?.agentDetails?.country_id?.country_name} | Region: {agent?.agentDetails?.region_id?.region_name}</p>
+
           </div>
 
           <motion.button
@@ -58,6 +61,11 @@ export default function AgentDetailsPage() {
             View Documents
           </motion.button>
         </div>
+      </div>
+
+      <div className="bg-gradient-to-tr space-y-2 mb-5 from-slate-950/50 to-slate-900/50 p-4 rounded-lg border border-slate-800">
+        <p className="text-md text-slate-100">On Going Enquiries: {agent?.onGoing}</p>
+        <p className="text-md text-slate-100">Closed Enquiries: {agent?.closed}</p>
       </div>
 
       {/* Enquiries */}
