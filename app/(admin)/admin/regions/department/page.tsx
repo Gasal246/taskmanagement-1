@@ -1,8 +1,8 @@
 "use client"
-import { RootState } from '@/redux/store'
+import { AppDispatch, RootState } from '@/redux/store'
 import { Building2, Check, ChevronLeft, CircleCheckBig, EllipsisVertical, Eye, InfoIcon, Plus, Trash2 } from 'lucide-react'
 import React, { useEffect, useState } from 'react'
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { motion } from 'framer-motion';
 import { Avatar, Popconfirm } from 'antd';
 import { Popover, PopoverContent, PopoverTrigger, } from "@/components/ui/popover";
@@ -12,17 +12,21 @@ import { useAddRegionDepartmentHead, useAddRegionDepartmentStaff, useGetRegionDe
 import { toast } from 'sonner';
 import LoaderSpin from '@/components/shared/LoaderSpin';
 import { useRouter } from 'next/navigation';
+import { loadAreaData, loadDepartmentData } from '@/redux/slices/application';
 
 const RegionDepartmentPage = () => {
     const router = useRouter();
+    const dispatch = useDispatch<AppDispatch>();
     const { departmentData, regionData } = useSelector((state: RootState) => state.application);
 
     const [openMessageDialog, setOpenMessageDialog] = useState<boolean>(false);
     const [messageTitle, setMessageTitle] = useState<string>("");
     const [messageContent, setMessageContent] = useState<string>("");
     const [heads, setHeads] = useState<any[]>([]);
-    const [subdeps, setSubdeps] = useState<any[]>([]);
     const [staffs, setStaffs] = useState<any[]>([]);
+    const [areas, setAreas] = useState<any[]>([]);
+    const [areaDepartments, setAreaDepartments] = useState<any[]>([]);
+    const [regionUsers, setRegionUsers] = useState<any[]>([]);
 
     const { mutateAsync: getRegionUsers } = useGetRegionUsers();
     const { mutateAsync: addDepartmentHead, isPending: addingDepartmentHead } = useAddRegionDepartmentHead();
@@ -30,7 +34,7 @@ const RegionDepartmentPage = () => {
     const { mutateAsync: fetchRegionDepartmentData, isPending: loadingRegionDepartmentData } = useGetRegionDepartmentCompleteData();
     const { mutateAsync: removeDepartmentStaff } = useRemoveRegionDepartmentStaff();
     const { mutateAsync: removeRegionDepartment } = useRemoveRegionDepartment();
-    const {mutateAsync: removeDeptHead} = useRemoveRegionDeptHead()
+    const {mutateAsync: removeDeptHead} = useRemoveRegionDeptHead();
 
     useEffect(() => {
         if(departmentData) {
@@ -44,13 +48,13 @@ const RegionDepartmentPage = () => {
         const res = await fetchRegionDepartmentData(departmentData?._id);
         console.log("Res: ", res);
         if(res?.status === 200) {
-            setSubdeps(res?.data?.sub_deps);
             setHeads(res?.data?.heads);
             setStaffs(res?.data?.staffs);
+            setAreas(res?.data?.areas || []);
+            setAreaDepartments(res?.data?.area_departments || []);
         }
     }
 
-    const [regionUsers, setRegionUsers] = useState<any[]>([]);
     const fetchRegionUsers = async () => {
         const res = await getRegionUsers([regionData?._id]);
         if(res?.status === 200) {
@@ -156,12 +160,26 @@ const RegionDepartmentPage = () => {
         }
     }
 
+    const handleViewSubDepartment = (department: any) => {
+        const areaId = department?.area_id?._id || department?.area_id;
+        const area = areas?.find((item: any) => item?._id === areaId) || department?.area;
+        if(area) {
+            dispatch(loadAreaData(area));
+        }
+        dispatch(loadDepartmentData(department));
+        router.push('/admin/regions/area/department');
+    }
+
     return (
         <div className='p-4 pb-20'>
             <Breadcrumb>
                 <BreadcrumbList>
                     <BreadcrumbItem>
                         <BreadcrumbLink onClick={() => router.back()} className='flex items-center gap-1 bg-gradient-to-br from-black/20 to-black rounded-lg px-2 p-1 pr-4 cursor-pointer group'><ChevronLeft size={16} className='group-hover:text-cyan-600' /> <span className='text-slate-300 group-hover:text-cyan-600 text-xs'>Back</span></BreadcrumbLink>
+                    </BreadcrumbItem>
+                    <BreadcrumbSeparator />
+                    <BreadcrumbItem>
+                        <BreadcrumbPage>{regionData?.region_name}</BreadcrumbPage>
                     </BreadcrumbItem>
                     <BreadcrumbSeparator />
                     <BreadcrumbItem>
@@ -191,7 +209,7 @@ const RegionDepartmentPage = () => {
                     <PopoverContent className='w-[100px] p-0 border border-slate-800 rounded-lg overflow-hidden'>
                         <div className='flex flex-col items-start gap-1 bg-black rounded-lg'>
                             <div className='w-full p-0.5 space-y-1'>
-                                <Popconfirm title={`Deleting Department ?`} description={`Deleting department will cause loss of data inside the department, and also will remove the department from the region.`} okText="Delete Anyway" cancelText="Cancel" onConfirm={() => { handleRemoveDepartmentHead('headId') }}>
+                                <Popconfirm title={`Deleting Department ?`} description={`Deleting department will cause loss of data inside the department, and also will remove the department from the region.`} okText="Delete Anyway" cancelText="Cancel" onConfirm={() => { handleRemoveDepartment(departmentData?._id) }}>
                                     <motion.div
                                         whileTap={{ scale: 0.98 }}
                                         whileHover={{ scale: 1.02 }}
@@ -282,6 +300,71 @@ const RegionDepartmentPage = () => {
             <div className="bg-slate-950/50 rounded-lg p-3 mb-2 min-h-[15vh]">
                 <div className='flex items-center justify-between'>
                     <div>
+                        <h1 className='text-sm font-medium text-slate-300 capitalize flex items-center gap-1'><InfoIcon size={14} /> Sub Departments</h1>
+                        <p className='text-xs pl-1 font-medium text-slate-400 lg:w-2/3 capitalize'>Area departments of {departmentData?.type} in {regionData?.region_name}. Each area can manage its own department with the same type.</p>
+                    </div>
+                </div>
+                {areaDepartments?.length === 0 && (
+                    <div className="flex items-center justify-center h-[15vh]">
+                        <h1 className="text-xs font-medium text-slate-300">No sub departments added.</h1>
+                    </div>
+                )}
+                <div className="flex flex-col gap-2 mt-2">
+                    {areas?.map((area: any) => {
+                        const areaDeps = areaDepartments?.filter((dep: any) => {
+                            const depAreaId = dep?.area_id?._id || dep?.area_id;
+                            return depAreaId === area?._id;
+                        });
+                        if(!areaDeps?.length) return null;
+                        return (
+                            <div key={area?._id} className="bg-gradient-to-tr from-slate-950/40 to-slate-900/40 rounded-lg p-2 border border-slate-800">
+                                <h2 className="text-xs font-semibold text-slate-300 mb-2">{area?.area_name}</h2>
+                                <div className="flex flex-wrap">
+                                    {areaDeps?.map((dep: any) => (
+                                        <div className="w-full lg:w-4/12 p-1" key={dep?._id}>
+                                            <div className="bg-gradient-to-tr from-slate-950/50 to-slate-950/70 rounded-lg p-2 border border-slate-800 hover:border-cyan-700 relative">
+                                                <div>
+                                                    <h1 className='text-sm font-semibold text-slate-300 capitalize flex items-center gap-1'>{dep?.dep_name}</h1>
+                                                    <p className='text-xs font-medium text-cyan-600 flex items-center gap-1'>{dep?.type}</p>
+                                                </div>
+                                                <Popover>
+                                                    <PopoverTrigger asChild>
+                                                        <motion.div
+                                                            whileTap={{ scale: 0.98 }}
+                                                            whileHover={{ scale: 1.02 }}
+                                                            className='absolute right-2 top-1 hover:bg-slate-700/50 p-1 rounded-full cursor-pointer'
+                                                        >
+                                                            <EllipsisVertical size={18} />
+                                                        </motion.div>
+                                                    </PopoverTrigger>
+                                                    <PopoverContent className='w-[100px] p-0 border border-slate-800 rounded-lg overflow-hidden'>
+                                                        <div className='flex flex-col items-start gap-1 bg-black rounded-lg'>
+                                                            <div className='w-full p-0.5 space-y-1'>
+                                                                <motion.div
+                                                                    whileTap={{ scale: 0.98 }}
+                                                                    whileHover={{ scale: 1.02 }}
+                                                                    onClick={() => handleViewSubDepartment(dep)}
+                                                                    className='bg-slate-800/50 w-full p-1 py-2 text-cyan-500 cursor-pointer hover:text-cyan-700 flex items-center justify-center gap-1 border border-dashed border-slate-700 rounded-lg'>
+                                                                    <Eye size={14} />
+                                                                    <h1 className='text-xs font-semibold'>View</h1>
+                                                                </motion.div>
+                                                            </div>
+                                                        </div>
+                                                    </PopoverContent>
+                                                </Popover>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+
+            <div className="bg-slate-950/50 rounded-lg p-3 mb-2 min-h-[15vh]">
+                <div className='flex items-center justify-between'>
+                    <div>
                         <h1 className='text-sm font-medium text-slate-300 capitalize flex items-center gap-1'><InfoIcon size={14} /> Department Staffs</h1>
                         <p className='text-xs pl-1 font-medium text-slate-400 lg:w-2/3 capitalize'>Staffs of {departmentData?.type} department in {regionData?.region_name}, can be assingned to complete the task within this {departmentData?.dep_name} department.</p>
                     </div>
@@ -331,7 +414,7 @@ const RegionDepartmentPage = () => {
                                                 <Eye size={14} />
                                                 <h1 className='text-xs font-semibold'>Profile</h1>
                                             </motion.div>
-                                            <Popconfirm title="Confirm to remove this region head ?" onConfirm={() => { handleRemoveDepartmentStaff('staffId') }}>
+                                            <Popconfirm title="Confirm to remove this region head ?" onConfirm={() => { handleRemoveDepartmentStaff(staff?._id) }}>
                                                 <motion.div
                                                     whileTap={{ scale: 0.98 }}
                                                     whileHover={{ scale: 1.02 }}
@@ -349,54 +432,6 @@ const RegionDepartmentPage = () => {
                 </div>
             </div>
 
-
-            <div className="bg-slate-950/50 rounded-lg p-3 mb-2 min-h-[15vh]">
-                <div className='flex items-center justify-between'>
-                    <div>
-                        <h1 className='text-sm font-medium text-slate-300 capitalize flex items-center gap-1'><InfoIcon size={14} /> Sub Departments</h1>
-                        <p className='text-xs pl-1 font-medium text-slate-400 lg:w-2/3 capitalize'>Sub departments of {departmentData?.type} department in {regionData?.region_name} are the {departmentData?.type} departments functioning under this department in multiple areas.</p>
-                    </div>
-                    <motion.div onClick={() => handleShowMessageDialog('Adding Sub Deparments', `Sub Departments for ${departmentData?.type} department "${departmentData?.dep_name}" in region "${regionData?.region_name}" can be only done by adding ${departmentData?.type} departments in areas of region "${regionData?.region_name}".`)} whileTap={{ scale: 0.96 }} className='flex items-center gap-1 cursor-pointer bg-gradient-to-tr from-slate-950/50 to-slate-950/70 rounded-lg p-2 hover:bg-slate-950/70 border border-slate-700 hover:border-cyan-600 group'>
-                        <Plus size={14} className='group-hover:text-cyan-600' />
-                        <h1 className='text-xs font-medium text-slate-400 group-hover:text-cyan-600 capitalize flex items-center gap-1'>Add Sub Department</h1>
-                    </motion.div>
-                </div>
-                <div className="flex flex-wrap mt-1">
-                    {subdeps?.map((subDepartment: any) => <div className="w-full lg:w-3/12 p-1" key={subDepartment?._id}>
-                        <div className="bg-gradient-to-tr from-slate-950/50 to-slate-950/70 rounded-lg p-2 flex items-center gap-1 border border-slate-800 hover:border-cyan-700 relative">
-                            <div>
-                                <h1 className='text-sm font-bold text-slate-300'>{subDepartment?.dep_name}</h1>
-                                <p className='text-xs font-semibold text-slate-400'>{subDepartment?.type}</p>
-                            </div>
-                            <Popover>
-                                <PopoverTrigger asChild>
-                                    <motion.div
-                                        whileTap={{ scale: 0.98 }}
-                                        whileHover={{ scale: 1.02 }}
-                                        className='absolute right-2 top-1 hover:bg-slate-700/50 p-1 rounded-full cursor-pointer'
-                                    >
-                                        <EllipsisVertical size={18} />
-                                    </motion.div>
-                                </PopoverTrigger>
-                                <PopoverContent className='w-[100px] p-0 border border-slate-800 rounded-lg overflow-hidden'>
-                                    <div className='flex flex-col items-start gap-1 bg-black rounded-lg'>
-                                        <div className='w-full p-0.5 space-y-1'>
-                                            <motion.div
-                                                whileTap={{ scale: 0.98 }}
-                                                whileHover={{ scale: 1.02 }}
-                                                onClick={() => { }}
-                                                className='bg-slate-800/50 w-full p-1 py-2 text-cyan-500 cursor-pointer hover:text-cyan-700 flex items-center justify-center gap-1 border border-dashed border-slate-700 rounded-lg'>
-                                                <Eye size={14} />
-                                                <h1 className='text-xs font-semibold'>Manage</h1>
-                                            </motion.div>
-                                        </div>
-                                    </div>
-                                </PopoverContent>
-                            </Popover>
-                        </div>
-                    </div>)}
-                </div>
-            </div>
 
 
             {departmentData?.type === "sales" && <div className="bg-slate-950/50 rounded-lg p-3 mb-2 min-h-[15vh]">

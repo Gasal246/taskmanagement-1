@@ -23,6 +23,8 @@ import {
     addLocationDepartmentFunc,
     addLoctionHeadFunc,
     addLoctionStaffFunc,
+    addLocationDepartmentHeadFunc,
+    addLocationDepartmentStaffFunc,
     addNewBusinessFunc,
     AddNewProjectByStaff,
     addNewTeamFunc,
@@ -65,6 +67,7 @@ import {
     GetDepartmentsForStaffs,
     GetFlowsByProjectFunc,
     getLocationCompleteDataFunc,
+    getLocationDepartmentCompleteDataFunc,
     GetLocationsandDeptsUnderArea,
     getLocationUsersFunc,
     GetProjectByIdForStaffs,
@@ -105,6 +108,8 @@ import {
     removeDepartmentStaffFunc,
     removeLocationDepartmentFunc,
     removeLocationHeadFunc,
+    removeLocationDepartmentHeadFunc,
+    removeLocationDepartmentStaffFunc,
     removeLocationStaffFunc,
     removeRegionAreaFunc,
     removeRegionDepartmentFunc,
@@ -642,6 +647,38 @@ export const useAddAreaDepartmentStaff = () => {
 export const useRemoveAreaDepartmentStaff = () => {
     return useMutation({
         mutationFn: (AreaDepStaffId: string) => removeAreaDepartmentStaffFunc(AreaDepStaffId)
+    })
+}
+
+// Location Departments
+
+export const useGetLocationDepartmentCompleteData = () => {
+    return useMutation({
+        mutationFn: (location_dep_id: string) => getLocationDepartmentCompleteDataFunc(location_dep_id)
+    })
+}
+
+export const useAddLocationDepartmentHead = () => {
+    return useMutation({
+        mutationFn: (payload: any) => addLocationDepartmentHeadFunc(payload)
+    })
+}
+
+export const useRemoveLocationDepartmentHead = () => {
+    return useMutation({
+        mutationFn: (LocationDepHeadId: string) => removeLocationDepartmentHeadFunc(LocationDepHeadId)
+    })
+}
+
+export const useAddLocationDepartmentStaff = () => {
+    return useMutation({
+        mutationFn: (payload: any) => addLocationDepartmentStaffFunc(payload)
+    })
+}
+
+export const useRemoveLocationDepartmentStaff = () => {
+    return useMutation({
+        mutationFn: (LocationDepStaffId: string) => removeLocationDepartmentStaffFunc(LocationDepStaffId)
     })
 }
 

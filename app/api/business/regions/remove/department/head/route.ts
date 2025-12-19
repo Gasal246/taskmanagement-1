@@ -6,38 +6,35 @@ import { NextRequest, NextResponse } from "next/server";
 
 connectDB();
 
-export async function DELETE(req: NextRequest) {
+export async function DELETE ( req: NextRequest ) {
     try {
-        const { searchParams } = new URL(req.url);
-        const dep_head_id = searchParams.get("head_id");
+        const { searchParams } = req.nextUrl;
+        const head_id = searchParams.get("head_id");
+        if(!head_id) {
+            return NextResponse.json({ error: "Head ID is required" }, { status: 400 });
+        }
 
-        if (!dep_head_id) return NextResponse.json({ message: "Please Provide head id", status: 400 }, { status: 400 });
+        const regDepHead = await Region_dep_heads.findById(head_id);
+        if(!regDepHead){
+            return NextResponse.json({ error: "Region Department Head Not Found" }, { status: 404 });
+        }
 
-        const deleted = await Region_dep_heads.findByIdAndUpdate(dep_head_id, { status: 0 }, { new: true });
-
-        const isAnyOtherHead = await Region_dep_heads.find({ user_id: deleted?.user_id, status: 1 });
-
-        if (isAnyOtherHead.length === 0) {
-            const role = await Roles.findOne({ role_name: "REGION_DEP_HEAD" });
-            
-            if (role) {
-                
-                const userRole = await User_roles.findOne({
-                    user_id: deleted?.user_id,
-                    role_id: role._id,
-                });
-
-                if (userRole) {
-                    
-                    userRole.status = 0;
-                    await userRole.save();
-                }
+        const head_departments = await Region_dep_heads.find({ user_id: regDepHead?.user_id });
+        if(head_departments?.length === 0) {
+            const user_roles = await User_roles.find({ user_id: regDepHead?.user_id }).populate("role_id");
+            const roles = user_roles?.map((role: any) => role?.role_id?.role_name);
+            if(roles?.includes("REGION_DEP_HEAD")) {
+                const role = await Roles.findOne({ role_name: "REGION_DEP_HEAD" });
+                await User_roles.deleteOne({ user_id: regDepHead?.user_id, role_id: role?._id });
             }
         }
 
-        return NextResponse.json({ message: "Head Removed", status: 200 }, { status: 200 });
-    } catch (err) {
-        console.log("Error while removing departmentHead: ", err);
-        return NextResponse.json({ message: "Internal Server Error", status: 500 }, { status: 500 });
+        await Region_dep_heads.findByIdAndUpdate(head_id, { status: 0 });
+        return NextResponse.json({ message: "Region Department Head removed successfully", status: 200 }, { status: 200 });
+    } catch (error: any) {
+        console.log(error?.message);
+        return NextResponse.json(`Internal Server Error: ${error?.message}`, { status: 500 });
     }
 }
+
+export const dynamic = "force-dynamic";

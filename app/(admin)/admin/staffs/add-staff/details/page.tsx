@@ -930,7 +930,7 @@ const AddBusinessStaffDetails = () => {
 
       {/* Add Region Dialog */}
       <Dialog open={addRegionDialog} onOpenChange={setAddRegionDialog}>
-        <DialogContent className="lg:w-[450px]">
+        <DialogContent className="lg:w-[450px] max-h-[calc(100vh-200px)] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add Region</DialogTitle>
             <DialogDescription>Add a new region for this business staff.</DialogDescription>
@@ -966,7 +966,7 @@ const AddBusinessStaffDetails = () => {
 
       {/* Add Area Dialog */}
       <Dialog open={addAreaDialog} onOpenChange={setAddAreaDialog}>
-        <DialogContent className="lg:w-[450px]">
+        <DialogContent className="lg:w-[450px] max-h-[calc(100vh-200px)] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add Area</DialogTitle>
             <DialogDescription>Areas shown are listed based on assigned regions.</DialogDescription>
@@ -1002,7 +1002,7 @@ const AddBusinessStaffDetails = () => {
 
       {/* Add Location Dialog */}
       <Dialog open={addLocationDialog} onOpenChange={setAddLocationDialog}>
-        <DialogContent className="lg:w-[450px]">
+        <DialogContent className="lg:w-[450px] max-h-[calc(100vh-200px)] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add Location</DialogTitle>
             <DialogDescription>Locations shown are listed based on assigned areas.</DialogDescription>
@@ -1038,12 +1038,12 @@ const AddBusinessStaffDetails = () => {
 
       {/* Add Skill Dialog */}
       <Dialog open={addSkillDialog} onOpenChange={setAddSkillDialog}>
-        <DialogContent className="lg:w-[450px]">
+        <DialogContent className="lg:w-[450px] max-h-[calc(100vh-200px)] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add Skill</DialogTitle>
             <DialogDescription>Select any of the business skill to add.</DialogDescription>
           </DialogHeader>
-          <div className="">
+          <div className="pb-14">
             {businessSkills?.length === 0 && (
               <div className="flex items-center justify-center h-[10vh]">
                 <h1 className="text-xs font-medium text-slate-300">No skills added.</h1>
@@ -1060,11 +1060,13 @@ const AddBusinessStaffDetails = () => {
               {currentSelectedSkill === skill?._id && <div className="absolute right-2 top-1.5"><Check className="text-cyan-600" strokeWidth={3} size={17} /> </div>}
             </motion.div>
             ))}
+          </div>
+          <div className="sticky bottom-0 left-0 right-0 bg-slate-900/80 backdrop-blur-sm border-t border-slate-800 p-2">
             <motion.div
               whileTap={{ scale: 0.98 }} 
               whileHover={{ scale: 1.02 }}
               onClick={handleAddSkill}
-              className="bg-gradient-to-tr from-slate-700/50 to-slate-800/50 p-3 hover:border-cyan-500 border border-slate-700 select-none cursor-pointer rounded-lg mt-3 flex items-center gap-1 justify-center">
+              className="bg-gradient-to-tr from-slate-700/50 to-slate-800/50 p-3 hover:border-cyan-500 border border-slate-700 select-none cursor-pointer rounded-lg flex items-center gap-1 justify-center">
               <Plus size={16} />
               <h1 className="font-semibold text-sm text-slate-300 flex items-center gap-1">Add New Skill</h1>
             </motion.div>
@@ -1073,7 +1075,7 @@ const AddBusinessStaffDetails = () => {
       </Dialog>
 
       <Dialog open={deleteDocDialogOpen} onOpenChange={setDeleteDocDialogOpen}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="max-w-sm max-h-[calc(100vh-200px)] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Remove document?</DialogTitle>
             <DialogDescription>This will delete the file from storage and records.</DialogDescription>

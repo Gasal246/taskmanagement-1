@@ -53,19 +53,28 @@ export async function GET (req: NextRequest) {
             {
                 $lookup: {
                     from: "area_departments",
-                    let: { areaId: "$areas._id", depType: "$type" },
+                    let: { areaIds: "$areas._id", depType: "$type" },
                     pipeline: [
                         {
                             $match: {
                                 $expr: {
                                     $and: [
-                                        { $eq: ["$area_id", "$$areaId"] },
+                                        { $in: ["$area_id", "$$areaIds"] },
                                         { $eq: ["$status", 1] },
                                         { $eq: ["$type", "$$depType"] }
                                     ]
                                 }
                             }
-                        }
+                        },
+                        {
+                            $lookup: {
+                                from: "business_areas",
+                                localField: "area_id",
+                                foreignField: "_id",
+                                as: "area"
+                            }
+                        },
+                        { $unwind: { path: "$area", preserveNullAndEmptyArrays: true } }
                     ],
                     as: "area_departments"
                 }

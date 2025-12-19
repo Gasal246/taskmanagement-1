@@ -8,7 +8,8 @@ import { Check, CircleCheckBig, Earth, EllipsisVertical, Eye, InfoIcon, Plus, Tr
 import { motion } from 'framer-motion';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from '@/components/ui/input';
-import { useAddRegionArea, useAddRegionDepartment, useAddRegionHead, useAddRegionStaff, useGetRegionComplete, useGetRegionUsers, useRemoveRegionArea, useRemoveRegionDepartment, useRemoveRegionHead, useRemoveRegionStaff } from '@/query/business/queries';
+import { useAddRegionArea, useAddRegionDepartment, useAddRegionHead, useAddRegionStaff, useGetRegionComplete, useRemoveRegionArea, useRemoveRegionDepartment, useRemoveRegionHead, useRemoveRegionStaff } from '@/query/business/queries';
+import { useGetBusinessStaffs } from '@/query/user/queries';
 import { toast } from 'sonner';
 import { Avatar, Popconfirm } from 'antd';
 import { Popover, PopoverContent, PopoverTrigger, } from "@/components/ui/popover";
@@ -40,7 +41,6 @@ const RegionPage = () => {
     useEffect(() => {
         if(regionData) {
             fetchRegionData();
-            handleGetRegionUsers();
         } else {
             router.push('/admin');
         }
@@ -164,8 +164,7 @@ const RegionPage = () => {
 
 
     const [openAddStaffDialog, setOpenAddStaffDialog] = useState<boolean>(false);
-    const [regionUsers, setRegionUsers] = useState<any[]>([]);
-    const { mutateAsync: fetchRegionUsers } = useGetRegionUsers();
+    const { data: businessStaffs, isLoading: loadingBusinessStaffs } = useGetBusinessStaffs(regionData?.business_id);
     const { mutateAsync: addStaff, isPending: addingStaff } = useAddRegionStaff();
 
     const handleAddRegionStaff = async () => {
@@ -190,14 +189,6 @@ const RegionPage = () => {
             fetchRegionData();
         }
     };
-
-    const handleGetRegionUsers = async () => {
-        if(!regionData?._id) return;
-        const res = await fetchRegionUsers([regionData?._id]);
-        if(res?.status === 200) {
-            setRegionUsers(res?.data);
-        }
-    }
 
     const { mutateAsync: removeStaff } = useRemoveRegionStaff();
 
@@ -530,24 +521,24 @@ const RegionPage = () => {
                         <DialogDescription>Adding region head under region - {regionData?.region_name}.</DialogDescription>
                     </DialogHeader>
                     <div className="">
-                        {regionUsers?.length === 0 && <div className='w-full h-[10vh] flex items-center justify-center'>
-                            <h1 className="text-xs font-medium text-slate-400">No region staffs found</h1>
+                        {!loadingBusinessStaffs && businessStaffs?.length === 0 && <div className='w-full h-[10vh] flex items-center justify-center'>
+                            <h1 className="text-xs font-medium text-slate-400">No business staffs found</h1>
                         </div>}
-                        {regionUsers?.map(( user: any ) => <motion.div
+                        {businessStaffs?.map(( staff: any ) => <motion.div
                             whileHover={{ scale: 1.02 }}
                             whileTap={{ scale: 0.98 }}
-                            key={user?._id}
+                            key={staff?._id}
                             className="p-2 bg-gradient-to-br group from-slate-900/60 to-slate-800/60 rounded-lg cursor-pointer text-sm font-medium flex items-center gap-1 px-4 border border-slate-700 hover:border-cyan-600 justify-start mt-2 relative"
-                            onClick={() => setSelectedUser(user?.user_id?._id)}
+                            onClick={() => setSelectedUser(staff?.user_id?._id)}
                         >
                             <div className="flex items-center gap-1">
-                                <Avatar src={user?.user_id?.avatar_url || '/avatar.png'} size={30} />
+                                <Avatar src={staff?.user_id?.avatar_url || '/avatar.png'} size={30} />
                                 <div className="">
-                                    <h1 className="text-xs font-medium">{user?.user_id?.name}</h1>
-                                    <p className="text-xs text-slate-400">{user?.user_id?.email}</p>
+                                    <h1 className="text-xs font-medium">{staff?.user_id?.name}</h1>
+                                    <p className="text-xs text-slate-400">{staff?.user_id?.email}</p>
                                 </div>
                             </div>
-                            {user?.user_id?._id === selectedUser && <div className="absolute top-1 right-2">
+                            {staff?.user_id?._id === selectedUser && <div className="absolute top-1 right-2">
                                 <Check className="text-cyan-600" strokeWidth={3} size={18} />
                             </div>}
                         </motion.div>)}
@@ -569,24 +560,24 @@ const RegionPage = () => {
                         <DialogDescription>Adding region staff under region - {regionData?.region_name}.</DialogDescription>
                     </DialogHeader>
                     <div className="">
-                        {regionUsers?.length === 0 && <div className='w-full h-[10vh] flex items-center justify-center'>
-                            <h1 className="text-xs font-medium text-slate-400">No region staffs found</h1>
+                        {!loadingBusinessStaffs && businessStaffs?.length === 0 && <div className='w-full h-[10vh] flex items-center justify-center'>
+                            <h1 className="text-xs font-medium text-slate-400">No business staffs found</h1>
                         </div>}
-                        {regionUsers?.map(( user: any ) => <motion.div
+                        {businessStaffs?.map(( staff: any ) => <motion.div
                             whileHover={{ scale: 1.02 }}
                             whileTap={{ scale: 0.98 }}
-                            key={user?._id}
+                            key={staff?._id}
                             className="p-2 bg-gradient-to-br group from-slate-900/60 to-slate-800/60 rounded-lg cursor-pointer text-sm font-medium flex items-center gap-1 px-4 border border-slate-700 hover:border-cyan-600 justify-start mt-2 relative"
-                            onClick={() => setSelectedUser(user?.user_id?._id)}
+                            onClick={() => setSelectedUser(staff?.user_id?._id)}
                         >
                             <div className="flex items-center gap-1">
-                                <Avatar src={user?.user_id?.avatar_url || '/avatar.png'} size={30} />
+                                <Avatar src={staff?.user_id?.avatar_url || '/avatar.png'} size={30} />
                                 <div className="">
-                                    <h1 className="text-xs font-medium">{user?.user_id?.name}</h1>
-                                    <p className="text-xs text-slate-400">{user?.user_id?.email}</p>
+                                    <h1 className="text-xs font-medium">{staff?.user_id?.name}</h1>
+                                    <p className="text-xs text-slate-400">{staff?.user_id?.email}</p>
                                 </div>
                             </div>
-                            {user?.user_id?._id === selectedUser && <div className="absolute top-1 right-2">
+                            {staff?.user_id?._id === selectedUser && <div className="absolute top-1 right-2">
                                 <Check className="text-cyan-600" strokeWidth={3} size={18} />
                             </div>}
                         </motion.div>)}
@@ -635,5 +626,4 @@ const RegionPage = () => {
 }
 
 export default RegionPage
-
 

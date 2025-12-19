@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation';
 import { useDispatch, useSelector } from 'react-redux';
-import { RootState } from '@/redux/store';
+import { AppDispatch, RootState } from '@/redux/store';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator, } from "@/components/ui/breadcrumb";
 import { Building, Check, ChevronLeft, CircleCheckBig, InfoIcon, Plus } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -13,21 +13,23 @@ import { EllipsisVertical } from 'lucide-react';
 import { Eye } from 'lucide-react';
 import { Trash2 } from 'lucide-react';
 import LoaderSpin from '@/components/shared/LoaderSpin';
-import { useAddLocationDepartment, useAddLocationStaff, useAddLoctionHead, useGetLocationCompleteData, useGetLocationUsers, useRemoveLocationHead, useRemoveLocationStaff } from '@/query/business/queries';
+import { useAddLocationDepartment, useAddLocationStaff, useAddLoctionHead, useGetLocationCompleteData, useRemoveLocationHead, useRemoveLocationStaff } from '@/query/business/queries';
+import { useGetBusinessStaffs } from '@/query/user/queries';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectTrigger, SelectValue, SelectItem } from '@/components/ui/select';
 import { DEPARTMENT_TYPES } from '@/lib/constants';
+import { loadDepartmentData } from '@/redux/slices/application';
 
 const LocationPage = () => {
   const router = useRouter();
-  const dispatch = useDispatch();
+  const dispatch = useDispatch<AppDispatch>();
   const { locationData, areaData, regionData } = useSelector((state: RootState) => state.application);
+  const { businessData } = useSelector((state: RootState) => state.user);
 
   const { mutateAsync: getLocationCompleteData, isPending: loadingLocationCompleteData } = useGetLocationCompleteData();
   const { mutateAsync: addLocationDepartment, isPending: addingDepartment } = useAddLocationDepartment();
-  const { mutateAsync: getLocationUsers } = useGetLocationUsers();
   const { mutateAsync: addLocationHead, isPending: addingHead } = useAddLoctionHead();
   const { mutateAsync: removeLocationHead } = useRemoveLocationHead();
   const { mutateAsync: addLocationStaff, isPending: addingStaff } = useAddLocationStaff();
@@ -36,12 +38,11 @@ const LocationPage = () => {
   const [heads, setHeads] = useState<any>([]);
   const [staffs, setStaffs] = useState<any>([]);
   const [departments, setDepartments] = useState<any>([]);
-  const [locationUsers, setLocationUsers] = useState<any[]>([]);
+  const { data: businessStaffs, isLoading: loadingBusinessStaffs } = useGetBusinessStaffs(businessData?._id);
 
   useEffect(() => {
     if (locationData?._id) {
       handleFetchCompleteData();
-      handleFetchLocationUsers();
     } else {
       router.replace('/admin')
     }
@@ -58,13 +59,11 @@ const LocationPage = () => {
     console.log("Location Data", res);
   };
 
-  const handleFetchLocationUsers = async () => {
-    const res = await getLocationUsers(locationData?._id);
-    if (res?.status === 200) {
-      setLocationUsers(res?.data);
-    }
-    // console.log("Users", res);
-  };
+  const handleManageDepartment = (dep: any) => {
+    if(!dep) return;
+    dispatch(loadDepartmentData(dep));
+    router.push('/admin/regions/area/department');
+  }
 
   const [addHeadDialog, setAddHeadDilog] = useState<boolean>(false);
   const [selectedUser, setSelectedUser] = useState<string>("");
@@ -321,7 +320,7 @@ const LocationPage = () => {
                         <motion.div
                           whileTap={{ scale: 0.98 }}
                           whileHover={{ scale: 1.02 }}
-                          onClick={() => { }}
+                          onClick={() => handleManageDepartment(dep)}
                           className='bg-slate-800/50 w-full p-1 py-2 text-cyan-500 cursor-pointer hover:text-cyan-700 flex items-center justify-center gap-1 border border-dashed border-slate-700 rounded-lg'>
                           <Eye size={14} />
                           <h1 className='text-xs font-semibold'>Preview</h1>
@@ -416,24 +415,24 @@ const LocationPage = () => {
             <DialogDescription>Adding {isAddingUser ? 'Staff' : 'Head'} For {areaData?.area_name} of {regionData?.region_name}.</DialogDescription>
           </DialogHeader>
           <div className="">
-            {locationUsers?.length === 0 && <div className='w-full h-[10vh] flex items-center justify-center'>
-              <h1 className="text-xs font-medium text-slate-400">No region staffs found</h1>
+            {!loadingBusinessStaffs && businessStaffs?.length === 0 && <div className='w-full h-[10vh] flex items-center justify-center'>
+              <h1 className="text-xs font-medium text-slate-400">No business staffs found</h1>
             </div>}
-            {locationUsers?.map((user: any) => <motion.div
+            {businessStaffs?.map((staff: any) => <motion.div
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              key={user?._id}
+              key={staff?._id}
               className="p-2 bg-gradient-to-br group from-slate-900/60 to-slate-800/60 rounded-lg cursor-pointer text-sm font-medium flex items-center gap-1 px-4 border border-slate-700 hover:border-cyan-600 justify-start mt-2 relative"
-              onClick={() => setSelectedUser(user?.user_id?._id)}
+              onClick={() => setSelectedUser(staff?.user_id?._id)}
             >
               <div className="flex items-center gap-1">
-                <Avatar src={user?.user_id?.avatar_url || '/avatar.png'} size={30} />
+                <Avatar src={staff?.user_id?.avatar_url || '/avatar.png'} size={30} />
                 <div className="">
-                  <h1 className="text-xs font-medium">{user?.user_id?.name}</h1>
-                  <p className="text-xs text-slate-400">{user?.user_id?.email}</p>
+                  <h1 className="text-xs font-medium">{staff?.user_id?.name}</h1>
+                  <p className="text-xs text-slate-400">{staff?.user_id?.email}</p>
                 </div>
               </div>
-              {user?.user_id?._id === selectedUser && <div className="absolute top-1 right-2">
+              {staff?.user_id?._id === selectedUser && <div className="absolute top-1 right-2">
                 <Check className="text-cyan-600" strokeWidth={3} size={18} />
               </div>}
             </motion.div>)}

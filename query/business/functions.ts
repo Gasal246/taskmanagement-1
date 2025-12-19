@@ -720,6 +720,53 @@ export async function removeAreaDepartmentStaffFunc ( AreaDepStaffId: string ) {
     }
 }
 
+// Location Departments
+
+export async function getLocationDepartmentCompleteDataFunc (location_dep_id: string) {
+    try {
+        const res = await axios.get(`/api/business/location-dep/get-complete?location_dep_id=${location_dep_id}`);
+        return res.data;
+    } catch (error) {
+        console.log(error);
+    }
+}
+
+export async function addLocationDepartmentHeadFunc ( payload: any ) {
+    try {
+        const res = await axios.post(`/api/business/location-dep/add/head`, payload);
+        return res.data;
+    } catch (error) {
+        console.log(error);
+    }
+}
+
+export async function removeLocationDepartmentHeadFunc ( LocationDepHeadId: string ) {
+    try {
+        const res = await axios.post(`/api/business/location-dep/remove/head`, { LocationDepHeadId });
+        return res.data;
+    } catch (error) {
+        console.log(error);
+    }
+}
+
+export async function addLocationDepartmentStaffFunc ( payload: any ) {
+    try {
+        const res = await axios.post(`/api/business/location-dep/add/staff`, payload);
+        return res.data;
+    } catch (error) {
+        console.log(error);
+    }
+}
+
+export async function removeLocationDepartmentStaffFunc ( LocationDepStaffId: string ) {
+    try {
+        const res = await axios.post(`/api/business/location-dep/remove/staff`, { LocationDepStaffId });
+        return res.data;
+    } catch (error) {
+        console.log(error);
+    }
+}
+
 export async function postNewProjectFunc ( payload: any ) {
     try {
         const res = await axios.post('/api/project/add-project', payload);
