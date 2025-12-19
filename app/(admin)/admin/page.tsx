@@ -1,11 +1,10 @@
 "use client"
 import TimeNow from '@/components/shared/TimeNow';
-import { formatDateShortly, formatNumber } from '@/lib/utils';
-import { Avatar, Tooltip } from 'antd';
-import { ArrowRight, BellElectric, Contact, Globe2, LandPlot } from 'lucide-react';
+import { formatDateShortly } from '@/lib/utils';
+import { Building2, CalendarCheck, CalendarPlus, EarthIcon, FilePlus, HandPlatter, ListTodo, PanelsTopLeft, ShieldQuestion, SquareLibrary, UserPlus, UserRound, Users } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import React, { useEffect, useRef } from 'react';
-import { motion, useInView } from 'framer-motion';
+import React, { useEffect } from 'react';
+import { motion } from 'framer-motion';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '@/redux/store';
 import { getBusinessByIdFunc } from '@/query/business/functions';
@@ -13,9 +12,106 @@ import Cookies from 'js-cookie';
 import { toast } from 'sonner';
 import { loadBusinessData } from '@/redux/slices/userdata';
 
+const quickActions = [
+  {
+    label: 'Add Staff',
+    description: 'Invite and onboard new team members.',
+    href: '/admin/staffs/add-staff',
+    icon: UserPlus,
+  },
+  {
+    label: 'New Project',
+    description: 'Start a project and define its scope.',
+    href: '/admin/projects/add',
+    icon: PanelsTopLeft,
+  },
+  {
+    label: 'New Task',
+    description: 'Create tasks and assign owners.',
+    href: '/admin/tasks/addtask',
+    icon: CalendarPlus,
+  },
+  {
+    label: 'Add Enquiry',
+    description: 'Log and route new enquiries.',
+    href: '/admin/enquiries/add-enquiry',
+    icon: FilePlus,
+  },
+];
+
+const adminModules = [
+  {
+    label: 'Staffs',
+    description: 'Manage staff profiles, roles, and access.',
+    href: '/admin/staffs',
+    icon: Users,
+    links: [{ label: 'Add Staff', href: '/admin/staffs/add-staff' }],
+  },
+  {
+    label: 'Clients',
+    description: 'Track clients, contacts, and coverage.',
+    href: '/admin/clients',
+    icon: Building2,
+  },
+  {
+    label: 'Departments',
+    description: 'Set up departments and capacity.',
+    href: '/admin/departments',
+    icon: SquareLibrary,
+  },
+  {
+    label: 'Regions',
+    description: 'Manage regions and operational coverage.',
+    href: '/admin/regions',
+    icon: EarthIcon,
+  },
+  {
+    label: 'Skills',
+    description: 'Maintain the skill catalog.',
+    href: '/admin/skills',
+    icon: HandPlatter,
+  },
+  {
+    label: 'Projects',
+    description: 'Plan and approve project work.',
+    href: '/admin/projects',
+    icon: PanelsTopLeft,
+    links: [{ label: 'Add Project', href: '/admin/projects/add' }],
+  },
+  {
+    label: 'Tasks',
+    description: 'Assign tasks and track progress.',
+    href: '/admin/tasks',
+    icon: CalendarCheck,
+    links: [{ label: 'Add Task', href: '/admin/tasks/addtask' }],
+  },
+  {
+    label: 'Enquiries',
+    description: 'Handle enquiries, agents, and camps.',
+    href: '/admin/enquiries',
+    icon: ShieldQuestion,
+    links: [
+      { label: 'Agents', href: '/admin/enquiries/agents' },
+      { label: 'Camps', href: '/admin/enquiries/camps' },
+      { label: 'Areas', href: '/admin/enquiries/areas' },
+      { label: 'Users', href: '/admin/enquiries/users' },
+    ],
+  },
+  {
+    label: 'Todo',
+    description: 'Personal task list and follow-ups.',
+    href: '/admin/todo',
+    icon: ListTodo,
+  },
+  {
+    label: 'Profile',
+    description: 'Admin profile and credentials.',
+    href: '/admin/profile',
+    icon: UserRound,
+  },
+];
+
 const AdminDashboard = () => {
-  const motionref = useRef(null);
-  const isMotionInView = useInView(motionref, { amount: 0.2 })
   const router = useRouter();
   const dispatch = useDispatch<AppDispatch>();
   const { businessData } = useSelector((state: RootState) => state.user);
@@ -28,113 +124,150 @@ const AdminDashboard = () => {
   }, [businessData]);
 
   const fetchBusinessData = async () => {
-    const bid = JSON.parse(Cookies.get("user_domain") || "")?.value;
+    const cookieValue = Cookies.get("user_domain");
+    const bid = cookieValue ? JSON.parse(cookieValue)?.value : null;
     if (!bid) {
       return toast("Domain Not Found")
     }
     const res = await getBusinessByIdFunc(bid)
-    console.log("businessData", res);
-    
     if (res?.data) {
       dispatch(loadBusinessData(res?.data?.info))
     }
   }
 
-  return (
-    <>
-      <div className='p-4 overflow-y-scroll pb-40 relative'>
-        <div className='absolute top-0 left-0 w-full h-[80vh] flex flex-col justify-center items-center'>
-          <h1 className='text-2xl font-bold text-center text-white'>Admin Dashboard</h1>
-          <p className='text-sm font-semibold text-slate-300 text-center'>This page is under maintenace, you will be notified when it is ready.</p>
-        </div>
-        <div className="bg-gradient-to-b from-slate-950 to-transparent blur-sm">
+  const businessLocation = [businessData?.business_city, businessData?.business_country].filter(Boolean).join(', ');
 
-        <motion.div
-          ref={motionref}
-          initial={{ opacity: 0, y: 50 }}
-          animate={isMotionInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 50 }}
-          transition={{ duration: 0.2 }}
-          className={`flex justify-between p-3 bg-slate-950/50 rounded-lg mb-3 items-center flex-wrap `}>
-          <h1 className='text-cyan-400'>Hi, <span className='text-white time-font'>Admin</span></h1>
-          <div className="flex gap-2 flex-wrap">
-            <Tooltip placement='left' title={<ArrowRight size={14} />}><div className='border border-slate-700 rounded-lg p-1 px-2 hover:bg-slate-950/20 cursor-pointer' onClick={() => router.push(`/admin/staffs`)}>
-              <h1 className='text-sm font-medium flex items-center gap-1 text-cyan-400'><LandPlot size={14} /> Staffs</h1>
-              <h2 className='text-xs text-slate-300 text-center font-medium'>{formatNumber(100)}</h2>
-            </div></Tooltip>
-            <Tooltip placement='left' title={<ArrowRight size={14} />}> <div className='border border-slate-700 rounded-lg p-1 px-2 hover:bg-slate-950/20 cursor-pointer' onClick={() => router.push(`/admin/departments`)}>
-              <h1 className='text-xs font-medium flex items-center gap-1 text-cyan-400'><BellElectric size={14} />Departments</h1>
-              <h2 className='text-sm text-slate-300 text-center font-medium'>{formatNumber(100)}</h2>
-            </div></Tooltip>
-            <Tooltip placement='left' title={<ArrowRight size={14} />}> <div className='border border-slate-700 rounded-lg p-1 px-2 hover:bg-slate-950/20 cursor-pointer' onClick={() => router.push(`/admin/regions`)}>
-              <h1 className='text-xs font-medium flex items-center gap-1 text-cyan-400'><Contact size={14} /> Regions</h1>
-              <h2 className='text-sm text-slate-300 capitalize text-center font-medium'>{formatNumber(100)}</h2>
-            </div></Tooltip>
-            <Tooltip placement='left' title={<ArrowRight size={14} />}><div className='border border-slate-700 rounded-lg p-1 px-2 hover:bg-slate-950/20 cursor-pointer' onClick={() => router.push(`/admin/areas`)}>
-              <h1 className='text-xs font-medium flex items-center gap-1 text-cyan-400'><Globe2 size={14} /> Areas</h1>
-              <h2 className='text-sm text-slate-300 text-center font-medium'>{formatNumber(100)}</h2>
-            </div></Tooltip>
-          </div>
-        </motion.div>
-        <motion.div
-          ref={motionref}
-          initial={{ opacity: 0, y: 50 }}
-          animate={isMotionInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 50 }}
-          transition={{ duration: 0.2 }}
-          className="bg-slate-950/50 p-3 rounded-lg flex gap-1 justify-between mb-3 lg:flex-nowrap flex-wrap ">
-          <div onClick={() => router.push(`/admin/tasks`)} className="bg-slate-950/50 p-2 px-3 rounded-lg w-full lg:w-1/2 border hover:border-slate-700 border-slate-900 select-none cursor-pointer">
-            <h1 className='text-sm font-medium mb-1 flex items-center gap-1 text-cyan-500'>Tasks</h1>
-            <div className="flex gap-2">
-              <h1 className='lg:w-32 text-xs font-semibold p-1 px-3 border border-slate-500 rounded-lg'>New: {formatNumber(100) || 0}</h1>
-              <h1 className='lg:w-32 text-xs font-semibold p-1 px-3 border border-slate-500 rounded-lg'>Ongoing: {formatNumber(100) || 0}</h1>
-              <h1 className='lg:w-32 text-xs font-semibold p-1 px-3 border border-slate-500 rounded-lg'>Completed: {formatNumber(100) || 0}</h1>
+  return (
+    <div className="p-4 pb-20 space-y-4">
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.25 }}
+        className="bg-gradient-to-tr from-slate-950/60 to-slate-900/60 p-4 rounded-lg border border-slate-800"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <p className="text-xs text-slate-400">Admin Dashboard</p>
+            <h1 className="text-lg font-semibold text-slate-200">
+              Welcome back{businessData?.business_name ? `, ${businessData.business_name}` : ""}
+            </h1>
+            <p className="text-xs text-slate-400">
+              {businessLocation || 'Organize staff, tasks, projects, and enquiries in one place.'}
+            </p>
+            <div className="flex flex-wrap gap-2 mt-3">
+              <span className="text-[10px] px-2 py-1 rounded-full border border-slate-800 text-slate-400">
+                Modules: {adminModules.length}
+              </span>
+              <span className="text-[10px] px-2 py-1 rounded-full border border-slate-800 text-slate-400">
+                Quick Actions: {quickActions.length}
+              </span>
+              {businessData?.business_email && (
+                <span className="text-[10px] px-2 py-1 rounded-full border border-slate-800 text-slate-400">
+                  {businessData.business_email}
+                </span>
+              )}
             </div>
           </div>
-          <div onClick={() => router.push(`/admin/projects`)} className="bg-slate-950/50 p-2 px-3 rounded-lg w-full lg:w-1/2 border hover:border-slate-700 border-slate-900 select-none cursor-pointer">
-            <h1 className='text-sm font-medium mb-1 flex items-center gap-1 text-cyan-500'>Projects</h1>
-            <div className="flex gap-2">
-              <h1 className='lg:w-32 text-xs font-semibold p-1 px-3 border border-slate-500 rounded-lg'>Ongoing: {formatNumber(100) || 0}</h1>
-              <h1 className=' text-xs font-semibold p-1 px-3 border border-slate-500 rounded-lg'>Waiting Approval: {formatNumber(100) || 0}</h1>
+          <div className="text-right">
+            <p className="text-xs text-slate-400">Local time</p>
+            <div className="flex items-center gap-2 justify-end">
+              <TimeNow />
+              <span className="text-xs text-slate-400">{formatDateShortly(new Date().toISOString())}</span>
             </div>
           </div>
-        </motion.div>
-        <motion.div
-          ref={motionref}
-          initial={{ opacity: 0, y: 50 }}
-          animate={isMotionInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 50 }}
-          transition={{ duration: 0.2 }}
-          className='mt-3 bg-slate-950/50 p-3 rounded-lg '>
-          <div className="flex justify-between">
-            <h1 className='text-sm text-cyan-500 font-medium flex gap-2 items-center'>Running <TimeNow /></h1>
-            <h1 className='text-sm text-cyan-500 font-medium flex gap-2 items-center time-font'>{formatDateShortly(new Date().toISOString())}</h1>
-          </div>
-          <div className="w-full h-[500px] flex mt-2">
-            <div className="w-2/3 h-full p-1">
-              <div className="bg-slate-950/50 rounded-lg">
-                {/* <DataTable columns={columns} data={payments} /> */}
-              </div>
-            </div>
-            <div className="w-1/3 h-full p-1">
-              <div className="bg-slate-950/50 rounded-lg w-full h-full gap-1 flex flex-col overflow-y-scroll p-3">
-                <h1 className='text-center text-sm text-slate-300 mb-2'>Staffs Free Now</h1>
-                <motion.div
-                  ref={motionref}
-                  initial={{ opacity: 0, y: 50 }}
-                  animate={isMotionInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 50 }}
-                  transition={{ duration: 0.2 }}
-                  className="bg-slate-800 hover:bg-slate-800/60  rounded-lg p-2 flex gap-1 select-none cursor-pointer" onClick={() => router.push(`/admin/staffs/${''}`)}>
-                  <Avatar src={`/avatar.png`} />
-                  <div className="">
-                    <h1 className='text-xs font-medium text-slate-300'>Staff Name</h1>
-                    <h1 className='text-xs text-slate-400'>staff123@gmail.com</h1>
-                  </div>
-                </motion.div>
-              </div>
-            </div>
-          </div>
-        </motion.div>
         </div>
-      </div>
-    </>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.25, delay: 0.05 }}
+        className="bg-gradient-to-tr from-slate-950/60 to-slate-900/60 p-3 rounded-lg border border-slate-800"
+      >
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold text-slate-300">Quick Actions</h2>
+          <p className="text-xs text-slate-500">Create new items faster</p>
+        </div>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {quickActions.map((action) => {
+            const Icon = action.icon;
+            return (
+              <motion.button
+                key={action.label}
+                type="button"
+                whileHover={{ scale: 1.02, y: -2 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => router.push(action.href)}
+                className="text-left bg-gradient-to-tr from-slate-950/70 to-slate-900/70 border border-slate-800 hover:border-cyan-700/70 rounded-lg p-3"
+              >
+                <div className="flex items-center gap-2 text-slate-200">
+                  <Icon size={16} className="text-cyan-400" />
+                  <h3 className="text-sm font-semibold">{action.label}</h3>
+                </div>
+                <p className="text-xs text-slate-400 mt-1">{action.description}</p>
+              </motion.button>
+            )
+          })}
+        </div>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.25, delay: 0.1 }}
+        className="bg-gradient-to-tr from-slate-950/60 to-slate-900/60 p-3 rounded-lg border border-slate-800"
+      >
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold text-slate-300">Admin Modules</h2>
+          <p className="text-xs text-slate-500">Based on routes in admin workspace</p>
+        </div>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {adminModules.map((module) => {
+            const Icon = module.icon;
+            return (
+              <motion.div
+                key={module.label}
+                role="button"
+                tabIndex={0}
+                whileHover={{ scale: 1.01, y: -2 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => router.push(module.href)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    router.push(module.href);
+                  }
+                }}
+                className="cursor-pointer text-left bg-gradient-to-tr from-slate-950/70 to-slate-900/70 border border-slate-800 hover:border-cyan-700/60 rounded-lg p-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/60"
+              >
+                <div className="flex items-center gap-2 text-slate-200">
+                  <Icon size={16} className="text-cyan-400" />
+                  <h3 className="text-sm font-semibold">{module.label}</h3>
+                </div>
+                <p className="text-xs text-slate-400 mt-1">{module.description}</p>
+                {module.links?.length ? (
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    {module.links.map((link) => (
+                      <button
+                        key={link.href}
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          router.push(link.href);
+                        }}
+                        className="text-[10px] px-2 py-1 rounded-full border border-slate-700 text-slate-300 hover:border-cyan-600/60 hover:text-cyan-300"
+                      >
+                        {link.label}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </motion.div>
+            )
+          })}
+        </div>
+      </motion.div>
+    </div>
   )
 }
 
