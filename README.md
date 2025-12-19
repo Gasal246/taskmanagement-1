@@ -64,3 +64,4 @@ npm run dev
 | **Muhammed Gasal C** | Lead Developer | [github.com/gasal246](https://github.com/gasal246) |
 | **Anas Malik P** | Lead Developer | [github.com/anasmalikp](https://github.com/anasmalikp) |
 
+latest version: v1.1.0
