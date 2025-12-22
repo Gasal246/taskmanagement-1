@@ -25,8 +25,8 @@ const Page = () => {
 
     const enquirySchema = z.object({
         enquiry_id: z.string(),
-        latitude: z.string(),
-        longitude: z.string(),
+        // latitude: z.string(),
+        // longitude: z.string(),
 
         wifi_available: z.enum(["Yes", "No"]),
         expected_monthly_price: z.string().optional(),
@@ -71,8 +71,8 @@ const Page = () => {
         if (enquiry) {
             form.reset({
                 enquiry_id: params.enquiry_id,
-                latitude: enquiry?.enquiry?.latitude ?? "",
-                longitude: enquiry?.enquiry?.longitude ?? "",
+                // latitude: enquiry?.enquiry?.latitude ?? "",
+                // longitude: enquiry?.enquiry?.longitude ?? "",
 
                 wifi_available: enquiry?.enquiry?.wifi_available ? "Yes" : "No",
                 expected_monthly_price: enquiry?.enquiry?.expected_monthly_price ?? "",
@@ -140,7 +140,7 @@ const Page = () => {
             </div>
             <Form {...form}>
                 <form onSubmit={handleSubmit(onFormSubmit)} className='space-y-8'>
-                    <FormField
+                    {/* <FormField
                         control={form.control}
                         name="latitude"
                         render={({ field }) => (
@@ -153,9 +153,9 @@ const Page = () => {
                                 />
                             </FormItem>
                         )}
-                    />
+                    /> */}
 
-                    <FormField
+                    {/* <FormField
                         control={form.control}
                         name="longitude"
                         render={({ field }) => (
@@ -168,7 +168,7 @@ const Page = () => {
                                 />
                             </FormItem>
                         )}
-                    />
+                    /> */}
 
                     <div className="text-xs text-slate-400 font-semibold flex items-center gap-1"><Wifi size={14} /> Wi-Fi / Internet</div>
 

@@ -14,6 +14,8 @@ interface IBody {
     camp_occupancy: number,
     camp_type: string,
     camp_id: string,
+    latitude: string,
+    longitude: string
 
     headoffice_phone: string,
     headoffice_geo_loc: string,
@@ -103,6 +105,8 @@ export async function PUT(req: NextRequest){
         campToEdit.camp_occupancy = body.camp_occupancy;
         campToEdit.camp_capacity = body.camp_capacity;
         campToEdit.camp_type = body.camp_type;
+        campToEdit.latitude = body.latitude;
+        campToEdit.longitude = body.longitude;
 
         await campToEdit.save();
 

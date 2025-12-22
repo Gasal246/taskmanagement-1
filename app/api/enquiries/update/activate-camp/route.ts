@@ -11,7 +11,9 @@ interface IBody {
     camp_occupancy: number,
     camp_type: string,
     camp_id: string,
-    enquiry_id: string
+    enquiry_id: string,
+    latitude: string,
+    longitude: string
 }
 
 export async function PUT(req: NextRequest){
@@ -27,7 +29,9 @@ export async function PUT(req: NextRequest){
             country_id: enquiry?.country_id,
             region_id: enquiry?.region_id,
             province_id: enquiry?.province_id,
-            city_id: enquiry?.city_id
+            city_id: enquiry?.city_id,
+            latitude: body?.latitude,
+            longitude: body?.longitude
         }});
 
         enquiry.is_active = true;

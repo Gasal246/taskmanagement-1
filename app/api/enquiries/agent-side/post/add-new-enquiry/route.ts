@@ -244,7 +244,9 @@ export async function POST(req:NextRequest){
                 camp_name: body.camp_name_request,
                 camp_capacity: body.camp_capacity,
                 camp_occupancy: body.camp_occupancy,
-                is_active: false
+                is_active: false,
+                latitude: body.latitude,
+                longitude: body.longitude,
             })
 
             const savedCamp = await newCamp.save();
@@ -274,8 +276,6 @@ export async function POST(req:NextRequest){
             next_action_due: body.next_action_due,
             rent_terms: body.rent_terms,
             enquiry_uuid: uuid,
-            latitude: body.latitude,
-            longitude: body.longitude,
             wifi_setup: body.wifi_type == "Other Sources" && body.wifi_available == "Yes" ? body.other_wifi_details : null,
         });
 

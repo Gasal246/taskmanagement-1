@@ -43,7 +43,9 @@ export default function EditCampPage() {
     headoffice_other_details: "",
     client_company: "",
     realestate_company: "",
-    landlord_company: ""
+    landlord_company: "",
+    latitude: "",
+    longitude: ""
   });
 
   useEffect(() => {
@@ -57,6 +59,8 @@ export default function EditCampPage() {
         camp_type: campData.camp.camp_type ?? "",
         camp_capacity: campData.camp.camp_capacity ?? "",
         camp_occupancy: campData.camp.camp_occupancy ?? 0,
+        latitude: campData.camp.latitude ?? "",
+        longitude: campData.camp.longitude ?? "",
         client_company: campData.camp.client_company_id?.client_company_name ?? "",
         landlord_company: campData.camp.landlord_id?.landlord_name ?? "",
         realestate_company: campData.camp.realestate_id?.company_name ?? "",
@@ -128,6 +132,20 @@ export default function EditCampPage() {
               ))}
             </SelectContent>
           </Select>
+        </Field>
+
+        <Field label="Camp Latitude">
+          <Input
+            value={form.latitude}
+            onChange={(e) => setForm({ ...form, latitude: e.target.value })}
+          />
+        </Field>
+
+        <Field label="Camp Longitude">
+          <Input
+            value={form.longitude}
+            onChange={(e) => setForm({ ...form, longitude: e.target.value })}
+          />
         </Field>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

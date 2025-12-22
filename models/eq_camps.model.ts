@@ -17,6 +17,8 @@ export interface IEq_camps extends Document{
     camp_occupancy: Number,
     is_active: Boolean,
     is_eq_added: Boolean,
+    latitude: String,
+    longitude: String,
     createdAt: Date,
     updatedAt: Date
 }
@@ -37,6 +39,8 @@ const Eq_campsSchema: Schema = new Schema({
     camp_occupancy: {type: Number},
     is_active: {type: Boolean, default: false},
     is_eq_added: {type: Boolean},
+    latitude: {type: String},
+    longitude: {type: String},
 }, {timestamps: true});
 
 const Eq_camps = mongoose.models?.eq_camps || mongoose.model<IEq_camps>("eq_camps", Eq_campsSchema);

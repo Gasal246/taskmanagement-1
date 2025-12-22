@@ -23,7 +23,7 @@ export default function SingleEnquiryPage() {
 
   
   const openMap = () => {
-    window.open(`https://www.google.com/maps?q=${enquiry.enquiry.latitude},${enquiry.enquiry.longitude}`, "_blank");
+    window.open(`https://www.google.com/maps?q=${enquiry.enquiry.camp_id?.latitude},${enquiry.enquiry.camp_id?.longitude}`, "_blank");
   };
 
   return (
@@ -62,8 +62,8 @@ export default function SingleEnquiryPage() {
             <p className="text-sm">City: {enquiry?.enquiry?.city_id?.city_name}</p>
             <p className="text-sm">Area: {enquiry?.enquiry?.area_id?.area_name}</p>
             <p className="text-sm">Camp: {enquiry?.enquiry?.camp_id?.camp_name}</p>
-            <p className="text-sm">Latitude: {enquiry?.enquiry?.latitude}</p>
-            <p className="text-sm">Longitude: {enquiry?.enquiry?.longitude}</p>
+            <p className="text-sm">Latitude: {enquiry?.enquiry?.camp_id?.latitude}</p>
+            <p className="text-sm">Longitude: {enquiry?.enquiry?.camp_id?.longitude}</p>
             <Button onClick={openMap}>Go to Location</Button>
           </div>
 

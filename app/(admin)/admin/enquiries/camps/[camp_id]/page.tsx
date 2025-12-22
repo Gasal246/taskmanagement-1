@@ -1,10 +1,10 @@
 "use client";
 
-import { ArrowLeft, Home, Building2, Pencil } from "lucide-react";
+import { ArrowLeft, Home, Building2, Pencil, Trash } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
-import { useAddNewCampContact, useGetEqCampsById, useUpdateEqCampContact } from "@/query/enquirymanager/queries";
+import { useAddNewCampContact, useGetEqCampsById, useRemoveEqCamp, useUpdateEqCampContact } from "@/query/enquirymanager/queries";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -30,10 +30,12 @@ export default function CampDetailsPage() {
     const params = useParams<{ camp_id: string }>()
     const { data: camps, isLoading, refetch } = useGetEqCampsById(params.camp_id);
     const { mutateAsync: updateContact, isPending } = useUpdateEqCampContact();
-    const {mutateAsync: AddContact, isPending: isAdding} = useAddNewCampContact();
+    const {mutateAsync: AddContact, isPending: isAdding } = useAddNewCampContact();
+    const { mutateAsync: RemoveCamp, isPending: isRemoving } = useRemoveEqCamp();
 
     const [modalOpen, setModalOpen] = useState(false);
     const [addModalOpen, setAddModalOpen] = useState(false);
+    const [deleteModalOpen, setDeleteModalOpen] = useState(false);
     const [selectedContact, setSelectedContact] = useState<any>(null);
 
     const [newContact, setNewContact] = useState<any>(null);
@@ -98,6 +100,15 @@ export default function CampDetailsPage() {
         setAddModalOpen(false);
     }
 
+    const DeleteCamp = async() => {
+        const res = await RemoveCamp(params.camp_id);
+        if(res?.status == 200){
+            toast.success(res?.message || "Camp removed");
+            return router.replace("/admin/enquiries/camps")
+        }
+        toast.error(res?.message || "Failed to remove camp")
+    }
+
 
     useEffect(() => {
         console.log("camps: ", camps);
@@ -132,6 +143,8 @@ export default function CampDetailsPage() {
                 </div>
 
                 {/* RIGHT — EDIT BUTTON */}
+                <div className="space-y-2 flex flex-col">
+
                 <Button
                     className="flex items-center gap-1"
                     onClick={() =>
@@ -140,6 +153,17 @@ export default function CampDetailsPage() {
                 >
                     <Pencil size={16} /> Edit Camp
                 </Button>
+
+                <Button
+                variant="outline"
+                    className="flex items-center gap-1 bg-red-500"
+                    onClick={() =>
+                        setDeleteModalOpen(true)
+                    }
+                >
+                    <Trash size={16} /> Delete Camp
+                </Button>
+                </div>
             </div>
 
             {/* CAMP DETAILS */}
@@ -150,6 +174,9 @@ export default function CampDetailsPage() {
                 <Detail label="Province" value={camps?.camp?.province_id?.province_name} />
                 <Detail label="City" value={camps?.camp?.city_id?.city_name} />
                 <Detail label="Area" value={camps?.camp?.area_id?.area_name} />
+
+                <Detail label="Latitude" value={camps?.camp?.latitude} />
+                <Detail label="Longitude" value={camps?.camp?.longitude} />
 
                 <Detail label="Capacity" value={camps?.camp?.camp_capacity} />
                 <Detail label="Current Occupancy" value={camps?.camp?.camp_occupancy} />
@@ -311,6 +338,26 @@ export default function CampDetailsPage() {
                             Save
                         </Button>
                     </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Delete confirmation Modal */}
+            <Dialog open={deleteModalOpen} onOpenChange={setDeleteModalOpen}>
+                <DialogContent className="bg-slate-900 border border-slate-700 text-slate-200">
+                     <DialogHeader>
+                        <DialogTitle>Delete Camp</DialogTitle>
+                    </DialogHeader>
+                    
+                    <p className="text-red-400 font-semibold">Proceeding with this action will remove enquiry associated with this camp.</p>
+
+                    <DialogFooter className="mt-4">
+                                <Button variant="secondary" onClick={() => setAddModalOpen(false)}>
+                                    Cancel
+                                </Button>
+                                <Button
+                                disabled={isRemoving}
+                                onClick={DeleteCamp}>{isRemoving ? "Deleting" : "Delete"}</Button>
+                            </DialogFooter>
                 </DialogContent>
             </Dialog>
 

@@ -490,3 +490,13 @@ export async function CloseEqnuiry(payload: any){
         console.log(err);
     }
 }
+
+//Delete Camp
+export async function RemoveEqCamp(camp_id: string){
+    try{
+        const res = await axios.delete(`/api/enquiries/delete/camp?camp_id=${camp_id}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
