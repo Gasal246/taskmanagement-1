@@ -115,20 +115,20 @@ export async function POST(req:NextRequest){
         switch(country.country_name){
             case "KSA": {
                 uuid = "KSA"
-                switch(region?.region_name){
-                    case "Central Region": {
+                switch(region?.region_name.toLowerCase()){
+                    case "central region": {
                         uuid += "-CR";
                         break;
                     }
-                    case "Eastern Region": {
+                    case "eastern region": {
                         uuid += "-ER";
                         break;
                     }
-                    case "Western Region": {
+                    case "western region": {
                         uuid += "-WR";
                         break;
                     }
-                    case "Southern Region": {
+                    case "southern region": {
                         uuid += "-SR";
                         break;
                     }

@@ -71,7 +71,7 @@ const enquirySchema = z.object({
         designation: z.string().optional(),
         is_decision_maker: z.string().optional(),
         authority_level: z.string().optional(),
-    })).min(1, "Add at least one contact"),
+    })).optional(),
 
     wifi_available: z.enum(["Yes", "No"]),
     expected_monthly_price: z.string().optional(),
@@ -162,7 +162,6 @@ export default function AddEnquiry() {
     const form = useForm({
         resolver: zodResolver(enquirySchema),
         defaultValues: {
-            contacts: [{ name: "", phone: "", is_decision_maker: "No", authority_level: "Operational" }],
             country: "",
             region: "",
             province: "",
