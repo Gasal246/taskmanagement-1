@@ -53,12 +53,12 @@ const adminModules = [
     href: '/admin/clients',
     icon: Building2,
   },
-  {
-    label: 'Departments',
-    description: 'Set up departments and capacity.',
-    href: '/admin/departments',
-    icon: SquareLibrary,
-  },
+  // {
+  //   label: 'Departments',
+  //   description: 'Set up departments and capacity.',
+  //   href: '/admin/departments',
+  //   icon: SquareLibrary,
+  // },
   {
     label: 'Regions',
     description: 'Manage regions and operational coverage.',

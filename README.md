@@ -64,9 +64,7 @@ npm run dev
 | **Muhammed Gasal C** | Lead Developer | [github.com/gasal246](https://github.com/gasal246) |
 | **Anas Malik P** | Lead Developer | [github.com/anasmalikp](https://github.com/anasmalikp) |
 
-latest version: v1.1.0
-latest commit: Anas 440189b | 440189b4c5f68f60cd956525858225c694b63924 
-```text
-feat: - added editing option for latitude and longitude
-- added camp removal option only for admin.
-```
+### Release Version
+
+- **Current:** alpha.1.0
+- **Last Updated:** Alpha 25.12.1

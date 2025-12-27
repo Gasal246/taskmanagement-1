@@ -1,5 +1,5 @@
 "use client"
-import React, { useEffect } from 'react'
+import React, { useCallback, useEffect } from 'react'
 import { Popover, PopoverContent, PopoverTrigger, } from "@/components/ui/popover"
 import Image from 'next/image'
 import { Bell, ListTodo } from 'lucide-react'
@@ -10,13 +10,32 @@ import { Avatar, Badge, Tooltip } from 'antd'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger, } from "@/components/ui/alert-dialog"
 import { useRouter } from 'next/navigation'
 import NotificationPane from '../shared/NotificationPane'
-import { useSelector } from 'react-redux'
-import { RootState } from '@/redux/store'
+import { useDispatch, useSelector } from 'react-redux'
+import { AppDispatch, RootState } from '@/redux/store'
 import Cookies from "js-cookie";
+import { getBusinessByIdFunc } from '@/query/business/functions'
+import { loadBusinessData } from '@/redux/slices/userdata'
 
 const AdminTopbar = () => {
     const router = useRouter();
+    const dispatch = useDispatch<AppDispatch>();
     const { businessData } = useSelector((state: RootState) => state.user);
+
+    const hydrateBusinessData = useCallback(async () => {
+        const cookieValue = Cookies.get("user_domain");
+        const businessId = cookieValue ? JSON.parse(cookieValue)?.value : null;
+        if (!businessId) return;
+        const res = await getBusinessByIdFunc(businessId);
+        if (res?.data?.info) {
+            dispatch(loadBusinessData(res.data.info));
+        }
+    }, [dispatch]);
+
+    useEffect(() => {
+        if (!businessData) {
+            hydrateBusinessData();
+        }
+    }, [businessData, hydrateBusinessData]);
 
     const logOut = async () => {
         Object.keys(Cookies.get()).forEach(cookieName => {

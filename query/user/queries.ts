@@ -78,10 +78,14 @@ export const useGetUserDomainByRole = () => {
     })
 }
 
-export const useGetBusinessStaffs = (business_id: string) => {
+export const useGetBusinessStaffs = (business_id?: string) => {
     return useQuery({
-        queryKey: [USER_KEYS.GET_BUSINESS_STAFFS],
-        queryFn: () => getBusinessStaffs(business_id)
+        queryKey: [USER_KEYS.GET_BUSINESS_STAFFS, business_id],
+        queryFn: async () => {
+            const data = await getBusinessStaffs(business_id || "");
+            return data ?? [];
+        },
+        enabled: Boolean(business_id),
     })
 }
 
