@@ -220,7 +220,8 @@ export default function EscalatePage() {
 
         {/* SEARCH USERS */}
         <div className="bg-slate-900/40 p-4 rounded-lg">
-          <h2 className="font-semibold mb-2 text-sm">Search & Select Users</h2>
+        <h2 className="font-semibold mb-2 text-sm">Enquiry View Access</h2>
+          <h1 className="font-semibold mb-2 text-sm">Search & Select Users</h1>
 
           <Input
             placeholder="Search users..."

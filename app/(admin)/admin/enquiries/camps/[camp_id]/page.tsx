@@ -211,7 +211,19 @@ export default function CampDetailsPage() {
             {camps?.camp?.headoffice_id && (
                 <DetailsCard title="Head Office Details" icon={<Building2 size={16} />}>
                     <Detail label="Phone" value={camps?.camp?.headoffice_id?.phone} />
-                    <Detail label="Geo Location" value={camps?.camp?.headoffice_id?.geo_location} />
+                   <Detail
+  label="Geo Location"
+  value={
+    <a
+      href={camps?.camp?.headoffice_id?.geo_location}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-blue-500 hover:text-blue-400 underline"
+    >
+      View Location
+    </a>
+  }
+/>
                     <Detail label="Address" value={camps?.camp?.headoffice_id?.address} />
                     <Detail label="Other Details" value={camps?.camp?.headoffice_id?.other_details} />
 
@@ -351,7 +363,7 @@ export default function CampDetailsPage() {
                     <p className="text-red-400 font-semibold">Proceeding with this action will remove enquiry associated with this camp.</p>
 
                     <DialogFooter className="mt-4">
-                                <Button variant="secondary" onClick={() => setAddModalOpen(false)}>
+                                <Button variant="secondary" onClick={() => setDeleteModalOpen(false)}>
                                     Cancel
                                 </Button>
                                 <Button

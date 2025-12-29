@@ -146,6 +146,7 @@ const filteredUsers = useMemo(() => {
 
       {/* SEARCH USERS */}
       <div className="bg-slate-900/40 p-4 rounded-lg">
+      <h2 className="font-semibold mb-2 text-sm">Select Enquiry View Access</h2>
         <h2 className="font-semibold mb-2 text-sm">Search & Select Users</h2>
 
         <Input

@@ -5,30 +5,43 @@ import { useEffect, useState } from "react";
 import { ArrowLeft, FileText, UserCircle2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { Avatar } from "antd";
-import { useActivateDeactivateEqAgents, useGetEqUserProfile } from "@/query/enquirymanager/queries";
+import { useActivateDeactivateEqAgents, useGetEqUserProfile, useRemoveEqUsers } from "@/query/enquirymanager/queries";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export default function AgentDetailsPage() {
     const router = useRouter();
 
     const params = useParams<{ user_id: string }>();
 
+    const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+
     const { data: user_profile, isLoading, refetch } = useGetEqUserProfile(params.user_id);
-    const {mutateAsync: ActAgent, isPending} = useActivateDeactivateEqAgents();
+    const { mutateAsync: ActAgent, isPending } = useActivateDeactivateEqAgents();
+    const { mutateAsync: DeleteUser, isPending: isDeleting} = useRemoveEqUsers();
 
     useEffect(() => {
         console.log("profile: ", user_profile);
     }, [user_profile]);
 
-    const toggleUser = async() => {
+    const toggleUser = async () => {
         const res = await ActAgent(user_profile?.user?._id);
-        if(res?.status == 200){
+        if (res?.status == 200) {
             toast.success(res?.message);
         } else {
             toast.error(res?.message);
         }
         refetch();
+    }
+
+    const DeleteUserAsync = async()=> {
+        const res = await DeleteUser(params.user_id);
+        if(res?.status == 200){
+            toast.success(res?.message);
+            return router.replace("/admin/enquiries/users")
+        }
+        toast.error(res?.message || "Failed to delete user");
     }
 
     return (
@@ -78,18 +91,29 @@ export default function AgentDetailsPage() {
                     </div>
                 </div>
 
-                {/* RIGHT SIDE - ACTIVATE / DEACTIVATE BUTTON */}
-                <Button
-                onClick={toggleUser}
-                    className={`px-4 py-2 rounded-lg text-sm font-semibold transition
-      ${user_profile?.user?.status == 1
-                            ? "bg-red-600 hover:bg-red-500 text-white"
-                            : "bg-green-600 hover:bg-green-500 text-white"
-                        }`}
-                >
-                    {user_profile?.user?.status == 1 ? "Deactivate" : "Activate"}
-                </Button>
+                {/* RIGHT SIDE - ACTION BUTTONS */}
+                <div className="flex gap-3">
+                    <Button
+                        onClick={toggleUser}
+                        className={`px-4 py-2 rounded-lg text-sm font-semibold transition
+                                ${user_profile?.user?.status == 1
+                                ? "bg-white hover:bg-slate-500 text-black"
+                                : "bg-green-600 hover:bg-green-500 text-white"
+                            }`}
+                    >
+                        {user_profile?.user?.status == 1 ? "Deactivate" : "Activate"}
+                    </Button>
+
+                    <Button
+                        onClick={()=> setDeleteModalOpen(true)}
+                        className="px-4 py-2 rounded-lg text-sm font-semibold bg-rose-700 hover:bg-rose-600 text-white transition"
+                    >
+                        Delete
+                    </Button>
+                </div>
+
             </div>
+
 
 
             {/* ENQUIRIES LIST */}
@@ -169,6 +193,26 @@ export default function AgentDetailsPage() {
                     </div>
                 )}
             </div>
+
+            {/* Delete confirmation Modal */}
+                        <Dialog open={deleteModalOpen} onOpenChange={setDeleteModalOpen}>
+                            <DialogContent className="bg-slate-900 border border-slate-700 text-slate-200">
+                                 <DialogHeader>
+                                    <DialogTitle>Delete User</DialogTitle>
+                                </DialogHeader>
+                                
+                                <p className="text-red-400 font-semibold">Proceeding with this action will remove the user from enquiry manager.</p>
+            
+                                <DialogFooter className="mt-4">
+                                            <Button variant="secondary" onClick={() => setDeleteModalOpen(false)}>
+                                                Cancel
+                                            </Button>
+                                            <Button
+                                            disabled={isDeleting}
+                                            onClick={DeleteUserAsync}>{isDeleting ? "Deleting" : "Delete"}</Button>
+                                        </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
         </div>
     );
 }

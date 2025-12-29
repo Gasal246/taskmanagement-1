@@ -29,6 +29,7 @@ const formSchema = z.object({
   dob: z.string().optional(),
   gender: z.string().optional(),
   contract_no: z.string().optional(),
+  contract_expiry: z.string().optional(),
   country_id: z.string(),
   region_id: z.string(),
   business_id: z.string()
@@ -199,6 +200,29 @@ const AddAgentPage = () => {
                   <FormMessage />
                 </FormItem>
               )} />
+
+              <FormField
+                control={form.control}
+                name="contract_expiry"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs text-slate-300 font-semibold">
+                      Contract Expiry
+                    </FormLabel>
+
+                    <FormControl className="border-slate-600 w-[95%]">
+                      <Input
+                        type="date"
+                        {...field}
+                        value={field.value ?? ""}
+                      />
+                    </FormControl>
+
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
 
               <FormField
                 control={form.control}

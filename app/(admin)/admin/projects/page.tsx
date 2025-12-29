@@ -16,9 +16,11 @@ import LoaderSpin from '@/components/shared/LoaderSpin';
 const { RangePicker } = DatePicker;
 
 const projectSections = [
+  { value: 'all', label: 'All Projects' },
   { value: 'current', label: 'Current Projects' },
   { value: 'previous', label: 'Previous Projects' },
   { value: 'waiting', label: 'Waiting For Approval' },
+  
 ]
 
 const domainWise = [

@@ -40,42 +40,42 @@ export default function SingleEnquiryPage() {
       </Breadcrumb>
       <div className="p-4 pb-10 text-slate-100">
         {/* HEADER */}
-<div className="flex items-center justify-between mb-4">
-  <div className="mb-4">
-  <h1 className="text-xl font-bold flex items-center gap-2">
-    <UserCircle2 size={20} /> Enquiry Details
-  </h1>
-  <p className="text-sm text-slate-400 mt-1">
-    Enquiry ID: {enquiry?.enquiry?.enquiry_uuid}
-  </p>
-</div>
-  {/* BUTTONS ON RIGHT */}
-  <div className="flex items-center gap-3">
-    {!enquiry?.enquiry?.area_id?.is_active && (<Button
-      className="flex items-center gap-1"
-      onClick={() => router.replace(`/admin/enquiries/${params.enquiry_id}/area/${enquiry?.enquiry?.area_id?._id}`)}
-    >
-      Activate Area
-    </Button>)}
-    
-      {!enquiry?.enquiry?.camp_id?.is_active && (<Button
-      className="flex items-center gap-1"
-      disabled={!enquiry?.enquiry?.area_id?.is_active}
-      onClick={() => router.replace(`/admin/enquiries/${params.enquiry_id}/camp`)}
-    >
-      Activate Camp
-    </Button>)}
+        <div className="flex items-center justify-between mb-4">
+          <div className="mb-4">
+            <h1 className="text-xl font-bold flex items-center gap-2">
+              <UserCircle2 size={20} /> Enquiry Details
+            </h1>
+            <p className="text-sm text-slate-400 mt-1">
+              Enquiry ID: {enquiry?.enquiry?.enquiry_uuid}
+            </p>
+          </div>
+          {/* BUTTONS ON RIGHT */}
+          <div className="flex items-center gap-3">
+            {!enquiry?.enquiry?.area_id?.is_active && (<Button
+              className="flex items-center gap-1"
+              onClick={() => router.replace(`/admin/enquiries/${params.enquiry_id}/area/${enquiry?.enquiry?.area_id?._id}`)}
+            >
+              Activate Area
+            </Button>)}
 
-    {enquiry?.enquiry?.is_edit_req && (
-      <Button
-      className="flex items-center gap-1"
-      onClick={() => router.replace(`/admin/enquiries/${params.enquiry_id}/edited`)}
-    >
-      View Edited
-    </Button>
-    )}
-  </div>
-</div>
+            {!enquiry?.enquiry?.camp_id?.is_active && (<Button
+              className="flex items-center gap-1"
+              disabled={!enquiry?.enquiry?.area_id?.is_active}
+              onClick={() => router.replace(`/admin/enquiries/${params.enquiry_id}/camp`)}
+            >
+              Activate Camp
+            </Button>)}
+
+            {enquiry?.enquiry?.is_edit_req && (
+              <Button
+                className="flex items-center gap-1"
+                onClick={() => router.replace(`/admin/enquiries/${params.enquiry_id}/edited`)}
+              >
+                View Edited
+              </Button>
+            )}
+          </div>
+        </div>
 
         {/* CARD */}
         <div className="bg-gradient-to-tr from-slate-950/60 to-slate-900/60 p-5 rounded-xl border border-slate-800 space-y-5">
@@ -100,7 +100,21 @@ export default function SingleEnquiryPage() {
               <h2 className="font-semibold text-lg mb-2">Head Office Details</h2>
 
               <p className="text-sm">Phone: {enquiry?.head_office?.phone}</p>
-              <p className="text-sm">Location: {enquiry?.head_office?.geo_location}</p>
+              <p className="text-sm">
+                Geo Location:{" "}
+                {enquiry?.head_office?.geo_location ? (
+                  <a
+                    href={enquiry.head_office.geo_location}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-500 hover:underline"
+                  >
+                    View Location
+                  </a>
+                ) : (
+                  "-"
+                )}
+              </p>
               <p className="text-sm">Address: {enquiry?.head_office?.address}</p>
               <p className="text-sm">Other details: {enquiry?.head_office?.other_details}</p>
             </div>
@@ -128,7 +142,7 @@ export default function SingleEnquiryPage() {
               <span className="text-yellow-400">Is Decision Maker: {enquiry?.contacts[0]?.is_decision_maker ? "Yes" : "No"}</span>
             </div>
             <Button
-            onClick={()=> router.push(`/admin/enquiries/${params.enquiry_id}/contacts`)}
+              onClick={() => router.push(`/admin/enquiries/${params.enquiry_id}/contacts`)}
             >Show More</Button>
           </div>
 
@@ -145,14 +159,14 @@ export default function SingleEnquiryPage() {
 
           {enquiry?.assigned && (
             <div className="mt-5">
-            <h2 className="font-semibold text-lg mb-2">Assigned To</h2>
-            <div className="flex items-center gap-3 border border-slate-800 p-3 rounded-xl bg-slate-900/40">
-              <Avatar size={50} src="https://api.dicebear.com/7.x/personas/svg" />
-              <div>
-                <h3 className="font-semibold text-sm">{enquiry?.assigned?.assigned_to?.name}</h3>
+              <h2 className="font-semibold text-lg mb-2">Assigned To</h2>
+              <div className="flex items-center gap-3 border border-slate-800 p-3 rounded-xl bg-slate-900/40">
+                <Avatar size={50} src="https://api.dicebear.com/7.x/personas/svg" />
+                <div>
+                  <h3 className="font-semibold text-sm">{enquiry?.assigned?.assigned_to?.name}</h3>
+                </div>
               </div>
             </div>
-          </div>
           )}
 
 
@@ -202,7 +216,7 @@ export default function SingleEnquiryPage() {
               <p className="text-sm">Next Action Due Date: {formatDateTiny(enquiry?.enquiry?.next_action_due)}</p>
             </div>
           </div>
-          
+
 
           {/* DATES */}
           <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -222,7 +236,7 @@ export default function SingleEnquiryPage() {
             <Button
               onClick={() => router.replace(`/admin/enquiries/${params.enquiry_id}/forward-enquiry`)}
               className="flex items-center gap-1"
-              disabled = {!enquiry?.enquiry?.is_active}
+              disabled={!enquiry?.enquiry?.is_active}
             >
               Forward Enquiry
             </Button>

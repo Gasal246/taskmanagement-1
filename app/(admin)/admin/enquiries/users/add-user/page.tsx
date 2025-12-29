@@ -47,7 +47,8 @@ export default function AddUserPage() {
     };
     const res = await AddUsers(data);
     if(res?.status == 201){
-        return toast.success(res?.message || "User added successfully");
+        toast.success(res?.message || "User added successfully");
+        return router.replace("/admin/enquiries/users");
     }
     return toast.error(res?.error || "Failed to add user");
   };

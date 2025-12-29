@@ -21,7 +21,7 @@ export default function SingleEnquiryPage() {
     console.log("enquiry: ", enquiry);
   }, [enquiry]);
 
-  
+
   const openMap = () => {
     window.open(`https://www.google.com/maps?q=${enquiry.enquiry.camp_id?.latitude},${enquiry.enquiry.camp_id?.longitude}`, "_blank");
   };
@@ -72,7 +72,21 @@ export default function SingleEnquiryPage() {
               <h2 className="font-semibold text-lg mb-2">Head Office Details</h2>
 
               <p className="text-sm">Phone: {enquiry?.head_office?.phone}</p>
-              <p className="text-sm">Location: {enquiry?.head_office?.geo_location}</p>
+              <p className="text-sm">
+                Geo Location:{" "}
+                {enquiry?.head_office?.geo_location ? (
+                  <a
+                    href={enquiry.head_office.geo_location}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-500 hover:underline"
+                  >
+                    View Location
+                  </a>
+                ) : (
+                  "-"
+                )}
+              </p>
               <p className="text-sm">Address: {enquiry?.head_office?.address}</p>
               <p className="text-sm">Other details: {enquiry?.head_office?.other_details}</p>
             </div>
@@ -101,8 +115,8 @@ export default function SingleEnquiryPage() {
             </div>
 
             <Button
-                        onClick={()=> router.push(`/staff/enquiry/${params.enquiry_id}/contacts`)}
-                        >Show More</Button>
+              onClick={() => router.push(`/staff/enquiry/${params.enquiry_id}/contacts`)}
+            >Show More</Button>
           </div>
 
           {/* CREATED BY */}
@@ -181,12 +195,12 @@ export default function SingleEnquiryPage() {
 
             {/* Forward Enquiry Button */}
             {enquiry?.canForward && (
-                <Button
+              <Button
                 onClick={() => router.replace(`/staff/enquiry/${params.enquiry_id}/view-assigned`)}
                 className="flex items-center gap-1"
-                >
+              >
                 View Assigned Action
-                </Button>
+              </Button>
             )}
 
             {/* View History Button (smaller) */}

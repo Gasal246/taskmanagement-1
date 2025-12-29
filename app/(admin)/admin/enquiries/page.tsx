@@ -357,7 +357,7 @@ export default function EnquiriesPage() {
                 <p>Status: {e.status}</p>
                 <p>Priority: {e.priority}</p>
                 <p>Occupancy: {e.camp_id?.camp_occupancy ?? "N/A"}</p>
-                <p>Competition: {e.competition_status ? "Yes" : "No"}</p>
+                <p>UUID: {e.enquiry_uuid}</p>
                 <p>WiFi: {e.wifi_available ? "Yes" : "No"}</p>
                 <p>Due Date: {e.due_date?.slice(0, 10)}</p>
               </div>

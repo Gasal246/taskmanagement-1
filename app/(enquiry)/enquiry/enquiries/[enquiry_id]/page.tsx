@@ -46,8 +46,8 @@ export default function SingleEnquiryPage() {
             <UserCircle2 size={20} /> Enquiry Details
           </h1>
           <Button
-          disabled={enquiry?.enquiry?.is_edit_req}
-          onClick={()=> router.push(`/enquiry/enquiries/${params.enquiry_id}/edit`)}
+            disabled={enquiry?.enquiry?.is_edit_req}
+            onClick={() => router.push(`/enquiry/enquiries/${params.enquiry_id}/edit`)}
           >
             Edit
           </Button>
@@ -66,7 +66,7 @@ export default function SingleEnquiryPage() {
             <p className="text-sm">City: {enquiry?.enquiry?.city_id?.city_name}</p>
             <p className="text-sm">Area: {enquiry?.enquiry?.area_id?.area_name}</p>
             <p className="text-sm">Camp: {enquiry?.enquiry?.camp_id?.camp_name}</p>
-                        <p className="text-sm">Latitude: {enquiry?.enquiry?.camp_id?.latitude}</p>
+            <p className="text-sm">Latitude: {enquiry?.enquiry?.camp_id?.latitude}</p>
             <p className="text-sm">Longitude: {enquiry?.enquiry?.camp_id?.longitude}</p>
             <Button onClick={openMap}>Go to Location</Button>
           </div>
@@ -76,7 +76,21 @@ export default function SingleEnquiryPage() {
               <h2 className="font-semibold text-lg mb-2">Head Office Details</h2>
 
               <p className="text-sm">Phone: {enquiry?.head_office?.phone}</p>
-              <p className="text-sm">Location: {enquiry?.head_office?.geo_location}</p>
+              <p className="text-sm">
+                Geo Location:{" "}
+                {enquiry?.head_office?.geo_location ? (
+                  <a
+                    href={enquiry.head_office.geo_location}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-500 hover:underline"
+                  >
+                    View Location
+                  </a>
+                ) : (
+                  "-"
+                )}
+              </p>
               <p className="text-sm">Address: {enquiry?.head_office?.address}</p>
               <p className="text-sm">Other details: {enquiry?.head_office?.other_details}</p>
             </div>
@@ -105,8 +119,8 @@ export default function SingleEnquiryPage() {
             </div>
 
             <Button
-                        onClick={()=> router.push(`/enquiry/enquiries/${params.enquiry_id}/contacts`)}
-                        >Show More</Button>
+              onClick={() => router.push(`/enquiry/enquiries/${params.enquiry_id}/contacts`)}
+            >Show More</Button>
           </div>
 
           {/* CREATED BY */}

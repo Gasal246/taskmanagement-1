@@ -17,6 +17,7 @@ interface IBody {
     dob: string,
     gender: string,
     contract_no: string,
+    contract_expiry: Date,
     country_id: string,
     region_id: string,
     business_id: string
@@ -51,6 +52,7 @@ export async function POST(req:NextRequest){
             country_id: body.country_id,
             region_id: body.region_id,
             contract_no: body.contract_no,
+            contract_expiry: body.contract_expiry,
             user_id: savedAgent?._id
         });
 

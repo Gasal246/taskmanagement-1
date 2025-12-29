@@ -14,7 +14,7 @@ import { useRouter } from "next/navigation";
 export default function UsersPage() {
   const router = useRouter();
   const { businessData } = useSelector((state: RootState) => state.user);
-  const {data: users, isLoading} = useGetEqUsers(businessData?._id, "agents");
+  const {data: users, isLoading} = useGetEqUsers(businessData?._id, "users");
 
   useEffect(()=>{
     console.log("users: ", users);
@@ -64,7 +64,7 @@ export default function UsersPage() {
             </div>
           )}
 
-          {users?.agents?.length > 0 && (
+          {users?.users?.length > 0 && (
             <table className="w-full bg-gradient-to-tr from-slate-950/40 to-slate-900/40 p-4 px-3 rounded-lg">
               <thead>
                 <tr>
@@ -82,16 +82,16 @@ export default function UsersPage() {
               </thead>
 
               <tbody>
-                {users?.agents?.map((user:any) => (
+                {users?.users?.map((user:any) => (
                   <tr key={user?._id}>
                     <td>
                       <div className="flex items-center gap-2 px-3 border rounded border-slate-800 p-1 min-h-[50px]">
                         <Avatar size={40} src="https://api.dicebear.com/7.x/personas/svg" />
                         <div>
                           <h1 className="font-semibold text-sm text-slate-300">
-                            {user?.name}
+                            {user?.user_id?.name}
                           </h1>
-                          <p className="text-xs text-slate-400">{user?.email}</p>
+                          <p className="text-xs text-slate-400">{user?.user_id?.email}</p>
                         </div>
                       </div>
                     </td>
@@ -102,7 +102,7 @@ export default function UsersPage() {
                         whileTap={{ scale: 0.98 }}
                         className="flex justify-center px-4 py-1 rounded-lg border border-slate-800 hover:border-slate-500 
                         cursor-pointer text-xs font-semibold text-slate-300"
-                        onClick={() => router.replace(`/admin/enquiries/users/${user?._id}`)}
+                        onClick={() => router.replace(`/admin/enquiries/users/${user?.user_id?._id}`)}
                       >
                         <Eye size={14} /> Details
                       </motion.div>

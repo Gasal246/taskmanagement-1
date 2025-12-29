@@ -251,6 +251,8 @@ export async function POST(req:NextRequest){
 
             const savedCamp = await newCamp.save();
             campId = savedCamp._id;
+        } else {
+            await Eq_camps.findByIdAndUpdate(campId, {$set: {latitude: body.latitude, longitude: body.longitude}});
         }
 
         const newEnquiry = new Eq_enquiry({

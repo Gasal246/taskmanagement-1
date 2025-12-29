@@ -28,6 +28,11 @@ export default function AddCampPage() {
     const { data: cities } = useGetEqCities(province_id);
     const { data: areas } = useGetEqAreas(city_id);
 
+    const capacityOptions = ["<500", "500-1000", "1000-1500", "1500-2000", "2000-2500", "2500-3000", "3000+"];
+const capacityLimits: Record<string, number> = {
+    "<500": 500, "500-1000": 1000, "1000-1500": 1500, "1500-2000": 2000, "2000-2500": 2500, "2500-3000": 3000, "3000+": 99999
+};
+
     const fetchCountries = async () => {
         const res = await GetCountries();
         if (res?.status == 200) {
@@ -42,6 +47,13 @@ export default function AddCampPage() {
     const { register, handleSubmit, reset, control } = useForm();
 
     const onSubmit = async (data: any) => {
+        const limit = capacityLimits[data.camp_capacity];
+        console.log("limit: ", limit);
+        console.log("occupancy: ", data.camp_occupancy);
+        
+        if(data.camp_occupancy > limit){
+            return toast.error("Camp occupancy cannot exceed Camp Capacity");
+        }
         console.log("Submitting Camp Data:", data);
         const submitData = {
             ...data,
@@ -121,7 +133,7 @@ export default function AddCampPage() {
                                     <SelectValue placeholder="Camp Capacity" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {EQ_CAMP_CAPACITY.map((c) => (
+                                    {capacityOptions.map((c) => (
                                         <SelectItem key={c} value={c}>
                                             {c}
                                         </SelectItem>
