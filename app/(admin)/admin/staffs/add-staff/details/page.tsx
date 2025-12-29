@@ -745,67 +745,7 @@ const AddBusinessStaffDetails = () => {
           </div>
         </div>
 
-        <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg min-h-[20vh] mt-3 border border-slate-700/50">
-          <div className="mb-2 flex items-center justify-between">
-            <h1 className="font-medium text-xs text-slate-300 flex items-center gap-1"><SquareArrowUpRight size={14} /> Assigned Departments</h1>
-          </div>
-          {assignedDepartments?.length === 0 ? (
-            <div className="flex items-center justify-center h-[10vh]">
-              <h1 className="text-xs font-medium text-slate-400">No departments assigned.</h1>
-            </div>
-          ) : (
-            <div className="flex flex-wrap">
-              {assignedDepartments?.map((dept: any) => {
-                const deptName = dept?.department?.dep_name || "Department";
-                const deptType = dept?.department?.type ? `Type: ${dept.department.type}` : "";
-                const scopeLabel = dept?.scope ? `Scope: ${dept.scope}` : "";
-                const roleLabel = dept?.role ? `Role: ${dept.role}` : "";
-                const meta = [deptType, scopeLabel, roleLabel].filter(Boolean).join(" | ");
-                const locationMeta = [
-                  dept?.region?.region_name ? `Region: ${dept.region.region_name}` : "",
-                  dept?.area?.area_name ? `Area: ${dept.area.area_name}` : "",
-                  dept?.location?.location_name ? `Location: ${dept.location.location_name}` : ""
-                ].filter(Boolean).join(" | ");
-                return (
-                  <div className="w-full lg:w-3/12 p-1" key={dept?._id || deptName}>
-                    <div className="bg-gradient-to-tr from-slate-900/60 to-slate-950/60 p-3 rounded-lg border border-slate-700">
-                      <h1 className="font-semibold text-xs text-slate-300">{deptName}</h1>
-                      {meta && <p className="text-[11px] text-slate-400 mt-1">{meta}</p>}
-                      {locationMeta && <p className="text-[11px] text-slate-500 mt-1">{locationMeta}</p>}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg min-h-[20vh] mt-3 border border-slate-700/50">
-          <div className="mb-2 flex items-center justify-between">
-            <h1 className="font-medium text-xs text-slate-300 flex items-center gap-1"><SquareArrowUpRight size={14} /> Assigned Roles</h1>
-          </div>
-          {assignedRoles?.length === 0 ? (
-            <div className="flex items-center justify-center h-[10vh]">
-              <h1 className="text-xs font-medium text-slate-400">No roles assigned.</h1>
-            </div>
-          ) : (
-            <div className="flex flex-wrap">
-              {assignedRoles?.map((role: any) => (
-                <div className="w-full lg:w-3/12 p-1" key={role?._id || role?.role_id?._id}>
-                  <div className="bg-gradient-to-tr from-slate-900/60 to-slate-950/60 p-3 rounded-lg border border-slate-700">
-                    <h1 className="font-semibold text-xs text-slate-300">{role?.role_id?.role_name || "Role"}</h1>
-                    {role?.role_id?.role_number && (
-                      <p className="text-[11px] text-slate-400 mt-1">Role Number: {role?.role_id?.role_number}</p>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-
-
+        
         <div className="mt-3">
           <div className="bg-gradient-to-tr from-slate-950/60 to-slate-900/60 p-4 rounded-lg border border-slate-800/70">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
@@ -962,41 +902,6 @@ const AddBusinessStaffDetails = () => {
         </div>
 
       </div>
-
-
-
-
-      {/* Select Role Dialog
-      <Dialog open={selectRoleOpen} onOpenChange={setSelectRoleOpen}>
-        <DialogContent className="lg:w-[450px]">
-          <DialogHeader>
-            <DialogTitle>Select User Roles</DialogTitle>
-            <DialogDescription>Select user roles for this business staff.</DialogDescription>
-          </DialogHeader>
-          <div className="">
-            {rolesData?.data?.map((role: any) => (
-              <motion.div 
-                key={role?._id}
-                whileTap={{ scale: 0.98 }} 
-                whileHover={{ scale: 1.02 }}  
-                onClick={() => setCurrentSelectedRole(role?.role_name)}
-                className="bg-gradient-to-tr from-slate-800/60 to-slate-900/60 p-3 hover:border-cyan-500 border border-slate-700 select-none cursor-pointer rounded-lg mb-1.5 relative">
-                <h1 className="font-semibold text-xs text-slate-300 flex items-center gap-1">{role?.role_name}</h1>
-                {currentSelectedRole === role?.role_name && <div className="absolute right-2 top-1.5"><Check className="text-cyan-600" strokeWidth={3} size={17} /> </div>}
-
-              </motion.div>
-            ))}
-            <motion.div
-              whileTap={{ scale: 0.98 }} 
-              whileHover={{ scale: 1.02 }}
-              onClick={handleAddSelectedRole}
-              className="bg-gradient-to-tr from-slate-700/50 to-slate-800/50 p-3 hover:border-cyan-500 border border-slate-700 select-none cursor-pointer rounded-lg mt-3 flex items-center gap-1 justify-center">
-              <Plus size={16} />
-              <h1 className="font-semibold text-sm text-slate-300 flex items-center gap-1">Add New Role</h1>
-            </motion.div>
-          </div>
-        </DialogContent>
-      </Dialog> */}
 
       {/* Add Region Dialog */}
       <Dialog open={addRegionDialog} onOpenChange={setAddRegionDialog}>
