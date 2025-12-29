@@ -4,7 +4,7 @@ import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbP
 import { useRouter } from 'next/navigation';
 import { useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '@/redux/store';
-import { DraftingCompass, EllipsisVertical, Eye, Files, MapPinned, Package, PencilRuler, UserRound } from 'lucide-react';
+import { DraftingCompass, EllipsisVertical, Eye, Files, MapPinned, Package, PencilRuler, SquareArrowUp, SquareArrowUpRight, UserRound } from 'lucide-react';
 import { Avatar, Tooltip } from 'antd';
 import { formatDateTiny } from '@/lib/utils';
 import { motion } from 'framer-motion';
@@ -105,6 +105,7 @@ const StaffPage = () => {
         locations: response?.user_locations,
         docs: response?.user_docs,
         skills: response?.user_skills,
+        departments: response?.user_departments,
       })
     } else {
       toast.error("Failed to fetch profile.")
@@ -324,6 +325,61 @@ const StaffPage = () => {
             </div>
           </div>)}
         </div>
+      </div>
+
+      <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg min-h-[20vh] mb-2 border border-slate-700/50 ">
+        <div className="mb-2 flex items-center justify-between">
+          <h1 className="font-medium text-xs text-slate-300 flex items-center gap-1"><SquareArrowUpRight size={14} /> Assigned Departments</h1>
+        </div>
+        {userData?.departments?.length ? (
+          <div className="flex flex-wrap">
+            {userData?.departments?.map((dept: any) => {
+              const deptName = dept?.department?.dep_name || "Department";
+              const deptType = dept?.department?.type ? `Type: ${dept.department.type}` : "";
+              // const scopeLabel = dept?.scope ? `Scope: ${dept.scope}` : "";
+              // const roleLabel = dept?.role ? `Role: ${dept.role}` : "";
+              const meta = [deptType].filter(Boolean).join(" | ");
+              const locationMeta = [
+                dept?.region?.region_name ? `Region: ${dept.region.region_name}` : "",
+                dept?.area?.area_name ? `Area: ${dept.area.area_name}` : "",
+                dept?.location?.location_name ? `Location: ${dept.location.location_name}` : ""
+              ].filter(Boolean).join(" | ");
+              return (
+                <div className="w-full lg:w-3/12 p-1" key={dept?._id || deptName}>
+                  <div className="bg-gradient-to-tr from-slate-900/60 to-slate-950/60 p-3 rounded-lg border border-slate-700">
+                    <h1 className="font-semibold text-xs text-slate-300">{deptName}</h1>
+                    {meta && <p className="text-[11px] text-slate-400 mt-1 uppercase">{meta}</p>}
+                    {locationMeta && <p className="text-[11px] text-slate-500 mt-1">{locationMeta}</p>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="flex items-center justify-center h-[10vh]">
+            <h1 className="text-xs font-medium text-slate-400">No departments assigned.</h1>
+          </div>
+        )}
+      </div>
+      <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg min-h-[20vh] mb-2 border border-slate-700/50 ">
+        <div className="mb-2 flex items-center justify-between">
+          <h1 className="font-medium text-xs text-slate-300 flex items-center gap-1"><SquareArrowUpRight size={14} /> Assigned Roles</h1>
+        </div>
+        {userData?.roles?.length ? (
+          <div className="flex flex-wrap">
+            {userData?.roles?.map((role: any) => (
+              <div className="w-full lg:w-3/12 p-1" key={role?._id || role?.role_id?._id}>
+                <div className="bg-gradient-to-tr from-slate-900/60 to-slate-950/60 p-3 rounded-lg border border-slate-700">
+                  <h1 className="font-semibold text-xs text-slate-300">{role?.role_id?.role_name || "Role"}</h1>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="flex items-center justify-center h-[10vh]">
+            <h1 className="text-xs font-medium text-slate-400">No roles assigned.</h1>
+          </div>
+        )}
       </div>
 
       {/* Update the User Info */}

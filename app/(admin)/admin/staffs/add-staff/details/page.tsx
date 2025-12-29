@@ -4,7 +4,7 @@ import React from 'react'
 import { useSelector } from 'react-redux'
 import { RootState } from '@/redux/store'
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator, BreadcrumbLink } from '@/components/ui/breadcrumb'
-import { Check, EllipsisVertical, FileText, Loader2, Plus, Trash2, Upload, UserPlus, X } from 'lucide-react'
+import { Check, EllipsisVertical, FileText, Loader2, Plus, SquareArrowUpRight, Trash2, Upload, UserPlus, X } from 'lucide-react'
 import { useGetApplicationRoles } from '@/query/superadmin/query'
 import { motion } from 'framer-motion';
 import { Popover, PopoverContent, PopoverTrigger, } from "@/components/ui/popover"
@@ -146,6 +146,8 @@ const AddBusinessStaffDetails = () => {
       setAreas(response?.user_areas);
       setDocs(response?.user_docs);
       setSkills(response?.user_skills);
+      setAssignedRoles(response?.user_roles || []);
+      setAssignedDepartments(response?.user_departments || []);
     } else {
       toast.error("Failed to fetch profile.")
     }
@@ -257,6 +259,8 @@ const AddBusinessStaffDetails = () => {
   const [addSkillDialog, setAddSkillDialog] = React.useState(false);
   const [currentSelectedSkill, setCurrentSelectedSkill] = React.useState<string>('');
   const [skillSearch, setSkillSearch] = React.useState<string>('');
+  const [assignedRoles, setAssignedRoles] = React.useState<any[]>([]);
+  const [assignedDepartments, setAssignedDepartments] = React.useState<any[]>([]);
 
   const skillSearchTerm = skillSearch.trim().toLowerCase();
   const filteredBusinessSkills = businessSkills?.filter((skill: any) => {
@@ -739,6 +743,65 @@ const AddBusinessStaffDetails = () => {
               <h1 className="font-semibold text-xs text-slate-300">Assign Skill</h1>
             </motion.div>
           </div>
+        </div>
+
+        <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg min-h-[20vh] mt-3 border border-slate-700/50">
+          <div className="mb-2 flex items-center justify-between">
+            <h1 className="font-medium text-xs text-slate-300 flex items-center gap-1"><SquareArrowUpRight size={14} /> Assigned Departments</h1>
+          </div>
+          {assignedDepartments?.length === 0 ? (
+            <div className="flex items-center justify-center h-[10vh]">
+              <h1 className="text-xs font-medium text-slate-400">No departments assigned.</h1>
+            </div>
+          ) : (
+            <div className="flex flex-wrap">
+              {assignedDepartments?.map((dept: any) => {
+                const deptName = dept?.department?.dep_name || "Department";
+                const deptType = dept?.department?.type ? `Type: ${dept.department.type}` : "";
+                const scopeLabel = dept?.scope ? `Scope: ${dept.scope}` : "";
+                const roleLabel = dept?.role ? `Role: ${dept.role}` : "";
+                const meta = [deptType, scopeLabel, roleLabel].filter(Boolean).join(" | ");
+                const locationMeta = [
+                  dept?.region?.region_name ? `Region: ${dept.region.region_name}` : "",
+                  dept?.area?.area_name ? `Area: ${dept.area.area_name}` : "",
+                  dept?.location?.location_name ? `Location: ${dept.location.location_name}` : ""
+                ].filter(Boolean).join(" | ");
+                return (
+                  <div className="w-full lg:w-3/12 p-1" key={dept?._id || deptName}>
+                    <div className="bg-gradient-to-tr from-slate-900/60 to-slate-950/60 p-3 rounded-lg border border-slate-700">
+                      <h1 className="font-semibold text-xs text-slate-300">{deptName}</h1>
+                      {meta && <p className="text-[11px] text-slate-400 mt-1">{meta}</p>}
+                      {locationMeta && <p className="text-[11px] text-slate-500 mt-1">{locationMeta}</p>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg min-h-[20vh] mt-3 border border-slate-700/50">
+          <div className="mb-2 flex items-center justify-between">
+            <h1 className="font-medium text-xs text-slate-300 flex items-center gap-1"><SquareArrowUpRight size={14} /> Assigned Roles</h1>
+          </div>
+          {assignedRoles?.length === 0 ? (
+            <div className="flex items-center justify-center h-[10vh]">
+              <h1 className="text-xs font-medium text-slate-400">No roles assigned.</h1>
+            </div>
+          ) : (
+            <div className="flex flex-wrap">
+              {assignedRoles?.map((role: any) => (
+                <div className="w-full lg:w-3/12 p-1" key={role?._id || role?.role_id?._id}>
+                  <div className="bg-gradient-to-tr from-slate-900/60 to-slate-950/60 p-3 rounded-lg border border-slate-700">
+                    <h1 className="font-semibold text-xs text-slate-300">{role?.role_id?.role_name || "Role"}</h1>
+                    {role?.role_id?.role_number && (
+                      <p className="text-[11px] text-slate-400 mt-1">Role Number: {role?.role_id?.role_number}</p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
 

@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { useParams, useRouter } from 'next/navigation';
-import { Building, CheckCircle, Files, FileText, ListTodo, Loader2, PanelsTopLeft, PencilRuler, Upload, Users, Workflow, X } from 'lucide-react';
+import { Building, CheckCircle, Files, FileText, ListTodo, Loader2, PanelsTopLeft, PencilRuler, Trash2, Upload, Users, Workflow, X } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useApproveProject, useGetProjectById, useUpdateProject, useAddProjectDoc, useRemoveProjectDoc } from '@/query/business/queries';
+import { useApproveProject, useGetProjectById, useUpdateProject, useAddProjectDoc, useRemoveProjectDoc, useDeleteProject } from '@/query/business/queries';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { DEPARTMENT_TYPES } from '@/lib/constants';
@@ -53,6 +53,7 @@ const ProjectView = () => {
   const [uploadingDoc, setUploadingDoc] = React.useState(false);
   const [docToDelete, setDocToDelete] = React.useState<any | null>(null);
   const [deleteDocDialogOpen, setDeleteDocDialogOpen] = React.useState(false);
+  const [deleteProjectDialogOpen, setDeleteProjectDialogOpen] = React.useState(false);
   const params = useParams<{ projectid: string }>();
   const { data: session }:any = useSession();
 
@@ -61,6 +62,7 @@ const ProjectView = () => {
   const { mutateAsync: UpdateProject, isPending: UpdatingProject } = useUpdateProject();
   const { mutateAsync: addProjectDoc } = useAddProjectDoc();
   const { mutateAsync: removeProjectDoc } = useRemoveProjectDoc();
+  const { mutateAsync: deleteProject, isPending: deletingProject } = useDeleteProject();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -333,6 +335,18 @@ const ProjectView = () => {
     setDeleteDocDialogOpen(true);
   };
 
+  const handleDeleteProject = async () => {
+    if (deletingProject) return;
+    const res = await deleteProject(params.projectid);
+    if (res?.status === 200) {
+      toast.success(res?.message || "Project deleted.");
+      setDeleteProjectDialogOpen(false);
+      router.push('/admin/projects');
+      return;
+    }
+    toast.error(res?.message || "Failed to delete project.");
+  };
+
   if (isLoading) {
     return (
       <div className='p-5 overflow-y-scroll pb-20 bg-gradient-to-tr from-slate-950/50 to-slate-900/50 min-h-screen flex items-center justify-center'>
@@ -374,6 +388,15 @@ const ProjectView = () => {
             >
               <PencilRuler className='group-hover:text-pink-300' size={12} />
               Edit Info
+            </motion.div>
+            <motion.div
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className='p-2 px-4 group rounded-lg border border-red-700/60 hover:border-red-500 bg-gradient-to-tr from-slate-900 to-slate-800 cursor-pointer text-xs font-medium flex gap-1 items-center text-red-300'
+              onClick={() => setDeleteProjectDialogOpen(true)}
+            >
+              <Trash2 className='group-hover:text-red-200' size={12} />
+              Delete
             </motion.div>
           </div>
         </div>
@@ -906,6 +929,21 @@ const ProjectView = () => {
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => { setDeleteDocDialogOpen(false); setDocToDelete(null); }}>Cancel</Button>
             <Button variant="destructive" onClick={() => { if(docToDelete) handleRemoveDoc(docToDelete); setDeleteDocDialogOpen(false); setDocToDelete(null); }}>Remove</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteProjectDialogOpen} onOpenChange={setDeleteProjectDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete project?</DialogTitle>
+            <DialogDescription>This will remove the project and its related records. This action cannot be undone.</DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setDeleteProjectDialogOpen(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleDeleteProject} disabled={deletingProject}>
+              {deletingProject ? "Deleting..." : "Delete"}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

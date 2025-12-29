@@ -35,7 +35,7 @@ const ProjectsPage = () => {
   const { mutateAsync: getBusinessClients, isPending: loadingBusinessClients } = useGetBusinessClients();
   const { mutateAsync: fetchCompleteRegion, isPending: loadingCompleteRegion } = useGetRegionComplete();
   const { data: session }: any = useSession();
-  const [selectedSection, setSelectedSection] = useState('waiting');
+  const [selectedSection, setSelectedSection] = useState('all');
   const [selectedDomainWise, setSelectedDomainWise] = useState('');
   const [selectedDomainId, setSelectedDomainId] = useState('');
   const [startDate, setStartDate] = useState('');
@@ -57,14 +57,17 @@ const ProjectsPage = () => {
   };
 
   useEffect(() => {
-    setFilters({business_id: businessData?._id, section: selectedSection});
+    setFilters({
+      business_id: businessData?._id,
+      ...(selectedSection !== 'all' ? { section: selectedSection } : {}),
+    });
     refetch();
   }, []);
 
   const handleClearAll = () => {
     setStartDate('');
     setEndDate('');
-    setSelectedSection('');
+    setSelectedSection('all');
     setSelectedDomainWise('');
     setSelectedDomainId('');
     setFilters({business_id: businessData?._id});
@@ -120,22 +123,45 @@ const ProjectsPage = () => {
   useEffect(()=>{
     if(businessData){
       setCanAdd(businessData?.admins?.some((x:any) => x.user_id == session?.user?.id));
-
     }
   }, [])
 
   const handleSearchProjects = async() => {
     try{
-      setFilters({
-      business_id: businessData?._id,
-      section: selectedSection,
-      domainWise: selectedDomainWise,
-      domainId: selectedDomainId,
-      department: selectedDomainWise === "region" ? selectedDepartment : "",
-      area: selectedDomainWise === "region" ? selectedArea : "",
-      startDate,
-      endDate,
-    });
+      const nextFilters: Record<string, string | undefined> = {
+        business_id: businessData?._id,
+      };
+
+      if (selectedSection !== 'all') {
+        nextFilters.section = selectedSection;
+      }
+
+      if (selectedDomainWise) {
+        nextFilters.domainWise = selectedDomainWise;
+      }
+
+      if (selectedDomainId) {
+        nextFilters.domainId = selectedDomainId;
+      }
+
+      if (selectedDomainWise === 'region') {
+        if (selectedDepartment) {
+          nextFilters.department = selectedDepartment;
+        }
+        if (selectedArea) {
+          nextFilters.area = selectedArea;
+        }
+      }
+
+      if (startDate) {
+        nextFilters.startDate = startDate;
+      }
+
+      if (endDate) {
+        nextFilters.endDate = endDate;
+      }
+
+      setFilters(nextFilters);
 
     //refetch(); 
     //console.log("Filters applied:", projects);

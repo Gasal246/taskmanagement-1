@@ -1,4 +1,5 @@
 import connectDB from "@/lib/mongo";
+import mongoose from "mongoose";
 import Business_Project from "@/models/business_project.model";
 import Business_Tasks from "@/models/business_tasks.model";
 import Flow_Log from "@/models/Flow_Log.model";
@@ -15,6 +16,9 @@ connectDB();
 export async function GET(req: NextRequest, {params}: { params: { projectid: string }}) {
     try{
         const {projectid} = params;
+        if (!mongoose.Types.ObjectId.isValid(projectid)) {
+            return NextResponse.json({ message: "Invalid project id" }, { status: 400 });
+        }
         let project = await Business_Project.findById(projectid);
         if (!project) {
             return NextResponse.json({ message: "Project not found" }, { status: 404 });
@@ -45,11 +49,19 @@ export async function GET(req: NextRequest, {params}: { params: { projectid: str
         }).lean();
 
         //Fetch project people (business staffs under this business)
-        const businessStaffs = await Business_staffs.find({ business_id: project?.business_id, status: { $ne: 0 } }).select("user_id");
-        const staffUserIds = businessStaffs.map((bs) => bs.user_id).filter(Boolean).map((id: any) => id.toString());
-        if (project?.creator) staffUserIds.push(project.creator.toString());
-        if (project?.admin_id) staffUserIds.push(project.admin_id.toString());
-        const uniqueStaffIds = [...new Set(staffUserIds)];
+        const staffUserIds: string[] = [];
+        if (mongoose.Types.ObjectId.isValid(project?.business_id)) {
+            const businessStaffs = await Business_staffs.find({ business_id: project?.business_id, status: { $ne: 0 } }).select("user_id");
+            staffUserIds.push(
+                ...businessStaffs
+                    .map((bs) => bs.user_id)
+                    .filter(Boolean)
+                    .map((id: any) => id.toString())
+            );
+        }
+        if (mongoose.Types.ObjectId.isValid(project?.creator)) staffUserIds.push(project.creator.toString());
+        if (mongoose.Types.ObjectId.isValid(project?.admin_id)) staffUserIds.push(project.admin_id.toString());
+        const uniqueStaffIds = [...new Set(staffUserIds.filter((id) => mongoose.Types.ObjectId.isValid(id)))];
 
         // roles lookup
         let roleMap = new Map<string, string[]>();

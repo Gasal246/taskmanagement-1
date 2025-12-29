@@ -813,6 +813,15 @@ export async function ApproveProjectFunc(project_id:string){
     }
 }
 
+export async function deleteProjectFunc(project_id: string) {
+    try {
+        const res = await axios.delete(`/api/project/delete?project_id=${project_id}`);
+        return res.data;
+    } catch (err) {
+        console.log(err);
+    }
+}
+
 export async function addNewTeamFunc (payload:any){
     try{
         const res = await axios.post('/api/project/teams/add-team', payload);
