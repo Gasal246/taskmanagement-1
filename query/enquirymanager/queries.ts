@@ -16,9 +16,11 @@ import { AcceptEnquiryEdits, ActivateDeactivateEqAgents, ActivateEqCamp, AddEqUs
      GetEqUsers,
      GetUserAssignedEnquiries,
      PutEnquiryEditReq,
+     RemoveEnquiry,
      RemoveEnquiryAgent,
      RemoveEqCamp,
      RemoveEqUsers,
+     UpdateEnquiry,
      UpdateEqArea,
      UpdateEqCamp,
      UpdateEqCampContact
@@ -262,6 +264,13 @@ export const useActivateEqCamp = () => {
     })
 }
 
+//Update Enquiry (Admin)
+export const useUpdateEnquiry = () => {
+    return useMutation({
+        mutationFn: (payload: any) => UpdateEnquiry(payload),
+    })
+}
+
 
 
 // Get Agent by ID
@@ -424,5 +433,12 @@ export const useRemoveEqUsers = () => {
 export const useRemoveEnquiryAgent = () => {
     return useMutation({
         mutationFn: (agent_id: string) => RemoveEnquiryAgent(agent_id),
+    })
+}
+
+//Remove Enquiry
+export const useRemoveEnquiry = () => {
+    return useMutation({
+        mutationFn: (enquiry_id: string) => RemoveEnquiry(enquiry_id),
     })
 }

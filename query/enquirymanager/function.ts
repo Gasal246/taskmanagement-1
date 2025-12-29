@@ -291,6 +291,16 @@ export async function ActivateEqCamp(payload:any){
     }
 }
 
+//Update Enquiry (Admin)
+export async function UpdateEnquiry(payload: any){
+    try{
+        const res = await axios.put("/api/enquiries/update/enquiry", payload);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
 //Get Area by ID
 export async function GetEqAreaById(area_id: string){
     try{
@@ -515,6 +525,16 @@ export async function RemoveEqUsers(user_id: string){
 export async function RemoveEnquiryAgent(agent_id: string){
     try{
         const res = await axios.delete(`/api/enquiries/agents/delete?agent_id=${agent_id}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+//Delete Enquiry
+export async function RemoveEnquiry(enquiry_id: string){
+    try{
+        const res = await axios.delete(`/api/enquiries/delete/enquiry?enquiry_id=${enquiry_id}`);
         return res.data;
     }catch(err){
         console.log(err);

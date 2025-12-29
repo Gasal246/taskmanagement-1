@@ -28,6 +28,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Form } from "antd";
 import { DEPARTMENT_TYPES } from "@/lib/constants";
 import { useGetBusinessClients, useGetBusinessRegions } from "@/query/business/queries";
+import { CheckCircle2 } from "lucide-react";
 
 // -------------------------------------------------------
 
@@ -221,7 +222,7 @@ export default function EscalatePage() {
         {/* SEARCH USERS */}
         <div className="bg-slate-900/40 p-4 rounded-lg">
         <h2 className="font-semibold mb-2 text-sm">Enquiry View Access</h2>
-          <h1 className="font-semibold mb-2 text-sm">Search & Select Users</h1>
+          <h1 className="font-semibold mb-2 text-sm">Search & Select Users ({selectedUsers.length})</h1>
 
           <Input
             placeholder="Search users..."
@@ -230,18 +231,20 @@ export default function EscalatePage() {
             className="mb-3"
           />
 
-          <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+          <div className="overflow-y-auto pr-1 w-full flex flex-row">
             {filteredUsers?.map((user: any) => (
+              <div className="p-1 w-1/4" key={user._id}> 
               <div
-                key={user._id}
                 onClick={() => toggleUser(user?.user_id._id)}
-                className={`p-2 rounded cursor-pointer border ${selectedUsers.includes(user?.user_id._id)
+                className={`relative p-2 rounded cursor-pointer border ${selectedUsers.includes(user?.user_id._id)
                   ? "bg-slate-700 border-slate-500"
                   : "bg-slate-800 border-slate-700 hover:border-slate-500"
                   }`}
               >
                 <p className="text-sm font-medium">{user?.user_id?.name}</p>
                 <p className="text-xs text-slate-400">{user?.user_id?.email}</p>
+                {selectedUsers.includes(user?.user_id._id) && <CheckCircle2 size={20} className="text-green-500 absolute top-2 right-2" />}
+              </div>
               </div>
             ))}
           </div>

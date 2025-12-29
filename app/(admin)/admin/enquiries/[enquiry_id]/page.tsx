@@ -1,28 +1,51 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Mail, Phone, User, Clock, BadgeCheck, UserCircle2 } from "lucide-react";
+import { Mail, Phone, User, Clock, BadgeCheck, Pencil, Trash2, UserCircle2 } from "lucide-react";
 import { Avatar } from "antd";
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useGetEnquiryById } from "@/query/enquirymanager/queries";
+import { useGetEnquiryById, useRemoveEnquiry } from "@/query/enquirymanager/queries";
 import { formatDateTiny } from "@/lib/utils";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { toast } from "sonner";
 
 
 export default function SingleEnquiryPage() {
   const router = useRouter();
   const params = useParams<{ enquiry_id: string }>();
   const { data: enquiry, isLoading } = useGetEnquiryById(params.enquiry_id);
-  useEffect(() => {
-    console.log("enquiry: ", enquiry);
-  }, [enquiry]);
-
+  const { mutateAsync: RemoveEnquiry, isPending: isDeleting } = useRemoveEnquiry();
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const openMap = () => {
-    window.open(`https://www.google.com/maps?q=${enquiry.enquiry.camp_id?.latitude},${enquiry.enquiry.camp_id?.longitude}`, "_blank");
+    const lat = enquiry?.enquiry?.camp_id?.latitude;
+    const lng = enquiry?.enquiry?.camp_id?.longitude;
+    if (!lat || !lng) {
+      toast.error("Location not available.");
+      return;
+    }
+    window.open(`https://www.google.com/maps?q=${lat},${lng}`, "_blank");
   };
+
+  const handleDeleteEnquiry = async () => {
+    const res = await RemoveEnquiry(params.enquiry_id);
+    if (res?.status === 200) {
+      toast.success(res?.message || "Enquiry deleted");
+      router.replace("/admin/enquiries");
+      return;
+    }
+    toast.error(res?.message || "Failed to delete enquiry");
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-40">
+        <div className="animate-spin rounded-full h-8 w-8 border-4 border-slate-700 border-t-cyan-400" />
+      </div>
+    );
+  }
 
   return (
     <div className='p-4 pb-10'>
@@ -40,17 +63,42 @@ export default function SingleEnquiryPage() {
       </Breadcrumb>
       <div className="p-4 pb-10 text-slate-100">
         {/* HEADER */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="mb-4">
-            <h1 className="text-xl font-bold flex items-center gap-2">
-              <UserCircle2 size={20} /> Enquiry Details
-            </h1>
-            <p className="text-sm text-slate-400 mt-1">
-              Enquiry ID: {enquiry?.enquiry?.enquiry_uuid}
-            </p>
+        <div className="mb-4 space-y-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h1 className="text-xl font-bold flex items-center gap-2">
+                <UserCircle2 size={20} /> Enquiry Details
+              </h1>
+              <p className="text-sm text-slate-400 mt-1">
+                Enquiry ID: {enquiry?.enquiry?.enquiry_uuid}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-900/40 px-3 py-2">
+                <span className="text-[11px] uppercase tracking-wide text-slate-400">Manage</span>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => router.replace(`/admin/enquiries/${params.enquiry_id}/edit`)}
+                  >
+                    <Pencil size={14} /> Edit
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => setDeleteDialogOpen(true)}
+                  >
+                    <Trash2 size={14} /> Delete
+                  </Button>
+                </div>
+              </div>
+            </div>
           </div>
           {/* BUTTONS ON RIGHT */}
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             {!enquiry?.enquiry?.area_id?.is_active && (<Button
               className="flex items-center gap-1"
               onClick={() => router.replace(`/admin/enquiries/${params.enquiry_id}/area/${enquiry?.enquiry?.area_id?._id}`)}
@@ -76,6 +124,27 @@ export default function SingleEnquiryPage() {
             )}
           </div>
         </div>
+
+        <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Delete this enquiry?</DialogTitle>
+              <DialogDescription>
+                This will remove the enquiry and its related records. This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+              <Button
+                variant="destructive"
+                disabled={isDeleting}
+                onClick={handleDeleteEnquiry}
+              >
+                {isDeleting ? "Deleting..." : "Delete"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* CARD */}
         <div className="bg-gradient-to-tr from-slate-950/60 to-slate-900/60 p-5 rounded-xl border border-slate-800 space-y-5">
