@@ -6,7 +6,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '@/redux/store';
 import { Check, CircleCheckBig, Earth, EllipsisVertical, Eye, InfoIcon, Plus, Trash2 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from '@/components/ui/input';
 import { useAddRegionArea, useAddRegionDepartment, useAddRegionHead, useAddRegionStaff, useGetRegionComplete, useRemoveRegionArea, useRemoveRegionDepartment, useRemoveRegionHead, useRemoveRegionStaff } from '@/query/business/queries';
 import { useGetBusinessStaffs } from '@/query/user/queries';
@@ -98,6 +98,7 @@ const RegionPage = () => {
 
     const [addHeadOpen, setAddHeadOpen] = React.useState<boolean>(false);
     const [selectedUser, setSelectedUser] = React.useState<string>("");
+    const [headSearch, setHeadSearch] = React.useState<string>("");
 
     const handleAddRegionHead = async () => {
         if(addingHead) return;
@@ -166,6 +167,12 @@ const RegionPage = () => {
     const [openAddStaffDialog, setOpenAddStaffDialog] = useState<boolean>(false);
     const { data: businessStaffs, isLoading: loadingBusinessStaffs } = useGetBusinessStaffs(regionData?.business_id);
     const { mutateAsync: addStaff, isPending: addingStaff } = useAddRegionStaff();
+
+    const headSearchTerm = headSearch.trim().toLowerCase();
+    const filteredHeadStaffs = businessStaffs?.filter((staff: any) => {
+        const name = staff?.user_id?.name || "";
+        return name.toLowerCase().includes(headSearchTerm);
+    });
 
     const handleAddRegionStaff = async () => {
         if(addingStaff) return;
@@ -515,16 +522,23 @@ const RegionPage = () => {
 
             {/* Add Head Dialog */}
             <Dialog open={addHeadOpen} onOpenChange={setAddHeadOpen}>
-                <DialogContent className="sm:max-w-[425px]">
+                <DialogContent className="sm:max-w-[425px] max-h-[70vh] flex flex-col">
                     <DialogHeader>
                         <DialogTitle>Add Region Head</DialogTitle>
                         <DialogDescription>Adding region head under region - {regionData?.region_name}.</DialogDescription>
                     </DialogHeader>
-                    <div className="">
-                        {!loadingBusinessStaffs && businessStaffs?.length === 0 && <div className='w-full h-[10vh] flex items-center justify-center'>
-                            <h1 className="text-xs font-medium text-slate-400">No business staffs found</h1>
+                    <div className="space-y-2">
+                        <Input
+                            placeholder="Search staff by name"
+                            value={headSearch}
+                            onChange={(e) => setHeadSearch(e.target.value)}
+                        />
+                    </div>
+                    <div className="relative flex-1 overflow-y-auto pb-16">
+                        {!loadingBusinessStaffs && filteredHeadStaffs?.length === 0 && <div className='w-full h-[10vh] flex items-center justify-center'>
+                            <h1 className="text-xs font-medium text-slate-400">{headSearchTerm ? "No matching users" : "No business staffs found"}</h1>
                         </div>}
-                        {businessStaffs?.map(( staff: any ) => <motion.div
+                        {filteredHeadStaffs?.map(( staff: any ) => <motion.div
                             whileHover={{ scale: 1.02 }}
                             whileTap={{ scale: 0.98 }}
                             key={staff?._id}
@@ -542,15 +556,20 @@ const RegionPage = () => {
                                 <Check className="text-cyan-600" strokeWidth={3} size={18} />
                             </div>}
                         </motion.div>)}
+                    </div>
+                    
+                <DialogFooter className='w-full'>
+                    <div className="pt-2 bg-slate-950/80 w-full">
                         <motion.div
                             whileTap={{ scale: 0.98 }}
                             whileHover={{ scale: 1.02 }}
-                            className='p-2 bg-gradient-to-br group from-slate-950/70 to-slate-800/70 rounded-lg cursor-pointer text-sm font-medium flex items-center gap-1 px-4 border border-slate-700 hover:border-cyan-600 justify-center mt-2'
+                            className='p-2 bg-gradient-to-br group from-slate-950/70 to-slate-800/70 rounded-lg cursor-pointer text-sm font-medium flex items-center gap-1 px-4 border border-slate-700 hover:border-cyan-600 justify-center'
                             onClick={handleAddRegionHead}
                         >
                             {addingHead ? <LoaderSpin size={22} /> : <CircleCheckBig className="group-hover:text-cyan-600" size={18} />} Add Head
                         </motion.div>
                     </div>
+                </DialogFooter>
                 </DialogContent>
             </Dialog>
             <Dialog open={openAddStaffDialog} onOpenChange={setOpenAddStaffDialog}>
@@ -626,4 +645,3 @@ const RegionPage = () => {
 }
 
 export default RegionPage
-

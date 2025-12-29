@@ -9,7 +9,7 @@ import { useGetApplicationRoles } from '@/query/superadmin/query'
 import { motion } from 'framer-motion';
 import { Popover, PopoverContent, PopoverTrigger, } from "@/components/ui/popover"
 import { Popconfirm } from 'antd';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from 'sonner'
 import { useGetAreaLocations, useGetBusinessRegions, useGetBusinessSkills, useGetRegionAreas } from '@/query/business/queries'
 import { useAddUserRegion, useAddUserRole, useGetUserCompleteProfile, useRemoveUserRole, useRemoveUserRegion, useAddUserArea, useRemoveUserArea, useAddUserSkill, useRemoveUserSkill, useAddUserDoc, useRemoveUserDoc, useAddUserLocation, useRemoveUserLocation } from '@/query/user/queries'
@@ -90,17 +90,17 @@ const AddBusinessStaffDetails = () => {
 
   const handleFetchBusinessRegions = async () => {
     const res = await getRegions({ business_id: businessData?._id });
-    if(res?.status == 200){
+    if (res?.status == 200) {
       setBusinessRegions(res?.data);
     }
   }
 
-  const handleAddRegion= async () => {
-    if(!currentSelectedRegion){
+  const handleAddRegion = async () => {
+    if (!currentSelectedRegion) {
       toast.error('Please select a region.');
       return;
     }
-    if(regions?.find((region: any) => region?.region_id == currentSelectedRegion)){
+    if (regions?.find((region: any) => region?.region_id == currentSelectedRegion)) {
       toast.error('Region already added.');
       return;
     }
@@ -110,7 +110,7 @@ const AddBusinessStaffDetails = () => {
       region_id: currentSelectedRegion
     }));
     const res = await addUserRegion(formData);
-    if(res?.status == 200){
+    if (res?.status == 200) {
       toast.success('Region added successfully.');
       await handleGetCompleteProfile();
     } else {
@@ -120,9 +120,9 @@ const AddBusinessStaffDetails = () => {
     setAddRegionDialog(false);
   }
 
-  const handleRemoveRegion = async (URegid: string /* UserRegionID */ ) => {
+  const handleRemoveRegion = async (URegid: string /* UserRegionID */) => {
     const res = await removeUserRegion(URegid);
-    if(res?.status == 200){
+    if (res?.status == 200) {
       toast.success('Region removed successfully.');
       handleGetCompleteProfile();
     } else {
@@ -133,14 +133,14 @@ const AddBusinessStaffDetails = () => {
   const handleGetCompleteProfile = async () => {
     const response = await getUserProfile(businessStaff?._id || "");
     console.log(response)
-    if(response?.status == 200){
+    if (response?.status == 200) {
       // setRoles(response?.user_roles);
       setRegions(response?.user_regions);
-      if(response?.user_regions?.length > 0){
+      if (response?.user_regions?.length > 0) {
         handleFetchBusinessAreas(response?.user_regions?.map((region: any) => region?.region_id?._id));
       }
       setLocations(response?.user_locations);
-      if(response?.user_areas?.length > 0){
+      if (response?.user_areas?.length > 0) {
         handleFetchBusinessLocations(response?.user_areas?.map((area: any) => area?.area_id?._id));
       }
       setAreas(response?.user_areas);
@@ -157,21 +157,21 @@ const AddBusinessStaffDetails = () => {
   const [currentSelectedLocation, setCurrentSelectedLocation] = React.useState<string>('');
 
   const handleFetchBusinessLocations = async (area_ids: string[]) => {
-    if(!area_ids?.length){
+    if (!area_ids?.length) {
       return;
     }
     const res = await getLocations({ area_ids });
-    if(res?.status == 200){
+    if (res?.status == 200) {
       setBusinessLocations(res?.data);
     }
   }
 
   const handleAddLocation = async () => {
-    if(!currentSelectedLocation){
+    if (!currentSelectedLocation) {
       toast.error('Please select a location.');
       return;
     }
-    if(locations?.find((location: any) => location?.location_id == currentSelectedLocation)){
+    if (locations?.find((location: any) => location?.location_id == currentSelectedLocation)) {
       toast.error('Location already added.');
       return;
     }
@@ -181,7 +181,7 @@ const AddBusinessStaffDetails = () => {
       location_id: currentSelectedLocation
     }));
     const res = await addUserLocation(formData);
-    if(res?.status == 200){
+    if (res?.status == 200) {
       toast.success('Location added successfully.');
       handleGetCompleteProfile();
     } else {
@@ -193,7 +193,7 @@ const AddBusinessStaffDetails = () => {
 
   const handleRemoveLocation = async (location_id: string) => {
     const res = await removeUserLocation(location_id);
-    if(res?.status == 200){
+    if (res?.status == 200) {
       toast.success('Location removed successfully.');
       handleGetCompleteProfile();
     } else {
@@ -207,22 +207,22 @@ const AddBusinessStaffDetails = () => {
   const [currentSelectedArea, setCurrentSelectedArea] = React.useState<string>('');
 
   const handleFetchBusinessAreas = async (region_ids: string[]) => {
-    if(!region_ids?.length){
+    if (!region_ids?.length) {
       toast.error('no areas fetched');
       return;
     }
     const res = await getAreas({ region_ids });
-    if(res?.status == 200){
+    if (res?.status == 200) {
       setBusinessAreas(res?.data);
     }
   }
 
   const handleAddArea = async () => {
-    if(!currentSelectedArea){
+    if (!currentSelectedArea) {
       toast.error('Please select an area.');
       return;
     }
-    if(areas?.find((area: any) => area?.area_id == currentSelectedArea)){
+    if (areas?.find((area: any) => area?.area_id == currentSelectedArea)) {
       toast.error('Area already added.');
       return;
     }
@@ -232,7 +232,7 @@ const AddBusinessStaffDetails = () => {
       area_id: currentSelectedArea
     }));
     const res = await addUserArea(formData);
-    if(res?.status == 200){
+    if (res?.status == 200) {
       toast.success('Area added successfully.');
       handleGetCompleteProfile();
     } else {
@@ -244,7 +244,7 @@ const AddBusinessStaffDetails = () => {
 
   const handleRemoveArea = async (UAreaId: string) => {
     const res = await removeUserArea(UAreaId);
-    if(res?.status == 200){
+    if (res?.status == 200) {
       toast.success('Area removed successfully.');
       handleGetCompleteProfile();
     } else {
@@ -256,20 +256,27 @@ const AddBusinessStaffDetails = () => {
   const [businessSkills, setBusinessSkills] = React.useState<any[]>([]);
   const [addSkillDialog, setAddSkillDialog] = React.useState(false);
   const [currentSelectedSkill, setCurrentSelectedSkill] = React.useState<string>('');
+  const [skillSearch, setSkillSearch] = React.useState<string>('');
+
+  const skillSearchTerm = skillSearch.trim().toLowerCase();
+  const filteredBusinessSkills = businessSkills?.filter((skill: any) => {
+    const name = skill?.skill_name || "";
+    return name.toLowerCase().includes(skillSearchTerm);
+  });
 
   const handleFetchBusinessSkills = async () => {
     const res = await getSkills(businessData?._id);
-    if(res?.status == 200){
+    if (res?.status == 200) {
       setBusinessSkills(res?.data);
     }
   }
 
   const handleAddSkill = async () => {
-    if(!currentSelectedSkill){
+    if (!currentSelectedSkill) {
       toast.error('Please select a skill.');
       return;
     }
-    if(skills?.find((skill: any) => skill?.skill_id == currentSelectedSkill)){
+    if (skills?.find((skill: any) => skill?.skill_id == currentSelectedSkill)) {
       toast.error('Skill already added.');
       return;
     }
@@ -279,7 +286,7 @@ const AddBusinessStaffDetails = () => {
       skill_id: currentSelectedSkill
     }));
     const res = await addUserSkill(formData);
-    if(res?.status == 200){
+    if (res?.status == 200) {
       toast.success('Skill added successfully.');
       handleGetCompleteProfile();
     } else {
@@ -291,7 +298,7 @@ const AddBusinessStaffDetails = () => {
 
   const handleRemoveSkill = async (USkillId: string) => {
     const res = await removeUserSkill(USkillId);
-    if(res?.status == 200){
+    if (res?.status == 200) {
       toast.success('Skill removed successfully.');
       handleGetCompleteProfile();
     } else {
@@ -428,7 +435,7 @@ const AddBusinessStaffDetails = () => {
         storage_path: storagePath,
       }));
       const res = await addUserDoc(formData);
-      if(res?.status == 200){
+      if (res?.status == 200) {
         toast.success('Document added successfully.');
         await handleGetCompleteProfile();
       } else {
@@ -452,14 +459,14 @@ const AddBusinessStaffDetails = () => {
   }
 
   const handleRemoveDoc = async (doc: any) => {
-    if(!doc?._id) return;
+    if (!doc?._id) return;
     const previousDocs = [...docs];
     setDocs((prev) => prev.filter((item: any) => item?._id !== doc?._id));
 
     const pathFromUrl = doc?.storage_path || extractStoragePath(doc?.doc_url || '');
     try {
       const res = await removeUserDoc(doc?._id);
-      if(res?.status != 200){
+      if (res?.status != 200) {
         setDocs(previousDocs);
         toast.error('Failed to remove document.');
         return;
@@ -483,12 +490,12 @@ const AddBusinessStaffDetails = () => {
   };
 
   React.useEffect(() => {
-    if(businessStaff){
+    if (businessStaff) {
       handleFetchBusinessRegions();
       handleGetCompleteProfile();
       handleFetchBusinessSkills();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [businessStaff]);
 
   return (
@@ -791,7 +798,7 @@ const AddBusinessStaffDetails = () => {
                           <Upload size={14} className="text-cyan-400" />
                           <span className="truncate">{docFile ? docFile.name : 'Choose or drop a file'}</span>
                         </div>
-                        {docFile && <span className="text-[11px] text-slate-400">{(docFile.size/1024/1024).toFixed(2)} MB</span>}
+                        {docFile && <span className="text-[11px] text-slate-400">{(docFile.size / 1024 / 1024).toFixed(2)} MB</span>}
                       </div>
                       <input type="file" accept="image/*,application/pdf" className="hidden" onChange={handleFileChange} />
                     </label>
@@ -890,11 +897,11 @@ const AddBusinessStaffDetails = () => {
             </div>
           </div>
         </div>
-        
+
       </div>
 
 
-      
+
 
       {/* Select Role Dialog
       <Dialog open={selectRoleOpen} onOpenChange={setSelectRoleOpen}>
@@ -944,16 +951,16 @@ const AddBusinessStaffDetails = () => {
             {businessRegions?.map((region: any) => (
               <motion.div
                 key={region?._id}
-                whileTap={{ scale: 0.98 }} 
-                whileHover={{ scale: 1.02 }}  
+                whileTap={{ scale: 0.98 }}
+                whileHover={{ scale: 1.02 }}
                 onClick={() => setCurrentSelectedRegion(region?._id)}
                 className="bg-gradient-to-tr from-slate-800/60 to-slate-900/60 p-3 hover:border-cyan-500 border border-slate-700 select-none cursor-pointer rounded-lg mb-1.5 relative">
-              <h1 className="font-semibold text-xs text-slate-300 flex items-center gap-1">{region?.region_name}</h1>
-              {currentSelectedRegion === region?._id && <div className="absolute right-2 top-1.5"><Check className="text-cyan-600" strokeWidth={3} size={17} /> </div>}
-            </motion.div>
+                <h1 className="font-semibold text-xs text-slate-300 flex items-center gap-1">{region?.region_name}</h1>
+                {currentSelectedRegion === region?._id && <div className="absolute right-2 top-1.5"><Check className="text-cyan-600" strokeWidth={3} size={17} /> </div>}
+              </motion.div>
             ))}
             <motion.div
-              whileTap={{ scale: 0.98 }} 
+              whileTap={{ scale: 0.98 }}
               whileHover={{ scale: 1.02 }}
               onClick={handleAddRegion}
               className="bg-gradient-to-tr from-slate-700/50 to-slate-800/50 p-3 hover:border-cyan-500 border border-slate-700 select-none cursor-pointer rounded-lg mt-3 flex items-center gap-1 justify-center">
@@ -980,16 +987,16 @@ const AddBusinessStaffDetails = () => {
             {businessAreas?.map((area: any) => (
               <motion.div
                 key={area?._id}
-                whileTap={{ scale: 0.98 }} 
-                whileHover={{ scale: 1.02 }}  
+                whileTap={{ scale: 0.98 }}
+                whileHover={{ scale: 1.02 }}
                 onClick={() => setCurrentSelectedArea(area?._id)}
                 className="bg-gradient-to-tr from-slate-800/60 to-slate-900/60 p-3 hover:border-cyan-500 border border-slate-700 select-none cursor-pointer rounded-lg mb-1.5 relative">
-              <h1 className="font-semibold text-xs text-slate-300 flex items-center gap-1">{area?.area_name}</h1>
-              {currentSelectedArea === area?._id && <div className="absolute right-2 top-1.5"><Check className="text-cyan-600" strokeWidth={3} size={17} /> </div>}
-            </motion.div>
+                <h1 className="font-semibold text-xs text-slate-300 flex items-center gap-1">{area?.area_name}</h1>
+                {currentSelectedArea === area?._id && <div className="absolute right-2 top-1.5"><Check className="text-cyan-600" strokeWidth={3} size={17} /> </div>}
+              </motion.div>
             ))}
             <motion.div
-              whileTap={{ scale: 0.98 }} 
+              whileTap={{ scale: 0.98 }}
               whileHover={{ scale: 1.02 }}
               onClick={handleAddArea}
               className="bg-gradient-to-tr from-slate-700/50 to-slate-800/50 p-3 hover:border-cyan-500 border border-slate-700 select-none cursor-pointer rounded-lg mt-3 flex items-center gap-1 justify-center">
@@ -1016,16 +1023,16 @@ const AddBusinessStaffDetails = () => {
             {businessLocations?.map((location: any) => (
               <motion.div
                 key={location?._id}
-                whileTap={{ scale: 0.98 }} 
-                whileHover={{ scale: 1.02 }}  
+                whileTap={{ scale: 0.98 }}
+                whileHover={{ scale: 1.02 }}
                 onClick={() => setCurrentSelectedLocation(location?._id)}
                 className="bg-gradient-to-tr from-slate-800/60 to-slate-900/60 p-3 hover:border-cyan-500 border border-slate-700 select-none cursor-pointer rounded-lg mb-1.5 relative">
-              <h1 className="font-semibold text-xs text-slate-300 flex items-center gap-1">{location?.location_name}</h1>
-              {currentSelectedLocation === location?._id && <div className="absolute right-2 top-1.5"><Check className="text-cyan-600" strokeWidth={3} size={17} /> </div>}
-            </motion.div>
+                <h1 className="font-semibold text-xs text-slate-300 flex items-center gap-1">{location?.location_name}</h1>
+                {currentSelectedLocation === location?._id && <div className="absolute right-2 top-1.5"><Check className="text-cyan-600" strokeWidth={3} size={17} /> </div>}
+              </motion.div>
             ))}
             <motion.div
-              whileTap={{ scale: 0.98 }} 
+              whileTap={{ scale: 0.98 }}
               whileHover={{ scale: 1.02 }}
               onClick={handleAddLocation}
               className="bg-gradient-to-tr from-slate-700/50 to-slate-800/50 p-3 hover:border-cyan-500 border border-slate-700 select-none cursor-pointer rounded-lg mt-3 flex items-center gap-1 justify-center">
@@ -1038,39 +1045,46 @@ const AddBusinessStaffDetails = () => {
 
       {/* Add Skill Dialog */}
       <Dialog open={addSkillDialog} onOpenChange={setAddSkillDialog}>
-        <DialogContent className="lg:w-[450px] max-h-[calc(100vh-200px)] overflow-y-auto">
+        <DialogContent className="lg:w-[450px] max-h-[80vh] overflow-y-auto flex flex-col">
           <DialogHeader>
             <DialogTitle>Add Skill</DialogTitle>
             <DialogDescription>Select any of the business skill to add.</DialogDescription>
           </DialogHeader>
-          <div className="pb-14">
-            {businessSkills?.length === 0 && (
+          <div className="space-y-2">
+            <Input
+              placeholder="Search skills by name"
+              value={skillSearch}
+              onChange={(e) => setSkillSearch(e.target.value)}
+            />
+          </div>
+          <div className="flex-1 overflow-y-auto pb-16">
+            {filteredBusinessSkills?.length === 0 && (
               <div className="flex items-center justify-center h-[10vh]">
-                <h1 className="text-xs font-medium text-slate-300">No skills added.</h1>
+                <h1 className="text-xs font-medium text-slate-300">{skillSearchTerm ? "No matching skills." : "No skills added."}</h1>
               </div>
             )}
-            {businessSkills?.map((skill: any) => (
+            {filteredBusinessSkills?.map((skill: any) => (
               <motion.div
                 key={skill?._id}
-                whileTap={{ scale: 0.98 }} 
-                whileHover={{ scale: 1.02 }}  
+                whileTap={{ scale: 0.98 }}
+                whileHover={{ scale: 1.02 }}
                 onClick={() => setCurrentSelectedSkill(skill?._id)}
                 className="bg-gradient-to-tr from-slate-800/60 to-slate-900/60 p-3 hover:border-cyan-500 border border-slate-700 select-none cursor-pointer rounded-lg mb-1.5 relative">
-              <h1 className="font-semibold text-xs text-slate-300 flex items-center gap-1">{skill?.skill_name}</h1>
-              {currentSelectedSkill === skill?._id && <div className="absolute right-2 top-1.5"><Check className="text-cyan-600" strokeWidth={3} size={17} /> </div>}
-            </motion.div>
+                <h1 className="font-semibold text-xs text-slate-300 flex items-center gap-1">{skill?.skill_name}</h1>
+                {currentSelectedSkill === skill?._id && <div className="absolute right-2 top-1.5"><Check className="text-cyan-600" strokeWidth={3} size={17} /> </div>}
+              </motion.div>
             ))}
           </div>
-          <div className="sticky bottom-0 left-0 right-0 bg-slate-900/80 backdrop-blur-sm border-t border-slate-800 p-2">
-            <motion.div
-              whileTap={{ scale: 0.98 }} 
-              whileHover={{ scale: 1.02 }}
-              onClick={handleAddSkill}
-              className="bg-gradient-to-tr from-slate-700/50 to-slate-800/50 p-3 hover:border-cyan-500 border border-slate-700 select-none cursor-pointer rounded-lg flex items-center gap-1 justify-center">
-              <Plus size={16} />
-              <h1 className="font-semibold text-sm text-slate-300 flex items-center gap-1">Add New Skill</h1>
-            </motion.div>
-          </div>
+          <DialogFooter className='sticky bottom-0 bg-black'>
+              <motion.div
+                whileTap={{ scale: 0.98 }}
+                whileHover={{ scale: 1.02 }}
+                onClick={handleAddSkill}
+                className="w-full bg-gradient-to-tr from-slate-700/50 to-slate-800/50 p-3 hover:border-cyan-500 border border-slate-700 select-none cursor-pointer rounded-lg flex items-center gap-1 justify-center">
+                <Plus size={16} />
+                <h1 className="font-semibold text-sm text-slate-300 flex items-center gap-1">Add New Skill</h1>
+              </motion.div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -1082,7 +1096,7 @@ const AddBusinessStaffDetails = () => {
           </DialogHeader>
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => { setDeleteDocDialogOpen(false); setDocToDelete(null); }}>Cancel</Button>
-            <Button variant="destructive" onClick={() => { if(docToDelete) handleRemoveDoc(docToDelete); setDeleteDocDialogOpen(false); setDocToDelete(null); }}>Remove</Button>
+            <Button variant="destructive" onClick={() => { if (docToDelete) handleRemoveDoc(docToDelete); setDeleteDocDialogOpen(false); setDocToDelete(null); }}>Remove</Button>
           </div>
         </DialogContent>
       </Dialog>
