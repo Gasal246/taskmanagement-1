@@ -19,6 +19,7 @@ export async function GET(req: NextRequest) {
     const area_id = searchParams.get("area_id");
     const camp_id = searchParams.get("camp_id");
     const enquiry_uuid = searchParams.get("enquiry_uuid");
+    const camp_capacity = searchParams.get("capacity");
     const page = Number(searchParams.get("page")) || 1;
     const limit = Number(searchParams.get("limit")) || 10;
 
@@ -61,6 +62,19 @@ export async function GET(req: NextRequest) {
 
     // --- NEW: Occupancy Filter (From Camps Schema) ---
     const occupancy = searchParams.get("occupancy");
+
+
+
+    let campIds : any[] = [];
+
+    if(camp_capacity){
+      const camps = await Eq_camps.find({camp_capacity: camp_capacity}).select("_id").lean();
+      campIds = camps.map((c)=> c._id);
+      if(campIds.length == 0){
+        return NextResponse.json({ status: 200, data: [], pagination: {page, limit, totalRecords: 0, totalPages:0}}, {status: 200})
+      }
+      filter.camp_id = {$in: campIds};
+    };
 
     // Take count of total docs
     const totalRecords = await Eq_enquiry.countDocuments(filter);

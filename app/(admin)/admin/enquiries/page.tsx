@@ -15,7 +15,7 @@ import { DatePicker, Space } from "antd";
 import { PanelsTopLeft } from "lucide-react";
 import LoaderSpin from "@/components/shared/LoaderSpin";
 import { useGetEnquiriesWithFilters, useGetEqAreas, useGetEqCampsByArea, useGetEqCities, useGetEqCountries, useGetEqProvince, useGetEqRegions } from "@/query/enquirymanager/queries";
-import { ENQUIRY_STATUS } from "@/lib/constants";
+import { ENQUIRY_STATUS, Eq_CAPACITY_OPTIONS } from "@/lib/constants";
 
 const { RangePicker } = DatePicker;
 
@@ -36,6 +36,7 @@ export default function EnquiriesPage() {
     camp_id: "",
     status: "",
     occupancy: "",
+    capacity: "",
     wifi_available: "",
     competition: "",
     priority: "",
@@ -280,6 +281,15 @@ export default function EnquiriesPage() {
             onChange={(v) => updateFilter("competition", v)}
           />
 
+            {/* Camp Capacity */}
+          <FilterCapacity
+            label="Camp Capacity"
+            value={filters.capacity}
+            disabled={false}
+            options={Eq_CAPACITY_OPTIONS}
+            onChange={(v)=> updateFilter("capacity", v)}
+            />
+
           {/* Priority */}
           <div className="w-full lg:w-1/4 p-1">
             <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg p-2">
@@ -438,6 +448,38 @@ function FilterSelect({ label, value, options, onChange, disabled }) {
                   o.area_name ||
                   o.camp_name ||
                   o.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+      </div>
+    </div>
+  );
+}
+
+function FilterCapacity({ label, value, options, onChange, disabled }) {
+  return (
+    <div className="w-full lg:w-1/4 p-1">
+      <div
+        className={`bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg p-2 ${disabled ? "opacity-40 cursor-not-allowed" : ""
+          }`}
+      >
+        <Label className="text-xs text-slate-400 mb-1 block">{label}</Label>
+
+        <Select
+          value={value === "" ? undefined : value}
+          onValueChange={(v) => onChange(v)}
+          disabled={disabled}
+        >
+          <SelectTrigger className={`${value ? "text-slate-200" : "text-slate-400"}`}>
+            <SelectValue placeholder={`Select ${label}`} />
+          </SelectTrigger>
+
+          <SelectContent>
+            {options?.map((o, i:number) => (
+              <SelectItem key={i} value={o}>
+                {o}
               </SelectItem>
             ))}
           </SelectContent>
