@@ -1,54 +1,29 @@
 "use client";
 
-import { ArrowLeft, MapPin, Pencil } from "lucide-react";
+import { ArrowLeft, MapPin, Pencil, Trash2 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { useGetEqAreaProfile, useUpdateEqArea } from "@/query/enquirymanager/queries";
-import { useEffect, useState } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { useGetEqAreaProfile, useRemoveEqArea } from "@/query/enquirymanager/queries";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useState } from "react";
 import { toast } from "sonner";
 
 export default function AreaDetailsPage() {
   const router = useRouter();
   const params = useParams<{ area_id: string }>();
 
-  const { data: area, isLoading, refetch } = useGetEqAreaProfile(params.area_id);
-  const {mutateAsync: updateArea, isPending} = useUpdateEqArea();
+  const { data: area } = useGetEqAreaProfile(params.area_id);
+  const { mutateAsync: RemoveArea, isPending: isDeleting } = useRemoveEqArea();
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
-  const [editOpen, setEditOpen] = useState(false);
-  const [newAreaName, setNewAreaName] = useState("");
-
-  useEffect(() => {
-    if (area?.area?.area_name) {
-      setNewAreaName(area.area.area_name);
+  const handleDeleteArea = async () => {
+    const res = await RemoveArea(params.area_id);
+    if (res?.status === 200) {
+      toast.success(res?.message || "Area deleted");
+      return router.replace("/admin/enquiries/areas");
     }
-  }, [area]);
-
-  const handleSave = async () => {
-    // TODO: Call your API here
-    console.log("Save new area name: ", newAreaName);
-
-    const data = {
-        area_id: params.area_id,
-        area_name: newAreaName
-    };
-
-    const res = await updateArea(data);
-    if(res?.status == 200){
-        toast.success(res?.message || "Area Updated");
-        refetch();
-    } else {
-        toast.error(res?.message || "Failed to Update Area")
-    }
-    setEditOpen(false);
+    toast.error(res?.message || "Failed to delete area");
   };
 
   return (
@@ -77,14 +52,22 @@ export default function AreaDetailsPage() {
           </p>
         </div>
 
-        {/* Edit Button */}
-        <Button
-          variant="secondary"
-          className="flex items-center gap-1"
-          onClick={() => setEditOpen(true)}
-        >
-          <Pencil size={14} /> Edit
-        </Button>
+        <div className="flex flex-col gap-2">
+          <Button
+            variant="secondary"
+            className="flex items-center gap-1"
+            onClick={() => router.push(`/admin/enquiries/areas/${params.area_id}/edit_area`)}
+          >
+            <Pencil size={14} /> Edit
+          </Button>
+          <Button
+            variant="destructive"
+            className="flex items-center gap-1"
+            onClick={() => setDeleteDialogOpen(true)}
+          >
+            <Trash2 size={14} /> Delete
+          </Button>
+        </div>
       </div>
 
       {/* DETAILS CARD */}
@@ -102,32 +85,27 @@ export default function AreaDetailsPage() {
         />
       </DetailsCard>
 
-      {/* EDIT MODAL */}
-      <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="bg-slate-900 text-slate-200 border-slate-700">
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Edit Area Name</DialogTitle>
+            <DialogTitle>Delete this area?</DialogTitle>
+            <DialogDescription>
+              This will remove the area along with its camps and enquiries. This action cannot be undone.
+            </DialogDescription>
           </DialogHeader>
-
-          <div className="space-y-3">
-            <label className="text-sm text-slate-300">Area Name</label>
-            <Input
-              value={newAreaName}
-              onChange={(e) => setNewAreaName(e.target.value)}
-              className="bg-slate-800 border-slate-600 text-slate-100"
-            />
-          </div>
-
-          <DialogFooter>
-            <Button variant="secondary"
-            
-            onClick={() => setEditOpen(false)}>
-              Close
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              disabled={isDeleting}
+              onClick={handleDeleteArea}
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
             </Button>
-            <Button disabled={isPending} onClick={handleSave}>{isPending ? "Saving" : "Save"}</Button>
-          </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
+
     </div>
   );
 }

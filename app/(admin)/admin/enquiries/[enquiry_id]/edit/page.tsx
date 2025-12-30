@@ -118,24 +118,6 @@ const enquirySchema = z.object({
     images: z.any().optional(),
 
 }).superRefine((values, ctx) => {
-    const needsCampDetails = values.area_input_mode === "new" || values.camp_input_mode === "new";
-
-    if (needsCampDetails && !values.camp_capacity) {
-        ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: ["camp_capacity"],
-            message: "Camp capacity is required for a new camp",
-        });
-    }
-
-    if (needsCampDetails && !values.camp_occupancy) {
-        ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: ["camp_occupancy"],
-            message: "Camp occupancy is required for a new camp",
-        });
-    }
-
     if (values.camp_capacity && values.camp_occupancy) {
         const limit = EQ_CAPACITY_LIMITS[values.camp_capacity];
         const occupancy = Number(values.camp_occupancy);
@@ -195,13 +177,25 @@ export default function EditEnquiry() {
     const baseCampId = (enquiry?.enquiry?.camp_id?._id ?? enquiry?.enquiry?.camp_id) || "";
     const activeCampId = selectedCampId || baseCampId;
     const { data: campData, isLoading: isCampDetailsLoading } = useGetEqCampsById(activeCampId);
+    const selectedCamp = campData?.camp;
 
     const country_id = form.watch("country");
     const region_id = form.watch("region");
     const province_id = form.watch("province");
     const city_id = form.watch("city");
     const area_id = form.watch("area");
-    const isNewCamp = form.watch("camp_input_mode") === "new" || form.watch("area_input_mode") == "new";
+    const areaInputMode = form.watch("area_input_mode");
+    const campInputMode = form.watch("camp_input_mode");
+    const isNewCamp = campInputMode === "new" || areaInputMode == "new";
+    const isExistingCampMode = areaInputMode === "existing" && campInputMode === "existing";
+    const campCapacityMissing = isExistingCampMode
+        && !!activeCampId
+        && !!selectedCamp
+        && (selectedCamp?.camp_capacity === null || selectedCamp?.camp_capacity === undefined || selectedCamp?.camp_capacity === "");
+    const campOccupancyMissing = isExistingCampMode
+        && !!activeCampId
+        && !!selectedCamp
+        && (selectedCamp?.camp_occupancy === null || selectedCamp?.camp_occupancy === undefined || selectedCamp?.camp_occupancy === "");
 
     const { data: regions, isLoading: isRegionLoading } = useGetEqRegions(country_id);
     const { data: provinces, isLoading: isProvinceLoading } = useGetEqProvince(region_id);
@@ -317,6 +311,25 @@ export default function EditEnquiry() {
         }
     }, [enquiry, campData, contactsData]);
 
+    useEffect(() => {
+        if (isExistingCampMode) {
+            return;
+        }
+        form.setValue("camp_capacity", "");
+        form.setValue("camp_occupancy", "");
+    }, [isExistingCampMode]);
+
+    useEffect(() => {
+        if (!isExistingCampMode) {
+            return;
+        }
+        const capacityValue = selectedCamp?.camp_capacity;
+        const occupancyValue = selectedCamp?.camp_occupancy;
+
+        form.setValue("camp_capacity", capacityValue === null || capacityValue === undefined ? "" : String(capacityValue));
+        form.setValue("camp_occupancy", occupancyValue === null || occupancyValue === undefined ? "" : String(occupancyValue));
+    }, [activeCampId, isExistingCampMode, selectedCamp?.camp_capacity, selectedCamp?.camp_occupancy]);
+
     const isPdf = (type: string) => type?.toLowerCase().includes('pdf');
     const isImage = (type: string) => type?.startsWith('image/');
     const getFileExtension = (file: File) => {
@@ -413,9 +426,11 @@ export default function EditEnquiry() {
     };
 
     const onSubmit = async (data: any) => {
-        const limit = capacityLimits[data.camp_capacity];
-        if (data.camp_capacity && data.camp_occupancy && Number(data.camp_occupancy) > limit) {
-            return toast.error("Camp occupancy cannot exceed Camp Capacity");
+        if (data.camp_capacity && data.camp_occupancy) {
+            const limit = EQ_CAPACITY_LIMITS[data.camp_capacity];
+            if (Number(data.camp_occupancy) > limit) {
+                return toast.error("Camp occupancy cannot exceed Camp Capacity");
+            }
         }
         const payload = { ...data, enquiry_id: params.enquiry_id };
         if (uploadedDoc?.url) {
@@ -545,7 +560,7 @@ export default function EditEnquiry() {
                                 </FormItem>
                             )} />
 
-                            {form.watch("area_input_mode") === "existing" && (
+                            {areaInputMode === "existing" && (
                                 <FormField control={form.control} name="area" render={({ field }) => (
                                     <FormItem>
                                         <FormLabel className="text-xs text-slate-300 font-semibold">Area</FormLabel>
@@ -563,7 +578,7 @@ export default function EditEnquiry() {
                                 )} />
                             )}
 
-                            {form.watch("area_input_mode") === "new" && (
+                            {areaInputMode === "new" && (
                                 <FormField control={form.control} name="area_name_request" render={({ field }) => (
                                     <FormItem>
                                         <FormLabel className="text-xs text-slate-300">New Area Name</FormLabel>
@@ -576,7 +591,7 @@ export default function EditEnquiry() {
 
 
                         {/* CAMP INPUT MODE TOGGLE */}
-                        {form.watch("area_input_mode") == "existing" && (
+                        {areaInputMode == "existing" && (
                             <FormField
                                 control={form.control}
                                 name="camp_input_mode"
@@ -613,7 +628,7 @@ export default function EditEnquiry() {
                         )}
 
                         {/* EXISTING CAMP SELECT */}
-                        {form.watch("camp_input_mode") === "existing" && form.watch("area_input_mode") == "existing" && (
+                        {campInputMode === "existing" && areaInputMode == "existing" && (
                             <FormField
                                 control={form.control}
                                 name="camp"
@@ -774,7 +789,58 @@ export default function EditEnquiry() {
 
                         </>
 
-                        {/* CAMP CAPACITY */}
+                        {isExistingCampMode ? (
+                            <>
+                                {/* CAMP CAPACITY (READ-ONLY) */}
+                                <FormField
+                                    control={form.control}
+                                    name="camp_capacity"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel className="text-xs text-slate-300">Camp Capacity</FormLabel>
+                                            <FormControl>
+                                                <Input
+                                                    {...field}
+                                                    readOnly
+                                                    value={field.value || ""}
+                                                    placeholder="Select a camp to view capacity"
+                                                />
+                                            </FormControl>
+                                            {campCapacityMissing && (
+                                                <p className="text-xs text-red-400 mt-1">Please add the camp capacity</p>
+                                            )}
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+
+                                {/* OCCUPANCY (READ-ONLY) */}
+                                <FormField
+                                    control={form.control}
+                                    name="camp_occupancy"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel className="text-xs text-slate-300">Current Occupancy</FormLabel>
+                                            <FormControl>
+                                                <Input
+                                                    type="number"
+                                                    {...field}
+                                                    readOnly
+                                                    value={field.value || ""}
+                                                    placeholder="Select a camp to view occupancy"
+                                                />
+                                            </FormControl>
+                                            {campOccupancyMissing && (
+                                                <p className="text-xs text-red-400 mt-1">Please add the camp occupancy</p>
+                                            )}
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            </>
+                        ) : (
+                            <>
+                                {/* CAMP CAPACITY */}
                                 <FormField control={form.control} name="camp_capacity" render={({ field }) => (
                                     <FormItem>
                                         <FormLabel className="text-xs text-slate-300">Camp Capacity</FormLabel>
@@ -796,6 +862,8 @@ export default function EditEnquiry() {
                                         <FormMessage />
                                     </FormItem>
                                 )} />
+                            </>
+                        )}
 
                         {/* CONTACTS */}
                         <div className="text-xs text-slate-400 font-semibold flex items-center gap-1">

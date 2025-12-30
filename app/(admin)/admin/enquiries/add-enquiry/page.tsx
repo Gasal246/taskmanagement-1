@@ -3,19 +3,13 @@
 
 import React, { useEffect, useState } from "react";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
-import { Building2, FileText, Loader2, Plus, Trash2, Upload, Wifi, PhoneCall, X } from "lucide-react";
+import { Building2, FileText, Loader2, Plus, Trash2, Upload, Wifi, PhoneCall, X, Info } from "lucide-react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import {
-    Select,
-    SelectTrigger,
-    SelectContent,
-    SelectItem,
-    SelectValue
-} from "@/components/ui/select";
+import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
 import { motion } from "framer-motion";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -28,6 +22,8 @@ import Image from "next/image";
 import { deleteObject, getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { storage } from "@/firebase/config";
 import { Button } from "@/components/ui/button";
+import InfoTootlip from "@/components/shared/InfoTootlip";
+import { Tooltip } from "antd";
 
 const priorityLevels = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"];
 
@@ -106,24 +102,6 @@ const enquirySchema = z.object({
     images: z.any().optional(),
 
 }).superRefine((values, ctx) => {
-    const needsCampDetails = values.area_input_mode === "new" || values.camp_input_mode === "new";
-
-    if (needsCampDetails && !values.camp_capacity) {
-        ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: ["camp_capacity"],
-            message: "Camp capacity is required for a new camp",
-        });
-    }
-
-    if (needsCampDetails && !values.camp_occupancy) {
-        ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: ["camp_occupancy"],
-            message: "Camp occupancy is required for a new camp",
-        });
-    }
-
     if (values.camp_capacity && values.camp_occupancy) {
         const limit = EQ_CAPACITY_LIMITS[values.camp_capacity];
         const occupancy = Number(values.camp_occupancy);
@@ -150,6 +128,10 @@ export default function AddEnquiry() {
     const [uploadedDoc, setUploadedDoc] = useState<{ url: string; name: string; type?: string; storagePath?: string } | null>(null);
     const [removingDoc, setRemovingDoc] = useState(false);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const priorityCapacityMap = Eq_CAPACITY_OPTIONS.map((capacity, index) => ({
+        priority: `${index + 1}/10`,
+        capacity,
+    }));
 
     const { mutateAsync: GetCountries, isPending: isCountryLoading } = useGetEqCountries();
     const { mutateAsync: AddNewEnquiry, isPending: isEqAdding } = useAddNewEnquiry();
@@ -179,12 +161,25 @@ export default function AddEnquiry() {
     const province_id = form.watch("province");
     const city_id = form.watch("city");
     const area_id = form.watch("area");
+    const camp_id = form.watch("camp");
+    const areaInputMode = form.watch("area_input_mode");
+    const campInputMode = form.watch("camp_input_mode");
+    const isExistingCampMode = areaInputMode === "existing" && campInputMode === "existing";
 
     const { data: regions, isLoading: isRegionLoading } = useGetEqRegions(country_id);
     const { data: provinces, isLoading: isProvinceLoading } = useGetEqProvince(region_id);
     const { data: cities, isLoading: isCityLoading } = useGetEqCities(province_id);
     const { data: areas, isLoading: isAreaLoading } = useGetEqAreas(city_id);
     const { data: camps, isLoading: isCampLoading } = useGetEqCampsByArea(area_id);
+    const selectedCamp = camps?.camps?.find((c: any) => c._id === camp_id);
+    const campCapacityMissing = isExistingCampMode
+        && !!camp_id
+        && !!selectedCamp
+        && (selectedCamp?.camp_capacity === null || selectedCamp?.camp_capacity === undefined || selectedCamp?.camp_capacity === "");
+    const campOccupancyMissing = isExistingCampMode
+        && !!camp_id
+        && !!selectedCamp
+        && (selectedCamp?.camp_occupancy === null || selectedCamp?.camp_occupancy === undefined || selectedCamp?.camp_occupancy === "");
 
 
     const { control, handleSubmit } = form;
@@ -206,6 +201,26 @@ export default function AddEnquiry() {
     useEffect(() => {
         console.log("regions: ", regions);
     }, [regions]);
+
+    useEffect(() => {
+        if (isExistingCampMode) {
+            return;
+        }
+        form.setValue("camp_capacity", "");
+        form.setValue("camp_occupancy", "");
+    }, [isExistingCampMode]);
+
+    useEffect(() => {
+        if (!isExistingCampMode) {
+            return;
+        }
+
+        const capacityValue = selectedCamp?.camp_capacity;
+        const occupancyValue = selectedCamp?.camp_occupancy;
+
+        form.setValue("camp_capacity", capacityValue === null || capacityValue === undefined ? "" : String(capacityValue));
+        form.setValue("camp_occupancy", occupancyValue === null || occupancyValue === undefined ? "" : String(occupancyValue));
+    }, [camp_id, isExistingCampMode, selectedCamp?.camp_capacity, selectedCamp?.camp_occupancy]);
 
     const isPdf = (type: string) => type?.toLowerCase().includes('pdf');
     const isImage = (type: string) => type?.startsWith('image/');
@@ -303,9 +318,11 @@ export default function AddEnquiry() {
     };
 
     const onSubmit = async (data: any) => {
-        const limit = EQ_CAPACITY_LIMITS[data.camp_capacity];
-        if (data.camp_occupancy > limit) {
-            return toast.error("Camp occupancy cannot exceed Camp Capacity");
+        if (data.camp_capacity && data.camp_occupancy) {
+            const limit = EQ_CAPACITY_LIMITS[data.camp_capacity];
+            if (Number(data.camp_occupancy) > limit) {
+                return toast.error("Camp occupancy cannot exceed Camp Capacity");
+            }
         }
         const payload = { ...data };
         if (uploadedDoc?.url) {
@@ -427,7 +444,7 @@ export default function AddEnquiry() {
                                 </FormItem>
                             )} />
 
-                            {form.watch("area_input_mode") === "existing" && (
+                            {areaInputMode === "existing" && (
                                 <FormField control={form.control} name="area" render={({ field }) => (
                                     <FormItem>
                                         <FormLabel className="text-xs text-slate-300 font-semibold">Area</FormLabel>
@@ -445,7 +462,7 @@ export default function AddEnquiry() {
                                 )} />
                             )}
 
-                            {form.watch("area_input_mode") === "new" && (
+                            {areaInputMode === "new" && (
                                 <FormField control={form.control} name="area_name_request" render={({ field }) => (
                                     <FormItem>
                                         <FormLabel className="text-xs text-slate-300">New Area Name</FormLabel>
@@ -458,7 +475,7 @@ export default function AddEnquiry() {
 
 
                         {/* CAMP INPUT MODE TOGGLE */}
-                        {form.watch("area_input_mode") == "existing" && (
+                        {areaInputMode == "existing" && (
                             <FormField
                                 control={form.control}
                                 name="camp_input_mode"
@@ -495,7 +512,7 @@ export default function AddEnquiry() {
                         )}
 
                         {/* EXISTING CAMP SELECT */}
-                        {form.watch("camp_input_mode") === "existing" && form.watch("area_input_mode") == "existing" && (
+                        {campInputMode === "existing" && areaInputMode == "existing" && (
                             <FormField
                                 control={form.control}
                                 name="camp"
@@ -523,7 +540,7 @@ export default function AddEnquiry() {
                         )}
 
                         {/* REQUEST NEW CAMP TEXT INPUT + LANDLORD/RE DETAILS/CLIENT */}
-                        {(form.watch("camp_input_mode") === "new" || form.watch("area_input_mode") == "new") && (
+                        {(campInputMode === "new" || areaInputMode == "new") && (
                             <>
                                 <FormField
                                     control={form.control}
@@ -640,7 +657,58 @@ export default function AddEnquiry() {
                             </>
                         )}
 
-                        {/* CAMP CAPACITY */}
+                        {isExistingCampMode ? (
+                            <>
+                                {/* CAMP CAPACITY (READ-ONLY) */}
+                                <FormField
+                                    control={form.control}
+                                    name="camp_capacity"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel className="text-xs text-slate-300">Camp Capacity</FormLabel>
+                                            <FormControl>
+                                                <Input
+                                                    {...field}
+                                                    readOnly
+                                                    value={field.value || ""}
+                                                    placeholder="Select a camp to view capacity"
+                                                />
+                                            </FormControl>
+                                            {campCapacityMissing && (
+                                                <p className="text-xs text-red-400 mt-1">Please add the camp capacity</p>
+                                            )}
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+
+                                {/* OCCUPANCY (READ-ONLY) */}
+                                <FormField
+                                    control={form.control}
+                                    name="camp_occupancy"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel className="text-xs text-slate-300">Current Occupancy</FormLabel>
+                                            <FormControl>
+                                                <Input
+                                                    type="number"
+                                                    {...field}
+                                                    readOnly
+                                                    value={field.value || ""}
+                                                    placeholder="Select a camp to view occupancy"
+                                                />
+                                            </FormControl>
+                                            {campOccupancyMissing && (
+                                                <p className="text-xs text-red-400 mt-1">Please add the camp occupancy</p>
+                                            )}
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            </>
+                        ) : (
+                            <>
+                                {/* CAMP CAPACITY */}
                                 <FormField control={form.control} name="camp_capacity" render={({ field }) => (
                                     <FormItem>
                                         <FormLabel className="text-xs text-slate-300">Camp Capacity</FormLabel>
@@ -662,6 +730,8 @@ export default function AddEnquiry() {
                                         <FormMessage />
                                     </FormItem>
                                 )} />
+                            </>
+                        )}
 
                         {/* CONTACTS */}
                         <div className="text-xs text-slate-400 font-semibold flex items-center gap-1">
@@ -860,7 +930,32 @@ export default function AddEnquiry() {
                         {/* PRIORITY */}
                         <FormField control={form.control} name="priority" render={({ field }) => (
                             <FormItem>
-                                <FormLabel className="text-xs text-slate-300 font-semibold">Priority (1 - Low, 10 - High)</FormLabel>
+                                <Tooltip
+                                    placement="topLeft"
+                                    rootClassName="w-[360px]"
+                                    className="w-[360px]"
+                                    title={
+                                        <div className="w-[360px] rounded-lg border border-slate-700/70 bg-slate-900/95 p-3 shadow-lg">
+                                            <div className="grid grid-cols-2 gap-x-4 text-[11px] font-semibold uppercase tracking-wide text-slate-300">
+                                                <span>Priority</span>
+                                                <span>Capacity</span>
+                                            </div>
+                                            <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-slate-200">
+                                                {priorityCapacityMap.map((item) => (
+                                                    <React.Fragment key={item.priority}>
+                                                        <span className="tabular-nums">{item.priority}</span>
+                                                        <span className="whitespace-nowrap">{item.capacity}</span>
+                                                    </React.Fragment>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    }
+                                >
+                                    <FormLabel className="text-xs text-slate-300 font-semibold flex gap-1 items-center">
+                                        <Info size={14} color="white" />
+                                        Priority (1 - Low, 10 - High)
+                                    </FormLabel>
+                                </Tooltip>
                                 <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
                                     <Select value={field.value} onValueChange={field.onChange}>
                                         <SelectTrigger><SelectValue placeholder="Priority" /></SelectTrigger>
@@ -873,15 +968,15 @@ export default function AddEnquiry() {
                         {/* FOLLOW-UP */}
                         <FormField control={form.control} name="followup_status" render={({ field }) => (
                             <FormItem>
-                        <FormLabel className="text-xs text-slate-300 font-semibold">Follow-up Status</FormLabel>
-                        <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
-                            <Select value={field.value} onValueChange={field.onChange}>
-                                <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
-                                <SelectContent><SelectItem value="Pending">Pending</SelectItem><SelectItem value="In Progress">In Progress</SelectItem><SelectItem value="Closed">Closed</SelectItem></SelectContent>
-                            </Select>
-                        </div>
-                    </FormItem>
-                )} />
+                                <FormLabel className="text-xs text-slate-300 font-semibold">Follow-up Status</FormLabel>
+                                <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
+                                    <Select value={field.value} onValueChange={field.onChange}>
+                                        <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
+                                        <SelectContent><SelectItem value="Pending">Pending</SelectItem><SelectItem value="In Progress">In Progress</SelectItem><SelectItem value="Closed">Closed</SelectItem></SelectContent>
+                                    </Select>
+                                </div>
+                            </FormItem>
+                        )} />
 
                         {/* DATES + NOTES */}
                         <FormField control={form.control} name="alert_date" render={({ field }) => (
@@ -906,7 +1001,7 @@ export default function AddEnquiry() {
                                             <Upload size={14} className="text-cyan-400" />
                                             <span className="truncate">{docFile ? docFile.name : 'Choose or drop a file (image/PDF, max 5MB)'}</span>
                                         </div>
-                                        {docFile && <span className="text-[11px] text-slate-400">{(docFile.size/1024/1024).toFixed(2)} MB</span>}
+                                        {docFile && <span className="text-[11px] text-slate-400">{(docFile.size / 1024 / 1024).toFixed(2)} MB</span>}
                                     </div>
                                     <input type="file" accept="image/*,application/pdf" className="hidden" onChange={handleEnquiryFileChange} />
                                 </label>
@@ -954,7 +1049,7 @@ export default function AddEnquiry() {
                                                         </span>
                                                     </div>
                                                     <div className="flex items-center justify-between text-[11px] text-slate-400">
-                                                        {docFile && <span className="text-[10px] text-slate-500">{(docFile.size/1024/1024).toFixed(2)} MB</span>}
+                                                        {docFile && <span className="text-[10px] text-slate-500">{(docFile.size / 1024 / 1024).toFixed(2)} MB</span>}
                                                     </div>
                                                 </div>
                                             </div>

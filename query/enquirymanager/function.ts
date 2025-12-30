@@ -511,6 +511,16 @@ export async function RemoveEqCamp(camp_id: string){
     }
 }
 
+//Delete Area
+export async function RemoveEqArea(area_id: string){
+    try{
+        const res = await axios.delete(`/api/enquiries/delete/area?area_id=${area_id}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
 //Delete Enquiry User
 export async function RemoveEqUsers(user_id: string){
     try{
