@@ -81,7 +81,7 @@ export const useGetEqCampsByArea = (area_id: string) => {
 }
 
 //Get Areas filtered
-export const useGetEqAreasFiltered = (queryParams: Record<string, string | undefined>) => {
+export const useGetEqAreasFiltered = (queryParams: Record<string, string | number | undefined>) => {
     return useQuery({
         queryKey: ["areas", queryParams],
         queryFn: () => GetEqAreasFiltered(queryParams),
@@ -96,7 +96,7 @@ export const useAddNewEqArea = () => {
 }
 
 //Get Camps filtered
-export const useGetEqCampsFiltered = (queryParams: Record<string, string | undefined>) => {
+export const useGetEqCampsFiltered = (queryParams: Record<string, string | number | undefined>) => {
     return useQuery({
         queryKey: ["camps", queryParams],
         queryFn: () => GetEqCampsFiltered(queryParams),

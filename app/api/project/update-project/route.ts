@@ -16,7 +16,9 @@ interface Body {
     start_date: Date,
     end_date: Date,
     priority: string,
-    type: string
+    type: string,
+    region_id?: string | null,
+    area_id?: string | null
 }
 
 export async function PUT(req: NextRequest) {
@@ -29,16 +31,26 @@ export async function PUT(req: NextRequest) {
 
         const user = await Users.findById(session?.user?.id).select("name");
 
+        const updateData: Record<string, any> = {
+            project_name: body.project_name,
+            project_description: body.project_description,
+            status: body.status,
+            start_date: body.start_date,
+            end_date: body.end_date,
+            type: body.type,
+            priority: body.priority
+        };
+
+        if (body.region_id !== undefined) {
+            updateData.region_id = body.region_id === "" ? null : body.region_id;
+        }
+
+        if (body.area_id !== undefined) {
+            updateData.area_id = body.area_id === "" ? null : body.area_id;
+        }
+
         const projectToUpdate = await Business_Project.findByIdAndUpdate(body.project_id, {
-            $set: {
-                project_name: body.project_name,
-                project_description: body.project_description,
-                status: body.status,
-                start_date: body.start_date,
-                end_date: body.end_date,
-                type: body.type,
-                priority: body.priority
-            }
+            $set: updateData
         });
 
         if (body.status == "completed" && projectToUpdate.status != "completed") {

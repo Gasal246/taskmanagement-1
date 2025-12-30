@@ -7,7 +7,8 @@ import { motion } from 'framer-motion';
 import { Avatar, Popconfirm } from 'antd';
 import { Popover, PopoverContent, PopoverTrigger, } from "@/components/ui/popover";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator, } from "@/components/ui/breadcrumb";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from '@/components/ui/input';
 import { useAddRegionDepartmentHead, useAddRegionDepartmentStaff, useGetRegionDepartmentCompleteData, useGetRegionUsers, useRemoveRegionDepartment, useRemoveRegionDepartmentStaff, useRemoveRegionDeptHead } from '@/query/business/queries';
 import { toast } from 'sonner';
 import LoaderSpin from '@/components/shared/LoaderSpin';
@@ -71,6 +72,13 @@ const RegionDepartmentPage = () => {
     const [openAddDepartmentHead, setOpenAddDepartmentHead ] = useState<boolean>(false);
     const [selectedUser, setSelectedUser ] = useState<string>("");
     const [isAddingUser, setIsAddingUser] = useState<boolean>(false);
+    const [userSearch, setUserSearch] = useState<string>("");
+    const userSearchTerm = userSearch.trim().toLowerCase();
+    const filteredRegionUsers = regionUsers?.filter((user: any) => {
+        const name = user?.user_id?.name || "";
+        const email = user?.user_id?.email || "";
+        return `${name} ${email}`.toLowerCase().includes(userSearchTerm);
+    });
 
     const clickAddHead = () => {
         setSelectedUser("");
@@ -464,16 +472,23 @@ const RegionDepartmentPage = () => {
 
             {/* Add Region Department Head Dialog */}
             <Dialog open={openAddDepartmentHead} onOpenChange={setOpenAddDepartmentHead}>
-                <DialogContent className="sm:max-w-[425px]">
+                <DialogContent className="sm:max-w-[425px] max-h-[70vh] flex flex-col">
                     <DialogHeader>
                         <DialogTitle className='capitalize'>Adding Department {isAddingUser ? 'Staff' : 'Head'}</DialogTitle>
                         <DialogDescription>Adding {isAddingUser ? 'Staff' : 'Head'} For {departmentData?.type} Department {departmentData?.dep_name} of {regionData?.region_name}.</DialogDescription>
                     </DialogHeader>
-                    <div className="">
-                        {regionUsers?.length === 0 && <div className='w-full h-[10vh] flex items-center justify-center'>
-                            <h1 className="text-xs font-medium text-slate-400">No region staffs found</h1>
+                    <div className="space-y-2">
+                        <Input
+                            placeholder="Search staff by name"
+                            value={userSearch}
+                            onChange={(e) => setUserSearch(e.target.value)}
+                        />
+                    </div>
+                    <div className="relative flex-1 overflow-y-auto pb-16">
+                        {filteredRegionUsers?.length === 0 && <div className='w-full h-[10vh] flex items-center justify-center'>
+                            <h1 className="text-xs font-medium text-slate-400">{userSearchTerm ? "No matching users" : "No region staffs found"}</h1>
                         </div>}
-                        {regionUsers?.map(( user: any ) => <motion.div
+                        {filteredRegionUsers?.map(( user: any ) => <motion.div
                             whileHover={{ scale: 1.02 }}
                             whileTap={{ scale: 0.98 }}
                             key={user?._id}
@@ -491,15 +506,19 @@ const RegionDepartmentPage = () => {
                                 <Check className="text-cyan-600" strokeWidth={3} size={18} />
                             </div>}
                         </motion.div>)}
-                        <motion.div
-                            whileTap={{ scale: 0.98 }}
-                            whileHover={{ scale: 1.02 }}
-                            className='p-2 bg-gradient-to-br group from-slate-950/70 to-slate-800/70 rounded-lg cursor-pointer text-sm font-medium flex items-center gap-1 px-4 border border-slate-700 hover:border-cyan-600 justify-center mt-2'
-                            onClick={isAddingUser ? handleAddDepartmentStaff : handleAddDepartmentHead}
-                        >
-                            {(addingDepartmentHead || addingDepartmentStaff) ? <LoaderSpin size={22} /> : <CircleCheckBig className="group-hover:text-cyan-600" size={18} />} {(addingDepartmentHead || addingDepartmentStaff) ? 'Adding' : 'Add'} Department {isAddingUser ? 'Staff' : 'Head'}
-                        </motion.div>
                     </div>
+                    <DialogFooter className="w-full">
+                        <div className="pt-2 bg-slate-950/80 w-full">
+                            <motion.div
+                                whileTap={{ scale: 0.98 }}
+                                whileHover={{ scale: 1.02 }}
+                                className='p-2 bg-gradient-to-br group from-slate-950/70 to-slate-800/70 rounded-lg cursor-pointer text-sm font-medium flex items-center gap-1 px-4 border border-slate-700 hover:border-cyan-600 justify-center'
+                                onClick={isAddingUser ? handleAddDepartmentStaff : handleAddDepartmentHead}
+                            >
+                                {(addingDepartmentHead || addingDepartmentStaff) ? <LoaderSpin size={22} /> : <CircleCheckBig className="group-hover:text-cyan-600" size={18} />} {(addingDepartmentHead || addingDepartmentStaff) ? 'Adding' : 'Add'} Department {isAddingUser ? 'Staff' : 'Head'}
+                            </motion.div>
+                        </div>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
         </div>

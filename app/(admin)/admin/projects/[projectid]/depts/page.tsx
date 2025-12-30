@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { Building, CheckCircle, Plus, Trash2, Search } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { toast } from 'sonner';
 import { useAddProjectDepartment, useGetAddedProjectDepartments, useGetBusinessDepartments, useGetBusinessDepartmentsByBusiness_id, useRemoveAddedProjectDepartment, useSelectActiveProjectDepartment } from '@/query/business/queries';
@@ -35,6 +35,7 @@ const ProjectDepartments = () => {
   const [activeDepartmentId, setActiveDepartmentId] = useState<string | null>(null);
   const [addDepartmentDialog, setAddDepartmentDialog] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>("");
   const { data: businessDepartmentsData, isPending, refetch } = useGetBusinessDepartmentsByBusiness_id(businessData?._id);
   const { data:project_depts, isPending: fetchingProjectDepts, refetch: refetchProjectDepts } = useGetAddedProjectDepartments(params.projectid);
   const {mutateAsync: addProjectDept, isPending: addingProjectDept} = useAddProjectDepartment();
@@ -61,6 +62,10 @@ const ProjectDepartments = () => {
   };
 
   const handleAddDepartment = async(deptId: string) => {
+    if (!deptId) {
+      toast.error("Please select a department.");
+      return;
+    }
     const data = {
       project_id: params.projectid,
       department_id: deptId,
@@ -76,6 +81,8 @@ const ProjectDepartments = () => {
     } else {
       toast.error("Error while adding department to project");
     }
+    setSelectedDepartmentId("");
+    setSearchQuery("");
     setAddDepartmentDialog(false);
   };
 
@@ -182,15 +189,20 @@ const ProjectDepartments = () => {
       </div>
 
       {/* Add Department Modal */}
-      <Dialog open={addDepartmentDialog} onOpenChange={setAddDepartmentDialog}>
-        <DialogContent className="sm:max-w-[425px]">
+      <Dialog open={addDepartmentDialog} onOpenChange={(open) => {
+        setAddDepartmentDialog(open);
+        if (!open) {
+          setSelectedDepartmentId("");
+          setSearchQuery("");
+        }
+      }}>
+        <DialogContent className="sm:max-w-[425px] max-h-[70vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Add Department to Project</DialogTitle>
             <DialogDescription>Select a department to add to this project.</DialogDescription>
           </DialogHeader>
-          <div>
-            {/* Search Input */}
-            <div className="relative mb-3">
+          <div className="space-y-2">
+            <div className="relative">
               <Input
                 placeholder="Search departments..."
                 value={searchQuery}
@@ -199,27 +211,44 @@ const ProjectDepartments = () => {
               />
               <Search size={16} className="absolute left-2 top-2.5 text-slate-400" />
             </div>
-
-            {/* Departments List */}
-            <div className="max-h-[200px] overflow-y-auto space-y-1">
-              {filteredAvailableDepartments?.length > 0 ? (
-                filteredAvailableDepartments.map((dept: any) => (
-                  <motion.div
-                    key={dept._id}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    className="p-2 rounded-lg cursor-pointer hover:bg-slate-800"
-                    onClick={() => handleAddDepartment(dept._id)}
-                  >
-                    <p className="text-sm font-medium text-slate-200">{dept.dep_name}</p>
-                    <p className="text-xs text-slate-400">Type: {dept?.type}</p>
-                  </motion.div>
-                ))
-              ) : (
-                <p className="text-xs text-slate-400">No available departments found.</p>
-              )}
-            </div>
           </div>
+
+          <div className="relative flex-1 overflow-y-auto pb-16">
+            {filteredAvailableDepartments?.length > 0 ? (
+              filteredAvailableDepartments.map((dept: any) => (
+                <motion.div
+                  key={dept._id}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="p-2 rounded-lg cursor-pointer hover:bg-slate-800 relative"
+                  onClick={() => setSelectedDepartmentId(dept._id)}
+                >
+                  <p className="text-sm font-medium text-slate-200">{dept.dep_name}</p>
+                  <p className="text-xs text-slate-400">Type: {dept?.type}</p>
+                  {selectedDepartmentId === dept._id && (
+                    <div className="absolute top-2 right-2">
+                      <CheckCircle size={16} className="text-cyan-500" />
+                    </div>
+                  )}
+                </motion.div>
+              ))
+            ) : (
+              <div className="flex items-center justify-center h-[10vh]">
+                <p className="text-xs text-slate-400">{searchQuery.trim() ? "No matching departments." : "No available departments found."}</p>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="w-full">
+            <div className="pt-2 bg-slate-950/80 w-full">
+              <motion.div
+                whileTap={{ scale: 0.98 }}
+                onClick={() => handleAddDepartment(selectedDepartmentId)}
+                className="w-full bg-gradient-to-tr from-slate-700/50 to-slate-800/50 p-3 hover:border-cyan-500 border border-slate-700 select-none cursor-pointer rounded-lg flex items-center gap-1 justify-center">
+                <Plus size={16} />
+                <h1 className="font-semibold text-sm text-slate-300 flex items-center gap-1">Add Department</h1>
+              </motion.div>
+            </div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

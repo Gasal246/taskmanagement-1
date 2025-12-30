@@ -80,7 +80,7 @@ const enquirySchema = z.object({
         authority_level: z.string().optional(),
     })).optional(),
 
-    wifi_available: z.enum(["Yes", "No"]),
+    wifi_available: z.enum(["Yes", "No", "not-specified"]),
     expected_monthly_price: z.string().optional(),
     other_wifi_details: z.string().optional(),
     wifi_type: z.string().optional(),
@@ -160,13 +160,44 @@ export default function EditEnquiry() {
             province: "",
             city: "",
             area: "",
+            area_name_request: "",
             camp: "",
+            camp_name_request: "",
+            camp_type: "",
+            client_company: "",
+            landlord: "",
+            real_estate: "",
+            camp_capacity: "",
+            camp_occupancy: "",
             wifi_available: "No",
+            wifi_type: "",
+            contractor_name: "",
+            contract_start: "",
+            contract_expiry: "",
+            wifi_plan: "",
+            speed_mbps: "",
+            pain_points: "",
+            provider_plan: "",
+            personal_wifi_start: "",
+            personal_wifi_expiry: "",
+            personal_wifi_price: "",
             followup_status: "Pending",
             area_input_mode: "existing",
             camp_input_mode: "existing",
             expected_monthly_price: "",
             other_wifi_details: "",
+            head_office_address: "",
+            head_office_contact: "",
+            head_office_location: "",
+            head_office_details: "",
+            lease_expiry_due: "",
+            rent_terms: "",
+            competition_status: "",
+            competition_notes: "",
+            priority: "",
+            alert_date: "",
+            next_action: "",
+            next_action_due: "",
             latitude: "",
             longitude: "",
             contacts: [{ name: "", phone: "" }]
@@ -277,7 +308,12 @@ export default function EditEnquiry() {
             camp_capacity: camp?.camp_capacity || "",
             camp_occupancy: camp?.camp_occupancy ? String(camp?.camp_occupancy) : "",
             contacts: mappedContacts.length ? mappedContacts : [{ name: "", phone: "" }],
-            wifi_available: enquiry?.enquiry?.wifi_available ? "Yes" : "No",
+            wifi_available:
+                enquiry?.enquiry?.wifi_available === true
+                    ? "Yes"
+                    : enquiry?.enquiry?.wifi_available === false
+                        ? "No"
+                        : "not-specified",
             expected_monthly_price: normalizeDecimal(enquiry?.enquiry?.expected_wifi_cost),
             other_wifi_details: enquiry?.enquiry?.wifi_setup || "",
             wifi_type: enquiry?.enquiry?.wifi_type || "",
@@ -954,7 +990,11 @@ export default function EditEnquiry() {
                                 <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
                                     <Select value={field.value} onValueChange={field.onChange}>
                                         <SelectTrigger><SelectValue placeholder="Select Wi-Fi Availability" /></SelectTrigger>
-                                        <SelectContent><SelectItem value="Yes">Yes</SelectItem><SelectItem value="No">No</SelectItem></SelectContent>
+                                        <SelectContent>
+                                            <SelectItem value="Yes">Yes</SelectItem>
+                                            <SelectItem value="No">No</SelectItem>
+                                            <SelectItem value="not-specified">Not Specified</SelectItem>
+                                        </SelectContent>
                                     </Select>
                                 </div>
                             </FormItem>

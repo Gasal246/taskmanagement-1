@@ -64,7 +64,7 @@ const enquirySchema = z.object({
         authority_level: z.string().optional(),
     })).optional(),
 
-    wifi_available: z.enum(["Yes", "No"]),
+    wifi_available: z.enum(["Yes", "No", "not-specified"]),
     expected_monthly_price: z.string().optional(),
     other_wifi_details: z.string().optional(),
     wifi_type: z.string().optional(),
@@ -822,7 +822,9 @@ export default function AddEnquiry() {
                                 <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
                                     <Select value={field.value} onValueChange={field.onChange}>
                                         <SelectTrigger><SelectValue placeholder="Select Wi-Fi Availability" /></SelectTrigger>
-                                        <SelectContent><SelectItem value="Yes">Yes</SelectItem><SelectItem value="No">No</SelectItem></SelectContent>
+                                        <SelectContent><SelectItem value="Yes">Yes</SelectItem>
+                                        <SelectItem value="No">No</SelectItem>
+                                        <SelectItem value="not-specified">Not Specified</SelectItem></SelectContent>
                                     </Select>
                                 </div>
                             </FormItem>

@@ -13,7 +13,8 @@ import { Avatar, Popconfirm } from 'antd';
 import { useAddAreaDepartmentHead, useAddAreaDepartmentStaff, useAddLocationDepartmentHead, useAddLocationDepartmentStaff, useGetAreaDepartmentCompleteData, useGetAreaLocations, useGetAreaUsers, useGetLocationDepartmentCompleteData, useGetLocationUsers, useRemoveAreaDepartment, useRemoveAreaDepartmentHead, useRemoveAreaDepartmentStaff, useRemoveLocationDepartment, useRemoveLocationDepartmentHead, useRemoveLocationDepartmentStaff } from '@/query/business/queries';
 import LoaderSpin from '@/components/shared/LoaderSpin';
 import { toast } from 'sonner';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from '@/components/ui/input';
 import { loadDepartmentData, loadLocationData } from '@/redux/slices/application';
 
 const AreaDepartmentPage = () => {
@@ -127,6 +128,13 @@ const AreaDepartmentPage = () => {
     const [selectedUser, setSelectedUser] = useState<string>("");
     const [isAddingStaff, setIsAddingStaff] = useState<boolean>(false);
     const [addStaffOpen, setAddStaffOpen] = useState<boolean>(false);
+    const [userSearch, setUserSearch] = useState<string>("");
+    const userSearchTerm = userSearch.trim().toLowerCase();
+    const filteredDepartmentUsers = departmentUsers?.filter((user: any) => {
+        const name = user?.user_id?.name || "";
+        const email = user?.user_id?.email || "";
+        return `${name} ${email}`.toLowerCase().includes(userSearchTerm);
+    });
 
     const clickAddHead = () => {
         setSelectedUser("");
@@ -521,20 +529,29 @@ const AreaDepartmentPage = () => {
 
             {/* Add Head and Staffs For Area Department */}
             <Dialog open={addStaffOpen} onOpenChange={setAddStaffOpen}>
-                <DialogContent className="sm:max-w-[425px]">
+                <DialogContent className="sm:max-w-[425px] max-h-[70vh] flex flex-col">
                     <DialogHeader>
                         <DialogTitle className='capitalize'>Adding Department {isAddingStaff ? 'Staff' : 'Head'}</DialogTitle>
                         <DialogDescription>Adding {isAddingStaff ? 'Staff' : 'Head'} For {departmentData?.type} Department {departmentData?.dep_name} of {departmentScopeLabel}.</DialogDescription>
                     </DialogHeader>
-                    <div className="">
-                        {departmentUsers?.length === 0 && <div className='w-full h-[10vh] flex items-center justify-center'>
+                    <div className="space-y-2">
+                        <Input
+                            placeholder="Search staff by name"
+                            value={userSearch}
+                            onChange={(e) => setUserSearch(e.target.value)}
+                        />
+                    </div>
+                    <div className="relative flex-1 overflow-y-auto pb-16">
+                        {filteredDepartmentUsers?.length === 0 && <div className='w-full h-[10vh] flex items-center justify-center'>
                             <h1 className="text-xs font-medium text-slate-400">
-                                {isLocationDepartment
-                                    ? `No Users with location (${locationName || 'this location'}) found.`
-                                    : `No Users with area (${areaData?.area_name}) found.`}
+                                {userSearchTerm
+                                    ? "No matching users"
+                                    : (isLocationDepartment
+                                        ? `No Users with location (${locationName || 'this location'}) found.`
+                                        : `No Users with area (${areaData?.area_name}) found.`)}
                             </h1>
                         </div>}
-                        {departmentUsers?.map((user: any) => <motion.div
+                        {filteredDepartmentUsers?.map((user: any) => <motion.div
                             whileHover={{ scale: 1.02 }}
                             whileTap={{ scale: 0.98 }}
                             key={user?._id}
@@ -552,15 +569,19 @@ const AreaDepartmentPage = () => {
                                 <Check className="text-cyan-600" strokeWidth={3} size={18} />
                             </div>}
                         </motion.div>)}
-                        <motion.div
-                            whileTap={{ scale: 0.98 }}
-                            whileHover={{ scale: 1.02 }}
-                            className='p-2 bg-gradient-to-br group from-slate-950/70 to-slate-800/70 rounded-lg cursor-pointer text-sm font-medium flex items-center gap-1 px-4 border border-slate-700 hover:border-cyan-600 justify-center mt-2'
-                            onClick={isAddingStaff ? handleAddDepartmentStaff : handleAddDepartmentHead}
-                        >
-                            {(isAddingDepartmentHead || isAddingDepartmentStaff) ? <LoaderSpin size={22} /> : <CircleCheckBig className="group-hover:text-cyan-600" size={18} />} {(isAddingDepartmentHead || isAddingDepartmentStaff) ? 'Adding' : 'Add'} Department {isAddingStaff ? 'Staff' : 'Head'}
-                        </motion.div>
                     </div>
+                    <DialogFooter className="w-full">
+                        <div className="pt-2 bg-slate-950/80 w-full">
+                            <motion.div
+                                whileTap={{ scale: 0.98 }}
+                                whileHover={{ scale: 1.02 }}
+                                className='p-2 bg-gradient-to-br group from-slate-950/70 to-slate-800/70 rounded-lg cursor-pointer text-sm font-medium flex items-center gap-1 px-4 border border-slate-700 hover:border-cyan-600 justify-center'
+                                onClick={isAddingStaff ? handleAddDepartmentStaff : handleAddDepartmentHead}
+                            >
+                                {(isAddingDepartmentHead || isAddingDepartmentStaff) ? <LoaderSpin size={22} /> : <CircleCheckBig className="group-hover:text-cyan-600" size={18} />} {(isAddingDepartmentHead || isAddingDepartmentStaff) ? 'Adding' : 'Add'} Department {isAddingStaff ? 'Staff' : 'Head'}
+                            </motion.div>
+                        </div>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
 

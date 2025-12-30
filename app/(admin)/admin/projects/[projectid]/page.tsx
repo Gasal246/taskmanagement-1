@@ -5,12 +5,12 @@ import { useParams, useRouter } from 'next/navigation';
 import { Building, CheckCircle, Files, FileText, ListTodo, Loader2, PanelsTopLeft, PencilRuler, Trash2, Upload, Users, Workflow, X } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from '@/components/ui/input';
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useApproveProject, useGetProjectById, useUpdateProject, useAddProjectDoc, useRemoveProjectDoc, useDeleteProject } from '@/query/business/queries';
+import { useApproveProject, useGetProjectById, useUpdateProject, useAddProjectDoc, useRemoveProjectDoc, useDeleteProject, useGetBusinessRegions, useGetAreasandDeptsForRegion } from '@/query/business/queries';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { DEPARTMENT_TYPES } from '@/lib/constants';
@@ -30,7 +30,9 @@ const formSchema = z.object({
   endDate: z.string().optional(),
   status: z.string().optional(),
   priority: z.string().optional(),
-  type: z.string().optional()
+  type: z.string().optional(),
+  region_id: z.string().min(1, { message: "Region is required." }),
+  area_id: z.string().nullable().optional()
 });
 
 const formatDateTiny = (date: any) => {
@@ -54,6 +56,8 @@ const ProjectView = () => {
   const [docToDelete, setDocToDelete] = React.useState<any | null>(null);
   const [deleteDocDialogOpen, setDeleteDocDialogOpen] = React.useState(false);
   const [deleteProjectDialogOpen, setDeleteProjectDialogOpen] = React.useState(false);
+  const [businessRegions, setBusinessRegions] = React.useState<any[]>([]);
+  const [regionAreas, setRegionAreas] = React.useState<any[]>([]);
   const params = useParams<{ projectid: string }>();
   const { data: session }:any = useSession();
 
@@ -63,6 +67,8 @@ const ProjectView = () => {
   const { mutateAsync: addProjectDoc } = useAddProjectDoc();
   const { mutateAsync: removeProjectDoc } = useRemoveProjectDoc();
   const { mutateAsync: deleteProject, isPending: deletingProject } = useDeleteProject();
+  const { mutateAsync: getRegions } = useGetBusinessRegions();
+  const { mutateAsync: getAreasForRegion, isPending: loadingAreas } = useGetAreasandDeptsForRegion();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -73,9 +79,13 @@ const ProjectView = () => {
       endDate: "",
       status: "approved",
       priority: "low",
-      type: "R&D"
+      type: "R&D",
+      region_id: "",
+      area_id: ""
     },
   });
+
+  const selectedRegionId = form.watch("region_id");
 
   useEffect(() => {
     if (project) {
@@ -86,6 +96,39 @@ const ProjectView = () => {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project]);
+
+  useEffect(() => {
+    const businessId = project?.data?.business_id?.toString?.() ?? project?.data?.business_id;
+    if (!businessId) return;
+    const fetchRegions = async () => {
+      const res = await getRegions({ business_id: businessId });
+      if (res?.status === 200) {
+        setBusinessRegions(res?.data ?? []);
+      } else {
+        setBusinessRegions([]);
+      }
+    };
+    fetchRegions();
+  }, [project?.data?.business_id, getRegions]);
+
+  useEffect(() => {
+    const fetchAreas = async () => {
+      if (!selectedRegionId) {
+        form.setValue("area_id", "");
+        setRegionAreas([]);
+        return;
+      }
+      const res = await getAreasForRegion(selectedRegionId);
+      const areas = res?.status === 200 ? res?.data?.areas ?? [] : [];
+      setRegionAreas(areas);
+      const currentAreaId = form.getValues("area_id");
+      if (!areas.some((area: any) => area?._id === currentAreaId)) {
+        form.setValue("area_id", "");
+      }
+    };
+
+    fetchAreas();
+  }, [selectedRegionId, getAreasForRegion, form]);
 
   const markAsApproved = async () => {
     const res = await ApproveProject(params.projectid);
@@ -112,6 +155,10 @@ const ProjectView = () => {
     form.setValue("status", project?.data?.status);
     form.setValue("priority", project?.data?.priority);
     form.setValue("type", project?.data?.type);
+    const regionValue = project?.data?.region?._id ?? project?.data?.region_id ?? "";
+    const areaValue = project?.data?.area?._id ?? project?.data?.area_id ?? "";
+    form.setValue("region_id", regionValue?.toString?.() ?? regionValue ?? "");
+    form.setValue("area_id", areaValue?.toString?.() ?? areaValue ?? "");
     setUpdateProjectDialog(true);
   };
 
@@ -140,7 +187,9 @@ const ProjectView = () => {
       start_date: values.startDate,
       end_date: values.endDate,
       priority: values.priority,
-      type: values.type
+      type: values.type,
+      region_id: values.region_id,
+      area_id: values.area_id == "" ? null : values.area_id
     };
     const res = await UpdateProject(updateProject);
     if (res?.status == 200) {
@@ -432,6 +481,16 @@ const ProjectView = () => {
             <p className={`text-xs font-semibold capitalize ${project?.data?.status == "Pending" ? 'text-gray-600' : project?.data.status == "completed" ? 'text-green-600' : project?.data?.status == "approved" ? 'text-blue-600' : project?.data?.status == "cancelled" ? 'text-red-600' : 'text-gray-600'}`}>
               {project?.data?.status}
             </p>
+          </div>
+
+          <div className="w-full lg:w-1/2 mb-2.5">
+            <p className='text-xs text-slate-400'>Region</p>
+            <p className='text-xs text-slate-300 font-semibold'>{project?.data?.region?.region_name || "-"}</p>
+          </div>
+
+          <div className="w-full lg:w-1/2 mb-2.5">
+            <p className='text-xs text-slate-400'>Area</p>
+            <p className='text-xs text-slate-300 font-semibold'>{project?.data?.area?.area_name || "-"}</p>
           </div>
 
           <div className="w-full lg:w-1/2 mb-2.5">
@@ -840,6 +899,70 @@ const ProjectView = () => {
                     </FormItem>
                   )}
                 />
+
+                <FormField
+                  control={form.control}
+                  name="region_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs text-slate-300 font-semibold">Region</FormLabel>
+                      <FormControl className="border-slate-600 focus:border-slate-400 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0">
+                        <select
+                          {...field}
+                          value={field.value ?? ""}
+                          className='w-full rounded-md border border-slate-700 bg-slate-900 text-white p-2 focus:border-slate-500 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0'
+                        >
+                          {businessRegions && businessRegions.length > 0 ? (
+                            <>
+                              <option value="">Select Region</option>
+                              {businessRegions.map((region: any) => (
+                                <option key={region._id} value={region._id}>
+                                  {region.region_name}
+                                </option>
+                              ))}
+                            </>
+                          ) : (
+                            <option value="">No Regions</option>
+                          )}
+                        </select>
+                      </FormControl>
+                      {selectedRegionId && loadingAreas && (
+                        <FormDescription className="text-xs text-slate-400">Loading areas...</FormDescription>
+                      )}
+                      {selectedRegionId && !loadingAreas && regionAreas.length === 0 && (
+                        <FormDescription className="text-xs text-slate-400">No areas for this region.</FormDescription>
+                      )}
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {selectedRegionId && regionAreas.length > 0 && (
+                  <FormField
+                    control={form.control}
+                    name="area_id"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs text-slate-300 font-semibold">Area (Optional)</FormLabel>
+                        <FormControl className="border-slate-600 focus:border-slate-400 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0">
+                          <select
+                            {...field}
+                            value={field.value ?? ""}
+                            className='w-full rounded-md border border-slate-700 bg-slate-900 text-white p-2 focus:border-slate-500 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0'
+                          >
+                            <option value="">Select Area (Optional)</option>
+                            {regionAreas.map((area: any) => (
+                              <option key={area._id} value={area._id}>
+                                {area.area_name}
+                              </option>
+                            ))}
+                          </select>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
 
                 <FormField
                   control={form.control}

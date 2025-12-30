@@ -47,6 +47,9 @@ export default function SingleEnquiryPage() {
     );
   }
 
+  const wifiAvailability = enquiry?.enquiry?.wifi_available;
+  const wifiStatusLabel = wifiAvailability === true ? "Available" : wifiAvailability === false ? "No WiFi" : "Not Specified";
+
   return (
     <div className='p-4 pb-10'>
       {/* Breadcrumb */}
@@ -246,8 +249,8 @@ export default function SingleEnquiryPage() {
           <div className="mt-5">
             <h2 className="font-semibold text-lg mb-2">WiFi Information</h2>
             <div className="text-sm text-slate-300 border border-slate-800 p-3 rounded-lg bg-slate-900/40 font-semibold space-y-2">
-              <p className="text-sm">WiFi Status: {enquiry?.enquiry?.wifi_available ? "Available" : "No WiFi"}</p>
-              {enquiry?.enquiry?.wifi_available ? (
+              <p className="text-sm">WiFi Status: {wifiStatusLabel}</p>
+              {wifiAvailability === true ? (
                 <>
                   <p className="text-sm">WiFi Type: {enquiry?.enquiry?.wifi_type}</p>
                   {enquiry?.enquiry?.wifi_type == "Existing Contractor" ? (
@@ -267,8 +270,10 @@ export default function SingleEnquiryPage() {
                     </>
                   )}
                 </>
-              ) : (
+              ) : wifiAvailability === false ? (
                 <p className="text-sm">WiFi Expected Cost: {enquiry?.enquiry?.expected_wifi_cost?.$numberDecimal ?? enquiry?.enquiry?.expected_wifi_cost}</p>
+              ) : (
+                <p className="text-sm">WiFi details not specified.</p>
               )}
             </div>
           </div>

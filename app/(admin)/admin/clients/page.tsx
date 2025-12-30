@@ -131,7 +131,18 @@ const ClientsPage = () => {
   const [openAddRegionOrAreaDialog, setOpenAddRegionOrAreaDialog] = React.useState(false);
   const [addRegionOrAreaType, setAddRegionOrAreaType] = React.useState<'region' | 'area' | ''>('');
   const [currentSelectedRegion, setCurrentSelectedRegion] = React.useState('');
+  const [regionAreaSearch, setRegionAreaSearch] = React.useState('');
+  const regionAreaSearchTerm = regionAreaSearch.trim().toLowerCase();
+  const filteredClientRegions = businessRegions.filter((region: any) => {
+    const name = region?.region_name || '';
+    return name.toLowerCase().includes(regionAreaSearchTerm);
+  });
+  const filteredClientAreas = businessAreas.filter((area: any) => {
+    const name = area?.area_name || '';
+    return name.toLowerCase().includes(regionAreaSearchTerm);
+  });
   const handleClickAddClientRegion = () => {
+    setRegionAreaSearch('');
     setOpenAddRegionOrAreaDialog(true)
     setAddRegionOrAreaType('region')
   }
@@ -154,6 +165,7 @@ const ClientsPage = () => {
 
   const [currentSelectedArea, setCurrentSelectedArea] = React.useState('');
   const handleClickAddClientArea = () => {
+    setRegionAreaSearch('');
     setOpenAddRegionOrAreaDialog(true)
     setAddRegionOrAreaType('area')
   }
@@ -706,66 +718,71 @@ const ClientsPage = () => {
 
       {/* Add Area or Region Dialog */}
       <Dialog open={openAddRegionOrAreaDialog} onOpenChange={setOpenAddRegionOrAreaDialog}>
-        <DialogContent className='w-full lg:w-[450px] border-cyan-900'>
+        <DialogContent className='w-full lg:w-[450px] max-h-[70vh] flex flex-col border-cyan-900'>
           <DialogHeader>
             <DialogTitle>{addRegionOrAreaType === 'region' ? 'Add Client Region' : 'Add Client Area'}</DialogTitle>
             <DialogDescription>Clients assigning will be based on their assigned region or area</DialogDescription>
           </DialogHeader>
-          {addRegionOrAreaType === 'region' ?
-            <div className="">
-              {businessRegions?.length === 0 && (
-                <div className="flex items-center justify-center h-[10vh]">
-                  <h1 className="text-xs text-yellow-600">No Business Regions Found.</h1>
-                </div>
-              )}
-              {businessRegions?.map((region: any) => (
-                <motion.div
-                  key={region?._id}
-                  whileTap={{ scale: 0.98 }}
-                  whileHover={{ scale: 1.02 }}
-                  onClick={() => setCurrentSelectedRegion(region?._id)}
-                  className="bg-gradient-to-tr from-slate-800/60 to-slate-900/60 p-3 hover:border-cyan-500 border border-slate-700 select-none cursor-pointer rounded-lg mb-1.5 relative">
-                  <h1 className="font-semibold text-xs text-slate-300 flex items-center gap-1">{region?.region_name}</h1>
-                  {currentSelectedRegion === region?._id && <div className="absolute right-2 top-1.5"><Check className="text-cyan-600" strokeWidth={3} size={17} /> </div>}
-                </motion.div>
-              ))}
+          <div className="space-y-2">
+            <Input
+              placeholder={addRegionOrAreaType === 'region' ? "Search regions by name" : "Search areas by name"}
+              value={regionAreaSearch}
+              onChange={(e) => setRegionAreaSearch(e.target.value)}
+            />
+          </div>
+          <div className="relative flex-1 overflow-y-auto pb-16">
+            {addRegionOrAreaType === 'region' ? (
+              <>
+                {filteredClientRegions?.length === 0 && (
+                  <div className="flex items-center justify-center h-[10vh]">
+                    <h1 className="text-xs text-yellow-600">{regionAreaSearchTerm ? "No matching regions." : "No Business Regions Found."}</h1>
+                  </div>
+                )}
+                {filteredClientRegions?.map((region: any) => (
+                  <motion.div
+                    key={region?._id}
+                    whileTap={{ scale: 0.98 }}
+                    whileHover={{ scale: 1.02 }}
+                    onClick={() => setCurrentSelectedRegion(region?._id)}
+                    className="bg-gradient-to-tr from-slate-800/60 to-slate-900/60 p-3 hover:border-cyan-500 border border-slate-700 select-none cursor-pointer rounded-lg mb-1.5 relative">
+                    <h1 className="font-semibold text-xs text-slate-300 flex items-center gap-1">{region?.region_name}</h1>
+                    {currentSelectedRegion === region?._id && <div className="absolute right-2 top-1.5"><Check className="text-cyan-600" strokeWidth={3} size={17} /> </div>}
+                  </motion.div>
+                ))}
+              </>
+            ) : (
+              <>
+                {filteredClientAreas?.length === 0 && (
+                  <div className="flex items-center justify-center h-[10vh]">
+                    <h1 className="text-xs text-yellow-600">{regionAreaSearchTerm ? "No matching areas." : "!! You must add Client Regions first."}</h1>
+                  </div>
+                )}
+                {filteredClientAreas?.map((area: any) => (
+                  <motion.div
+                    key={area?._id}
+                    whileTap={{ scale: 0.98 }}
+                    whileHover={{ scale: 1.02 }}
+                    onClick={() => setCurrentSelectedArea(area?._id)}
+                    className="bg-gradient-to-tr from-slate-800/60 to-slate-900/60 p-3 hover:border-cyan-500 border border-slate-700 select-none cursor-pointer rounded-lg mb-1.5 relative">
+                    <h1 className="font-semibold text-xs text-slate-300 flex items-center gap-1">{area?.area_name}</h1>
+                    {currentSelectedArea === area?._id && <div className="absolute right-2 top-1.5"><Check className="text-cyan-600" strokeWidth={3} size={17} /> </div>}
+                  </motion.div>
+                ))}
+              </>
+            )}
+          </div>
+          <DialogFooter className="w-full">
+            <div className="pt-2 bg-slate-950/80 w-full">
               <motion.div
                 whileTap={{ scale: 0.98 }}
                 whileHover={{ scale: 1.02 }}
-                onClick={handleAddRegion}
-                className="bg-gradient-to-tr from-slate-700/50 to-slate-800/50 p-3 hover:border-cyan-500 border border-slate-700 select-none cursor-pointer rounded-lg mt-3 flex items-center gap-1 justify-center">
+                onClick={addRegionOrAreaType === 'region' ? handleAddRegion : handleAddArea}
+                className="bg-gradient-to-tr from-slate-700/50 to-slate-800/50 p-3 hover:border-cyan-500 border border-slate-700 select-none cursor-pointer rounded-lg flex items-center gap-1 justify-center">
                 <Plus size={16} />
-                <h1 className="font-semibold text-sm text-slate-300 flex items-center gap-1">Add New Region</h1>
+                <h1 className="font-semibold text-sm text-slate-300 flex items-center gap-1">{addRegionOrAreaType === 'region' ? "Add New Region" : "Add New Area"}</h1>
               </motion.div>
             </div>
-            :
-            <div className="">
-              {businessAreas?.length === 0 && (
-                <div className="flex items-center justify-center h-[10vh]">
-                  <h1 className="text-xs text-yellow-600">!! You must add Client Regions first.</h1>
-                </div>
-              )}
-              {businessAreas?.map((area: any) => (
-                <motion.div
-                  key={area?._id}
-                  whileTap={{ scale: 0.98 }}
-                  whileHover={{ scale: 1.02 }}
-                  onClick={() => setCurrentSelectedArea(area?._id)}
-                  className="bg-gradient-to-tr from-slate-800/60 to-slate-900/60 p-3 hover:border-cyan-500 border border-slate-700 select-none cursor-pointer rounded-lg mb-1.5 relative">
-                  <h1 className="font-semibold text-xs text-slate-300 flex items-center gap-1">{area?.area_name}</h1>
-                  {currentSelectedArea === area?._id && <div className="absolute right-2 top-1.5"><Check className="text-cyan-600" strokeWidth={3} size={17} /> </div>}
-                </motion.div>
-              ))}
-              <motion.div
-                whileTap={{ scale: 0.98 }}
-                whileHover={{ scale: 1.02 }}
-                onClick={handleAddArea}
-                className="bg-gradient-to-tr from-slate-700/50 to-slate-800/50 p-3 hover:border-cyan-500 border border-slate-700 select-none cursor-pointer rounded-lg mt-3 flex items-center gap-1 justify-center">
-                <Plus size={16} />
-                <h1 className="font-semibold text-sm text-slate-300 flex items-center gap-1">Add New Area</h1>
-              </motion.div>
-            </div>
-          }
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

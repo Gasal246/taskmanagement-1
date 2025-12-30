@@ -3,8 +3,9 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
-import { useGetEqCountries, useGetEqRegions, useGetEqCities, useGetEqAreasFiltered, useGetEqProvince, useGetEqAreas, useGetEqCampsFiltered } from "@/query/enquirymanager/queries";
+import { useGetEqCountries, useGetEqRegions, useGetEqCities, useGetEqProvince, useGetEqAreas, useGetEqCampsFiltered } from "@/query/enquirymanager/queries";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { useRouter } from "next/navigation";
 
@@ -16,6 +17,9 @@ export default function CampsListPage() {
     const [province_id, setProvince] = React.useState("");
     const [city_id, setCity] = React.useState("");
     const [area_id, setArea] = useState("");
+    const [search, setSearch] = React.useState("");
+    const [page, setPage] = React.useState(1);
+    const limit = 15;
 
     const { mutateAsync: GetCountries } = useGetEqCountries();
     const { data: regions } = useGetEqRegions(country_id);
@@ -23,7 +27,8 @@ export default function CampsListPage() {
     const { data: cities } = useGetEqCities(province_id);
     const {data: areas} = useGetEqAreas(city_id);
 
-    const { data: camps, isLoading } = useGetEqCampsFiltered({ country_id, region_id, province_id, city_id, area_id });
+    const { data: camps, isLoading } = useGetEqCampsFiltered({ country_id, region_id, province_id, city_id, area_id, search, page, limit });
+    const pagination = camps?.pagination;
 
     const fetchCountries = async () => {
         const res = await GetCountries();
@@ -33,6 +38,10 @@ export default function CampsListPage() {
     useEffect(() => {
         fetchCountries();
     }, []);
+
+    useEffect(() => {
+        setPage(1);
+    }, [country_id, region_id, province_id, city_id, area_id, search]);
 
     return (
         <div className="p-5 pb-10">
@@ -59,6 +68,15 @@ export default function CampsListPage() {
 
                 {/* Filters */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div className="sm:col-span-2 lg:col-span-4">
+                        <Input
+                            type="search"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            placeholder="Search by camp, area, city, province, region, or country..."
+                            className="bg-slate-900/50 text-slate-200 border-slate-700 placeholder:text-slate-500"
+                        />
+                    </div>
                     <Select value={country_id} onValueChange={(v) => { setCountry(v); setRegion(""); setProvince(""); setCity(""); }}>
                         <SelectTrigger className="bg-slate-900/50 text-slate-200"><SelectValue placeholder="Country" /></SelectTrigger>
                         <SelectContent>
@@ -109,7 +127,9 @@ export default function CampsListPage() {
                         </thead>
                         <tbody>
                             {isLoading ? (
-                                <tr><td colSpan={5} className="p-4 text-center text-slate-400">Loading...</td></tr>
+                                <tr><td colSpan={6} className="p-4 text-center text-slate-400">Loading...</td></tr>
+                            ) : camps?.camps?.length === 0 ? (
+                                <tr><td colSpan={6} className="p-4 text-center text-slate-400">No camps found.</td></tr>
                             ) : (
                                 camps?.camps?.map((camps:any) => (
                                     <tr key={camps._id} onClick={()=> router.replace(`/admin/enquiries/camps/${camps?._id}`)} className="border-b border-slate-700/50 hover:bg-slate-800/40">
@@ -125,6 +145,33 @@ export default function CampsListPage() {
                         </tbody>
                     </table>
                 </div>
+                {pagination && pagination.totalPages > 1 && (
+                    <div className="flex justify-between items-center mt-4 text-xs text-slate-400">
+                        <p>
+                            Page {pagination.page} of {pagination.totalPages} · Total {pagination.totalRecords}
+                        </p>
+
+                        <div className="flex gap-2">
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={page === 1}
+                                onClick={() => setPage(prev => Math.max(prev - 1, 1))}
+                            >
+                                Previous
+                            </Button>
+
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={page === pagination.totalPages}
+                                onClick={() => setPage(prev => Math.min(prev + 1, pagination.totalPages))}
+                            >
+                                Next
+                            </Button>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

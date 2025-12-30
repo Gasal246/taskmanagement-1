@@ -31,6 +31,7 @@ interface Body {
     type: string,
     priority: string,
     region_id:string | null,
+    area_id: string | null,
     role_id: string,
     dept_id: string | null
 }
@@ -60,7 +61,8 @@ export async function POST(req: NextRequest){
                 admin_id: session?.user?.id,
                 type: body.type,
                 priority: body.priority,
-                region_id: body.region_id
+                region_id: body.region_id,
+                area_id: body.area_id || null
             })
 
             const savedProject = await newProject.save();

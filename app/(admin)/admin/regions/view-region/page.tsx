@@ -99,6 +99,7 @@ const RegionPage = () => {
     const [addHeadOpen, setAddHeadOpen] = React.useState<boolean>(false);
     const [selectedUser, setSelectedUser] = React.useState<string>("");
     const [headSearch, setHeadSearch] = React.useState<string>("");
+    const [staffSearch, setStaffSearch] = React.useState<string>("");
 
     const handleAddRegionHead = async () => {
         if(addingHead) return;
@@ -172,6 +173,12 @@ const RegionPage = () => {
     const filteredHeadStaffs = businessStaffs?.filter((staff: any) => {
         const name = staff?.user_id?.name || "";
         return name.toLowerCase().includes(headSearchTerm);
+    });
+    const staffSearchTerm = staffSearch.trim().toLowerCase();
+    const filteredStaffs = businessStaffs?.filter((staff: any) => {
+        const name = staff?.user_id?.name || "";
+        const email = staff?.user_id?.email || "";
+        return `${name} ${email}`.toLowerCase().includes(staffSearchTerm);
     });
 
     const handleAddRegionStaff = async () => {
@@ -573,16 +580,23 @@ const RegionPage = () => {
                 </DialogContent>
             </Dialog>
             <Dialog open={openAddStaffDialog} onOpenChange={setOpenAddStaffDialog}>
-                <DialogContent className="sm:max-w-[425px]">
+                <DialogContent className="sm:max-w-[425px] max-h-[70vh] flex flex-col">
                     <DialogHeader>
                         <DialogTitle>Add Region Staff</DialogTitle>
                         <DialogDescription>Adding region staff under region - {regionData?.region_name}.</DialogDescription>
                     </DialogHeader>
-                    <div className="">
-                        {!loadingBusinessStaffs && businessStaffs?.length === 0 && <div className='w-full h-[10vh] flex items-center justify-center'>
-                            <h1 className="text-xs font-medium text-slate-400">No business staffs found</h1>
+                    <div className="space-y-2">
+                        <Input
+                            placeholder="Search staff by name"
+                            value={staffSearch}
+                            onChange={(e) => setStaffSearch(e.target.value)}
+                        />
+                    </div>
+                    <div className="relative flex-1 overflow-y-auto pb-16">
+                        {!loadingBusinessStaffs && filteredStaffs?.length === 0 && <div className='w-full h-[10vh] flex items-center justify-center'>
+                            <h1 className="text-xs font-medium text-slate-400">{staffSearchTerm ? "No matching users" : "No business staffs found"}</h1>
                         </div>}
-                        {businessStaffs?.map(( staff: any ) => <motion.div
+                        {filteredStaffs?.map(( staff: any ) => <motion.div
                             whileHover={{ scale: 1.02 }}
                             whileTap={{ scale: 0.98 }}
                             key={staff?._id}
@@ -600,15 +614,19 @@ const RegionPage = () => {
                                 <Check className="text-cyan-600" strokeWidth={3} size={18} />
                             </div>}
                         </motion.div>)}
-                        <motion.div
-                            whileTap={{ scale: 0.98 }}
-                            whileHover={{ scale: 1.02 }}
-                            className='p-2 bg-gradient-to-br group from-slate-950/70 to-slate-800/70 rounded-lg cursor-pointer text-sm font-medium flex items-center gap-1 px-4 border border-slate-700 hover:border-cyan-600 justify-center mt-2'
-                            onClick={handleAddRegionStaff}
-                        >
-                            {addingStaff ? <LoaderSpin size={22} /> : <CircleCheckBig className="group-hover:text-cyan-600" size={18} />} Add Staff
-                        </motion.div>
                     </div>
+                    <DialogFooter className='w-full'>
+                        <div className="pt-2 bg-slate-950/80 w-full">
+                            <motion.div
+                                whileTap={{ scale: 0.98 }}
+                                whileHover={{ scale: 1.02 }}
+                                className='p-2 bg-gradient-to-br group from-slate-950/70 to-slate-800/70 rounded-lg cursor-pointer text-sm font-medium flex items-center gap-1 px-4 border border-slate-700 hover:border-cyan-600 justify-center'
+                                onClick={handleAddRegionStaff}
+                            >
+                                {addingStaff ? <LoaderSpin size={22} /> : <CircleCheckBig className="group-hover:text-cyan-600" size={18} />} Add Staff
+                            </motion.div>
+                        </div>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
 

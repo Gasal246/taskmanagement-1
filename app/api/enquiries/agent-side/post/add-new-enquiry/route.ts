@@ -98,6 +98,11 @@ export async function POST(req:NextRequest){
         if(!session) return NextResponse.json({message: "Unauthorized Access", status: 401}, {status: 401});
 
         const body:Body = await req.json();
+        const wifiAvailability = body.wifi_available === "Yes"
+            ? true
+            : body.wifi_available === "No"
+                ? false
+                : null;
 
         let areaId = body.area;
         let campId = body.camp;
@@ -268,9 +273,9 @@ export async function POST(req:NextRequest){
             priority: body.priority,
             alert_date: body.alert_date,
             due_date: body.next_action_due,
-            wifi_available: body.wifi_available == "Yes" ? true : false,
-            wifi_type: body.wifi_type,
-            expected_wifi_cost: body.wifi_available == "No" ? body.expected_monthly_price || null : null,
+            wifi_available: wifiAvailability,
+            wifi_type: wifiAvailability === true ? body.wifi_type : null,
+            expected_wifi_cost: wifiAvailability === false ? body.expected_monthly_price || null : null,
             lease_expiry_due: body.lease_expiry_due,
             competition_status: body.competition_status == "Yes" ? true : false,
             competition_notes: body.competition_notes || null,
@@ -278,7 +283,7 @@ export async function POST(req:NextRequest){
             next_action_due: body.next_action_due,
             rent_terms: body.rent_terms,
             enquiry_uuid: uuid,
-            wifi_setup: body.wifi_type == "Other Sources" && body.wifi_available == "Yes" ? body.other_wifi_details : null,
+            wifi_setup: wifiAvailability === true && body.wifi_type == "Other Sources" ? body.other_wifi_details : null,
         });
 
         const savedEnquiry = await newEnquiry.save();
@@ -302,7 +307,7 @@ export async function POST(req:NextRequest){
             await Eq_camp_contacts.insertMany(newContacts);
         };
 
-        if(body.wifi_available == "Yes"){
+        if(wifiAvailability === true){
             switch(body.wifi_type){
                 case "Existing Contractor": {
                     const newExistingWifi = new Eq_enquiry_wifi_external({

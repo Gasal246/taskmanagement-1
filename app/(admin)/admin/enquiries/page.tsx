@@ -361,26 +361,32 @@ export default function EnquiriesPage() {
         )}
 
         <div className="space-y-2">
-          {enquiries?.data?.map((e) => (
-            <div
-              key={e._id}
-              className="p-3 border border-slate-700 rounded-lg hover:bg-slate-800/60 transition cursor-pointer"
-              onClick={() => router.replace(`/admin/enquiries/${e._id}`)}
-            >
-              <h2 className="text-md font-medium text-slate-200 truncate">
-                Camp: {e.camp_id?.camp_name ?? "N/A"}
-              </h2>
-              {!e?.is_active && <p className="text-sm font-medium truncate text-red-500">Action Required</p>}
-              <div className="mt-1 text-xs text-slate-400 flex flex-wrap gap-2">
-                <p className="bg-gradient-to-br from-slate-700 to-slate-900 px-2 py-1 rounded-sm font-bold">Status: <span className="text-white/80 font-normal">{e.status}</span></p>
-                <p className="bg-gradient-to-br from-slate-700 to-slate-900 px-2 py-1 rounded-sm font-bold">Priority: <span className="text-white/80 font-normal">{e.priority}</span></p>
-                <p className="bg-gradient-to-br from-slate-700 to-slate-900 px-2 py-1 rounded-sm font-bold">Occupancy: <span className="text-white/80 font-normal">{e.camp_id?.camp_occupancy ?? "N/A"}</span></p>
-                <p className="bg-gradient-to-br from-slate-700 to-slate-900 px-2 py-1 rounded-sm font-bold">UUID: <span className="text-white/80 font-normal">{e.enquiry_uuid}</span></p>
-                <p className="bg-gradient-to-br from-slate-700 to-slate-900 px-2 py-1 rounded-sm font-bold">WiFi: <span className="text-white/80 font-normal">{e.wifi_available ? "Yes" : "No"}</span></p>
-                <p className="bg-gradient-to-br from-slate-700 to-slate-900 px-2 py-1 rounded-sm font-bold">Due Date: <span className="text-white/80 font-normal">{e.due_date?.slice(0, 10)}</span></p>
+          {enquiries?.data?.map((e: any, index: any) => {
+            const currentPage = pagination?.page ?? page;
+            const totalRecords = pagination?.totalRecords ?? 0;
+            const enquiryNumber = Math.max(totalRecords - ((currentPage - 1) * limit + index), 0);
+            return (
+              <div
+                key={e._id}
+                className="relative p-3 border border-slate-700 rounded-lg hover:bg-slate-800/60 transition cursor-pointer"
+                onClick={() => router.replace(`/admin/enquiries/${e._id}`)}
+              >
+                <div className="absolute top-3 left-3 text-xs font-bold text-slate-400 p-1">{String(enquiryNumber).padStart(2, '0')} )</div>
+                <h2 className="text-md font-medium text-slate-200 truncate ml-8">
+                  Camp: {e.camp_id?.camp_name ?? "N/A"}
+                </h2>
+                {!e?.is_active && <p className="text-sm font-medium truncate text-red-500">Action Required</p>}
+                <div className="mt-1 text-xs text-slate-400 flex flex-wrap gap-2">
+                  <p className="bg-gradient-to-br from-slate-700 to-slate-900 px-2 py-1 rounded-sm font-bold">Status: <span className="text-white/80 font-normal">{e.status}</span></p>
+                  <p className="bg-gradient-to-br from-slate-700 to-slate-900 px-2 py-1 rounded-sm font-bold">Priority: <span className="text-white/80 font-normal">{e.priority}</span></p>
+                  <p className="bg-gradient-to-br from-slate-700 to-slate-900 px-2 py-1 rounded-sm font-bold">Occupancy: <span className="text-white/80 font-normal">{e.camp_id?.camp_occupancy ?? "N/A"}</span></p>
+                  <p className="bg-gradient-to-br from-slate-700 to-slate-900 px-2 py-1 rounded-sm font-bold">UUID: <span className="text-white/80 font-normal">{e.enquiry_uuid}</span></p>
+                <p className="bg-gradient-to-br from-slate-700 to-slate-900 px-2 py-1 rounded-sm font-bold">WiFi: <span className="text-white/80 font-normal">{e.wifi_available === true ? "Yes" : e.wifi_available === false ? "No" : "Not Specified"}</span></p>
+                  <p className="bg-gradient-to-br from-slate-700 to-slate-900 px-2 py-1 rounded-sm font-bold">Due Date: <span className="text-white/80 font-normal">{e.due_date?.slice(0, 10)}</span></p>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
       {pagination && pagination.totalPages > 1 && (
@@ -489,4 +495,3 @@ function FilterCapacity({ label, value, options, onChange, disabled }) {
     </div>
   );
 }
-

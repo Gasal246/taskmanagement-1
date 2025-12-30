@@ -7,6 +7,7 @@ import { Check, EllipsisVertical, Eye, Library, MapPinned, Plus, Trash2, UserPlu
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator, BreadcrumbLink } from '@/components/ui/breadcrumb'
 import { useRouter } from 'next/navigation'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from '@/components/ui/input';
 import { useGetBusinessStaffs } from '@/query/user/queries';
 import { toast } from 'sonner';
 import { Avatar } from 'antd';
@@ -25,9 +26,12 @@ const DepartmentPage = () => {
     const { mutateAsync: getAreas } = useGetRegionAreas();
     const [isAddingStaff, setIsAddingStaff] = useState(false);
     const [currentSelectedStaff, setCurrentSelectedStaff] = useState<string>('');
+    const [staffSearch, setStaffSearch] = useState<string>('');
     const [allRegions, setAllRegions] = useState<any[]>([]);
     const [allAreas, setAllAreas] = useState<any[]>([]);
     const [addHeadDialog, setAddHeadDialog] = useState(false);
+    const [regionSearch, setRegionSearch] = useState<string>('');
+    const [areaSearch, setAreaSearch] = useState<string>('');
 
     const { mutateAsync: addDepartmentHead } = useAddDepartmentHead();
     const { mutateAsync: removeDepartmentHead } = useRemoveDepartmentHead();
@@ -42,6 +46,22 @@ const DepartmentPage = () => {
     const [regions, setRegions] = useState<any[]>([]);
     const [areas, setAreas] = useState<any[]>([]);
     const [staffs, setStaffs] = useState<any[]>([]);
+    const staffSearchTerm = staffSearch.trim().toLowerCase();
+    const filteredStaffs = allStaffs?.filter((staff: any) => {
+        const name = staff?.user_id?.name || "";
+        const email = staff?.user_id?.email || "";
+        return `${name} ${email}`.toLowerCase().includes(staffSearchTerm);
+    });
+    const regionSearchTerm = regionSearch.trim().toLowerCase();
+    const filteredRegions = allRegions.filter((region: any) => {
+        const name = region?.region_name || "";
+        return name.toLowerCase().includes(regionSearchTerm);
+    });
+    const areaSearchTerm = areaSearch.trim().toLowerCase();
+    const filteredAreas = allAreas.filter((area: any) => {
+        const name = area?.area_name || "";
+        return name.toLowerCase().includes(areaSearchTerm);
+    });
 
     const handleGetCompleteDepData = async () => {
         if (!departmentData?._id) return toast.error("No department data found");
@@ -503,18 +523,25 @@ const DepartmentPage = () => {
 
             {/* Add Department Head */}
             <Dialog open={addHeadDialog} onOpenChange={setAddHeadDialog}>
-                <DialogContent className="lg:w-[450px] border-slate-800 bg-black/10 backdrop-blur-sm">
+                <DialogContent className="lg:w-[450px] max-h-[70vh] flex flex-col border-slate-800 bg-black/10 backdrop-blur-sm">
                     <DialogHeader>
                         <DialogTitle>Add Department {isAddingStaff ? "Staff" : "Head"}</DialogTitle>
                         <DialogDescription>You can add any business staff as department {isAddingStaff ? "staff" : "head"} for {departmentData?.dep_name}.</DialogDescription>
                     </DialogHeader>
-                    <div className="h-[45vh] overflow-y-scroll">
-                        {allStaffs?.length === 0 && (
+                    <div className="space-y-2">
+                        <Input
+                            placeholder="Search staff by name"
+                            value={staffSearch}
+                            onChange={(e) => setStaffSearch(e.target.value)}
+                        />
+                    </div>
+                    <div className="relative flex-1 overflow-y-auto pb-16">
+                        {filteredStaffs?.length === 0 && (
                             <div className="flex items-center justify-center h-[10vh]">
-                                <h1 className="text-xs font-medium text-slate-300">No business staffs.</h1>
+                                <h1 className="text-xs font-medium text-slate-300">{staffSearchTerm ? "No matching users." : "No business staffs."}</h1>
                             </div>
                         )}
-                        {allStaffs?.map((staff: any) => (
+                        {filteredStaffs?.map((staff: any) => (
                             <motion.div
                                 key={staff?._id}
                                 whileTap={{ scale: 0.98 }}
@@ -532,31 +559,40 @@ const DepartmentPage = () => {
                         ))}
                     </div>
                     <DialogFooter className="w-full">
-                        <motion.div
-                            whileTap={{ scale: 0.98 }}
-                            onClick={isAddingStaff ? handleAddStaff : handleAddHead}
-                            className="w-full bg-gradient-to-tr from-slate-700/50 to-slate-800/50 p-3 hover:border-cyan-500 border border-slate-700 select-none cursor-pointer rounded-lg mt-3 flex items-center gap-1 justify-center">
-                            <Plus size={16} />
-                            <h1 className="font-semibold text-sm text-slate-300 flex items-center gap-1">Add Deparment {isAddingStaff ? "Staff" : "Head"}</h1>
-                        </motion.div>
+                        <div className="pt-2 bg-slate-950/80 w-full">
+                            <motion.div
+                                whileTap={{ scale: 0.98 }}
+                                onClick={isAddingStaff ? handleAddStaff : handleAddHead}
+                                className="w-full bg-gradient-to-tr from-slate-700/50 to-slate-800/50 p-3 hover:border-cyan-500 border border-slate-700 select-none cursor-pointer rounded-lg flex items-center gap-1 justify-center">
+                                <Plus size={16} />
+                                <h1 className="font-semibold text-sm text-slate-300 flex items-center gap-1">Add Deparment {isAddingStaff ? "Staff" : "Head"}</h1>
+                            </motion.div>
+                        </div>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
 
             {/* Add Department Region */}
             <Dialog open={addRegionDialog} onOpenChange={setAddRegionDialog}>
-                <DialogContent className="lg:w-[450px] border-slate-800 bg-black/10 backdrop-blur-sm">
+                <DialogContent className="lg:w-[450px] max-h-[70vh] flex flex-col border-slate-800 bg-black/10 backdrop-blur-sm">
                     <DialogHeader>
                         <DialogTitle>Add Department Region</DialogTitle>
                         <DialogDescription>Select the business regions for {departmentData?.dep_name}.</DialogDescription>
                     </DialogHeader>
-                    <div className="h-[35vh] overflow-y-scroll">
-                        {allRegions?.length === 0 && (
+                    <div className="space-y-2">
+                        <Input
+                            placeholder="Search regions by name"
+                            value={regionSearch}
+                            onChange={(e) => setRegionSearch(e.target.value)}
+                        />
+                    </div>
+                    <div className="relative flex-1 overflow-y-auto pb-16">
+                        {filteredRegions?.length === 0 && (
                             <div className="flex items-center justify-center h-[10vh]">
-                                <h1 className="text-xs font-medium text-slate-300">No business regions.</h1>
+                                <h1 className="text-xs font-medium text-slate-300">{regionSearchTerm ? "No matching regions." : "No business regions."}</h1>
                             </div>
                         )}
-                        {allRegions?.map((region: any) => (
+                        {filteredRegions?.map((region: any) => (
                             <motion.div
                                 key={region?._id}
                                 whileTap={{ scale: 0.98 }}
@@ -568,36 +604,45 @@ const DepartmentPage = () => {
                         ))}
                     </div>
                     <DialogFooter className="w-full">
-                        <motion.div
-                            whileTap={{ scale: 0.98 }}
-                            onClick={handleAddRegion}
-                            className="w-full bg-gradient-to-tr from-slate-700/50 to-slate-800/50 p-3 hover:border-cyan-500 border border-slate-700 select-none cursor-pointer rounded-lg mt-3 flex items-center gap-1 justify-center">
-                            <Plus size={16} />
-                            <h1 className="font-semibold text-sm text-slate-300 flex items-center gap-1">Add Deparment Region</h1>
-                        </motion.div>
+                        <div className="pt-2 bg-slate-950/80 w-full">
+                            <motion.div
+                                whileTap={{ scale: 0.98 }}
+                                onClick={handleAddRegion}
+                                className="w-full bg-gradient-to-tr from-slate-700/50 to-slate-800/50 p-3 hover:border-cyan-500 border border-slate-700 select-none cursor-pointer rounded-lg flex items-center gap-1 justify-center">
+                                <Plus size={16} />
+                                <h1 className="font-semibold text-sm text-slate-300 flex items-center gap-1">Add Deparment Region</h1>
+                            </motion.div>
+                        </div>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
 
             {/* Add Department Region */}
             <Dialog open={addAreaDialog} onOpenChange={setAddAreaDialog}>
-                <DialogContent className="lg:w-[450px] border-slate-800 bg-black/10 backdrop-blur-sm">
+                <DialogContent className="lg:w-[450px] max-h-[70vh] flex flex-col border-slate-800 bg-black/10 backdrop-blur-sm">
                     <DialogHeader>
                         <DialogTitle>Add Department Area</DialogTitle>
                         <DialogDescription>Select the business areas for {departmentData?.dep_name}.</DialogDescription>
                     </DialogHeader>
-                    <div className="h-[35vh] overflow-y-scroll">
+                    <div className="space-y-2">
+                        <Input
+                            placeholder="Search areas by name"
+                            value={areaSearch}
+                            onChange={(e) => setAreaSearch(e.target.value)}
+                        />
+                    </div>
+                    <div className="relative flex-1 overflow-y-auto pb-16">
                         {allRegions?.length === 0 && (
                             <div className="flex items-center justify-center h-[10vh]">
                                 <h1 className="text-xs font-medium text-slate-300">No business regions.</h1>
                             </div>
                         )}
-                        {allAreas?.length === 0 && (
+                        {filteredAreas?.length === 0 && allRegions?.length !== 0 && (
                             <div className="flex items-center justify-center h-[10vh]">
-                                <h1 className="text-xs font-medium text-slate-300">No business areas.</h1>
+                                <h1 className="text-xs font-medium text-slate-300">{areaSearchTerm ? "No matching areas." : "No business areas."}</h1>
                             </div>
                         )}
-                        {allAreas?.map((area: any) => (
+                        {filteredAreas?.map((area: any) => (
                             <motion.div
                                 key={area?._id}
                                 whileTap={{ scale: 0.98 }}
@@ -609,13 +654,15 @@ const DepartmentPage = () => {
                         ))}
                     </div>
                     <DialogFooter className="w-full">
-                        <motion.div
-                            whileTap={{ scale: 0.98 }}
-                            onClick={handleAddArea}
-                            className="w-full bg-gradient-to-tr from-slate-700/50 to-slate-800/50 p-3 hover:border-cyan-500 border border-slate-700 select-none cursor-pointer rounded-lg mt-3 flex items-center gap-1 justify-center">
-                            <Plus size={16} />
-                            <h1 className="font-semibold text-sm text-slate-300 flex items-center gap-1">Add Deparment Area</h1>
-                        </motion.div>
+                        <div className="pt-2 bg-slate-950/80 w-full">
+                            <motion.div
+                                whileTap={{ scale: 0.98 }}
+                                onClick={handleAddArea}
+                                className="w-full bg-gradient-to-tr from-slate-700/50 to-slate-800/50 p-3 hover:border-cyan-500 border border-slate-700 select-none cursor-pointer rounded-lg flex items-center gap-1 justify-center">
+                                <Plus size={16} />
+                                <h1 className="font-semibold text-sm text-slate-300 flex items-center gap-1">Add Deparment Area</h1>
+                            </motion.div>
+                        </div>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

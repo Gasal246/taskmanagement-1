@@ -47,23 +47,28 @@ interface IBody {
 export async function PUT(req:NextRequest){
     try{
         const body: IBody = await req.json();
+        const wifiAvailability = body.wifi_available === "Yes"
+            ? true
+            : body.wifi_available === "No"
+                ? false
+                : null;
         const enquiryEdit = new Eq_Enquiry_Edit({
             enquiry_id: body.enquiry_id,
             next_action: body.next_action,
             next_action_date: body.next_action_due,
             priority: body.priority,
-            wifi_available: body.wifi_available == "Yes" ? true : false,
-            wifi_type: body.wifi_available == "Yes" ? body.wifi_type : null,
-            wifi_expected_cost: body.wifi_available == "No" ? body.expected_monhtly_price : null,
+            wifi_available: wifiAvailability,
+            wifi_type: wifiAvailability === true ? body.wifi_type : null,
+            wifi_expected_cost: wifiAvailability === false ? body.expected_monhtly_price : null,
             latitude: body.latitude,
             longitude: body.longitude,
             alert_date: body.alert_date,
-            wifi_setup: body.other_wifi_details
+            wifi_setup: wifiAvailability === true && body.wifi_type === "Other Sources" ? body.other_wifi_details : null
         });
 
         const savedEqEdit = await enquiryEdit.save();
 
-        if(body.wifi_available == "Yes"){
+        if(wifiAvailability === true){
             switch(body.wifi_type){
                 case "Existing Contractor": {
                     const externalEdit = new Eq_Enquiry_External_Wifi_Edit({

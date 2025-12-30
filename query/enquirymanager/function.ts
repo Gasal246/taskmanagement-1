@@ -63,7 +63,17 @@ export async function GetEqCampsByArea(area_id: string){
 //Get Areas Filtered
 export async function GetEqAreasFiltered(queryParams: any){
     try{
-        const queryString = new URLSearchParams(queryParams).toString();
+        const safeParams: Record<string, string> = {};
+
+        for (const key in queryParams) {
+            const rawValue = queryParams[key];
+            const value = typeof rawValue === "string" ? rawValue.trim() : rawValue;
+            if (value !== "" && value !== null && value !== undefined) {
+                safeParams[key] = String(value);
+            }
+        }
+
+        const queryString = new URLSearchParams(safeParams).toString();
         const res = await axios.get(`/api/enquiries/get/area/filtered?${queryString}`);
         return res.data;
     }catch(err){
@@ -84,7 +94,17 @@ export async function AddNewEqArea(payload: any){
 //Get Camps filtered
 export async function GetEqCampsFiltered(queryParams:any){
     try{
-        const queryString = new URLSearchParams(queryParams).toString();
+        const safeParams: Record<string, string> = {};
+
+        for (const key in queryParams) {
+            const rawValue = queryParams[key];
+            const value = typeof rawValue === "string" ? rawValue.trim() : rawValue;
+            if (value !== "" && value !== null && value !== undefined) {
+                safeParams[key] = String(value);
+            }
+        }
+
+        const queryString = new URLSearchParams(safeParams).toString();
         const res = await axios.get(`/api/enquiries/get/camps/filtered?${queryString}`);
         return res.data;
     }catch(err){

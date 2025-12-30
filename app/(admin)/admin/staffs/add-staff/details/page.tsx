@@ -87,6 +87,12 @@ const AddBusinessStaffDetails = () => {
   const [businessRegions, setBusinessRegions] = React.useState<any[]>([]);
   const [addRegionDialog, setAddRegionDialog] = React.useState(false);
   const [currentSelectedRegion, setCurrentSelectedRegion] = React.useState<string>('');
+  const [regionSearch, setRegionSearch] = React.useState<string>('');
+  const regionSearchTerm = regionSearch.trim().toLowerCase();
+  const filteredBusinessRegions = businessRegions.filter((region: any) => {
+    const name = region?.region_name || "";
+    return name.toLowerCase().includes(regionSearchTerm);
+  });
 
   const handleFetchBusinessRegions = async () => {
     const res = await getRegions({ business_id: businessData?._id });
@@ -157,6 +163,12 @@ const AddBusinessStaffDetails = () => {
   const [businessLocations, setBusinessLocations] = React.useState<any[]>([]);
   const [addLocationDialog, setAddLocationDialog] = React.useState(false);
   const [currentSelectedLocation, setCurrentSelectedLocation] = React.useState<string>('');
+  const [locationSearch, setLocationSearch] = React.useState<string>('');
+  const locationSearchTerm = locationSearch.trim().toLowerCase();
+  const filteredBusinessLocations = businessLocations.filter((location: any) => {
+    const name = location?.location_name || "";
+    return name.toLowerCase().includes(locationSearchTerm);
+  });
 
   const handleFetchBusinessLocations = async (area_ids: string[]) => {
     if (!area_ids?.length) {
@@ -207,6 +219,12 @@ const AddBusinessStaffDetails = () => {
   const [businessAreas, setBusinessAreas] = React.useState<any[]>([]);
   const [addAreaDialog, setAddAreaDialog] = React.useState(false);
   const [currentSelectedArea, setCurrentSelectedArea] = React.useState<string>('');
+  const [areaSearch, setAreaSearch] = React.useState<string>('');
+  const areaSearchTerm = areaSearch.trim().toLowerCase();
+  const filteredBusinessAreas = businessAreas.filter((area: any) => {
+    const name = area?.area_name || "";
+    return name.toLowerCase().includes(areaSearchTerm);
+  });
 
   const handleFetchBusinessAreas = async (region_ids: string[]) => {
     if (!region_ids?.length) {
@@ -905,18 +923,25 @@ const AddBusinessStaffDetails = () => {
 
       {/* Add Region Dialog */}
       <Dialog open={addRegionDialog} onOpenChange={setAddRegionDialog}>
-        <DialogContent className="lg:w-[450px] max-h-[calc(100vh-200px)] overflow-y-auto">
+        <DialogContent className="lg:w-[450px] max-h-[70vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Add Region</DialogTitle>
             <DialogDescription>Add a new region for this business staff.</DialogDescription>
           </DialogHeader>
-          <div className="">
-            {businessRegions?.length === 0 && (
+          <div className="space-y-2">
+            <Input
+              placeholder="Search regions by name"
+              value={regionSearch}
+              onChange={(e) => setRegionSearch(e.target.value)}
+            />
+          </div>
+          <div className="relative flex-1 overflow-y-auto pb-16">
+            {filteredBusinessRegions?.length === 0 && (
               <div className="flex items-center justify-center h-[10vh]">
-                <h1 className="text-xs font-medium text-slate-300">No regions added.</h1>
+                <h1 className="text-xs font-medium text-slate-300">{regionSearchTerm ? "No matching regions." : "No regions added."}</h1>
               </div>
             )}
-            {businessRegions?.map((region: any) => (
+            {filteredBusinessRegions?.map((region: any) => (
               <motion.div
                 key={region?._id}
                 whileTap={{ scale: 0.98 }}
@@ -927,32 +952,43 @@ const AddBusinessStaffDetails = () => {
                 {currentSelectedRegion === region?._id && <div className="absolute right-2 top-1.5"><Check className="text-cyan-600" strokeWidth={3} size={17} /> </div>}
               </motion.div>
             ))}
-            <motion.div
-              whileTap={{ scale: 0.98 }}
-              whileHover={{ scale: 1.02 }}
-              onClick={handleAddRegion}
-              className="bg-gradient-to-tr from-slate-700/50 to-slate-800/50 p-3 hover:border-cyan-500 border border-slate-700 select-none cursor-pointer rounded-lg mt-3 flex items-center gap-1 justify-center">
-              <Plus size={16} />
-              <h1 className="font-semibold text-sm text-slate-300 flex items-center gap-1">Add New Region</h1>
-            </motion.div>
           </div>
+          <DialogFooter className="w-full">
+            <div className="pt-2 bg-slate-950/80 w-full">
+              <motion.div
+                whileTap={{ scale: 0.98 }}
+                whileHover={{ scale: 1.02 }}
+                onClick={handleAddRegion}
+                className="bg-gradient-to-tr from-slate-700/50 to-slate-800/50 p-3 hover:border-cyan-500 border border-slate-700 select-none cursor-pointer rounded-lg flex items-center gap-1 justify-center">
+                <Plus size={16} />
+                <h1 className="font-semibold text-sm text-slate-300 flex items-center gap-1">Add New Region</h1>
+              </motion.div>
+            </div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Add Area Dialog */}
       <Dialog open={addAreaDialog} onOpenChange={setAddAreaDialog}>
-        <DialogContent className="lg:w-[450px] max-h-[calc(100vh-200px)] overflow-y-auto">
+        <DialogContent className="lg:w-[450px] max-h-[70vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Add Area</DialogTitle>
             <DialogDescription>Areas shown are listed based on assigned regions.</DialogDescription>
           </DialogHeader>
-          <div className="">
-            {businessAreas?.length === 0 && (
+          <div className="space-y-2">
+            <Input
+              placeholder="Search areas by name"
+              value={areaSearch}
+              onChange={(e) => setAreaSearch(e.target.value)}
+            />
+          </div>
+          <div className="relative flex-1 overflow-y-auto pb-16">
+            {filteredBusinessAreas?.length === 0 && (
               <div className="flex items-center justify-center h-[10vh]">
-                <h1 className="text-xs font-medium text-slate-300">No areas added.</h1>
+                <h1 className="text-xs font-medium text-slate-300">{areaSearchTerm ? "No matching areas." : "No areas added."}</h1>
               </div>
             )}
-            {businessAreas?.map((area: any) => (
+            {filteredBusinessAreas?.map((area: any) => (
               <motion.div
                 key={area?._id}
                 whileTap={{ scale: 0.98 }}
@@ -963,32 +999,43 @@ const AddBusinessStaffDetails = () => {
                 {currentSelectedArea === area?._id && <div className="absolute right-2 top-1.5"><Check className="text-cyan-600" strokeWidth={3} size={17} /> </div>}
               </motion.div>
             ))}
-            <motion.div
-              whileTap={{ scale: 0.98 }}
-              whileHover={{ scale: 1.02 }}
-              onClick={handleAddArea}
-              className="bg-gradient-to-tr from-slate-700/50 to-slate-800/50 p-3 hover:border-cyan-500 border border-slate-700 select-none cursor-pointer rounded-lg mt-3 flex items-center gap-1 justify-center">
-              <Plus size={16} />
-              <h1 className="font-semibold text-sm text-slate-300 flex items-center gap-1">Add New Area</h1>
-            </motion.div>
           </div>
+          <DialogFooter className="w-full">
+            <div className="pt-2 bg-slate-950/80 w-full">
+              <motion.div
+                whileTap={{ scale: 0.98 }}
+                whileHover={{ scale: 1.02 }}
+                onClick={handleAddArea}
+                className="bg-gradient-to-tr from-slate-700/50 to-slate-800/50 p-3 hover:border-cyan-500 border border-slate-700 select-none cursor-pointer rounded-lg flex items-center gap-1 justify-center">
+                <Plus size={16} />
+                <h1 className="font-semibold text-sm text-slate-300 flex items-center gap-1">Add New Area</h1>
+              </motion.div>
+            </div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Add Location Dialog */}
       <Dialog open={addLocationDialog} onOpenChange={setAddLocationDialog}>
-        <DialogContent className="lg:w-[450px] max-h-[calc(100vh-200px)] overflow-y-auto">
+        <DialogContent className="lg:w-[450px] max-h-[70vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Add Location</DialogTitle>
             <DialogDescription>Locations shown are listed based on assigned areas.</DialogDescription>
           </DialogHeader>
-          <div className="">
-            {businessLocations?.length === 0 && (
+          <div className="space-y-2">
+            <Input
+              placeholder="Search locations by name"
+              value={locationSearch}
+              onChange={(e) => setLocationSearch(e.target.value)}
+            />
+          </div>
+          <div className="relative flex-1 overflow-y-auto pb-16">
+            {filteredBusinessLocations?.length === 0 && (
               <div className="flex items-center justify-center h-[10vh]">
-                <h1 className="text-xs font-medium text-slate-300">No locations added.</h1>
+                <h1 className="text-xs font-medium text-slate-300">{locationSearchTerm ? "No matching locations." : "No locations added."}</h1>
               </div>
             )}
-            {businessLocations?.map((location: any) => (
+            {filteredBusinessLocations?.map((location: any) => (
               <motion.div
                 key={location?._id}
                 whileTap={{ scale: 0.98 }}
@@ -999,21 +1046,25 @@ const AddBusinessStaffDetails = () => {
                 {currentSelectedLocation === location?._id && <div className="absolute right-2 top-1.5"><Check className="text-cyan-600" strokeWidth={3} size={17} /> </div>}
               </motion.div>
             ))}
-            <motion.div
-              whileTap={{ scale: 0.98 }}
-              whileHover={{ scale: 1.02 }}
-              onClick={handleAddLocation}
-              className="bg-gradient-to-tr from-slate-700/50 to-slate-800/50 p-3 hover:border-cyan-500 border border-slate-700 select-none cursor-pointer rounded-lg mt-3 flex items-center gap-1 justify-center">
-              <Plus size={16} />
-              <h1 className="font-semibold text-sm text-slate-300 flex items-center gap-1">Add New Location</h1>
-            </motion.div>
           </div>
+          <DialogFooter className="w-full">
+            <div className="pt-2 bg-slate-950/80 w-full">
+              <motion.div
+                whileTap={{ scale: 0.98 }}
+                whileHover={{ scale: 1.02 }}
+                onClick={handleAddLocation}
+                className="bg-gradient-to-tr from-slate-700/50 to-slate-800/50 p-3 hover:border-cyan-500 border border-slate-700 select-none cursor-pointer rounded-lg flex items-center gap-1 justify-center">
+                <Plus size={16} />
+                <h1 className="font-semibold text-sm text-slate-300 flex items-center gap-1">Add New Location</h1>
+              </motion.div>
+            </div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Add Skill Dialog */}
       <Dialog open={addSkillDialog} onOpenChange={setAddSkillDialog}>
-        <DialogContent className="lg:w-[450px] max-h-[80vh] overflow-y-auto flex flex-col">
+        <DialogContent className="lg:w-[450px] max-h-[70vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Add Skill</DialogTitle>
             <DialogDescription>Select any of the business skill to add.</DialogDescription>
@@ -1043,7 +1094,8 @@ const AddBusinessStaffDetails = () => {
               </motion.div>
             ))}
           </div>
-          <DialogFooter className='sticky bottom-0 bg-black'>
+          <DialogFooter className="w-full">
+            <div className="pt-2 bg-slate-950/80 w-full">
               <motion.div
                 whileTap={{ scale: 0.98 }}
                 whileHover={{ scale: 1.02 }}
@@ -1052,6 +1104,7 @@ const AddBusinessStaffDetails = () => {
                 <Plus size={16} />
                 <h1 className="font-semibold text-sm text-slate-300 flex items-center gap-1">Add New Skill</h1>
               </motion.div>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>

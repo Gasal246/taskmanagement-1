@@ -16,7 +16,7 @@ import LoaderSpin from '@/components/shared/LoaderSpin';
 import { useAddLocationDepartment, useAddLocationStaff, useAddLoctionHead, useGetLocationCompleteData, useRemoveLocationHead, useRemoveLocationStaff } from '@/query/business/queries';
 import { useGetBusinessStaffs } from '@/query/user/queries';
 import { toast } from 'sonner';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectTrigger, SelectValue, SelectItem } from '@/components/ui/select';
 import { DEPARTMENT_TYPES } from '@/lib/constants';
@@ -68,6 +68,13 @@ const LocationPage = () => {
   const [addHeadDialog, setAddHeadDilog] = useState<boolean>(false);
   const [selectedUser, setSelectedUser] = useState<string>("");
   const [isAddingUser, setIsAddingUser] = useState<boolean>(false);
+  const [staffSearch, setStaffSearch] = useState<string>("");
+  const staffSearchTerm = staffSearch.trim().toLowerCase();
+  const filteredStaffs = businessStaffs?.filter((staff: any) => {
+    const name = staff?.user_id?.name || "";
+    const email = staff?.user_id?.email || "";
+    return `${name} ${email}`.toLowerCase().includes(staffSearchTerm);
+  });
 
   const handleClickAddHead = () => {
     setSelectedUser("");
@@ -409,16 +416,23 @@ const LocationPage = () => {
 
       {/* Add Area Head or Staffs */}
       <Dialog open={addHeadDialog} onOpenChange={setAddHeadDilog}>
-        <DialogContent className="sm:max-w-[425px]  bg-transparent backdrop-blur-sm border-slate-700">
+        <DialogContent className="sm:max-w-[425px] max-h-[70vh] flex flex-col bg-transparent backdrop-blur-sm border-slate-700">
           <DialogHeader>
             <DialogTitle className='capitalize'>Adding Area {isAddingUser ? 'Staff' : 'Head'}</DialogTitle>
             <DialogDescription>Adding {isAddingUser ? 'Staff' : 'Head'} For {areaData?.area_name} of {regionData?.region_name}.</DialogDescription>
           </DialogHeader>
-          <div className="">
-            {!loadingBusinessStaffs && businessStaffs?.length === 0 && <div className='w-full h-[10vh] flex items-center justify-center'>
-              <h1 className="text-xs font-medium text-slate-400">No business staffs found</h1>
+          <div className="space-y-2">
+            <Input
+              placeholder="Search staff by name"
+              value={staffSearch}
+              onChange={(e) => setStaffSearch(e.target.value)}
+            />
+          </div>
+          <div className="relative flex-1 overflow-y-auto pb-16">
+            {!loadingBusinessStaffs && filteredStaffs?.length === 0 && <div className='w-full h-[10vh] flex items-center justify-center'>
+              <h1 className="text-xs font-medium text-slate-400">{staffSearchTerm ? "No matching users" : "No business staffs found"}</h1>
             </div>}
-            {businessStaffs?.map((staff: any) => <motion.div
+            {filteredStaffs?.map((staff: any) => <motion.div
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               key={staff?._id}
@@ -436,15 +450,19 @@ const LocationPage = () => {
                 <Check className="text-cyan-600" strokeWidth={3} size={18} />
               </div>}
             </motion.div>)}
-            <motion.div
-              whileTap={{ scale: 0.98 }}
-              whileHover={{ scale: 1.02 }}
-              className='p-2 bg-gradient-to-br group from-slate-950/70 to-slate-800/70 rounded-lg cursor-pointer text-sm font-medium flex items-center gap-1 px-4 border border-slate-700 hover:border-cyan-600 justify-center mt-2'
-              onClick={isAddingUser ? handleAddStaff : handleAddHead}
-            >
-              {(addingHead || addingStaff) ? <LoaderSpin size={22} /> : <CircleCheckBig className="group-hover:text-cyan-600" size={18} />} {(addingHead || addingStaff) ? 'Adding' : 'Add'} Area {isAddingUser ? 'Staff' : 'Head'}
-            </motion.div>
           </div>
+          <DialogFooter className="w-full">
+            <div className="pt-2 bg-slate-950/80 w-full">
+              <motion.div
+                whileTap={{ scale: 0.98 }}
+                whileHover={{ scale: 1.02 }}
+                className='p-2 bg-gradient-to-br group from-slate-950/70 to-slate-800/70 rounded-lg cursor-pointer text-sm font-medium flex items-center gap-1 px-4 border border-slate-700 hover:border-cyan-600 justify-center'
+                onClick={isAddingUser ? handleAddStaff : handleAddHead}
+              >
+                {(addingHead || addingStaff) ? <LoaderSpin size={22} /> : <CircleCheckBig className="group-hover:text-cyan-600" size={18} />} {(addingHead || addingStaff) ? 'Adding' : 'Add'} Area {isAddingUser ? 'Staff' : 'Head'}
+              </motion.div>
+            </div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

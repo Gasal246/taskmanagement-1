@@ -90,6 +90,11 @@ interface Body {
 export async function PUT(req: NextRequest) {
     try {
         const body: Body = await req.json();
+        const wifiAvailability = body.wifi_available === "Yes"
+            ? true
+            : body.wifi_available === "No"
+                ? false
+                : null;
 
         if (!body.enquiry_id) {
             return NextResponse.json({ message: "Enquiry ID Missing", status: 400 }, { status: 400 });
@@ -313,17 +318,17 @@ export async function PUT(req: NextRequest) {
         enquiry.priority = body.priority;
         enquiry.alert_date = body.alert_date || null;
         enquiry.due_date = body.next_action_due || null;
-        enquiry.wifi_available = body.wifi_available === "Yes";
-        enquiry.wifi_type = body.wifi_available === "Yes" ? body.wifi_type : null;
+        enquiry.wifi_available = wifiAvailability;
+        enquiry.wifi_type = wifiAvailability === true ? body.wifi_type : null;
         const expectedCost = body.expected_monthly_price === "" ? null : body.expected_monthly_price;
-        enquiry.expected_wifi_cost = body.wifi_available === "No" ? expectedCost : null;
+        enquiry.expected_wifi_cost = wifiAvailability === false ? expectedCost : null;
         enquiry.lease_expiry_due = body.lease_expiry_due || null;
         enquiry.competition_status = body.competition_status === "Yes";
         enquiry.competition_notes = body.competition_notes || null;
         enquiry.next_action = body.next_action;
         enquiry.next_action_due = body.next_action_due || null;
         enquiry.rent_terms = body.rent_terms;
-        enquiry.wifi_setup = body.wifi_available === "Yes" && body.wifi_type === "Other Sources" ? body.other_wifi_details : null;
+        enquiry.wifi_setup = wifiAvailability === true && body.wifi_type === "Other Sources" ? body.other_wifi_details : null;
         enquiry.latitude = body.latitude;
         enquiry.longitude = body.longitude;
         enquiry.is_active = body.area_input_mode === "existing" && body.camp_input_mode === "existing";
@@ -351,7 +356,7 @@ export async function PUT(req: NextRequest) {
         await Eq_enquiry_wifi_external.deleteMany({ enquiry_id: enquiry._id });
         await Eq_enquiry_wifi_personal.deleteMany({ enquiry_id: enquiry._id });
 
-        if (body.wifi_available === "Yes") {
+        if (wifiAvailability === true) {
             switch (body.wifi_type) {
                 case "Existing Contractor": {
                     const painPoints = body.pain_points || body.plain_points || null;

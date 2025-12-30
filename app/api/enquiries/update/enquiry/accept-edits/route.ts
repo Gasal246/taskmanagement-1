@@ -50,13 +50,19 @@ interface IBody {
 export async function PUT(req:NextRequest){
     try{
         const body: IBody = await req.json();
+        const wifiAvailability = body.wifi_available === "Yes"
+            ? true
+            : body.wifi_available === "No"
+                ? false
+                : null;
 
         const enquiry = await Eq_enquiry.findById(body.enquiry_id);
         enquiry.latitude = body.latitude;
         enquiry.longitude = body.longitude;
 
-        enquiry.wifi_available = body.wifi_available == "Yes" ? true : false;
-        enquiry.wifi_type = body.wifi_type;
+        enquiry.wifi_available = wifiAvailability;
+        enquiry.wifi_type = wifiAvailability === true ? body.wifi_type : null;
+        enquiry.wifi_setup = wifiAvailability === true && body.wifi_type === "Other Sources" ? body.other_wifi_details : null;
 
         enquiry.lease_expiry_due = body.lease_expiry_due;
         enquiry.rent_terms = body.rent_terms;
@@ -70,7 +76,7 @@ export async function PUT(req:NextRequest){
         enquiry.next_action = body.next_action;
         enquiry.next_action_due = body.next_action_due;
 
-        if(body.wifi_available == "Yes"){
+        if(wifiAvailability === true){
             switch(body.wifi_type){
                 case "Existing Contractor" : {
                      const extisting_wifi = await Eq_enquiry_wifi_external.findOne({enquiry_id: body.enquiry_id});
@@ -101,8 +107,10 @@ export async function PUT(req:NextRequest){
                     break;
                 }
             }
-        } else {
+        } else if (wifiAvailability === false) {
             enquiry.expected_wifi_cost = body.expected_monthly_price;
+        } else {
+            enquiry.expected_wifi_cost = null;
         }
 
         const existingEdit = await Eq_Enquiry_Edit.findById(body.enquiry_edit_id);

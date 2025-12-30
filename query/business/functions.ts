@@ -788,10 +788,12 @@ export async function getProjectsFunc ( queryParams: any ) {
 
 export async function getProjectByIdFunc ( project_id: string ) {
     try{
+        if (!project_id) return null;
         const res = await axios.get(`/api/project/get-id/${project_id}`);
         return res.data;
     } catch (error) {
         console.log(error);
+        return null;
     }
 }
 
