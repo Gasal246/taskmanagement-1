@@ -21,7 +21,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useAddNewEnquiry, useGetEqAreas, useGetEqCampsByArea, useGetEqCities, useGetEqCountries, useGetEqProvince, useGetEqRegions } from "@/query/enquirymanager/queries";
 import { toast } from "sonner";
-import { EQ_CAMP_TYPES } from "@/lib/constants";
+import { EQ_CAMP_TYPES, EQ_CAPACITY_LIMITS, Eq_CAPACITY_OPTIONS } from "@/lib/constants";
 import { useRouter } from "next/navigation";
 import LocationPicker from "@/components/enquiries/LocationPicker";
 import Image from "next/image";
@@ -30,11 +30,6 @@ import { storage } from "@/firebase/config";
 import { Button } from "@/components/ui/button";
 
 const priorityLevels = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"];
-
-const capacityOptions = ["<500", "500-1000", "1000-1500", "1500-2000", "2000-2500", "2500-3000", "3000+"];
-const capacityLimits: Record<string, number> = {
-    "<500": 500, "500-1000": 1000, "1000-1500": 1500, "1500-2000": 2000, "2000-2500": 2500, "2500-3000": 3000, "3000+": 99999
-};
 
 const MAX_DOC_SIZE = 5 * 1024 * 1024; // 5MB
 
@@ -130,7 +125,7 @@ const enquirySchema = z.object({
     }
 
     if (values.camp_capacity && values.camp_occupancy) {
-        const limit = capacityLimits[values.camp_capacity];
+        const limit = EQ_CAPACITY_LIMITS[values.camp_capacity];
         const occupancy = Number(values.camp_occupancy);
 
         if (!Number.isNaN(occupancy) && limit && occupancy > limit) {
@@ -308,7 +303,7 @@ export default function AddEnquiry() {
     };
 
     const onSubmit = async (data: any) => {
-        const limit = capacityLimits[data.camp_capacity];
+        const limit = EQ_CAPACITY_LIMITS[data.camp_capacity];
         if (data.camp_occupancy > limit) {
             return toast.error("Camp occupancy cannot exceed Camp Capacity");
         }
@@ -606,30 +601,6 @@ export default function AddEnquiry() {
                                     )}
                                 />
 
-                                {/* CAMP CAPACITY */}
-                                <FormField control={form.control} name="camp_capacity" render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel className="text-xs text-slate-300">Camp Capacity</FormLabel>
-                                        <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
-                                            <Select value={field.value} onValueChange={field.onChange}>
-                                                <SelectTrigger><SelectValue placeholder="Select Capacity" /></SelectTrigger>
-                                                <SelectContent>{capacityOptions.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-                                            </Select>
-                                        </div>
-                                        <FormMessage />
-                                    </FormItem>
-                                )} />
-
-                                {/* OCCUPANCY */}
-                                <FormField control={form.control} name="camp_occupancy" render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel className="text-xs text-slate-300">Current Occupancy</FormLabel>
-                                        <Input type="number" {...field} value={field.value || ""} />
-                                        <FormMessage />
-                                    </FormItem>
-                                )} />
-
-
 
                                 {/* HEAD OFFICE */}
                                 {!showHeadOffice && (
@@ -668,6 +639,29 @@ export default function AddEnquiry() {
 
                             </>
                         )}
+
+                        {/* CAMP CAPACITY */}
+                                <FormField control={form.control} name="camp_capacity" render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel className="text-xs text-slate-300">Camp Capacity</FormLabel>
+                                        <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
+                                            <Select value={field.value} onValueChange={field.onChange}>
+                                                <SelectTrigger><SelectValue placeholder="Select Capacity" /></SelectTrigger>
+                                                <SelectContent>{Eq_CAPACITY_OPTIONS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                                            </Select>
+                                        </div>
+                                        <FormMessage />
+                                    </FormItem>
+                                )} />
+
+                                {/* OCCUPANCY */}
+                                <FormField control={form.control} name="camp_occupancy" render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel className="text-xs text-slate-300">Current Occupancy</FormLabel>
+                                        <Input type="number" {...field} value={field.value || ""} />
+                                        <FormMessage />
+                                    </FormItem>
+                                )} />
 
                         {/* CONTACTS */}
                         <div className="text-xs text-slate-400 font-semibold flex items-center gap-1">

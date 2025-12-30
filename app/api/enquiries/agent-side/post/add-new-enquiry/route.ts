@@ -252,7 +252,7 @@ export async function POST(req:NextRequest){
             const savedCamp = await newCamp.save();
             campId = savedCamp._id;
         } else {
-            await Eq_camps.findByIdAndUpdate(campId, {$set: {latitude: body.latitude, longitude: body.longitude}});
+            await Eq_camps.findByIdAndUpdate(campId, {$set: {latitude: body.latitude, longitude: body.longitude, camp_capacity: body.camp_capacity, camp_occupancy: body.camp_occupancy}});
         }
 
         const newEnquiry = new Eq_enquiry({

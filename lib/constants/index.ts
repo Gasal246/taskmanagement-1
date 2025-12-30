@@ -23,7 +23,11 @@ export const TASK_STATUS = [
 
 export const EQ_CAMP_TYPES = ["Labour Camp", "Staff Accommodation", "Hotel Apartment", "Other"];
 
-export const EQ_CAMP_CAPACITY = ["<500", "500-1000", "1000-1500", "1500-2000", "2000-2500", "2500-3000", "3000+"];
+export const Eq_CAPACITY_OPTIONS = ["<500", "500-1000", "1000-1500", "1500-2000", "2000-3000", "3000-5000", "5000-7500", "7500-10000", "10000-15000", "15000+"];
+
+export const EQ_CAPACITY_LIMITS: Record<string, number> = {
+  "<500": 500, "500-1000": 1000, "1000-1500": 1500, "1500-2000": 2000, "2000-3000": 3000, "3000-5000": 5000, "5000-7500": 7500, "7500-10000": 10000, "10000-15000": 15000, "15000+": 99999
+};
 
 export const ENQUIRY_STATUS = [
     {_id:"Pending", name:"Pending"},

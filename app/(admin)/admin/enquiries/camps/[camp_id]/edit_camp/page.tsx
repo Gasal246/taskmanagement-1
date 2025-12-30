@@ -16,8 +16,7 @@ import {
 } from "@/components/ui/select";
 
 import { useGetEqCampsById, useUpdateEqCamp } from "@/query/enquirymanager/queries";
-import { EQ_CAMP_CAPACITY, EQ_CAMP_TYPES } from "@/lib/constants";
-import { number } from "zod";
+import { EQ_CAMP_TYPES, EQ_CAPACITY_LIMITS, Eq_CAPACITY_OPTIONS } from "@/lib/constants";
 import { toast } from "sonner";
 
 export default function EditCampPage() {
@@ -26,11 +25,6 @@ export default function EditCampPage() {
 
   const { data: campData } = useGetEqCampsById(params.camp_id);
   const { mutateAsync: updateCamp, isPending } = useUpdateEqCamp();
-
-  const capacityLimits: Record<string, number> = {
-    "<500": 500, "500-1000": 1000, "1000-1500": 1500, "1500-2000": 2000, "2000-2500": 2500, "2500-3000": 3000, "3000+": 99999
-};
-
 
   const [form, setForm] = useState({
     camp_name: "",
@@ -75,9 +69,9 @@ export default function EditCampPage() {
   }, [campData]);
 
   const handleSubmit = async () => {
-    console.log(capacityLimits[form.camp_capacity]);
+    console.log(EQ_CAPACITY_LIMITS[form.camp_capacity]);
     
-    if(capacityLimits[form.camp_capacity] < form.camp_occupancy){
+    if(EQ_CAPACITY_LIMITS[form.camp_capacity] < form.camp_occupancy){
         return toast.error("Camp Occupancy cannot exceed Camp Capacity")
     }
     const payload = {
@@ -158,7 +152,7 @@ export default function EditCampPage() {
               <SelectValue placeholder="Select" />
             </SelectTrigger>
             <SelectContent>
-              {EQ_CAMP_CAPACITY.map((c)=> (
+              {Eq_CAPACITY_OPTIONS.map((c)=> (
                  <SelectItem key={c} value={c}>{c}</SelectItem>
               ))}
             </SelectContent>

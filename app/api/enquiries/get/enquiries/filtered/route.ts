@@ -19,6 +19,10 @@ export async function GET(req: NextRequest) {
     const area_id = searchParams.get("area_id");
     const camp_id = searchParams.get("camp_id");
     const enquiry_uuid = searchParams.get("enquiry_uuid");
+    const page = Number(searchParams.get("page")) || 1;
+    const limit = Number(searchParams.get("limit")) || 10;
+
+    const skip = (page - 1) * limit;
 
     if (country_id) filter.country_id = country_id;
     if (region_id) filter.region_id = region_id;
@@ -58,13 +62,18 @@ export async function GET(req: NextRequest) {
     // --- NEW: Occupancy Filter (From Camps Schema) ---
     const occupancy = searchParams.get("occupancy");
 
+    // Take count of total docs
+    const totalRecords = await Eq_enquiry.countDocuments(filter);
+
     // First fetch enquiries + populate camp
     let enquiries = await Eq_enquiry.find(filter)
       .populate({
         path: "camp_id",
         model: Eq_camps,
       })
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
 
     // Apply occupancy filter AFTER populate
     if (occupancy) {
@@ -75,10 +84,9 @@ export async function GET(req: NextRequest) {
     console.log("filter: ", filter);  
 
     return NextResponse.json(
-      { status: 200, data: enquiries },
+      { status: 200, data: enquiries, pagination: {page, limit, totalRecords, totalPages: Math.ceil(totalRecords / limit)}},
       { status: 200 }
     );
-
   } catch (err) {
     console.error("Error filtering enquiries:", err);
     return NextResponse.json(

@@ -159,6 +159,8 @@ export default function SingleEnquiryPage() {
             <p className="text-sm">City: {enquiry?.enquiry?.city_id?.city_name}</p>
             <p className="text-sm">Area: {enquiry?.enquiry?.area_id?.area_name}</p>
             <p className="text-sm">Camp: {enquiry?.enquiry?.camp_id?.camp_name}</p>
+            <p className="text-sm">Camp Capacity: {enquiry?.enquiry?.camp_id?.camp_capacity}</p>
+            <p className="text-sm">Camp Occupancy: {enquiry?.enquiry?.camp_id?.camp_occupancy}</p>
             <p className="text-sm">Latitude: {enquiry?.enquiry?.camp_id?.latitude}</p>
             <p className="text-sm">Longitude: {enquiry?.enquiry?.camp_id?.longitude}</p>
             <Button onClick={openMap}>Go to Location</Button>

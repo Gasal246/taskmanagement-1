@@ -316,28 +316,28 @@ export default function EnquiriesPage() {
           </div>
         )}
 
-        {!isLoading && enquiries?.length === 0 && (
+        {!isLoading && enquiries?.enquiries?.length === 0 && (
           <p className="text-xs text-slate-500 italic">No enquiries found.</p>
         )}
 
         <div className="space-y-2">
-          {enquiries?.enquiries?.map((e: any) => (
+          {enquiries?.enquiries?.map((e) => (
             <div
               key={e._id}
               className="p-3 border border-slate-700 rounded-lg hover:bg-slate-800/60 transition cursor-pointer"
-              onClick={() => router.replace(`/staff/enquiry/${e._id}?from=assigned`)}
+              onClick={() => router.replace(`/staff/enquiry/${e._id}`)}
             >
               <h2 className="text-md font-medium text-slate-200 truncate">
                 Camp: {e.camp_id?.camp_name ?? "N/A"}
               </h2>
-
-              <div className="mt-1 text-xs text-slate-400">
-                <p>Status: {e.status}</p>
-                <p>Priority: {e.priority}</p>
-                <p>Occupancy: {e.camp_id?.camp_occupancy ?? "N/A"}</p>
-                <p>Competition: {e.competition_status ? "Yes" : "No"}</p>
-                <p>WiFi: {e.wifi_available ? "Yes" : "No"}</p>
-                <p>Due Date: {e.due_date?.slice(0, 10)}</p>
+              {!e?.is_active && <p className="text-sm font-medium truncate text-red-500">Action Required</p>}
+              <div className="mt-1 text-xs text-slate-400 flex flex-wrap gap-2">
+                <p className="bg-gradient-to-br from-slate-700 to-slate-900 px-2 py-1 rounded-sm font-bold">Status: <span className="text-white/80 font-normal">{e.status}</span></p>
+                <p className="bg-gradient-to-br from-slate-700 to-slate-900 px-2 py-1 rounded-sm font-bold">Priority: <span className="text-white/80 font-normal">{e.priority}</span></p>
+                <p className="bg-gradient-to-br from-slate-700 to-slate-900 px-2 py-1 rounded-sm font-bold">Occupancy: <span className="text-white/80 font-normal">{e.camp_id?.camp_occupancy ?? "N/A"}</span></p>
+                <p className="bg-gradient-to-br from-slate-700 to-slate-900 px-2 py-1 rounded-sm font-bold">UUID: <span className="text-white/80 font-normal">{e.enquiry_uuid}</span></p>
+                <p className="bg-gradient-to-br from-slate-700 to-slate-900 px-2 py-1 rounded-sm font-bold">WiFi: <span className="text-white/80 font-normal">{e.wifi_available ? "Yes" : "No"}</span></p>
+                <p className="bg-gradient-to-br from-slate-700 to-slate-900 px-2 py-1 rounded-sm font-bold">Due Date: <span className="text-white/80 font-normal">{e.due_date?.slice(0, 10)}</span></p>
               </div>
             </div>
           ))}

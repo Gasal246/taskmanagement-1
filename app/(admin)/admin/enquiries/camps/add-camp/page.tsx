@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
 import { useGetEqCountries, useGetEqRegions, useGetEqCities, useGetEqAreas, useGetEqProvince, useAddNewEqCamp } from "@/query/enquirymanager/queries";
-import { EQ_CAMP_CAPACITY, EQ_CAMP_TYPES } from "@/lib/constants";
+import { EQ_CAMP_TYPES, EQ_CAPACITY_LIMITS, Eq_CAPACITY_OPTIONS } from "@/lib/constants";
 import { toast } from "sonner";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { useRouter } from "next/navigation";
@@ -28,11 +28,6 @@ export default function AddCampPage() {
     const { data: cities } = useGetEqCities(province_id);
     const { data: areas } = useGetEqAreas(city_id);
 
-    const capacityOptions = ["<500", "500-1000", "1000-1500", "1500-2000", "2000-2500", "2500-3000", "3000+"];
-const capacityLimits: Record<string, number> = {
-    "<500": 500, "500-1000": 1000, "1000-1500": 1500, "1500-2000": 2000, "2000-2500": 2500, "2500-3000": 3000, "3000+": 99999
-};
-
     const fetchCountries = async () => {
         const res = await GetCountries();
         if (res?.status == 200) {
@@ -47,7 +42,7 @@ const capacityLimits: Record<string, number> = {
     const { register, handleSubmit, reset, control } = useForm();
 
     const onSubmit = async (data: any) => {
-        const limit = capacityLimits[data.camp_capacity];
+        const limit = EQ_CAPACITY_LIMITS[data.camp_capacity];
         console.log("limit: ", limit);
         console.log("occupancy: ", data.camp_occupancy);
         
@@ -133,7 +128,7 @@ const capacityLimits: Record<string, number> = {
                                     <SelectValue placeholder="Camp Capacity" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {capacityOptions.map((c) => (
+                                    {Eq_CAPACITY_OPTIONS.map((c) => (
                                         <SelectItem key={c} value={c}>
                                             {c}
                                         </SelectItem>

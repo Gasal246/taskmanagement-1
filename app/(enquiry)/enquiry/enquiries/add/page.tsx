@@ -20,105 +20,115 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useAddNewEnquiry, useGetEqAreas, useGetEqCampsByArea, useGetEqCities, useGetEqCountries, useGetEqProvince, useGetEqRegions } from "@/query/enquirymanager/queries";
 import { toast } from "sonner";
-import { EQ_CAMP_TYPES, EQ_CONTACT_AUTHORITY } from "@/lib/constants";
+import { EQ_CAMP_TYPES, EQ_CAPACITY_LIMITS, Eq_CAPACITY_OPTIONS, EQ_CONTACT_AUTHORITY } from "@/lib/constants";
 import LocationPicker from "@/components/enquiries/LocationPicker";
 
 
 const priorityLevels = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"];
 
-const capacityOptions = ["<500", "500-1000", "1000-1500", "1500-2000", "2000-2500", "2500-3000", "3000+"];
-const capacityLimits: Record<string, number> = {
-  "<500": 500, "500-1000": 1000, "1000-1500": 1500, "1500-2000": 2000, "2000-2500": 2500, "2500-3000": 3000, "3000+": 99999
-};
-
 /* =========== SCHEMA =========== */
 const enquirySchema = z.object({
-  country: z.string().min(1, "Select country"),
-  region: z.string().min(1, "Select region"),
-  province: z.string().optional(),
-  city: z.string().optional(),
+    country: z.string().min(1, "Select country"),
+    region: z.string().min(1, "Select region"),
+    province: z.string().optional(),
+    city: z.string().optional(),
 
-  area_input_mode: z.enum(["existing", "new"]).default("existing"),
-  area: z.string().optional(),
-  area_name_request: z.string().optional(),
+    area_input_mode: z.enum(["existing", "new"]).default("existing"),
+    area: z.string().optional(),
+    area_name_request: z.string().optional(),
 
-  camp_input_mode: z.enum(["existing", "new"]).default("existing"),
-  camp: z.string().optional(),
-  camp_name_request: z.string().optional(),
+    camp_input_mode: z.enum(["existing", "new"]).default("existing"),
+    camp: z.string().optional(),
+    camp_name_request: z.string().optional(),
 
-  camp_type: z.string().optional(),
-  client_company: z.string().optional(),
-  landlord: z.string().optional(),
-  real_estate: z.string().optional(),
+    camp_type: z.string().optional(),
+    client_company: z.string().optional(),
+    landlord: z.string().optional(),
+    real_estate: z.string().optional(),
 
-  longitude: z.string(),
-  latitude: z.string(),
+    latitude: z.string(),
+    longitude: z.string(),
 
-  camp_capacity: z.string().optional(),
-  camp_occupancy: z
-    .string()
-    .optional()
-    .refine((value, ctx) => {
-      if (!value) return true; // allow empty
+    camp_capacity: z.string().optional(),
+    camp_occupancy: z.string().optional(),
 
-      const occupancy = Number(value);
-      if (isNaN(occupancy) || occupancy < 0) return false;
+    contacts: z.array(z.object({
+        name: z.string().min(1, "Contact name required"),
+        phone: z.string().min(5, "Phone required"),
+        email: z.string().optional(),
+        designation: z.string().optional(),
+        is_decision_maker: z.string().optional(),
+        authority_level: z.string().optional(),
+    })).optional(),
 
-      const capacity = ctx?.parent?.camp_capacity; // ✅ safe
-      const limit = capacityLimits[capacity]; // ✅ lookup
+    wifi_available: z.enum(["Yes", "No"]),
+    expected_monthly_price: z.string().optional(),
+    other_wifi_details: z.string().optional(),
+    wifi_type: z.string().optional(),
+    contractor_name: z.string().optional(),
+    contract_start: z.string().optional(),
+    contract_expiry: z.string().optional(),
+    wifi_plan: z.string().optional(),
+    speed_mbps: z.string().optional(),
+    service_quality: z.string().optional(),
+    pain_points: z.string().optional(),
 
-      if (!limit) return true; // capacity not selected yet
-      return occupancy <= limit; // ✅ final comparison
-    }, {
-      message: "Occupancy exceeds selected capacity"
-    }),
+    provider_plan: z.string().optional(),
+    personal_wifi_start: z.string().optional(),
+    personal_wifi_expiry: z.string().optional(),
+    personal_wifi_price: z.string().optional(),
 
-  contacts: z.array(z.object({
-    name: z.string().min(1, "Contact name required"),
-    phone: z.string().min(5, "Phone required"),
-    email: z.string().optional(),
-    designation: z.string().optional(),
-    is_decision_maker: z.string().optional(),
-    authority_level: z.string().optional(),
-  })).min(1, "Add at least one contact"),
+    head_office_address: z.string().optional(),
+    head_office_contact: z.string().optional(),
+    head_office_location: z.string().optional(),
+    head_office_details: z.string().optional(),
 
-  wifi_available: z.enum(["Yes", "No"]),
-  expected_monthly_price: z.string().optional(),
-  other_wifi_details: z.string().optional(),
-  wifi_type: z.string().optional(),
-  contractor_name: z.string().optional(),
-  contract_start: z.string().optional(),
-  contract_expiry: z.string().optional(),
-  wifi_plan: z.string().optional(),
-  speed_mbps: z.string().optional(),
-  service_quality: z.string().optional(),
-  pain_points: z.string().optional(),
+    lease_expiry_due: z.string().optional(),
+    rent_terms: z.string().optional(),
 
-  provider_plan: z.string().optional(),
-  personal_wifi_start: z.string().optional(),
-  personal_wifi_expiry: z.string().optional(),
-  personal_wifi_price: z.string().optional(),
+    competition_status: z.string().optional(),
+    competition_notes: z.string().optional(),
 
-  head_office_address: z.string().optional(),
-  head_office_contact: z.string().optional(),
-  head_office_location: z.string().optional(),
-  head_office_details: z.string().optional(),
+    priority: z.enum(priorityLevels as [string, ...string[]]).optional(),
 
-  lease_expiry_due: z.string().optional(),
-  rent_terms: z.string().optional(),
+    followup_status: z.enum(["Pending", "In Progress", "Closed"]),
+    alert_date: z.string().optional(),
+    next_action: z.string().optional(),
+    next_action_due: z.string().optional(),
 
-  competition_status: z.string().optional(),
-  competition_notes: z.string().optional(),
+    images: z.any().optional(),
 
-  priority: z.enum(priorityLevels as [string, ...string[]]).optional(),
+}).superRefine((values, ctx) => {
+    const needsCampDetails = values.area_input_mode === "new" || values.camp_input_mode === "new";
 
-  followup_status: z.enum(["Pending", "In Progress", "Closed"]),
-  alert_date: z.string().optional(),
-  next_action: z.string().optional(),
-  next_action_due: z.string().optional(),
+    if (needsCampDetails && !values.camp_capacity) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["camp_capacity"],
+            message: "Camp capacity is required for a new camp",
+        });
+    }
 
-  images: z.any().optional(),
+    if (needsCampDetails && !values.camp_occupancy) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["camp_occupancy"],
+            message: "Camp occupancy is required for a new camp",
+        });
+    }
 
+    if (values.camp_capacity && values.camp_occupancy) {
+        const limit = EQ_CAPACITY_LIMITS[values.camp_capacity];
+        const occupancy = Number(values.camp_occupancy);
+
+        if (!Number.isNaN(occupancy) && limit && occupancy > limit) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["camp_occupancy"],
+                message: "Camp occupancy cannot exceed Camp Capacity",
+            });
+        }
+    }
 });
 
 /* =========== COMPONENT =========== */
@@ -470,30 +480,6 @@ export default function AddEnquiry() {
                   )}
                 />
 
-                {/* CAMP CAPACITY */}
-                <FormField control={form.control} name="camp_capacity" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs text-slate-300">Camp Capacity</FormLabel>
-                    <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
-                      <Select value={field.value} onValueChange={field.onChange}>
-                        <SelectTrigger><SelectValue placeholder="Select Capacity" /></SelectTrigger>
-                        <SelectContent>{capacityOptions.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-                      </Select>
-                    </div>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-
-                {/* OCCUPANCY */}
-                <FormField control={form.control} name="camp_occupancy" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs text-slate-300">Current Occupancy</FormLabel>
-                    <Input type="number" {...field} value={field.value || ""} />
-                    <FormMessage />
-                  </FormItem>
-                )} />
-
-
 
                 {/* HEAD OFFICE */}
                 {!showHeadOffice && (
@@ -532,6 +518,29 @@ export default function AddEnquiry() {
 
               </>
             )}
+
+            {/* CAMP CAPACITY */}
+                <FormField control={form.control} name="camp_capacity" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs text-slate-300">Camp Capacity</FormLabel>
+                    <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <SelectTrigger><SelectValue placeholder="Select Capacity" /></SelectTrigger>
+                        <SelectContent>{Eq_CAPACITY_OPTIONS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+
+                {/* OCCUPANCY */}
+                <FormField control={form.control} name="camp_occupancy" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs text-slate-300">Current Occupancy</FormLabel>
+                    <Input type="number" {...field} value={field.value || ""} />
+                    <FormMessage />
+                  </FormItem>
+                )} />
 
             {/* CONTACTS */}
             <div className="text-xs text-slate-400 font-semibold flex items-center gap-1">

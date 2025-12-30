@@ -47,15 +47,19 @@ export default function EnquiriesPage() {
 
   // Cascading dropdown lists
   const [countries, setCountries] = useState([]);
+  const [page, setPage] = useState(1);
+  const limit = 10;
 
   // Queries
-  const { data: enquiries, isLoading } = useGetEnquiriesWithFilters(filters);
+  const { data: enquiries, isLoading } = useGetEnquiriesWithFilters({...filters, page, limit});
   const { mutateAsync: GetCountries, isPending: isCompanyLoading } = useGetEqCountries();
   const { data: regions, isLoading: isRegionLoading } = useGetEqRegions(filters?.country_id);
   const { data: provinces, isLoading: isProvinceLoading } = useGetEqProvince(filters?.region_id);
   const { data: cities, isLoading: isCityLoading } = useGetEqCities(filters?.province_id);
   const { data: areas, isLoading: isAreaLoading } = useGetEqAreas(filters.city_id);
   const { data: camps, isLoading: isCampLoading } = useGetEqCampsByArea(filters?.area_id);
+
+  const pagination = enquiries?.pagination;
 
   const fetchCountries = async () => {
     const res = await GetCountries();
@@ -69,6 +73,10 @@ export default function EnquiriesPage() {
   useEffect(() => {
     fetchCountries();
   }, []);
+
+  useEffect(() => {
+  setPage(1);
+}, [filters]);
 
 
   /* -------------------------------------------------------
@@ -365,6 +373,36 @@ export default function EnquiriesPage() {
           ))}
         </div>
       </div>
+      {pagination && pagination.totalPages > 1 && (
+  <div className="flex justify-between items-center mt-4 text-xs text-slate-400">
+    
+    <p>
+      Page {pagination.page} of {pagination.totalPages} · Total {pagination.totalRecords}
+    </p>
+
+    <div className="flex gap-2">
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={page === 1}
+        onClick={() => setPage(prev => Math.max(prev - 1, 1))}
+      >
+        Previous
+      </Button>
+
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={page === pagination.totalPages}
+        onClick={() =>
+          setPage(prev => Math.min(prev + 1, pagination.totalPages))
+        }
+      >
+        Next
+      </Button>
+    </div>
+  </div>
+)}
     </div>
   );
 }
