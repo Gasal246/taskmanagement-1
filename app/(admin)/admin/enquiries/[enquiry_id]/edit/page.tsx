@@ -114,6 +114,7 @@ const enquirySchema = z.object({
     alert_date: z.string().optional(),
     next_action: z.string().optional(),
     next_action_due: z.string().optional(),
+    comments: z.string().optional(),
 
     images: z.any().optional(),
 
@@ -198,6 +199,7 @@ export default function EditEnquiry() {
             alert_date: "",
             next_action: "",
             next_action_due: "",
+            comments: "",
             latitude: "",
             longitude: "",
             contacts: [{ name: "", phone: "" }]
@@ -339,7 +341,8 @@ export default function EditEnquiry() {
             followup_status: enquiry?.enquiry?.status || "Pending",
             alert_date: formatDate(enquiry?.enquiry?.alert_date) || "",
             next_action: enquiry?.enquiry?.next_action || "",
-            next_action_due: formatDate(enquiry?.enquiry?.next_action_due) || ""
+            next_action_due: formatDate(enquiry?.enquiry?.next_action_due) || "",
+            comments: enquiry?.enquiry?.comments || ""
         });
 
         if (mappedContacts.length) {
@@ -1130,6 +1133,7 @@ export default function EditEnquiry() {
                             <FormItem><FormLabel className="text-xs text-slate-300">Alert Date</FormLabel><Input type="date" {...field} /></FormItem>
                         )} />
                         <Textarea {...form.register("next_action")} placeholder="Next Action" />
+                        <Textarea {...form.register("comments")} placeholder="Comments" />
                         <FormField control={form.control} name="next_action_due" render={({ field }) => (
                             <FormItem><FormLabel className="text-xs text-slate-300">Next Action Due Date</FormLabel>
                                 <Input type="date" {...field} />

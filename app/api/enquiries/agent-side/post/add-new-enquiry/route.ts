@@ -65,6 +65,7 @@ interface Body {
     lease_expiry_due: Date,
     next_action: string,
     next_action_due: Date,
+    comments: string,
     rent_terms: string,
 
     //Wifi Details
@@ -281,6 +282,7 @@ export async function POST(req:NextRequest){
             competition_notes: body.competition_notes || null,
             next_action: body.next_action,
             next_action_due: body.next_action_due,
+            comments: body.comments || null,
             rent_terms: body.rent_terms,
             enquiry_uuid: uuid,
             wifi_setup: wifiAvailability === true && body.wifi_type == "Other Sources" ? body.other_wifi_details : null,

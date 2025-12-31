@@ -85,6 +85,7 @@ interface Body {
     alert_date: string;
     next_action: string;
     next_action_due: string;
+    comments?: string;
 }
 
 export async function PUT(req: NextRequest) {
@@ -327,6 +328,7 @@ export async function PUT(req: NextRequest) {
         enquiry.competition_notes = body.competition_notes || null;
         enquiry.next_action = body.next_action;
         enquiry.next_action_due = body.next_action_due || null;
+        enquiry.comments = body.comments || null;
         enquiry.rent_terms = body.rent_terms;
         enquiry.wifi_setup = wifiAvailability === true && body.wifi_type === "Other Sources" ? body.other_wifi_details : null;
         enquiry.latitude = body.latitude;

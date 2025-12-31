@@ -19,6 +19,8 @@ const Staffs = () => {
   const router = useRouter();
 
   const [allStaffs, setAllStaffs] = useState<any[]>([]);
+  const [searchValue, setSearchValue] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const { businessData } = useSelector((state: RootState) => state.user);
   const { filteredStaffs, staffFilterValues } = useSelector((state: RootState) => state.application);
@@ -33,9 +35,24 @@ const Staffs = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadedStaffs]);
 
+  const normalizedSearch = searchQuery.trim().toLowerCase();
+  const visibleStaffs = normalizedSearch
+    ? allStaffs.filter((staff: any) => {
+        const user = staff?.user_id || {};
+        const name = user?.name || "";
+        const email = user?.email || "";
+        const phone = user?.phone || "";
+        return `${name} ${email} ${phone}`.toLowerCase().includes(normalizedSearch);
+      })
+    : allStaffs;
+
   const handleViewStaff = async (user: any) => {
     dispatch(loadAdminBusinessStaff(user));
     router.push(`/admin/staffs/view-staff`);
+  }
+
+  const handleSearch = () => {
+    setSearchQuery(searchValue.trim());
   }
   
   return (
@@ -85,17 +102,36 @@ const Staffs = () => {
               </div>
             </div>}
             <div className="w-full flex items-center gap-2 mb-2">
-              <Tooltip title="search with email, phone or name"><Input placeholder='Search Users' className='border-slate-700 focus:border-slate-500 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0' type='search' /></Tooltip>
-              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className='p-2 px-4 rounded-lg border border-slate-700 hover:border-slate-500 bg-gradient-to-tr from-slate-900 to-slate-800 cursor-pointer text-xs font-semibold flex gap-1 items-center'>
+              <Tooltip title="search with email, phone or name">
+                <Input
+                  placeholder='Search Users'
+                  className='border-slate-700 focus:border-slate-500 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0'
+                  type='search'
+                  value={searchValue}
+                  onChange={(e) => {
+                    const nextValue = e.target.value;
+                    setSearchValue(nextValue);
+                    if (!nextValue.trim()) {
+                      setSearchQuery("");
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      handleSearch();
+                    }
+                  }}
+                />
+              </Tooltip>
+              <motion.div onClick={handleSearch} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className='p-2 px-4 rounded-lg border border-slate-700 hover:border-slate-500 bg-gradient-to-tr from-slate-900 to-slate-800 cursor-pointer text-xs font-semibold flex gap-1 items-center'>
                 <Search size={14} />
                 search
               </motion.div>
             </div>
             {loadingStaffData && <TableSkeleton />}
-            {(!allStaffs || allStaffs?.length === 0) && <div className='w-full h-full flex items-center justify-center min-h-[10vh]'>
-              <p className='text-slate-300 text-sm'>No staffs added</p>
+            {!loadingStaffData && visibleStaffs?.length === 0 && <div className='w-full h-full flex items-center justify-center min-h-[10vh]'>
+              <p className='text-slate-300 text-sm'>{normalizedSearch ? "No matching staffs found" : "No staffs added"}</p>
             </div>}
-            {allStaffs?.length > 0 && !loadingStaffData && <div className="w-full">
+            {visibleStaffs?.length > 0 && !loadingStaffData && <div className="w-full">
               <table className="w-full bg-gradient-to-tr from-slate-950/40 to-slate-900/40 p-4 px-3 rounded-lg">
                 <thead>
                   <tr>
@@ -126,7 +162,7 @@ const Staffs = () => {
                   </tr>
                 </thead>
                 <tbody>
-                {allStaffs?.map((staff: any) => <tr className="p-1" key={staff?._id}>
+                {visibleStaffs?.map((staff: any) => <tr className="p-1" key={staff?._id}>
                   <td className=''>
                     <div className="flex items-center gap-2 px-3 border rounded border-slate-800 p-1 min-h-[50px]">
                       <Avatar size={40} src={staff?.user_id?.avatar_url} />

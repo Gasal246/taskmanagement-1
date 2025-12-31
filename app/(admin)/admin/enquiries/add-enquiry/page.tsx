@@ -98,6 +98,7 @@ const enquirySchema = z.object({
     alert_date: z.string().optional(),
     next_action: z.string().optional(),
     next_action_due: z.string().optional(),
+    comments: z.string().optional(),
 
     images: z.any().optional(),
 
@@ -152,7 +153,8 @@ export default function AddEnquiry() {
             expected_monthly_price: "",
             other_wifi_details: "",
             latitude: "",
-            longitude: ""
+            longitude: "",
+            comments: ""
         }
     });
 
@@ -985,6 +987,7 @@ export default function AddEnquiry() {
                             <FormItem><FormLabel className="text-xs text-slate-300">Alert Date</FormLabel><Input type="date" {...field} /></FormItem>
                         )} />
                         <Textarea {...form.register("next_action")} placeholder="Next Action" />
+                        <Textarea {...form.register("comments")} placeholder="Comments" />
                         <FormField control={form.control} name="next_action_due" render={({ field }) => (
                             <FormItem><FormLabel className="text-xs text-slate-300">Next Action Due Date</FormLabel>
                                 <Input type="date" {...field} />

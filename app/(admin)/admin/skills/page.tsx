@@ -22,6 +22,7 @@ const SkillsPage = () => {
     const { mutateAsync: removeSkill } = useRemoveBusinessSkill();
     const [openAddSkill, setOpenAddSkill] = useState(false);
     const [skillName, setSkillName] = useState('');
+    const [searchValue, setSearchValue] = useState('');
 
     const handleGetSkills = async () => {
         const res = await getSkills(businessData?._id);
@@ -61,6 +62,13 @@ const SkillsPage = () => {
         }
     }
 
+    const normalizedSearch = searchValue.trim().toLowerCase();
+    const visibleSkills = normalizedSearch
+        ? businessSkills.filter((skill: any) =>
+            (skill?.skill_name || "").toLowerCase().includes(normalizedSearch)
+        )
+        : businessSkills;
+
     useEffect(() => {
         handleGetSkills();
     }, []);
@@ -80,10 +88,19 @@ const SkillsPage = () => {
                 </motion.div>
             </div>
             <div className="bg-gradient-to-tr from-slate-950/60 to-slate-900/60 p-3 rounded-lg min-h-[30vh]">
-                <h1 className='font-medium text-xs text-slate-300 flex items-center gap-1'><Pyramid size={14} /> Added Skills</h1>
-                {(!loadingSkills && businessSkills?.length === 0) && (
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                    <h1 className='font-medium text-xs text-slate-300 flex items-center gap-1'><Pyramid size={14} /> Added Skills</h1>
+                    <Input
+                        placeholder="Search skills"
+                        type="search"
+                        value={searchValue}
+                        onChange={(e) => setSearchValue(e.target.value)}
+                        className="border-slate-700 focus:border-slate-500 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 w-full sm:w-[260px]"
+                    />
+                </div>
+                {(!loadingSkills && visibleSkills?.length === 0) && (
                     <div className='flex items-center justify-center h-[15vh]'>
-                        <h1 className='text-xs text-slate-300'>No Skills Added.</h1>
+                        <h1 className='text-xs text-slate-300'>{normalizedSearch ? "No matching skills found." : "No Skills Added."}</h1>
                     </div>
                 )}
                 {loadingSkills && (
@@ -92,7 +109,7 @@ const SkillsPage = () => {
                     </div>
                 )}
                 <div className="flex flex-wrap">
-                    {businessSkills?.map((skill: any) => (
+                    {visibleSkills?.map((skill: any) => (
                         <div className="w-full lg:w-3/12 p-1" key={skill?._id}>
                         <div className="bg-gradient-to-tr from-slate-950/60 to-slate-900/60 p-3 rounded-lg border border-slate-800 hover:border-cyan-700 relative">
                             <h1 className='font-medium text-xs text-slate-300 flex items-center gap-1'>{skill?.skill_name}</h1>
