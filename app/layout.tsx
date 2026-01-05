@@ -1,12 +1,12 @@
+import { auth } from "@/auth";
 import type { Metadata } from "next";
 import { AR_One_Sans } from "next/font/google";
 import SessionProvider from '@/lib/SessionProvider'
 import "./globals.css";
-import { getServerSession } from "next-auth";
-import { authOptions } from "./api/auth/[...nextauth]/route";
 import { Toaster } from "@/components/ui/sonner";
 import TanstackProvider from "@/query/TanstackProvider";
 import ReduxProvider from "@/redux/ReduxProvider";
+import UserActivityTracker from "@/components/shared/UserActivityTracker";
 
 const ar_one_sans = AR_One_Sans({ subsets: ["latin"] });
 
@@ -21,7 +21,7 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const session = await getServerSession(authOptions);
+  const session = await auth();
 
   return (
     <html lang="en" className="dark" style={{ colorScheme: "dark" }}>
@@ -29,6 +29,7 @@ export default async function RootLayout({
         <SessionProvider session={session}>
           <TanstackProvider>
             <ReduxProvider>
+              <UserActivityTracker />
               {children}
             </ReduxProvider>
           </TanstackProvider>

@@ -1,4 +1,4 @@
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import Area_dep_heads from "@/models/area_dep_heads.model";
 import Area_heads from "@/models/area_heads.model";
@@ -12,14 +12,13 @@ import Region_dep_heads from "@/models/region_dep_heads.model";
 import Region_heads from "@/models/region_heads.model";
 import Roles from "@/models/roles.model";
 import mongoose from "mongoose";
-import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 
 connectDB();
 
 export async function GET(req: NextRequest) {
     try {
-        const session: any = await getServerSession(authOptions);
+        const session: any = await auth();
         if (!session) return NextResponse.json({ message: "Un-Authorized Access", status: 401 }, { status: 401 });
 
         const { searchParams } = new URL(req.url);

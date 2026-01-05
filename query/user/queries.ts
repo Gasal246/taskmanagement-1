@@ -9,6 +9,7 @@ import {
     addUserRoleFunc,
     addUserSkillFunc,
     CheckTodo,
+    deleteBusinessStaff,
     DeleteTodo,
     GetAdminProfile,
     GetAllUserTodos,
@@ -29,6 +30,7 @@ import {
     sendEmailVerification,
     setupUserPassword,
     UpdateStaffProfile,
+    updateStaffStatus,
     updateUserData,
     verifyUserOtp
 } from "./function";
@@ -78,12 +80,45 @@ export const useGetUserDomainByRole = () => {
     })
 }
 
-export const useGetBusinessStaffs = (business_id?: string) => {
+export const useGetBusinessStaffs = (
+    business_id?: string,
+    options?: {
+        includeBlocked?: boolean;
+        search?: string;
+        region_id?: string;
+        area_id?: string;
+        location_id?: string;
+        skill_id?: string;
+    }
+) => {
+    const includeBlocked = options?.includeBlocked ?? false;
+    const search = options?.search ?? "";
+    const region_id = options?.region_id ?? "";
+    const area_id = options?.area_id ?? "";
+    const location_id = options?.location_id ?? "";
+    const skill_id = options?.skill_id ?? "";
     return useQuery({
-        queryKey: [USER_KEYS.GET_BUSINESS_STAFFS, business_id],
+        queryKey: [
+            USER_KEYS.GET_BUSINESS_STAFFS,
+            business_id,
+            includeBlocked ? "all" : "active",
+            search,
+            region_id,
+            area_id,
+            location_id,
+            skill_id
+        ],
         queryFn: async () => {
-            const data = await getBusinessStaffs(business_id || "");
-            return data ?? [];
+            const data = await getBusinessStaffs(business_id || "", {
+                search,
+                region_id,
+                area_id,
+                location_id,
+                skill_id
+            });
+            const staffs = data ?? [];
+            if (includeBlocked) return staffs;
+            return staffs.filter((staff: any) => staff?.user_id?.status === 1);
         },
         enabled: Boolean(business_id),
     })
@@ -260,6 +295,30 @@ export const useUpdateUserInfo = () => {
     return useMutation({
         mutationFn: (payload: any) => updateUserData(payload),
         onSuccess: (data: any) => {
+            queryClient.invalidateQueries({
+                queryKey: [USER_KEYS.GET_BUSINESS_STAFFS]
+            })
+        }
+    })
+}
+
+export const useUpdateStaffStatus = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (payload: { staffid: string; status: "active" | "blocked" }) => updateStaffStatus(payload),
+        onSuccess: () => {
+            queryClient.invalidateQueries({
+                queryKey: [USER_KEYS.GET_BUSINESS_STAFFS]
+            })
+        }
+    })
+}
+
+export const useDeleteBusinessStaff = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (payload: { staff_id: string; business_id: string }) => deleteBusinessStaff(payload),
+        onSuccess: () => {
             queryClient.invalidateQueries({
                 queryKey: [USER_KEYS.GET_BUSINESS_STAFFS]
             })

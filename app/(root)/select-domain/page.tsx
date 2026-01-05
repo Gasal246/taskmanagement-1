@@ -9,11 +9,13 @@ import { useGetUserDomainByRole } from '@/query/user/queries';
 import { useSession } from 'next-auth/react';
 import Cookies from 'js-cookie';
 import { loadBusinessData } from '@/redux/slices/userdata';
-import { redirect } from 'next/navigation';
+import { useRouter } from 'next/navigation';
+import { resolveSessionUserId } from '@/lib/utils';
 
 const SelectDomainPage = () => {
-    const session: any = useSession();
+    const { data: session, status } = useSession();
     const dispatch = useDispatch<AppDispatch>();
+    const router = useRouter();
     const [selectedDomain, setSelectedDomain] = React.useState<string>('');
     const [domains, setDomains] = React.useState<any[]>([]);
     const [businessData, setBusinessData] = React.useState<any[]>([]);
@@ -22,35 +24,95 @@ const SelectDomainPage = () => {
     const { mutateAsync: fetchDomains, isPending: domainsLoading } = useGetUserDomainByRole();
 
     const handleFetchDomains = async () => {
-        const user_role = JSON.parse(Cookies.get('user_role') || '')?.role_name;
-        const data = await fetchDomains({userid: session?.data?.user?.id, role: user_role});
+        const roleCookie = Cookies.get('user_role');
+        if (!roleCookie) {
+            router.replace('/select-roles');
+            return;
+        }
+        let userRole: any = null;
+        try {
+            userRole = JSON.parse(roleCookie);
+        } catch (error) {
+            Cookies.remove('user_role');
+            router.replace('/select-roles');
+            return;
+        }
+
+        const roleName = userRole?.role_name;
+        if (!roleName) {
+            router.replace('/select-roles');
+            return;
+        }
+
+        const userId = resolveSessionUserId(session);
+        if (!userId) {
+            router.replace('/signin');
+            return;
+        }
+        const data = await fetchDomains({userid: userId, role: roleName});
         console.log("businessData: ", data);
-        setDomains(data?.returnData)
-        if(user_role == 'BUSINESS_ADMIN') {
+        setDomains(data?.returnData || []);
+        if(roleName == 'BUSINESS_ADMIN') {
             setBusinessData(data?.businesses?.map((business: any) => business?.business_id));
             setDomains(data?.businesses?.map((business: any) => ({ name: business?.business_id?.business_name, value: business?.business_id?._id })));
+        } else if (data?.returnData?.length) {
+            setBusinessData(data?.returnData?.map((domain: any) => ({
+                _id: domain?.business_id,
+            })));
         }
     }
 
     React.useEffect(() => {
+        if (status === "loading") return;
+        const userId = resolveSessionUserId(session);
+        if (!userId) {
+            router.replace('/signin');
+            return;
+        }
         handleFetchDomains();
-    }, [session]);
+    }, [session, status]);
 
 
     const handleContinueWithDomain = async () => {
         setLoading(true);
-        const user_role = JSON.parse(Cookies.get('user_role') || '')?.role_name;    
-        await Cookies.set('user_domain', JSON.stringify(domains?.find((domain: any) => domain?.value == selectedDomain)));
-        if(user_role == 'BUSINESS_ADMIN') {
-            dispatch(loadBusinessData(businessData?.find((business: any) => business?._id == selectedDomain)));
+        const roleCookie = Cookies.get('user_role');
+        if (!roleCookie) {
             setLoading(false);
-            redirect('/admin')
-        } else {            
-            dispatch(loadBusinessData(businessData?.find((business: any) => business?._id == selectedDomain)));
+            router.replace('/select-roles');
+            return;
+        }
+
+        let userRole: any = null;
+        try {
+            userRole = JSON.parse(roleCookie);
+        } catch (error) {
             setLoading(false);
-            redirect('/staff');
+            Cookies.remove('user_role');
+            router.replace('/select-roles');
+            return;
+        }
+
+        const roleName = userRole?.role_name;
+        const selected = domains?.find((domain: any) => domain?.value == selectedDomain);
+        if (!selected) {
+            setLoading(false);
+            return;
+        }
+
+        await Cookies.set('user_domain', JSON.stringify(selected));
+
+        const selectedBusiness = businessData?.find((business: any) => business?._id == selectedDomain) || {
+            _id: selected?.business_id,
+        };
+        dispatch(loadBusinessData(selectedBusiness));
+
+        if(roleName == 'BUSINESS_ADMIN') {
+            setLoading(false);
+            router.push('/admin');
+            return;
         }
         setLoading(false);
+        router.push('/staff');
     }
     
 

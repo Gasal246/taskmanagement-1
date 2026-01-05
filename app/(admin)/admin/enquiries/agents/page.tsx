@@ -1,5 +1,5 @@
 "use client"
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { BadgeCheck, Eye, Filter, Hourglass, PencilRuler, Plus, Search, Users, Users2 } from 'lucide-react';
@@ -10,6 +10,15 @@ import { useSelector } from 'react-redux';
 import { RootState } from '@/redux/store';
 import { useGetAgentsByBusiness } from '@/query/enquirymanager/queries';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 
 const multiFormatDateString = (date: any) => {
@@ -22,6 +31,8 @@ const AgentsPage = () => {
   const [allStaffs, setAllStaffs] = useState<any[]>([]);
   const [searchVal, setSearchVal] = useState("");
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const limit = 10;
   
     const { businessData } = useSelector((state: RootState) => state.user);
   const {data: agents, isLoading} = useGetAgentsByBusiness(businessData?._id, search);
@@ -38,6 +49,47 @@ const AgentsPage = () => {
   const handleSearch = () => {
     setSearch(searchVal);
   }
+
+  const agentList = agents?.agents || [];
+  const totalPages = Math.max(1, Math.ceil(agentList.length / limit));
+  const pagedAgents = agentList.slice((page - 1) * limit, page * limit);
+
+  const pageItems = useMemo(() => {
+    if (totalPages <= 1) return [];
+    if (totalPages <= 10) return Array.from({ length: totalPages }, (_, i) => i + 1);
+
+    const tailSize = 5;
+    const mainSize = 5;
+    const tailStart = Math.max(totalPages - tailSize + 1, 1);
+    let mainStart = page <= 5 ? 1 : page + 1;
+
+    if (mainStart >= tailStart) {
+      mainStart = tailStart;
+    }
+    let mainEnd = Math.min(mainStart + mainSize - 1, totalPages);
+    if (mainEnd >= tailStart - 1) {
+      mainEnd = tailStart - 1;
+    }
+
+    const items: Array<number | "ellipsis"> = [];
+    for (let i = mainStart; i <= mainEnd; i += 1) {
+      items.push(i);
+    }
+    if (mainEnd > 0 && mainEnd < tailStart - 1) {
+      items.push("ellipsis");
+    }
+    for (let i = tailStart; i <= totalPages; i += 1) {
+      items.push(i);
+    }
+    return items;
+  }, [totalPages, page]);
+
+  const startIndex = agentList.length === 0 ? 0 : (page - 1) * limit + 1;
+  const endIndex = Math.min(page * limit, agentList.length);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, agentList.length]);
 
   return (
     <div className='p-4 pb-10'>
@@ -86,7 +138,7 @@ const AgentsPage = () => {
             </div>
           )}
 
-          { agents?.agents?.length > 0 && (
+          { agentList.length > 0 && (
             <table className="w-full bg-gradient-to-tr from-slate-950/40 to-slate-900/40 p-4 px-3 rounded-lg">
               <thead>
                 <tr>
@@ -95,7 +147,7 @@ const AgentsPage = () => {
                 </tr>
               </thead>
               <tbody>
-                {agents?.agents?.map((agent: any) => (
+                {pagedAgents.map((agent: any) => (
                   <tr key={agent._id}>
                     <td>
                       <div className="flex items-center gap-2 px-3 border rounded border-slate-800 p-1 min-h-[50px]">
@@ -120,6 +172,55 @@ const AgentsPage = () => {
                 ))}
               </tbody>
             </table>
+          )}
+          {totalPages > 1 && (
+            <div className="flex flex-col gap-2 mt-4 text-xs text-slate-400">
+              <p>
+                Showing {startIndex}-{endIndex} of {agentList.length} agents · Looking good.
+              </p>
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      href="#"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        setPage((prev) => Math.max(prev - 1, 1));
+                      }}
+                      className={page === 1 ? "pointer-events-none opacity-40" : ""}
+                    />
+                  </PaginationItem>
+                  {pageItems.map((item, index) => (
+                    <PaginationItem key={`${item}-${index}`}>
+                      {item === "ellipsis" ? (
+                        <PaginationEllipsis />
+                      ) : (
+                        <PaginationLink
+                          href="#"
+                          isActive={item === page}
+                          onClick={(event) => {
+                            event.preventDefault();
+                            setPage(item);
+                          }}
+                        >
+                          {item}
+                        </PaginationLink>
+                      )}
+                    </PaginationItem>
+                  ))}
+                  <PaginationItem>
+                    <PaginationNext
+                      href="#"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        setPage((prev) => Math.min(prev + 1, totalPages));
+                      }}
+                      className={page === totalPages ? "pointer-events-none opacity-40" : ""}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
           )}
         </div>
       </div>

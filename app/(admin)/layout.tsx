@@ -1,9 +1,8 @@
+import { auth } from "@/auth";
 import AdminSidebar from '@/components/admin/AdminSidebar'
 import AdminTopbar from '@/components/admin/AdminTopbar'
 import { Metadata } from 'next';
-import { getServerSession } from 'next-auth';
 import React from 'react'
-import { authOptions } from '../api/auth/[...nextauth]/route';
 import { redirect } from 'next/navigation';
 
 export const metadata: Metadata = {
@@ -14,7 +13,7 @@ export const metadata: Metadata = {
 const AdminLayout = async ({ children }: {
   children: React.ReactNode
 }) => {
-  const session: any = await getServerSession(authOptions)
+  const session: any = await auth()
   if (!session) {
     return redirect('/signin')
   }

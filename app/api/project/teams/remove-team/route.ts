@@ -1,11 +1,10 @@
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import Business_Tasks from "@/models/business_tasks.model";
 import Flow_Log from "@/models/Flow_Log.model";
 import Project_Teams from "@/models/project_team.model";
 import Project_Team_Members from "@/models/project_team_members.model";
 import Users from "@/models/users.model";
-import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 
 connectDB();
@@ -13,7 +12,7 @@ connectDB();
 export async function DELETE(req:NextRequest){
     try{
 
-         const session: any = await getServerSession(authOptions);
+         const session: any = await auth();
         if(!session) return NextResponse.json({message: "Un Authorized Access", status: 401}, { status: 401 });
         
         const username = await Users.findById(session?.user?.id).select("name");

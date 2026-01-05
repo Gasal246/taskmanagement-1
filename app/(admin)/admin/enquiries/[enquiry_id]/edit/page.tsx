@@ -3,7 +3,7 @@
 
 import React, { useEffect, useState } from "react";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
-import { Building2, FileText, Loader2, Plus, Trash2, Upload, Wifi, PhoneCall, X } from "lucide-react";
+import { Building2, FileText, Loader2, Plus, Trash2, Upload, Wifi, PhoneCall, X, Info } from "lucide-react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -39,6 +39,7 @@ import Image from "next/image";
 import { deleteObject, getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { storage } from "@/firebase/config";
 import { Button } from "@/components/ui/button";
+import { Tooltip } from "antd";
 
 const priorityLevels = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"];
 
@@ -146,6 +147,10 @@ export default function EditEnquiry() {
     const [uploadedDoc, setUploadedDoc] = useState<{ url: string; name: string; type?: string; storagePath?: string } | null>(null);
     const [removingDoc, setRemovingDoc] = useState(false);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const priorityCapacityMap = Eq_CAPACITY_OPTIONS.map((capacity, index) => ({
+        priority: `${index + 1}/10`,
+        capacity,
+    }));
 
     const { mutateAsync: GetCountries } = useGetEqCountries();
     const { mutateAsync: UpdateEnquiry, isPending: isUpdating } = useUpdateEnquiry();
@@ -202,7 +207,7 @@ export default function EditEnquiry() {
             comments: "",
             latitude: "",
             longitude: "",
-            contacts: [{ name: "", phone: "" }]
+            contacts: []
         }
     });
 
@@ -309,7 +314,7 @@ export default function EditEnquiry() {
             longitude: camp?.longitude || enquiry?.enquiry?.longitude || "",
             camp_capacity: camp?.camp_capacity || "",
             camp_occupancy: camp?.camp_occupancy ? String(camp?.camp_occupancy) : "",
-            contacts: mappedContacts.length ? mappedContacts : [{ name: "", phone: "" }],
+            contacts: mappedContacts,
             wifi_available:
                 enquiry?.enquiry?.wifi_available === true
                     ? "Yes"
@@ -345,9 +350,7 @@ export default function EditEnquiry() {
             comments: enquiry?.enquiry?.comments || ""
         });
 
-        if (mappedContacts.length) {
-            replace(mappedContacts);
-        }
+        replace(mappedContacts);
     }, [enquiry, campData, contactsData]);
 
     useEffect(() => {
@@ -909,6 +912,11 @@ export default function EditEnquiry() {
                             <PhoneCall size={14} /> Contacts
                         </div>
 
+                        {fields?.length === 0 && (
+                            <div className="border border-dashed border-slate-700 rounded-lg p-3 text-xs text-slate-400">
+                                No contacts added yet. You can continue editing and add contacts anytime.
+                            </div>
+                        )}
                         {fields?.map((field, i) => (
                             <div key={field.id} className="border border-slate-700 p-3 rounded-lg space-y-2">
 
@@ -960,15 +968,13 @@ export default function EditEnquiry() {
                                     </div>
                                 </div>
 
-                                {fields.length > 1 && (
-                                    <button
-                                        type="button"
-                                        onClick={() => remove(i)}
-                                        className="text-red-400 text-xs flex items-center gap-1"
-                                    >
-                                        <Trash2 size={14} /> Remove Contact
-                                    </button>
-                                )}
+                                <button
+                                    type="button"
+                                    onClick={() => remove(i)}
+                                    className="text-red-400 text-xs flex items-center gap-1"
+                                >
+                                    <Trash2 size={14} /> Remove Contact
+                                </button>
                             </div>
                         ))}
                         <button type="button" onClick={() => append({ name: "", phone: "" })} className="text-cyan-400 text-xs flex items-center gap-1">
@@ -1105,7 +1111,32 @@ export default function EditEnquiry() {
                         {/* PRIORITY */}
                         <FormField control={form.control} name="priority" render={({ field }) => (
                             <FormItem>
-                                <FormLabel className="text-xs text-slate-300 font-semibold">Priority (1 - Low, 10 - High)</FormLabel>
+                                <Tooltip
+                                    placement="topLeft"
+                                    rootClassName="w-[360px]"
+                                    className="w-[360px]"
+                                    title={
+                                        <div className="w-[360px] rounded-lg border border-slate-700/70 bg-slate-900/95 p-3 shadow-lg">
+                                            <div className="grid grid-cols-2 gap-x-4 text-[11px] font-semibold uppercase tracking-wide text-slate-300">
+                                                <span>Priority</span>
+                                                <span>Capacity</span>
+                                            </div>
+                                            <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-slate-200">
+                                                {priorityCapacityMap.map((item) => (
+                                                    <React.Fragment key={item.priority}>
+                                                        <span className="tabular-nums">{item.priority}</span>
+                                                        <span className="whitespace-nowrap">{item.capacity}</span>
+                                                    </React.Fragment>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    }
+                                >
+                                    <FormLabel className="text-xs text-slate-300 font-semibold flex gap-1 items-center">
+                                        <Info size={14} color="white" />
+                                        Priority (1 - Low, 10 - High)
+                                    </FormLabel>
+                                </Tooltip>
                                 <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
                                     <Select value={field.value} onValueChange={field.onChange}>
                                         <SelectTrigger><SelectValue placeholder="Priority" /></SelectTrigger>

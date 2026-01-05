@@ -1,3 +1,4 @@
+import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import Business_Project from "@/models/business_project.model";
 import Business_Tasks from "@/models/business_tasks.model";
@@ -7,16 +8,14 @@ import Project_Departments from "@/models/project_departments.model";
 import Project_Team_Members from "@/models/project_team_members.model";
 import Project_Teams from "@/models/project_team.model";
 import Users from "@/models/users.model";
-import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
-import { authOptions } from "../../auth/[...nextauth]/route";
 import mongoose from "mongoose";
 
 connectDB();
 
 export async function DELETE(req: NextRequest) {
   try {
-    const session: any = await getServerSession(authOptions);
+    const session: any = await auth();
     if (!session) return new NextResponse("Un Authorized Access", { status: 401 });
 
     const { searchParams } = new URL(req.url);

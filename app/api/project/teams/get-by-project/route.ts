@@ -1,7 +1,5 @@
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import connectDB from "@/lib/mongo";
 import Project_Teams from "@/models/project_team.model";
-import { getServerSession } from "next-auth";
 import '@/models/project_departments.model';
 import '@/models/users.model';
 import { NextRequest, NextResponse } from "next/server";

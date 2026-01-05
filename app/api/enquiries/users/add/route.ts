@@ -1,7 +1,6 @@
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import Eq_enquiry_users from "@/models/eq_enquiry_users.model";
-import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 
 connectDB();
@@ -14,7 +13,7 @@ interface IBody {
 
 export async function POST(req: NextRequest){
     try{
-        const session: any = await getServerSession(authOptions);
+        const session: any = await auth();
         if(!session) return NextResponse.json({message: "Unauthorized Access", status: 401}, {status: 401});
         const body: IBody = await req.json();
         if(!body.business_id || !body.user_id) return NextResponse.json({message:"Please fill all fields", status: 400}, {status: 400});

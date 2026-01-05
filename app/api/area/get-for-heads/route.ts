@@ -1,14 +1,13 @@
+import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
-import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
-import { authOptions } from "../../auth/[...nextauth]/route";
 import Area_heads from "@/models/area_heads.model";
 
 connectDB();
 
 export async function GET(req:NextRequest){
     try{
-        const session:any = await getServerSession(authOptions);
+        const session:any = await auth();
         if(!session) return NextResponse.json({message:"Unauthorized", status:401}, {status:401});
 
         const areas = await Area_heads.find({user_id: session?.user?.id}).populate("area_id");

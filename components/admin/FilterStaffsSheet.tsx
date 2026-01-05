@@ -64,6 +64,17 @@ const FilterStaffsSheet = ({ trigger }: { trigger: React.ReactNode }) => {
     const handleSelect = async (type: 'region' | 'area' | 'location' | 'skill', value: string) => {
         switch (type) {
             case 'region':
+                if (value === 'all') {
+                    setRegion('');
+                    setRegionName('');
+                    setArea('');
+                    setAreaName('');
+                    setLocation('');
+                    setLocationName('');
+                    setAreaList([]);
+                    setLocationList([]);
+                    break;
+                }
                 const selectedRegion = regionList.find((r) => r?._id === value);
                 if (selectedRegion) {
                     setRegion(value);
@@ -82,6 +93,14 @@ const FilterStaffsSheet = ({ trigger }: { trigger: React.ReactNode }) => {
                 }
                 break;
             case 'area':
+                if (value === 'all') {
+                    setArea('');
+                    setAreaName('');
+                    setLocation('');
+                    setLocationName('');
+                    setLocationList([]);
+                    break;
+                }
                 const selectedArea = areaList.find((a) => a?._id === value);
                 if (selectedArea) {
                     setArea(value);
@@ -98,6 +117,11 @@ const FilterStaffsSheet = ({ trigger }: { trigger: React.ReactNode }) => {
                 }
                 break;
             case 'location':
+                if (value === 'all') {
+                    setLocation('');
+                    setLocationName('');
+                    break;
+                }
                 const selectedLocation = locationList.find((l) => l?._id === value);
                 if (selectedLocation) {
                     setLocation(value);
@@ -105,6 +129,11 @@ const FilterStaffsSheet = ({ trigger }: { trigger: React.ReactNode }) => {
                 }
                 break;
             case 'skill':
+                if (value === 'all') {
+                    setSkill('');
+                    setSkillName('');
+                    break;
+                }
                 const selectedSkill = skillList.find((s) => s?._id === value);
                 if (selectedSkill) {
                     setSkill(value);
@@ -163,7 +192,7 @@ const FilterStaffsSheet = ({ trigger }: { trigger: React.ReactNode }) => {
                     <SheetTitle>
                         <div>
                             <h1 className='font-medium text-xl text-slate-300'>Filter Staffs</h1>
-                            <h1 className='font-medium text-sm text-slate-400 flex items-center gap-1'>Apply filter to fetch the results.</h1>
+                            <h1 className='font-medium text-sm text-slate-400 flex items-center gap-1'>Apply filters to focus your staff list.</h1>
                         </div>
                     </SheetTitle>
                 </SheetHeader>

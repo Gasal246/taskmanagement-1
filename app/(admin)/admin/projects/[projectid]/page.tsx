@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { useParams, useRouter } from 'next/navigation';
-import { Building, CheckCircle, Files, FileText, ListTodo, Loader2, PanelsTopLeft, PencilRuler, Trash2, Upload, Users, Workflow, X } from 'lucide-react';
+import { Building, CheckCircle, Files, FileText, ListTodo, Loader2, PanelsTopLeft, PencilRuler, Square, Trash2, Upload, Users, Workflow, X } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -471,12 +471,6 @@ const ProjectView = () => {
             <p className='text-xs text-slate-300 font-semibold'>{formatDateTiny(project?.data?.end_date) || "-"}</p>
           </div>
           <div className="w-full lg:w-1/2 mb-2.5">
-            <p className='text-xs text-slate-400'>Approval</p>
-            <p className={`text-xs font-semibold ${project?.data?.is_approved ? 'text-green-600' : 'text-red-600'}`}>
-              {project?.data?.is_approved ? "Approved" : "Not Approved"}
-            </p>
-          </div>
-          <div className="w-full lg:w-1/2 mb-2.5">
             <p className='text-xs text-slate-400'>Status</p>
             <p className={`text-xs font-semibold capitalize ${project?.data?.status == "Pending" ? 'text-gray-600' : project?.data.status == "completed" ? 'text-green-600' : project?.data?.status == "approved" ? 'text-blue-600' : project?.data?.status == "cancelled" ? 'text-red-600' : 'text-gray-600'}`}>
               {project?.data?.status}
@@ -502,8 +496,8 @@ const ProjectView = () => {
 
           <div className="w-full lg:w-1/2 mb-2.5">
             <p className='text-xs text-slate-400'>Project Priority</p>
-            <p className={`text-xs font-semibold capitalize ${project?.data?.priority == "high" ? 'text-red-600' : 'text-slate-300'}`}>
-              {project?.data?.priority}
+            <p className={`text-xs font-semibold capitalize ${project?.data?.priority == "high" ? 'text-red-600' : 'text-slate-300'} flex gap-1 items-center`}>
+              <Square color='gray' strokeWidth={1} size={8} fill={project?.data?.priority === "high" ? '#ef4444' : project?.data?.priority === 'normal' ? 'gold' : 'silver'} /> {project?.data?.priority}
             </p>
           </div>
         </div>

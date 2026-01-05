@@ -1,7 +1,6 @@
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import Eq_enquiry from "@/models/eq_enquiries.model";
-import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 import "@/models/eq_camps.model";
 
@@ -9,7 +8,7 @@ connectDB();
 
 export async function GET(req:NextRequest){
     try{
-        const session:any = await getServerSession(authOptions);
+        const session:any = await auth();
         if(!session) return NextResponse.json({message: "Unauthorized access", status: 401}, {status: 401});
 
         console.log("user: ", session?.user?.id);

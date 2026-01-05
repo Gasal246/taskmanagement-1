@@ -1,8 +1,5 @@
-
-
-import { getServerSession } from 'next-auth';
+import { auth } from "@/auth";
 import React, { useEffect } from 'react'
-import { authOptions } from '../api/auth/[...nextauth]/route';
 import { redirect } from 'next/navigation';
 
 import EnquiriesSidebar from '@/components/enquiries/EnquiriesSidebar';
@@ -12,7 +9,7 @@ import { cookies } from "next/headers";
 
 const EnquiryLayout = async ({ children }: { children: React.ReactNode }) => {
 
-  const session = await getServerSession(authOptions);
+  const session = await auth();
   if (!session) return redirect("/signin");
 
   const cookieStore = await Promise.resolve(cookies());

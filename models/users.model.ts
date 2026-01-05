@@ -10,6 +10,8 @@ export interface IUsers extends Document {
   status: Number;
   avatar_url: String | null;
   otp: String | null;
+  last_login: Date | null;
+  last_logout: Date | null;
   createdAt: Date;
   updateAt: Date;
 }
@@ -23,9 +25,10 @@ const UsersSchema: Schema = new Schema({
   status: { type: Number, default: 1, enum: [0, 1] },
   avatar_url: { type: String },
   otp: { type: String },
+  last_login: { type: Date, default: null },
+  last_logout: { type: Date, default: null },
 }, { timestamps: true });
 
 const Users = mongoose.models?.users || mongoose.model<IUsers>('users', UsersSchema);
 
 export default Users;
-

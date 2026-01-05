@@ -22,35 +22,56 @@ export async function GET(req:NextRequest){
         
         const is_region = await Region_departments.findById(department_id).lean();
         if(is_region){
-            const region_dept_staffs = await Region_dep_staffs.find({region_dep_id: department_id}).populate("user_id", "name").lean();
-            for(const staff of region_dept_staffs){
-                const skills = await User_skills.find({user_id: staff.user_id}).populate("skill_id", "skill_name").lean();
+            const region_dept_staffs = await Region_dep_staffs.find({region_dep_id: department_id})
+                .populate({
+                    path: "user_id",
+                    select: "name status",
+                    match: { status: 1 }
+                })
+                .lean();
+            const activeStaffs = region_dept_staffs.filter((staff: any) => staff?.user_id);
+            for(const staff of activeStaffs){
+                const skills = await User_skills.find({user_id: staff.user_id._id}).populate("skill_id", "skill_name").lean();
                 staff.skills = skills;
             }
 
-            return NextResponse.json({data: region_dept_staffs, status: 200}, {status:200});
+            return NextResponse.json({data: activeStaffs, status: 200}, {status:200});
         }
 
         const is_area = await Area_departments.findById(department_id).lean();
         if(is_area){
-            const area_dept_staffs = await Area_dep_staffs.find({area_dep_id: department_id}).lean();
-            for(const staff of area_dept_staffs){
-                const skills = await User_skills.find({user_id: staff.user_id}).populate("skill_id", "skill_name").lean();
+            const area_dept_staffs = await Area_dep_staffs.find({area_dep_id: department_id})
+                .populate({
+                    path: "user_id",
+                    select: "name status",
+                    match: { status: 1 }
+                })
+                .lean();
+            const activeStaffs = area_dept_staffs.filter((staff: any) => staff?.user_id);
+            for(const staff of activeStaffs){
+                const skills = await User_skills.find({user_id: staff.user_id._id}).populate("skill_id", "skill_name").lean();
                 staff.skills = skills;
             }
 
-            return NextResponse.json({data: area_dept_staffs, status: 200}, {status:200});
+            return NextResponse.json({data: activeStaffs, status: 200}, {status:200});
         }
 
         const is_location = await Location_departments.findById(department_id).lean();
         if(is_location){
-            const location_dept_staffs = await Location_dep_staffs.find({location_dep_id: department_id}).lean();
-            for(const staff of location_dept_staffs){
-                const skills = await User_skills.find({user_id: staff.user_id}).populate("skill_id", "skill_name").lean();
+            const location_dept_staffs = await Location_dep_staffs.find({location_dep_id: department_id})
+                .populate({
+                    path: "user_id",
+                    select: "name status",
+                    match: { status: 1 }
+                })
+                .lean();
+            const activeStaffs = location_dept_staffs.filter((staff: any) => staff?.user_id);
+            for(const staff of activeStaffs){
+                const skills = await User_skills.find({user_id: staff.user_id._id}).populate("skill_id", "skill_name").lean();
                 staff.skills = skills;
             }
 
-            return NextResponse.json({data: location_dept_staffs, status: 200}, {status:200});
+            return NextResponse.json({data: activeStaffs, status: 200}, {status:200});
         }
 
         return NextResponse.json({data: [], status: 200}, {status:200});

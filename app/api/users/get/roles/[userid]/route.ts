@@ -2,13 +2,20 @@ import connectDB from "@/lib/mongo";
 import Roles from "@/models/roles.model";
 import User_roles from "@/models/user_roles.model";
 import Users from "@/models/users.model";
+import { isValidObjectId } from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
 
 connectDB();
 
-export async function GET (req: NextRequest, { params }: { params: { userid: string } }) {
+export async function GET (
+    req: NextRequest,
+    { params }: { params: Promise<{ userid: string }> }
+) {
     try {
-        const { userid } = params;
+        const { userid } = await params;
+        if (!userid || !isValidObjectId(userid)) {
+            return NextResponse.json({ error: "Invalid user id" }, { status: 400 });
+        }
         const user = await Users.findById(userid);
         if (!user) {
             return NextResponse.json({ error: "User not found" }, { status: 404 });

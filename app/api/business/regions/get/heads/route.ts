@@ -22,9 +22,11 @@ export async function GET (req: NextRequest) {
         const heads = await Region_heads.find({ region_id: { $in: regionIds }, status: 1 })
             .populate({
                 path: "user_id",
-                select: { password: 0, otp: 0 }
+                select: { password: 0, otp: 0 },
+                match: { status: 1 }
             });
-        return NextResponse.json({ data: heads, status: 200 });
+        const activeHeads = heads.filter((head: any) => head?.user_id);
+        return NextResponse.json({ data: activeHeads, status: 200 });
     } catch (error) {
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }

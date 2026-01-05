@@ -38,23 +38,33 @@ export async function GET(req: NextRequest) {
 
     switch (user_role) {
       case "REGION_STAFF":
-        staffDetails = await Region_staffs.findOne({ staff_id: user_id }).populate("region_id").populate("staff_id");
+        staffDetails = await Region_staffs.findOne({ staff_id: user_id })
+          .populate("region_id")
+          .populate({ path: "staff_id", match: { status: 1 } });
         break;
 
       case "AREA_HEAD":
-        staffDetails = await Area_heads.findOne({ user_id: user_id }).populate("area_id").populate("user_id");
+        staffDetails = await Area_heads.findOne({ user_id: user_id })
+          .populate("area_id")
+          .populate({ path: "user_id", match: { status: 1 } });
         break;
 
       case "AREA_STAFF":
-        staffDetails = await Area_staffs.findOne({ staff_id: user_id }).populate("area_id").populate("staff_id");
+        staffDetails = await Area_staffs.findOne({ staff_id: user_id })
+          .populate("area_id")
+          .populate({ path: "staff_id", match: { status: 1 } });
         break;
 
       case "LOCATION_HEAD":
-        staffDetails = await Location_heads.findOne({ user_id: user_id }).populate("location_id").populate("user_id");
+        staffDetails = await Location_heads.findOne({ user_id: user_id })
+          .populate("location_id")
+          .populate({ path: "user_id", match: { status: 1 } });
         break;
 
       case "LOCATION_STAFF":
-        staffDetails = await Location_staffs.findOne({ user_id: user_id }).populate("location_id").populate("user_id");
+        staffDetails = await Location_staffs.findOne({ user_id: user_id })
+          .populate("location_id")
+          .populate({ path: "user_id", match: { status: 1 } });
         break;
 
       case "REGION_DEP_HEAD":
@@ -64,7 +74,7 @@ export async function GET(req: NextRequest) {
             populate: {
               path: "region_id"
             }
-          }).populate("user_id");
+          }).populate({ path: "user_id", match: { status: 1 } });
         break;
 
       case "REGION_DEP_STAFF":
@@ -74,7 +84,7 @@ export async function GET(req: NextRequest) {
             populate: {
               path: "region_id"
             }
-          }).populate("user_id");
+          }).populate({ path: "user_id", match: { status: 1 } });
         break;
 
       case "AREA_DEP_HEAD":
@@ -84,7 +94,7 @@ export async function GET(req: NextRequest) {
             populate: {
               path: "area_id"
             }
-          }).populate("user_id");
+          }).populate({ path: "user_id", match: { status: 1 } });
         break;
 
       case "AREA_DEP_STAFF":
@@ -94,7 +104,7 @@ export async function GET(req: NextRequest) {
             populate: {
               path: "area_id"
             }
-          }).populate("user_id");
+          }).populate({ path: "user_id", match: { status: 1 } });
         break;
 
       case "LOCATION_DEP_HEAD":
@@ -104,7 +114,7 @@ export async function GET(req: NextRequest) {
             populate: {
               path: "location_id"
             }
-          }).populate("user_id");
+          }).populate({ path: "user_id", match: { status: 1 } });
         break;
 
       case "LOCATION_DEP_STAFF":
@@ -114,7 +124,7 @@ export async function GET(req: NextRequest) {
             populate: {
               path: "location_id"
             }
-          }).populate("user_id");
+          }).populate({ path: "user_id", match: { status: 1 } });
         break;
 
       default:
@@ -125,6 +135,13 @@ export async function GET(req: NextRequest) {
     }
 
     if (!staffDetails) {
+      return NextResponse.json(
+        { message: "Staff details not found", status: 404 },
+        { status: 404 }
+      );
+    }
+    const staffUser = staffDetails?.user_id || staffDetails?.staff_id;
+    if (!staffUser) {
       return NextResponse.json(
         { message: "Staff details not found", status: 404 },
         { status: 404 }

@@ -1,6 +1,5 @@
-import { getServerSession } from 'next-auth';
+import { auth } from "@/auth";
 import React from 'react'
-import { authOptions } from '../api/auth/[...nextauth]/route';
 import { redirect } from 'next/navigation';
 //import axiosInstance from '@/query/server/axiosInstace';
 import StaffSidebar from '@/components/staff/Sidebar';
@@ -8,7 +7,7 @@ import StaffTopbar from '@/components/staff/Topbar';
 import MobileBottomBar from '@/components/staff/MobileBottomBar';
 
 // export const generateMetadata = async () => {
-//   const session: any = await getServerSession(authOptions)
+//   const session: any = await auth()
 //   const res = await axiosInstance.get(`/api/users/get-id/${session?.user?.id}`);
 //   return {
 //     title: `TM | ${res?.data?.Name}`
@@ -18,7 +17,7 @@ import MobileBottomBar from '@/components/staff/MobileBottomBar';
 const AdminLayout = async ({ children }: {
   children: React.ReactNode
 }) => {
-  const session = await getServerSession(authOptions)
+  const session = await auth()
   if (!session) {
     return redirect('/signin')
   }

@@ -92,6 +92,10 @@ const adminModules = [
     icon: ShieldQuestion,
     links: [
       { label: 'Agents', href: '/admin/enquiries/agents' },
+      { label: 'Countries', href: '/admin/enquiries/countries' },
+      { label: 'Regions', href: '/admin/enquiries/regions' },
+      { label: 'Provinces', href: '/admin/enquiries/provinces' },
+      { label: 'Cities', href: '/admin/enquiries/cities' },
       { label: 'Camps', href: '/admin/enquiries/camps' },
       { label: 'Areas', href: '/admin/enquiries/areas' },
       { label: 'Users', href: '/admin/enquiries/users' },

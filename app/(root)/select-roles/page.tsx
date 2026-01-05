@@ -1,14 +1,16 @@
 "use client"
 import React, { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
-import { redirect } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { getUserRolesAndDomains } from '@/query/user/function';
 import Cookies from 'js-cookie';
 import { motion } from 'framer-motion';
 import LoaderSpin from '@/components/shared/LoaderSpin';
+import { resolveSessionUserId } from '@/lib/utils';
 
 const SelectUserRole = () => {
-    const session: any = useSession();
+    const { data: session, status } = useSession();
+    const router = useRouter();
     const [userRoles, setUserRoles] = useState<any[]>([]);
     const [selectedRole, setSelectedRole] = useState<string>('');
     const [loading, setLoading] = useState<boolean>(false);
@@ -16,35 +18,42 @@ const SelectUserRole = () => {
     const clearCookies = async () => {
         await Cookies.remove('next-auth.session-token');
         await Cookies.remove('next-auth.csrf-token');
+        await Cookies.remove('authjs.session-token');
+        await Cookies.remove('authjs.csrf-token');
     }
 
-    const fetchUserRoles = async () => {
+    const fetchUserRoles = async (userid: string) => {
         setLoading(true);
-        const userRoles = await getUserRolesAndDomains(session?.data?.user?.id);
-        console.log(userRoles)
-        setUserRoles(userRoles);
-        setLoading(false);
+        try {
+            const fetchedRoles = await getUserRolesAndDomains(userid);
+            console.log(fetchedRoles)
+            setUserRoles(fetchedRoles || []);
+        } finally {
+            setLoading(false);
+        }
     }
 
     useEffect(() => {
-        if(!session?.data?.user) {
+        if (status === "loading") return;
+        const userId = resolveSessionUserId(session);
+        if(!userId) {
             clearCookies();
-            redirect('/signin');
-        } else {
-            fetchUserRoles();
+            router.replace('/signin');
+            return;
         }
+        fetchUserRoles(userId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [session]);
+    }, [session, status]);
 
     const handleContinueWithRole = async () => {
         setLoading(true);
         await Cookies.set('user_role', JSON.stringify(userRoles?.find((role: any) => role?.role_name == selectedRole)));
         if(selectedRole == "AGENT"){
             setLoading(false);
-            redirect('/enquiry');
+            router.push('/enquiry');
             return;
         }
-        redirect('/select-domain');
+        router.push('/select-domain');
     }
 
 

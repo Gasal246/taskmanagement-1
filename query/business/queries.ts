@@ -61,6 +61,7 @@ import {
     getBusinessRegionsFunc,
     getBusinessSkillsFunc,
     GetBusinessStaffsWithSkills,
+    GetBusinessStaffsBySkill,
     GetBusinessTasks,
     getCompleteDepartmentDataFunc,
     GetDepartmentsforHeads,
@@ -103,6 +104,7 @@ import {
     removeBusinessLocationFunc,
     removeBusinessRegionFunc,
     removeBusinessSkillFunc,
+    updateBusinessSkillFunc,
     removeDepartmentAreaFunc,
     removeDepartmentHeadFunc,
     removeDepartmentRegionFunc,
@@ -289,6 +291,12 @@ export const useGetBusinessSkills = () => {
 export const useRemoveBusinessSkill = () => {
     return useMutation({
         mutationFn: (BSkillId: string) => removeBusinessSkillFunc(BSkillId)
+    })
+}
+
+export const useUpdateBusinessSkill = () => {
+    return useMutation({
+        mutationFn: (payload: any) => updateBusinessSkillFunc(payload)
     })
 }
 
@@ -880,6 +888,13 @@ export const useGetBusinessStaffsWithSkills = (business_id:string) => {
         queryKey: ["staffs", business_id],
         queryFn: ()=> GetBusinessStaffsWithSkills(business_id),
         enabled: !!business_id
+    })
+}
+
+export const useGetBusinessStaffsBySkill = () => {
+    return useMutation({
+        mutationFn: ({ business_id, skill_id }: { business_id: string; skill_id: string }) =>
+            GetBusinessStaffsBySkill(business_id, skill_id)
     })
 }
 

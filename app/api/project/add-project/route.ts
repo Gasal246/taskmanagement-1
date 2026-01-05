@@ -1,8 +1,7 @@
+import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import { ObjectId } from "mongoose";
-import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
-import { authOptions } from "../../auth/[...nextauth]/route";
 import User_roles from "@/models/user_roles.model";
 import Flow_Log from "@/models/Flow_Log.model";
 import Business_Project from "@/models/business_project.model";
@@ -38,7 +37,7 @@ interface Body {
 
 export async function POST(req: NextRequest){
     try{
-        const session: any = await getServerSession(authOptions);
+        const session: any = await auth();
         if(!session) return new NextResponse("Un Authorized Access", { status: 401 });
 
         const username = await Users.findById(session?.user?.id).select("name");

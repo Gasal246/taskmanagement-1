@@ -4,18 +4,20 @@ import LoaderSpin from "@/components/shared/LoaderSpin";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip } from "antd";
 import { useSession } from "next-auth/react";
-import { redirect } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import Cookies from "js-cookie";
 import { useDispatch } from "react-redux";
 import { AppDispatch } from "@/redux/store";
 import { loadCurrentUser, loadUserRole } from "@/redux/slices/userdata";
 import { useGetUserByUserId } from "@/query/user/queries";
+import { resolveSessionUserId } from "@/lib/utils";
 
 export default function Home() {
-  const session: any = useSession();
+  const { data: session, status } = useSession();
   const dispatch = useDispatch<AppDispatch>();
   const { mutateAsync: getUserById } = useGetUserByUserId();
+  const router = useRouter();
 
   const findUserData = async (userid: string) => {
     const userData = await getUserById(userid);
@@ -24,38 +26,44 @@ export default function Home() {
   }
 
   useEffect(() => {
-    if (!session?.data) {
-      redirect('/signin');
+    if (status === "loading") return;
+    if (!session?.user) {
+      router.replace('/signin');
+      return;
     };
-    if (session?.data) {
-      if (session?.data?.user?.is_super) {
-        redirect('/superadmin');
-      } else {
-        findUserData(session?.data?.user?.id);
-        if(Cookies.get('user_role')) {
-          const userRole = JSON.parse(Cookies.get('user_role') || '');
-          dispatch(loadUserRole(userRole));
-          const userDomain = Cookies.get('user_domain') ? JSON.parse(Cookies.get('user_domain') || '') : null;
-          if(userDomain){
-            if(userRole?.role_name == 'BUSINESS_ADMIN') {
-              redirect('/admin');
-              return;
-            }
-            redirect('/staff');
-            return;
-          } else {
-            Cookies.remove('user_role');
-            redirect('/select-roles');
-            return;
-          }
-        } else {
-          Cookies.remove('user_role');
-          redirect('/select-roles');
+    if (session?.user?.is_super) {
+      router.replace('/superadmin');
+      return;
+    }
+
+    const userId = resolveSessionUserId(session);
+    if (!userId) {
+      router.replace('/signin');
+      return;
+    }
+    findUserData(userId);
+    if(Cookies.get('user_role')) {
+      const userRole = JSON.parse(Cookies.get('user_role') || '');
+      dispatch(loadUserRole(userRole));
+      const userDomain = Cookies.get('user_domain') ? JSON.parse(Cookies.get('user_domain') || '') : null;
+      if(userDomain){
+        if(userRole?.role_name == 'BUSINESS_ADMIN') {
+          router.replace('/admin');
           return;
         }
+        router.replace('/staff');
+        return;
+      } else {
+        Cookies.remove('user_role');
+        router.replace('/select-roles');
+        return;
       }
+    } else {
+      Cookies.remove('user_role');
+      router.replace('/select-roles');
+      return;
     }
-  }, [session]);
+  }, [session, status, router]);
 
   return (
     <main className="flex h-screen flex-col items-center justify-center p-24">

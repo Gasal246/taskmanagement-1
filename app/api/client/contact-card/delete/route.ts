@@ -1,14 +1,13 @@
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import Clients from "@/models/clientCollection";
-import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 
 connectDB();
 
 export async function POST ( req: NextRequest ) {
     try {
-        const session: any = await getServerSession(authOptions);
+        const session: any = await auth();
         if (!session) return new NextResponse("Un Authorized Access", { status: 401 });
         
         const { clientId, cardId } = await req.json();

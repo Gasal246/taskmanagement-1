@@ -1,7 +1,6 @@
+import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
-import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
-import { authOptions } from "../../../auth/[...nextauth]/route";
 import Teams from "@/models/teams.model";
 import Team_Members from "@/models/team_members.model";
 import Project_Teams from "@/models/project_team.model";
@@ -18,7 +17,7 @@ interface Body {
 
 export async function PUT(req: NextRequest) {
     try {
-        const session: any = await getServerSession(authOptions);
+        const session: any = await auth();
         if (!session) return new NextResponse("Un Authorized Access", { status: 401 });
 
         const body:Body = await req.json();

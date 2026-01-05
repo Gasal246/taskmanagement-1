@@ -1,250 +1,482 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Save } from "lucide-react";
-import { motion } from "framer-motion";
+import React, { useEffect, useMemo, useState } from "react";
+import { Controller, useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
-  Select,
-  SelectTrigger,
-  SelectContent,
-  SelectItem,
-  SelectValue,
-} from "@/components/ui/select";
-
-import { useGetEqCampsById, useUpdateEqCamp } from "@/query/enquirymanager/queries";
+    useGetEqCountries,
+    useGetEqRegions,
+    useGetEqCities,
+    useGetEqAreas,
+    useGetEqProvince,
+    useGetEqCampsById,
+    useUpdateEqCamp,
+    useGetEqHeadOfficesFiltered
+} from "@/query/enquirymanager/queries";
 import { EQ_CAMP_TYPES, EQ_CAPACITY_LIMITS, Eq_CAPACITY_OPTIONS } from "@/lib/constants";
 import { toast } from "sonner";
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
+import { useParams, useRouter } from "next/navigation";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { motion } from "framer-motion";
+import { Check, CircleCheckBig, Trash2 } from "lucide-react";
 
 export default function EditCampPage() {
-  const params = useParams<{ camp_id: string }>();
-  const router = useRouter();
+    const router = useRouter();
+    const params = useParams<{ camp_id: string }>();
+    const [countries, setCountries] = useState([]);
+    const [country_id, setCountry] = useState("");
+    const [region_id, setRegion] = useState("");
+    const [province_id, setProvince] = useState("");
+    const [city_id, setCity] = useState("");
+    const [area_id, setArea] = useState("");
+    const [head_office_id, setHeadOffice] = useState("");
+    const [headOfficeOpen, setHeadOfficeOpen] = useState(false);
+    const [headOfficeSearch, setHeadOfficeSearch] = useState("");
+    const [headOfficeCandidate, setHeadOfficeCandidate] = useState("");
+    const [selectedHeadOffice, setSelectedHeadOffice] = useState<any>(null);
 
-  const { data: campData } = useGetEqCampsById(params.camp_id);
-  const { mutateAsync: updateCamp, isPending } = useUpdateEqCamp();
+    const { mutateAsync: GetCountries, isPending: isCountryLoading } = useGetEqCountries();
+    const { mutateAsync: UpdateCamp, isPending: isCampUpdating } = useUpdateEqCamp();
+    const { data: campData, isLoading: isCampLoading } = useGetEqCampsById(params.camp_id);
+    const { data: regions } = useGetEqRegions(country_id);
+    const { data: provinces } = useGetEqProvince(region_id);
+    const { data: cities } = useGetEqCities(province_id);
+    const { data: areas } = useGetEqAreas(city_id);
+    const { data: headOffices, isLoading: isHeadOfficeLoading } = useGetEqHeadOfficesFiltered({
+        search: headOfficeSearch,
+        page: 1,
+        limit: 200
+    });
 
-  const [form, setForm] = useState({
-    camp_name: "",
-    camp_type: "",
-    camp_capacity: "",
-    camp_occupancy: 0,
-    headoffice_phone: "",
-    headoffice_geo_loc: "",
-    headffice_address: "",
-    headoffice_other_details: "",
-    client_company: "",
-    realestate_company: "",
-    landlord_company: "",
-    latitude: "",
-    longitude: ""
-  });
+    const { register, handleSubmit, reset, control } = useForm();
 
-  useEffect(() => {
-    console.log("Camp_data: ", campData);
-    
-    if (campData?.camp) {
-      const ho = campData?.camp?.headoffice_id;
-
-      setForm({
-        camp_name: campData.camp.camp_name ?? "",
-        camp_type: campData.camp.camp_type ?? "",
-        camp_capacity: campData.camp.camp_capacity ?? "",
-        camp_occupancy: campData.camp.camp_occupancy ?? 0,
-        latitude: campData.camp.latitude ?? "",
-        longitude: campData.camp.longitude ?? "",
-        client_company: campData.camp.client_company_id?.client_company_name ?? "",
-        landlord_company: campData.camp.landlord_id?.landlord_name ?? "",
-        realestate_company: campData.camp.realestate_id?.company_name ?? "",
-
-        // head office (non-nested)
-        headoffice_phone: ho?.phone ?? "",
-        headoffice_geo_loc: ho?.geo_location ?? "",
-        headffice_address: ho?.address ?? "",
-        headoffice_other_details: ho?.other_details ?? "",
-      });
-    }
-  }, [campData]);
-
-  const handleSubmit = async () => {
-    console.log(EQ_CAPACITY_LIMITS[form.camp_capacity]);
-    
-    if(EQ_CAPACITY_LIMITS[form.camp_capacity] < form.camp_occupancy){
-        return toast.error("Camp Occupancy cannot exceed Camp Capacity")
-    }
-    const payload = {
-      camp_id: params.camp_id,
-      ...form, // no nested head office obj
+    const fetchCountries = async () => {
+        const res = await GetCountries();
+        if (res?.status == 200) {
+            setCountries(res?.countries);
+        }
     };
 
-    const res = await updateCamp(payload);
-    if(res?.status == 200){
-        toast.success(res?.message || "Camp updated");
-        return router.replace(`/admin/enquiries/camps/${params.camp_id}`);
-    } else {
-        return toast.error(res?.message || "Failed to Update Camp");
+    useEffect(() => {
+        fetchCountries();
+    }, []);
+
+    useEffect(() => {
+        if (headOfficeOpen) {
+            setHeadOfficeCandidate(head_office_id);
+        }
+    }, [headOfficeOpen, head_office_id]);
+
+    const normalizeId = (value: any) => {
+        if (!value) return "";
+        return typeof value === "string" ? value : value?._id || "";
+    };
+
+    const selectedCountry = campData?.camp?.country_id;
+    const selectedRegion = campData?.camp?.region_id;
+    const selectedProvince = campData?.camp?.province_id;
+    const selectedCity = campData?.camp?.city_id;
+    const selectedArea = campData?.camp?.area_id;
+    const campHeadOffice = campData?.camp?.headoffice_id;
+
+    const countryOptions = useMemo(() => {
+        const list = countries || [];
+        const selectedId = normalizeId(selectedCountry);
+        if (!selectedId) return list;
+        const exists = list.some((c: any) => normalizeId(c) === selectedId);
+        if (exists) return list;
+        return [{ _id: selectedId, country_name: selectedCountry?.country_name || "Selected Country" }, ...list];
+    }, [countries, selectedCountry]);
+
+    const regionOptions = useMemo(() => {
+        const list = regions?.region || [];
+        const selectedId = normalizeId(selectedRegion);
+        if (!selectedId) return list;
+        const exists = list.some((r: any) => normalizeId(r) === selectedId);
+        if (exists) return list;
+        return [{ _id: selectedId, region_name: selectedRegion?.region_name || "Selected Region" }, ...list];
+    }, [regions?.region, selectedRegion]);
+
+    const provinceOptions = useMemo(() => {
+        const list = provinces?.provinces || [];
+        const selectedId = normalizeId(selectedProvince);
+        if (!selectedId) return list;
+        const exists = list.some((p: any) => normalizeId(p) === selectedId);
+        if (exists) return list;
+        return [{ _id: selectedId, province_name: selectedProvince?.province_name || "Selected Province" }, ...list];
+    }, [provinces?.provinces, selectedProvince]);
+
+    const cityOptions = useMemo(() => {
+        const list = cities?.cities || [];
+        const selectedId = normalizeId(selectedCity);
+        if (!selectedId) return list;
+        const exists = list.some((c: any) => normalizeId(c) === selectedId);
+        if (exists) return list;
+        return [{ _id: selectedId, city_name: selectedCity?.city_name || "Selected City" }, ...list];
+    }, [cities?.cities, selectedCity]);
+
+    const areaOptions = useMemo(() => {
+        const list = areas?.areas || [];
+        const selectedId = normalizeId(selectedArea);
+        if (!selectedId) return list;
+        const exists = list.some((a: any) => normalizeId(a) === selectedId);
+        if (exists) return list;
+        return [{ _id: selectedId, area_name: selectedArea?.area_name || "Selected Area" }, ...list];
+    }, [areas?.areas, selectedArea]);
+
+    const headOfficeList = useMemo(() => headOffices?.head_offices || [], [headOffices?.head_offices]);
+
+    useEffect(() => {
+        if (!campData?.camp) return;
+        const camp = campData?.camp;
+        console.log("Camp data:", camp);
+        setCountry(normalizeId(camp?.country_id));
+        setRegion(normalizeId(camp?.region_id));
+        setProvince(normalizeId(camp?.province_id));
+        setCity(normalizeId(camp?.city_id));
+        setArea(normalizeId(camp?.area_id));
+        setHeadOffice(normalizeId(camp?.headoffice_id));
+        if (camp?.headoffice_id) {
+            setSelectedHeadOffice(camp.headoffice_id);
+            setHeadOfficeCandidate(normalizeId(camp.headoffice_id));
+        } else {
+            setSelectedHeadOffice(null);
+            setHeadOfficeCandidate("");
+        }
+
+        reset({
+            camp_name: camp?.camp_name || "",
+            camp_type: camp?.camp_type || "",
+            camp_capacity: camp?.camp_capacity ? String(camp?.camp_capacity) : "",
+            camp_occupancy: camp?.camp_occupancy ?? "",
+            landlord: camp?.landlord_id?.landlord_name || "",
+            real_estate: camp?.realestate_id?.company_name || "",
+            client_company: camp?.client_company_id?.client_company_name || "",
+        });
+    }, [campData, reset]);
+
+    const onSubmit = async (data: any) => {
+        const limit = EQ_CAPACITY_LIMITS[data.camp_capacity];
+        const occupancyValue = data.camp_occupancy === "" ? undefined : Number(data.camp_occupancy);
+
+        if (data.camp_capacity && occupancyValue !== undefined && limit && occupancyValue > limit) {
+            return toast.error("Camp occupancy cannot exceed Camp Capacity");
+        }
+
+        const payload: any = {
+            camp_id: params.camp_id,
+            camp_name: data.camp_name,
+            camp_type: data.camp_type,
+            camp_capacity: data.camp_capacity,
+            country_id,
+            region_id,
+            province_id,
+            city_id,
+            area_id,
+            headoffice_id: head_office_id || null,
+            landlord: data.landlord,
+            real_estate: data.real_estate,
+            client_company: data.client_company
+        };
+        if (occupancyValue !== undefined) {
+            payload.camp_occupancy = occupancyValue;
+        }
+
+        const res = await UpdateCamp(payload);
+        if (res?.status == 200) {
+            toast.success(res?.message || "Camp updated");
+            return router.replace(`/admin/enquiries/camps/${params.camp_id}`);
+        }
+        toast.error(res?.message || "Failed to update camp");
+    };
+
+    if (isCampLoading) {
+        return (
+            <div className="flex items-center justify-center h-40">
+                <div className="animate-spin rounded-full h-8 w-8 border-4 border-slate-700 border-t-cyan-400" />
+            </div>
+        );
     }
-  };
 
-  return (
-    <div className="p-6 text-slate-200">
+    return (
+        <div className="p-5 pb-10">
+            <Breadcrumb>
+                <BreadcrumbList>
+                    <BreadcrumbItem>
+                        <BreadcrumbLink onClick={() => router.replace("/admin/enquiries")}>Enquiries</BreadcrumbLink>
+                    </BreadcrumbItem>
+                    <BreadcrumbSeparator />
+                    <BreadcrumbItem>
+                        <BreadcrumbLink onClick={() => router.back()}>Manage Camps</BreadcrumbLink>
+                    </BreadcrumbItem>
+                    <BreadcrumbSeparator />
+                    <BreadcrumbItem>
+                        <BreadcrumbPage>Edit Camp</BreadcrumbPage>
+                    </BreadcrumbItem>
+                </BreadcrumbList>
+            </Breadcrumb>
 
-      {/* Back Button */}
-      <motion.button
-        whileHover={{ scale: 1.02 }}
-        whileTap={{ scale: 0.95 }}
-        onClick={() => router.back()}
-        className="flex items-center gap-2 mb-5 text-sm text-slate-400 hover:text-white"
-      >
-        <ArrowLeft size={16} /> Back
-      </motion.button>
+            <div className="p-6 max-w-4xl mx-auto space-y-6">
+                <h1 className="text-xl font-semibold text-slate-200">Edit Camp</h1>
 
-      <h1 className="text-xl font-semibold mb-4">Edit Camp</h1>
+                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                    <div className="mt-6 mb-2 flex items-center gap-2">
+                        <div className="h-px bg-slate-700 flex-1" />
+                        <span className="text-xs text-slate-400 whitespace-nowrap">Camp Details</span>
+                        <div className="h-px bg-slate-700 flex-1" />
+                    </div>
 
-      <div className="bg-gradient-to-tr from-slate-900/50 to-slate-800/50 p-6 rounded-lg border border-slate-700 space-y-6">
+                    <Input placeholder="Camp Name" {...register("camp_name", { required: true })} />
 
-        <Field label="Camp Name">
-          <Input
-            value={form.camp_name}
-            onChange={(e) => setForm({ ...form, camp_name: e.target.value })}
-          />
-        </Field>
+                    <Controller
+                        control={control}
+                        name="camp_type"
+                        defaultValue=""
+                        render={({ field }) => (
+                            <select
+                                value={field.value ?? ""}
+                                onChange={field.onChange}
+                                className="w-full rounded-md border border-slate-700 bg-slate-900 text-slate-200 p-2 focus:border-slate-500 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                            >
+                                <option value="">Select Camp Type</option>
+                                {EQ_CAMP_TYPES.map((c) => (
+                                    <option key={c} value={c}>
+                                        {c}
+                                    </option>
+                                ))}
+                            </select>
+                        )}
+                    />
 
-        <Field label="Camp Type">
-          <Select
-            value={form.camp_type}
-            onValueChange={(v) => setForm({ ...form, camp_type: v })}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select" />
-            </SelectTrigger>
-            <SelectContent>
-              {EQ_CAMP_TYPES.map((c)=> (
-                 <SelectItem key={c} value={c}>{c}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
+                    <Controller
+                        control={control}
+                        name="camp_capacity"
+                        defaultValue=""
+                        render={({ field }) => (
+                            <select
+                                value={field.value ?? ""}
+                                onChange={field.onChange}
+                                className="w-full rounded-md border border-slate-700 bg-slate-900 text-slate-200 p-2 focus:border-slate-500 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                            >
+                                <option value="">Select Camp Capacity</option>
+                                {Eq_CAPACITY_OPTIONS.map((c) => (
+                                    <option key={c} value={c}>
+                                        {c}
+                                    </option>
+                                ))}
+                            </select>
+                        )}
+                    />
 
-        <Field label="Camp Latitude">
-          <Input
-            value={form.latitude}
-            onChange={(e) => setForm({ ...form, latitude: e.target.value })}
-          />
-        </Field>
+                    <Input type="number" placeholder="Current Occupancy" {...register("camp_occupancy")} />
 
-        <Field label="Camp Longitude">
-          <Input
-            value={form.longitude}
-            onChange={(e) => setForm({ ...form, longitude: e.target.value })}
-          />
-        </Field>
+                    <select
+                        value={country_id}
+                        onChange={(e) => {
+                            const value = e.target.value;
+                            setCountry(value);
+                            setRegion("");
+                            setProvince("");
+                            setCity("");
+                            setArea("");
+                        }}
+                        className="w-full rounded-md border border-slate-700 bg-slate-900 text-slate-200 p-2 focus:border-slate-500 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                    >
+                        <option value="">Select Country</option>
+                        {countryOptions?.map((c: any) => (
+                            <option key={c._id} value={c._id}>
+                                {c.country_name}
+                            </option>
+                        ))}
+                    </select>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="Camp Capacity">
-            <Select
-            value={form.camp_capacity}
-            onValueChange={(v) => setForm({ ...form, camp_capacity: v })}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select" />
-            </SelectTrigger>
-            <SelectContent>
-              {Eq_CAPACITY_OPTIONS.map((c)=> (
-                 <SelectItem key={c} value={c}>{c}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          </Field>
+                    <select
+                        disabled={!country_id}
+                        value={region_id}
+                        onChange={(e) => {
+                            const value = e.target.value;
+                            setRegion(value);
+                            setProvince("");
+                            setCity("");
+                            setArea("");
+                        }}
+                        className="w-full rounded-md border border-slate-700 bg-slate-900 text-slate-200 p-2 focus:border-slate-500 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                    >
+                        <option value="">{country_id ? "Select Region" : "Select Country first"}</option>
+                        {regionOptions?.map((r: any) => (
+                            <option key={r._id} value={r._id}>
+                                {r.region_name}
+                            </option>
+                        ))}
+                    </select>
 
-          <Field label="Camp Occupancy">
-            <Input
-              type="number"
-              value={form.camp_occupancy}
-              onChange={(e) =>
-                setForm({ ...form, camp_occupancy: e.target.value })
-              }
-            />
-          </Field>
+                    <select
+                        disabled={!region_id}
+                        value={province_id}
+                        onChange={(e) => {
+                            const value = e.target.value;
+                            setProvince(value);
+                            setCity("");
+                            setArea("");
+                        }}
+                        className="w-full rounded-md border border-slate-700 bg-slate-900 text-slate-200 p-2 focus:border-slate-500 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                    >
+                        <option value="">{region_id ? "Select Province" : "Select Region first"}</option>
+                        {provinceOptions?.map((p: any) => (
+                            <option key={p._id} value={p._id}>
+                                {p.province_name}
+                            </option>
+                        ))}
+                    </select>
+
+                    <select
+                        disabled={!province_id}
+                        value={city_id}
+                        onChange={(e) => {
+                            const value = e.target.value;
+                            setCity(value);
+                            setArea("");
+                        }}
+                        className="w-full rounded-md border border-slate-700 bg-slate-900 text-slate-200 p-2 focus:border-slate-500 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                    >
+                        <option value="">{province_id ? "Select City" : "Select Province first"}</option>
+                        {cityOptions?.map((c: any) => (
+                            <option key={c._id} value={c._id}>
+                                {c.city_name}
+                            </option>
+                        ))}
+                    </select>
+
+                    <select
+                        disabled={!city_id}
+                        value={area_id}
+                        onChange={(e) => setArea(e.target.value)}
+                        className="w-full rounded-md border border-slate-700 bg-slate-900 text-slate-200 p-2 focus:border-slate-500 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                    >
+                        <option value="">{city_id ? "Select Area" : "Select City first"}</option>
+                        {areaOptions?.map((a: any) => (
+                            <option key={a._id} value={a._id}>
+                                {a.area_name}
+                            </option>
+                        ))}
+                    </select>
+
+                    <div className="mt-6 mb-2 flex items-center gap-2">
+                        <div className="h-px bg-slate-700 flex-1" />
+                        <span className="text-xs text-slate-400 whitespace-nowrap">Head Office (Optional)</span>
+                        <div className="h-px bg-slate-700 flex-1" />
+                    </div>
+
+                    {selectedHeadOffice ? (
+                        <div className="rounded-lg border border-slate-700 bg-slate-900/40 p-3 flex items-start justify-between gap-3">
+                            <div className="text-sm text-slate-200">
+                                <div className="font-medium">Selected Head Office</div>
+                                <div className="text-xs text-slate-400">Phone: {selectedHeadOffice.phone || "N/A"}</div>
+                                <div className="text-xs text-slate-400">Address: {selectedHeadOffice.address || "N/A"}</div>
+                            </div>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-red-400"
+                                onClick={() => {
+                                    setHeadOffice("");
+                                    setSelectedHeadOffice(null);
+                                    setHeadOfficeCandidate("");
+                                }}
+                            >
+                                <Trash2 size={14} /> Remove
+                            </Button>
+                        </div>
+                    ) : (
+                        <div className="text-xs text-slate-500">No head office selected.</div>
+                    )}
+
+                    {!head_office_id && (
+                        <Button type="button" variant="secondary" onClick={() => setHeadOfficeOpen(true)}>
+                            Select Head Office
+                        </Button>
+                    )}
+
+                    <div className="mt-6 mb-2 flex items-center gap-2">
+                        <div className="h-px bg-slate-700 flex-1" />
+                        <span className="text-xs text-slate-400 whitespace-nowrap">Additional Information (Optional)</span>
+                        <div className="h-px bg-slate-700 flex-1" />
+                    </div>
+
+                    <Input placeholder="Landlord" {...register("landlord")} />
+                    <Input placeholder="Real Estate Company" {...register("real_estate")} />
+                    <Input placeholder="Client Company" {...register("client_company")} />
+
+                    <Button type="submit" className="bg-cyan-700 hover:bg-cyan-600" disabled={isCampUpdating || isCountryLoading}>
+                        {isCampUpdating ? "Saving..." : "Save Camp"}
+                    </Button>
+                </form>
+            </div>
+
+            <Dialog open={headOfficeOpen} onOpenChange={setHeadOfficeOpen}>
+                <DialogContent className="sm:max-w-[425px] max-h-[70vh] flex flex-col">
+                    <DialogHeader>
+                        <DialogTitle>Select Head Office</DialogTitle>
+                        <DialogDescription>Choose a head office to attach to this camp.</DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-2">
+                        <Input
+                            placeholder="Search by phone or address"
+                            value={headOfficeSearch}
+                            onChange={(e) => setHeadOfficeSearch(e.target.value)}
+                        />
+                    </div>
+                    <div className="relative flex-1 overflow-y-auto pb-16">
+                        {!isHeadOfficeLoading && headOfficeList.length === 0 && (
+                            <div className="w-full h-[10vh] flex items-center justify-center">
+                                <h1 className="text-xs font-medium text-slate-400">
+                                    {headOfficeSearch ? "No matching head offices" : "No head offices found"}
+                                </h1>
+                            </div>
+                        )}
+                        {headOfficeList.map((office: any) => (
+                            <motion.div
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
+                                key={office._id}
+                                className="p-2 bg-gradient-to-br group from-slate-900/60 to-slate-800/60 rounded-lg cursor-pointer text-sm font-medium flex items-center gap-1 px-4 border border-slate-700 hover:border-cyan-600 justify-start mt-2 relative"
+                                onClick={() => setHeadOfficeCandidate(office._id)}
+                            >
+                                <div className="flex flex-col">
+                                    <h1 className="text-xs font-medium">Phone: {office.phone || "N/A"}</h1>
+                                    <p className="text-xs text-slate-400">Address: {office.address || "N/A"}</p>
+                                </div>
+                                {office._id === headOfficeCandidate && (
+                                    <div className="absolute top-1 right-2">
+                                        <Check className="text-cyan-600" strokeWidth={3} size={18} />
+                                    </div>
+                                )}
+                            </motion.div>
+                        ))}
+                    </div>
+
+                    <DialogFooter className="w-full">
+                        <div className="pt-2 bg-slate-950/80 w-full">
+                            <motion.div
+                                whileTap={{ scale: 0.98 }}
+                                whileHover={{ scale: 1.02 }}
+                                className="p-2 bg-gradient-to-br group from-slate-950/70 to-slate-800/70 rounded-lg cursor-pointer text-sm font-medium flex items-center gap-1 px-4 border border-slate-700 hover:border-cyan-600 justify-center"
+                                onClick={() => {
+                                    if (!headOfficeCandidate) return;
+                                    const office = headOfficeList.find((item: any) => item._id === headOfficeCandidate);
+                                    setSelectedHeadOffice(office || campHeadOffice || null);
+                                    setHeadOffice(headOfficeCandidate);
+                                    setHeadOfficeOpen(false);
+                                }}
+                            >
+                                <CircleCheckBig className="group-hover:text-cyan-600" size={18} /> Select Head Office
+                            </motion.div>
+                        </div>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
-
-        {/* HEAD OFFICE DETAILS */}
-        <h2 className="text-lg font-semibold mt-6">Head Office Details</h2>
-
-        <Field label="Phone">
-          <Input
-            value={form.headoffice_phone}
-            onChange={(e) => setForm({ ...form, headoffice_phone: e.target.value })}
-          />
-        </Field>
-
-        <Field label="Geo Location">
-          <Input
-            value={form.headoffice_geo_loc}
-            onChange={(e) => setForm({ ...form, headoffice_geo_loc: e.target.value })}
-          />
-        </Field>
-
-        <Field label="Address">
-          <Input
-            value={form.headffice_address}
-            onChange={(e) => setForm({ ...form, headffice_address: e.target.value })}
-          />
-        </Field>
-
-        <Field label="Other Details">
-          <Input
-            value={form.headoffice_other_details}
-            onChange={(e) =>
-              setForm({ ...form, headoffice_other_details: e.target.value })
-            }
-          />
-        </Field>
-
-        {/* HEAD OFFICE DETAILS */}
-        <h2 className="text-lg font-semibold mt-6">Additional Details</h2>
-
-        <Field label="Landlord">
-          <Input
-            value={form.landlord_company}
-            onChange={(e) => setForm({ ...form, landlord_company: e.target.value })}
-          />
-        </Field>
-
-        <Field label="Client Company">
-          <Input
-            value={form.client_company}
-            onChange={(e) => setForm({ ...form, client_company: e.target.value })}
-          />
-        </Field>
-
-        <Field label="Real Estate">
-          <Input
-            value={form.realestate_company}
-            onChange={(e) => setForm({ ...form, realestate_company: e.target.value })}
-          />
-        </Field>
-      </div>
-
-      <Button
-        className="mt-6 flex items-center gap-2 bg-cyan-700 hover:bg-cyan-600"
-        onClick={handleSubmit}
-        disabled={isPending}
-      >
-        <Save size={18} /> Save Changes
-      </Button>
-    </div>
-  );
-}
-
-/* Reusable Field Component */
-function Field({ label, children }: any) {
-  return (
-    <div className="space-y-1">
-      <Label className="text-xs text-slate-400">{label}</Label>
-      {children}
-    </div>
-  );
+    );
 }

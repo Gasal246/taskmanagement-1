@@ -1,3 +1,4 @@
+import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import Area_departments from "@/models/area_departments.model";
 import Area_heads from "@/models/area_heads.model";
@@ -8,16 +9,13 @@ import Location_heads from "@/models/location_heads.model";
 import Region_departments from "@/models/region_departments.model";
 import Region_heads from "@/models/region_heads.model";
 import User_roles from "@/models/user_roles.model";
-import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
-import { authOptions } from "../../auth/[...nextauth]/route";
-
 connectDB();
 
 export async function GET(req:NextRequest){
     try{
         const {searchParams} = new URL(req.url);
-        const session:any = await getServerSession(authOptions);
+        const session:any = await auth();
         if(!session) return NextResponse.json({message:"Un-Authorized Access", status:401}, {status:401});
 
         const user_id = session?.user?.id;

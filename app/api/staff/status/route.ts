@@ -1,15 +1,14 @@
+import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import Users from "@/models/users.model";
-import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
-import { authOptions } from "../../auth/[...nextauth]/route";
 import { sendTrigger } from "../../helpers/notification-helper";
 
 connectDB();
 
 export async function POST(req: NextRequest) {
     try {
-        const session: any = await getServerSession(authOptions);
+        const session: any = await auth();
         if (!session) {
             return new NextResponse("Unauthorised Access to req", { status: 401 });
         }

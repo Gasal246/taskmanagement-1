@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,15 @@ import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@
 import { useGetEqCountries, useGetEqRegions, useGetEqCities, useGetEqAreasFiltered, useGetEqProvince } from "@/query/enquirymanager/queries";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { useRouter } from "next/navigation";
+import {
+    Pagination,
+    PaginationContent,
+    PaginationEllipsis,
+    PaginationItem,
+    PaginationLink,
+    PaginationNext,
+    PaginationPrevious,
+} from "@/components/ui/pagination";
 
 export default function AreasListPage() {
     const router = useRouter();
@@ -27,6 +36,37 @@ export default function AreasListPage() {
 
     const { data: areas, isLoading } = useGetEqAreasFiltered({ country_id, region_id, province_id, city_id, search, page, limit });
     const pagination = areas?.pagination;
+
+    const pageItems = useMemo(() => {
+        const totalPages = pagination?.totalPages ?? 1;
+        if (totalPages <= 1) return [];
+        if (totalPages <= 10) return Array.from({ length: totalPages }, (_, i) => i + 1);
+
+        const tailSize = 5;
+        const mainSize = 5;
+        const tailStart = Math.max(totalPages - tailSize + 1, 1);
+        let mainStart = page <= 5 ? 1 : page + 1;
+
+        if (mainStart >= tailStart) {
+            mainStart = tailStart;
+        }
+        let mainEnd = Math.min(mainStart + mainSize - 1, totalPages);
+        if (mainEnd >= tailStart - 1) {
+            mainEnd = tailStart - 1;
+        }
+
+        const items: Array<number | "ellipsis"> = [];
+        for (let i = mainStart; i <= mainEnd; i += 1) {
+            items.push(i);
+        }
+        if (mainEnd > 0 && mainEnd < tailStart - 1) {
+            items.push("ellipsis");
+        }
+        for (let i = tailStart; i <= totalPages; i += 1) {
+            items.push(i);
+        }
+        return items;
+    }, [pagination?.totalPages, page]);
 
     const fetchCountries = async () => {
         const res = await GetCountries();
@@ -135,28 +175,52 @@ export default function AreasListPage() {
                     </table>
                 </div>
                 {pagination && pagination.totalPages > 1 && (
-                    <div className="flex justify-between items-center mt-4 text-xs text-slate-400">
+                    <div className="flex flex-col gap-2 mt-4 text-xs text-slate-400">
                         <p>
                             Page {pagination.page} of {pagination.totalPages} · Total {pagination.totalRecords}
                         </p>
-                        <div className="flex gap-2">
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                disabled={page === 1}
-                                onClick={() => setPage(prev => Math.max(prev - 1, 1))}
-                            >
-                                Previous
-                            </Button>
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                disabled={page === pagination.totalPages}
-                                onClick={() => setPage(prev => Math.min(prev + 1, pagination.totalPages))}
-                            >
-                                Next
-                            </Button>
-                        </div>
+                        <Pagination>
+                            <PaginationContent>
+                                <PaginationItem>
+                                    <PaginationPrevious
+                                        href="#"
+                                        onClick={(event) => {
+                                            event.preventDefault();
+                                            setPage((prev) => Math.max(prev - 1, 1));
+                                        }}
+                                        className={page === 1 ? "pointer-events-none opacity-40" : ""}
+                                    />
+                                </PaginationItem>
+                                {pageItems.map((item, index) => (
+                                    <PaginationItem key={`${item}-${index}`}>
+                                        {item === "ellipsis" ? (
+                                            <PaginationEllipsis />
+                                        ) : (
+                                            <PaginationLink
+                                                href="#"
+                                                isActive={item === page}
+                                                onClick={(event) => {
+                                                    event.preventDefault();
+                                                    setPage(item);
+                                                }}
+                                            >
+                                                {item}
+                                            </PaginationLink>
+                                        )}
+                                    </PaginationItem>
+                                ))}
+                                <PaginationItem>
+                                    <PaginationNext
+                                        href="#"
+                                        onClick={(event) => {
+                                            event.preventDefault();
+                                            setPage((prev) => Math.min(prev + 1, pagination.totalPages));
+                                        }}
+                                        className={page === pagination.totalPages ? "pointer-events-none opacity-40" : ""}
+                                    />
+                                </PaginationItem>
+                            </PaginationContent>
+                        </Pagination>
                     </div>
                 )}
             </div>

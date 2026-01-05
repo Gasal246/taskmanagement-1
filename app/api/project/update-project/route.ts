@@ -1,8 +1,7 @@
+import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import Business_Project from "@/models/business_project.model";
-import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
-import { authOptions } from "../../auth/[...nextauth]/route";
 import Flow_Log from "@/models/Flow_Log.model";
 import Users from "@/models/users.model";
 
@@ -26,7 +25,7 @@ export async function PUT(req: NextRequest) {
         const body: Body = await req.json();
         if (!body.project_id) return NextResponse.json({ message: "Please Provide project_id" }, { status: 400 });
 
-        const session: any = await getServerSession(authOptions);
+        const session: any = await auth();
         if (!session) return new NextResponse("Un Authorized Access", { status: 401 });
 
         const user = await Users.findById(session?.user?.id).select("name");

@@ -15,9 +15,11 @@ export async function GET (req: NextRequest) {
         const region_users = await User_regions.find({ region_id: { $in: regionIds }, status: 1 })
             .populate({
                 path: "user_id",
-                select: { password: 0, otp: 0 }
+                select: { password: 0, otp: 0 },
+                match: { status: 1 }
             });
-        return NextResponse.json({ data: region_users, status: 200 });
+        const activeUsers = region_users.filter((entry: any) => entry?.user_id);
+        return NextResponse.json({ data: activeUsers, status: 200 });
     } catch (error) {
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }

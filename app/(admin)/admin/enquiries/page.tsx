@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Select,
@@ -12,10 +12,19 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { DatePicker, Space } from "antd";
-import { PanelsTopLeft } from "lucide-react";
+import { PanelsTopLeft, SlidersHorizontal } from "lucide-react";
 import LoaderSpin from "@/components/shared/LoaderSpin";
 import { useGetEnquiriesWithFilters, useGetEqAreas, useGetEqCampsByArea, useGetEqCities, useGetEqCountries, useGetEqProvince, useGetEqRegions } from "@/query/enquirymanager/queries";
 import { ENQUIRY_STATUS, Eq_CAPACITY_OPTIONS } from "@/lib/constants";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 const { RangePicker } = DatePicker;
 
@@ -27,7 +36,7 @@ export default function EnquiriesPage() {
   const router = useRouter();
 
   // Filters (linked to API keys)
-  const [filters, setFilters] = useState({
+  const initialFilters = useMemo(() => ({
     country_id: "",
     region_id: "",
     province_id: "",
@@ -44,11 +53,16 @@ export default function EnquiriesPage() {
     due_date: "",
     lease_expiry: "",
     enquiry_uuid: "",
-  });
+    search: "",
+  }), []);
+  const [filters, setFilters] = useState(initialFilters);
 
   // Cascading dropdown lists
   const [countries, setCountries] = useState([]);
   const [page, setPage] = useState(1);
+  const [showFilters, setShowFilters] = useState(false);
+  const [rangeValue, setRangeValue] = useState<any>(null);
+  const [leaseValue, setLeaseValue] = useState<any>(null);
   const limit = 10;
 
   // Queries
@@ -136,14 +150,54 @@ export default function EnquiriesPage() {
           DATE HANDLERS
   ---------------------------------------------------------*/
 
-  const handleRangeChange = (_, [from, to]) => {
+  const handleRangeChange = (dates: any, [from, to]) => {
+    setRangeValue(dates || null);
     updateFilter("from_date", from || "");
     updateFilter("due_date", to || "");
   };
 
-  const handleLeaseChange = (_, dateString) => {
+  const handleLeaseChange = (date: any, dateString: string) => {
+    setLeaseValue(date || null);
     updateFilter("lease_expiry", dateString || "");
   };
+  
+  const handleClearFilters = () => {
+    setFilters(initialFilters);
+    setRangeValue(null);
+    setLeaseValue(null);
+    setPage(1);
+  };
+
+  const pageItems = useMemo(() => {
+    const totalPages = pagination?.totalPages ?? 1;
+    if (totalPages <= 1) return [];
+    if (totalPages <= 10) return Array.from({ length: totalPages }, (_, i) => i + 1);
+
+    const tailSize = 5;
+    const mainSize = 5;
+    const tailStart = Math.max(totalPages - tailSize + 1, 1);
+    let mainStart = page <= 5 ? 1 : page + 1;
+
+    if (mainStart >= tailStart) {
+      mainStart = tailStart;
+    }
+    let mainEnd = Math.min(mainStart + mainSize - 1, totalPages);
+    if (mainEnd >= tailStart - 1) {
+      mainEnd = tailStart - 1;
+    }
+
+    const items: Array<number | "ellipsis"> = [];
+    for (let i = mainStart; i <= mainEnd; i += 1) {
+      items.push(i);
+    }
+    if (mainEnd > 0 && mainEnd < tailStart - 1) {
+      items.push("ellipsis");
+    }
+    for (let i = tailStart; i <= totalPages; i += 1) {
+      items.push(i);
+    }
+    return items;
+  }, [pagination?.totalPages, page]);
 
   /* -------------------------------------------------------
           UI START
@@ -159,6 +213,18 @@ export default function EnquiriesPage() {
         <div className="flex items-center gap-2">
           <Button variant="ghost" className="text-xs" onClick={() => router.push("/admin/enquiries/agents")}>
             Manage Agents
+          </Button>
+          <Button variant="ghost" className="text-xs" onClick={() => router.push("/admin/enquiries/countries")}>
+            Manage Countries
+          </Button>
+          <Button variant="ghost" className="text-xs" onClick={() => router.push("/admin/enquiries/regions")}>
+            Manage Regions
+          </Button>
+          <Button variant="ghost" className="text-xs" onClick={() => router.push("/admin/enquiries/provinces")}>
+            Manage Provinces
+          </Button>
+          <Button variant="ghost" className="text-xs" onClick={() => router.push("/admin/enquiries/cities")}>
+            Manage Cities
           </Button>
           <Button variant="ghost" className="text-xs" onClick={() => router.push("/admin/enquiries/camps")}>
             Manage Camps
@@ -177,9 +243,31 @@ export default function EnquiriesPage() {
 
       {/* FILTERS */}
       <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg mb-4">
-        <h2 className="font-semibold text-xs text-slate-400 px-2 mb-2">Filters</h2>
+        <div className="flex items-center justify-between px-2 mb-2 cursor-pointer" onClick={() => setShowFilters((prev) => !prev)}>
+          <h2 className="font-semibold text-xs text-slate-400">Enquiry Filters</h2>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              className="text-xs"
+              onClick={() => {}}
+            >
+              <SlidersHorizontal size={14} className="mr-1" />
+              {showFilters ? "Hide Filters" : "Open Filters"}
+            </Button>
+            {showFilters && (
+              <Button
+                variant="ghost"
+                className="text-xs text-red-400 hover:text-red-300 z-10"
+                onClick={handleClearFilters}
+              >
+                Clear
+              </Button>
+            )}
+          </div>
+        </div>
 
-        <div className="flex flex-wrap -m-1">
+        {showFilters && (
+          <div className="flex flex-wrap -m-1">
           {/* COUNTRY */}
           <FilterSelect
             label="Country"
@@ -327,7 +415,7 @@ export default function EnquiriesPage() {
             <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg p-2">
               <Label className="text-xs text-slate-400">Within Period</Label>
               <Space direction="vertical" size={12} style={{ width: "100%" }}>
-                <RangePicker onChange={handleRangeChange} style={{ width: "100%" }} />
+                <RangePicker value={rangeValue} onChange={handleRangeChange} style={{ width: "100%" }} />
               </Space>
             </div>
           </div>
@@ -337,18 +425,28 @@ export default function EnquiriesPage() {
             <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg p-2">
               <Label className="text-xs text-slate-400">Lease Expiry</Label>
               <Space direction="vertical" size={12} style={{ width: "100%" }}>
-                <DatePicker onChange={handleLeaseChange} style={{ width: "100%" }} />
+                <DatePicker value={leaseValue} onChange={handleLeaseChange} style={{ width: "100%" }} />
               </Space>
             </div>
           </div>
         </div>
+        )}
       </div>
 
       {/* ENQUIRY LIST */}
       <div className="bg-slate-900/50 p-4 rounded-xl shadow-sm min-h-[13vh]">
-        <h1 className="font-semibold text-sm text-slate-300 flex items-center gap-2 mb-3">
-          <PanelsTopLeft size={16} /> Enquiry List
-        </h1>
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+          <h1 className="font-semibold text-sm text-slate-300 flex items-center gap-2">
+            <PanelsTopLeft size={16} /> Enquiry List
+          </h1>
+          <input
+            type="search"
+            placeholder="Search enquiries..."
+            value={filters.search}
+            onChange={(e) => updateFilter("search", e.target.value)}
+            className="w-full md:w-[260px] bg-transparent border border-slate-700 rounded px-3 py-1.5 text-xs text-slate-200"
+          />
+        </div>
 
         {isLoading && (
           <div className="flex justify-center items-center h-24">
@@ -377,7 +475,7 @@ export default function EnquiriesPage() {
                 </h2>
                 {!e?.is_active && <p className="text-sm font-medium truncate text-red-500">Action Required</p>}
                 <div className="mt-1 text-xs text-slate-400 flex flex-wrap gap-2">
-                  <p className="bg-gradient-to-br from-slate-700 to-slate-900 px-2 py-1 rounded-sm font-bold">Status: <span className="text-white/80 font-normal">{e.status}</span></p>
+                  <p className={`bg-gradient-to-br ${e.status ==='Closed' ? 'from-green-700 to-green-900' : 'from-slate-700 to-slate-900'} px-2 py-1 rounded-sm font-bold`}>Status: <span className={`text-white/80 font-normal`}>{e.status}</span></p>
                   <p className="bg-gradient-to-br from-slate-700 to-slate-900 px-2 py-1 rounded-sm font-bold">Priority: <span className="text-white/80 font-normal">{e.priority}</span></p>
                   <p className="bg-gradient-to-br from-slate-700 to-slate-900 px-2 py-1 rounded-sm font-bold">Occupancy: <span className="text-white/80 font-normal">{e.camp_id?.camp_occupancy ?? "N/A"}</span></p>
                   <p className="bg-gradient-to-br from-slate-700 to-slate-900 px-2 py-1 rounded-sm font-bold">UUID: <span className="text-white/80 font-normal">{e.enquiry_uuid}</span></p>
@@ -390,35 +488,54 @@ export default function EnquiriesPage() {
         </div>
       </div>
       {pagination && pagination.totalPages > 1 && (
-  <div className="flex justify-between items-center mt-4 text-xs text-slate-400">
-    
-    <p>
-      Page {pagination.page} of {pagination.totalPages} · Total {pagination.totalRecords}
-    </p>
-
-    <div className="flex gap-2">
-      <Button
-        size="sm"
-        variant="outline"
-        disabled={page === 1}
-        onClick={() => setPage(prev => Math.max(prev - 1, 1))}
-      >
-        Previous
-      </Button>
-
-      <Button
-        size="sm"
-        variant="outline"
-        disabled={page === pagination.totalPages}
-        onClick={() =>
-          setPage(prev => Math.min(prev + 1, pagination.totalPages))
-        }
-      >
-        Next
-      </Button>
-    </div>
-  </div>
-)}
+        <div className="flex flex-col gap-2 mt-4 text-xs text-slate-400">
+          <p>
+            Page {pagination.page} of {pagination.totalPages} · Total {pagination.totalRecords}
+          </p>
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  href="#"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    setPage((prev) => Math.max(prev - 1, 1));
+                  }}
+                  className={page === 1 ? "pointer-events-none opacity-40" : ""}
+                />
+              </PaginationItem>
+              {pageItems.map((item, index) => (
+                <PaginationItem key={`${item}-${index}`}>
+                  {item === "ellipsis" ? (
+                    <PaginationEllipsis />
+                  ) : (
+                    <PaginationLink
+                      href="#"
+                      isActive={item === page}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        setPage(item);
+                      }}
+                    >
+                      {item}
+                    </PaginationLink>
+                  )}
+                </PaginationItem>
+              ))}
+              <PaginationItem>
+                <PaginationNext
+                  href="#"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    setPage((prev) => Math.min(prev + 1, pagination.totalPages));
+                  }}
+                  className={page === pagination.totalPages ? "pointer-events-none opacity-40" : ""}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      )}
     </div>
   );
 }

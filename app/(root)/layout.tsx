@@ -1,6 +1,5 @@
-import { getServerSession } from 'next-auth';
+import { auth } from "@/auth";
 import React from 'react';
-import { authOptions } from '../api/auth/[...nextauth]/route';
 import { redirect } from 'next/navigation';
 import { Metadata } from 'next';
 
@@ -12,7 +11,7 @@ export const metadata: Metadata = {
 const HomeLayout = async ({ children }: {
     children: React.ReactNode
 }) => {
-    const session: any = await getServerSession(authOptions);
+    const session: any = await auth();
     if (!session) {
         redirect('/signin');
     }

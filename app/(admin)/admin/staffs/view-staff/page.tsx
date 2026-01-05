@@ -4,12 +4,12 @@ import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbP
 import { useRouter } from 'next/navigation';
 import { useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '@/redux/store';
-import { DraftingCompass, EllipsisVertical, Eye, Files, MapPinned, Package, PencilRuler, SquareArrowUp, SquareArrowUpRight, UserRound } from 'lucide-react';
-import { Avatar, Tooltip } from 'antd';
+import { DraftingCompass, EllipsisVertical, Eye, Files, LockKeyhole, MapPinned, Package, PencilRuler, SquareArrowUp, SquareArrowUpRight, Trash2, UserRound } from 'lucide-react';
+import { Avatar, Popconfirm, Tooltip } from 'antd';
 import { formatDateTiny } from '@/lib/utils';
 import { motion } from 'framer-motion';
 import { Popover, PopoverContent, PopoverTrigger, } from "@/components/ui/popover"
-import { useGetUserCompleteProfile, useUpdateUserInfo } from '@/query/user/queries';
+import { useDeleteBusinessStaff, useGetUserCompleteProfile, useUpdateStaffStatus, useUpdateUserInfo } from '@/query/user/queries';
 import { toast } from 'sonner';
 import { useDispatch } from 'react-redux';
 import { loadAdminBusinessStaff } from '@/redux/slices/application';
@@ -19,6 +19,7 @@ import { useForm } from "react-hook-form"
 import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, } from "@/components/ui/form";
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "name must be at least 2 characters." }),
@@ -35,11 +36,16 @@ const StaffPage = () => {
   const router = useRouter();
   const dispatch = useDispatch<AppDispatch>();
   const { businessStaff } = useSelector((state: RootState) => state.application);
+  const { businessData } = useSelector((state: RootState) => state.user);
   const { mutateAsync: getUserProfile, isPending: loadingUserProfile } = useGetUserCompleteProfile();
   const [userData, setUserData] = useState<any>(null);
   const { mutateAsync: updateUserInfo } = useUpdateUserInfo()
+  const { mutateAsync: updateStaffStatus } = useUpdateStaffStatus();
+  const { mutateAsync: deleteBusinessStaff } = useDeleteBusinessStaff();
 
   const [updateUserDialog, setUpdateUserDialog] = useState(false);
+  const currentStatus = userData?.status ?? businessStaff?.status ?? 1;
+  const isBlocked = currentStatus === 0;
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -123,6 +129,53 @@ const StaffPage = () => {
     router.push(`/admin/staffs/add-staff/details`);
   }
 
+  const handleEditUserStatus = async (staffId?: string) => {
+    if (!staffId) {
+      toast.error("User not found.");
+      return;
+    }
+
+    const nextStatus = isBlocked ? "active" : "blocked";
+    try {
+      const response = await updateStaffStatus({ staffid: staffId, status: nextStatus });
+      if (response?._id) {
+        const updatedStatus = typeof response?.status === "number" ? response.status : nextStatus === "blocked" ? 0 : 1;
+        setUserData((prev: any) => (prev ? { ...prev, status: updatedStatus } : prev));
+        if (businessStaff) {
+          dispatch(loadAdminBusinessStaff({ ...businessStaff, status: updatedStatus }));
+        }
+        toast.success(nextStatus === "blocked" ? "Staff blocked." : "Staff unblocked.");
+      } else {
+        toast.error("Failed to update staff status.");
+      }
+    } catch (error) {
+      toast.error("Failed to update staff status.");
+    }
+  };
+
+  const handleRemoveUser = async (staffId?: string) => {
+    if (!staffId) {
+      toast.error("User not found.");
+      return;
+    }
+    if (!businessData?._id) {
+      toast.error("Business not found.");
+      return;
+    }
+
+    try {
+      const response = await deleteBusinessStaff({ staff_id: staffId, business_id: businessData._id });
+      if (response?.status === 200) {
+        toast.success("Staff deleted successfully.");
+        router.push("/admin/staffs");
+      } else {
+        toast.error(response?.message || "Failed to delete staff.");
+      }
+    } catch (error) {
+      toast.error("Failed to delete staff.");
+    }
+  };
+
   return (
     <div className='p-5 overflow-y-scroll pb-20'>
       <Breadcrumb className='mb-3'>
@@ -137,13 +190,47 @@ const StaffPage = () => {
         </BreadcrumbList>
       </Breadcrumb>
 
-      <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg mb-2">
+      <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg mb-2 flex items-center justify-between relative">
         <div className="flex items-center gap-2">
           <Avatar src={userData?.avatar_url || '/avatar.png'} size={60} />
           <div>
             <h1 className='font-semibold text-sm text-slate-300 flex items-center gap-1'>{userData?.name}</h1>
             <p className='text-xs text-slate-400'>{userData?.email}</p>
           </div>
+        </div>
+        <div>
+          <Popover>
+            <PopoverTrigger asChild>
+              <motion.div
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.98 }}
+                className='absolute right-3 top-3 hover:bg-slate-700/50 p-1 rounded-full cursor-pointer'
+              >
+                <EllipsisVertical size={20} strokeWidth={2} />
+              </motion.div>
+            </PopoverTrigger>
+            <PopoverContent className='w-[100px] p-0 border border-slate-800 rounded-lg overflow-hidden'>
+              <div className='flex flex-col items-start gap-1 bg-black rounded-lg'>
+                <div className='w-full p-0.5 space-y-1'>
+                  <Popconfirm
+                    title={isBlocked ? "This will unblock this staff." : "This will block this staff."}
+                    onConfirm={() => handleEditUserStatus(businessStaff?._id)}
+                  >
+                    <motion.div whileTap={{ scale: 0.98 }} whileHover={{ scale: 1.02 }} className='bg-slate-800/50 w-full p-1 py-2 text-slate-400 cursor-pointer hover:text-slate-200 flex items-center justify-center gap-1 border border-dashed border-slate-700 rounded-lg'>
+                      <LockKeyhole size={14} />
+                      <h1 className='text-xs font-semibold'>{isBlocked ? "Unblock" : "Block"}</h1>
+                    </motion.div>
+                  </Popconfirm>
+                  <Popconfirm title="This action will delete this staff entirely from this application, you can block this staff if you are not sure ?" onConfirm={() => handleRemoveUser(businessStaff?._id)}>
+                    <motion.div whileTap={{ scale: 0.98 }} whileHover={{ scale: 1.02 }} className='bg-slate-800/50 w-full p-1 py-2 text-red-600 cursor-pointer hover:text-red-400 flex items-center justify-center gap-1 border border-dashed border-slate-700 rounded-lg'>
+                      <Trash2 size={14} />
+                      <h1 className='text-xs font-semibold'>Delete</h1>
+                    </motion.div>
+                  </Popconfirm>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
 
@@ -175,7 +262,7 @@ const StaffPage = () => {
           </div>
           <div className="w-full lg:w-1/2 mb-2.5">
             <p className='text-xs text-slate-400'>Status</p>
-            <p className={`text-xs font-semibold ${businessStaff?.status == 1 ? 'text-green-600' : businessStaff?.status == 2 ? 'text-yellow-600' : businessStaff?.status == 3 ? 'text-red-600' : 'text-gray-600'}`}>{businessStaff?.status == 1 ? "Active" : businessStaff?.status == 2 ? "On Leave" : businessStaff?.status == 3 ? "Suspended" : "Inactive"}</p>
+            <p className={`text-xs font-semibold ${currentStatus === 1 ? 'text-green-600' : 'text-red-600'}`}>{currentStatus === 1 ? "Active" : "Blocked"}</p>
           </div>
           <div className="w-full lg:w-1/2 mb-2.5">
             <p className='text-xs text-slate-400'>Country</p>

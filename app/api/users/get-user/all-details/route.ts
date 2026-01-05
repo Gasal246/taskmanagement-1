@@ -1,3 +1,4 @@
+import { auth } from "@/auth";
 // import connectDB from "@/lib/mongo";
 // import mongoose from "mongoose";
 // import Users from "@/models/users.model";
@@ -13,8 +14,6 @@ import User_roles from "@/models/user_roles.model";
 import "@/models/roles.model"
 import { NextRequest, NextResponse } from "next/server";
 import Roles from "@/models/roles.model";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import Users from "@/models/users.model";
 
 // import Region_heads from "@/models/region_heads.model";
@@ -163,7 +162,7 @@ export async function GET(req:NextRequest){
     console.log("role_id: ", role_id);
     console.log("org_id: ", org_id);
 
-    const session:any = await getServerSession(authOptions);
+    const session:any = await auth();
     if(!session) return NextResponse.json({message: "Un-Authorized Access", status: 401}, {status:401});
 
     const user_name = await Users.findById(session?.user?.id).select("name");

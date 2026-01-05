@@ -1,7 +1,6 @@
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import Superadmin_plans from "@/models/super_admin_plans.model";
-import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 
 connectDB();
@@ -16,7 +15,7 @@ interface Body {
 
 export async function POST (req: NextRequest) {
     try {
-        const session: any = await getServerSession(authOptions);
+        const session: any = await auth();
         if (!session) {
             return new NextResponse("Authorisation Error", { status: 401 })
         }

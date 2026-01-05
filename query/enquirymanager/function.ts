@@ -10,10 +10,52 @@ export async function GetEqCountries(){
     }
 }
 
+//Get Countries filtered
+export async function GetEqCountriesFiltered(queryParams: any){
+    try{
+        const safeParams: Record<string, string> = {};
+
+        for (const key in queryParams) {
+            const rawValue = queryParams[key];
+            const value = typeof rawValue === "string" ? rawValue.trim() : rawValue;
+            if (value !== "" && value !== null && value !== undefined) {
+                safeParams[key] = String(value);
+            }
+        }
+
+        const queryString = new URLSearchParams(safeParams).toString();
+        const res = await axios.get(`/api/enquiries/get/countries/filtered?${queryString}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
 //Get Regions
 export async function GetEqRegionsByCountry(country_id: string){
     try{
         const res = await axios.get(`/api/enquiries/agent-side/get/get-regions-by-country?country_id=${country_id}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+//Get Regions filtered
+export async function GetEqRegionsFiltered(queryParams: any){
+    try{
+        const safeParams: Record<string, string> = {};
+
+        for (const key in queryParams) {
+            const rawValue = queryParams[key];
+            const value = typeof rawValue === "string" ? rawValue.trim() : rawValue;
+            if (value !== "" && value !== null && value !== undefined) {
+                safeParams[key] = String(value);
+            }
+        }
+
+        const queryString = new URLSearchParams(safeParams).toString();
+        const res = await axios.get(`/api/enquiries/get/regions/filtered?${queryString}`);
         return res.data;
     }catch(err){
         console.log(err);
@@ -30,10 +72,73 @@ export async function GetEqProvincesByRegion(region_id: string){
     }
 }
 
+//Get Provinces filtered
+export async function GetEqProvincesFiltered(queryParams: any){
+    try{
+        const safeParams: Record<string, string> = {};
+
+        for (const key in queryParams) {
+            const rawValue = queryParams[key];
+            const value = typeof rawValue === "string" ? rawValue.trim() : rawValue;
+            if (value !== "" && value !== null && value !== undefined) {
+                safeParams[key] = String(value);
+            }
+        }
+
+        const queryString = new URLSearchParams(safeParams).toString();
+        const res = await axios.get(`/api/enquiries/get/provinces/filtered?${queryString}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
 //Get Cities
 export async function GetEqCitiesByProvince(province_id: string){
     try{
         const res = await axios.get(`/api/enquiries/agent-side/get/get-city-by-province?province_id=${province_id}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+//Get Head Offices filtered
+export async function GetEqHeadOfficesFiltered(queryParams: any){
+    try{
+        const safeParams: Record<string, string> = {};
+
+        for (const key in queryParams) {
+            const rawValue = queryParams[key];
+            const value = typeof rawValue === "string" ? rawValue.trim() : rawValue;
+            if (value !== "" && value !== null && value !== undefined) {
+                safeParams[key] = String(value);
+            }
+        }
+
+        const queryString = new URLSearchParams(safeParams).toString();
+        const res = await axios.get(`/api/enquiries/get/head-offices/filtered?${queryString}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+//Get Cities filtered
+export async function GetEqCitiesFiltered(queryParams: any){
+    try{
+        const safeParams: Record<string, string> = {};
+
+        for (const key in queryParams) {
+            const rawValue = queryParams[key];
+            const value = typeof rawValue === "string" ? rawValue.trim() : rawValue;
+            if (value !== "" && value !== null && value !== undefined) {
+                safeParams[key] = String(value);
+            }
+        }
+
+        const queryString = new URLSearchParams(safeParams).toString();
+        const res = await axios.get(`/api/enquiries/get/cities/filtered?${queryString}`);
         return res.data;
     }catch(err){
         console.log(err);
@@ -78,6 +183,61 @@ export async function GetEqAreasFiltered(queryParams: any){
         return res.data;
     }catch(err){
         console.log(err);
+    }
+}
+
+//Add New Country
+export async function AddNewEqCountry(payload: any){
+    try{
+        const res = await axios.post("/api/enquiries/post/add-country", payload);
+        return res.data;
+    }catch(err){
+        console.log(err);
+        return (err as any)?.response?.data;
+    }
+}
+
+//Add New Region
+export async function AddNewEqRegion(payload: any){
+    try{
+        const res = await axios.post("/api/enquiries/post/add-region", payload);
+        return res.data;
+    }catch(err){
+        console.log(err);
+        return (err as any)?.response?.data;
+    }
+}
+
+//Add New Province
+export async function AddNewEqProvince(payload: any){
+    try{
+        const res = await axios.post("/api/enquiries/post/add-province", payload);
+        return res.data;
+    }catch(err){
+        console.log(err);
+        return (err as any)?.response?.data;
+    }
+}
+
+//Add New City
+export async function AddNewEqCity(payload: any){
+    try{
+        const res = await axios.post("/api/enquiries/post/add-city", payload);
+        return res.data;
+    }catch(err){
+        console.log(err);
+        return (err as any)?.response?.data;
+    }
+}
+
+//Add New Head Office
+export async function AddNewEqHeadOffice(payload: any){
+    try{
+        const res = await axios.post("/api/enquiries/post/add-head-office", payload);
+        return res.data;
+    }catch(err){
+        console.log(err);
+        return (err as any)?.response?.data;
     }
 }
 
@@ -281,6 +441,61 @@ export async function GetUserAssignedEnquiries(queryParams: any){
     }
 }
 
+//Update Country
+export async function UpdateEqCountry(payload: any) {
+    try{
+        const res = await axios.put("/api/enquiries/update/country", payload);
+        return res.data;
+    }catch(err){
+        console.log(err);
+        return (err as any)?.response?.data;
+    }
+}
+
+//Update Region
+export async function UpdateEqRegion(payload: any) {
+    try{
+        const res = await axios.put("/api/enquiries/update/region", payload);
+        return res.data;
+    }catch(err){
+        console.log(err);
+        return (err as any)?.response?.data;
+    }
+}
+
+//Update Province
+export async function UpdateEqProvince(payload: any) {
+    try{
+        const res = await axios.put("/api/enquiries/update/province", payload);
+        return res.data;
+    }catch(err){
+        console.log(err);
+        return (err as any)?.response?.data;
+    }
+}
+
+//Update City
+export async function UpdateEqCity(payload: any) {
+    try{
+        const res = await axios.put("/api/enquiries/update/city", payload);
+        return res.data;
+    }catch(err){
+        console.log(err);
+        return (err as any)?.response?.data;
+    }
+}
+
+//Update Head Office
+export async function UpdateEqHeadOffice(payload: any) {
+    try{
+        const res = await axios.put("/api/enquiries/update/head-office", payload);
+        return res.data;
+    }catch(err){
+        console.log(err);
+        return (err as any)?.response?.data;
+    }
+}
+
 //Update / Activate Area
 export async function UpdateEqArea(payload: any) {
     try{
@@ -411,6 +626,56 @@ export async function GetEqCampsById(camp_id: string){
     }
 }
 
+//Get Eq Country Profile
+export async function GetEqCountryProfile(country_id: string){
+    try{
+        const res = await axios.get(`/api/enquiries/get/country/profile-by-id?country_id=${country_id}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+//Get Eq Region Profile
+export async function GetEqRegionProfile(region_id: string){
+    try{
+        const res = await axios.get(`/api/enquiries/get/region/profile-by-id?region_id=${region_id}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+//Get Eq Province Profile
+export async function GetEqProvinceProfile(province_id: string){
+    try{
+        const res = await axios.get(`/api/enquiries/get/province/profile-by-id?province_id=${province_id}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+//Get Eq City Profile
+export async function GetEqCityProfile(city_id: string){
+    try{
+        const res = await axios.get(`/api/enquiries/get/city/profile-by-id?city_id=${city_id}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+//Get Eq Head Office Profile
+export async function GetEqHeadOfficeProfile(head_office_id: string){
+    try{
+        const res = await axios.get(`/api/enquiries/get/head-office/profile-by-id?head_office_id=${head_office_id}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
 //Get Eq Area Profile
 export async function GetEqAreaProfile(area_id: string){
     try{
@@ -501,6 +766,17 @@ export async function AddNewContactAgent (payload: any) {
     }
 }
 
+//Delete Contact
+export async function RemoveEqContact(contact_id: string){
+    try{
+        const res = await axios.delete(`/api/enquiries/delete/contact?contact_id=${contact_id}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+        return (err as any)?.response?.data;
+    }
+}
+
 //Convert Enquiry to Project
 export async function EnquiryToProject(payload: any){
     try{
@@ -528,6 +804,61 @@ export async function RemoveEqCamp(camp_id: string){
         return res.data;
     }catch(err){
         console.log(err);
+    }
+}
+
+//Delete Country
+export async function RemoveEqCountry(country_id: string){
+    try{
+        const res = await axios.delete(`/api/enquiries/delete/country?country_id=${country_id}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+        return (err as any)?.response?.data;
+    }
+}
+
+//Delete Region
+export async function RemoveEqRegion(region_id: string){
+    try{
+        const res = await axios.delete(`/api/enquiries/delete/region?region_id=${region_id}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+        return (err as any)?.response?.data;
+    }
+}
+
+//Delete Province
+export async function RemoveEqProvince(province_id: string){
+    try{
+        const res = await axios.delete(`/api/enquiries/delete/province?province_id=${province_id}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+        return (err as any)?.response?.data;
+    }
+}
+
+//Delete City
+export async function RemoveEqCity(city_id: string){
+    try{
+        const res = await axios.delete(`/api/enquiries/delete/city?city_id=${city_id}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+        return (err as any)?.response?.data;
+    }
+}
+
+//Delete Head Office
+export async function RemoveEqHeadOffice(head_office_id: string){
+    try{
+        const res = await axios.delete(`/api/enquiries/delete/head-office?head_office_id=${head_office_id}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+        return (err as any)?.response?.data;
     }
 }
 

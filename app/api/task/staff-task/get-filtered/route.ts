@@ -1,16 +1,15 @@
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import Business_Tasks from "@/models/business_tasks.model";
 import Project_Teams from "@/models/project_team.model";
 import Team_Members from "@/models/team_members.model";
-import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 
 connectDB();
 
 export async function GET(req: NextRequest) {
   try {
-    const session: any = await getServerSession(authOptions);
+    const session: any = await auth();
     if (!session)
       return NextResponse.json(
         { message: "Un-Authorized Access", status: 401 },

@@ -33,7 +33,11 @@ export async function GET(req: NextRequest, { params }:{ params: { userid: strin
             role_id: { $in: allowedRoleIds },
             status: 1,
         })
-            .populate("user_id", "name email avatar_url status")
+            .populate({
+                path: "user_id",
+                select: "name email avatar_url status",
+                match: { status: 1 }
+            })
             .populate("role_id", "role_name")
             .lean();
 

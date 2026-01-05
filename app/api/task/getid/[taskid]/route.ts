@@ -5,9 +5,6 @@ import { NextRequest, NextResponse } from "next/server";
 import Users from "@/models/users.model";
 import Business_Project from "@/models/business_project.model";
 import Project_Teams from "@/models/project_team.model";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-
 connectDB();
 
 export async function GET(req:NextRequest, {params}: {params: {taskid:string}}){

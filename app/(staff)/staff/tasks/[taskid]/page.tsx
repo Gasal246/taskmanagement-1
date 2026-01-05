@@ -15,8 +15,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { useGetTaskById, useAddTaskActivity, useUpdateTaskActivity, useDeleteTaskActivity, useUpdateBusinessTask } from '@/query/business/queries';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import Cookies from "js-cookie";
 import { getSession } from 'next-auth/react';
 

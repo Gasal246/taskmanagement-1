@@ -1,4 +1,4 @@
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import Eq_area from "@/models/eq_area.model";
 import Eq_camp_client_company from "@/models/eq_camp_client_company.model";
@@ -13,7 +13,6 @@ import Eq_enquiry_wifi_external from "@/models/eq_enquiry_wifi_external.model";
 import Eq_enquiry_wifi_personal from "@/models/eq_enquiry_wifi_personal.model";
 import Eq_region from "@/models/eq_region.model";
 import { Decimal128, Types } from "mongoose";
-import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 
 connectDB();
@@ -95,7 +94,7 @@ interface Body {
 export async function POST(req:NextRequest){
     try{
 
-        const session:any = await getServerSession(authOptions);
+        const session:any = await auth();
         if(!session) return NextResponse.json({message: "Unauthorized Access", status: 401}, {status: 401});
 
         const body:Body = await req.json();

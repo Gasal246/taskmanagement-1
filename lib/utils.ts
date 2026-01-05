@@ -5,6 +5,29 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+export function resolveSessionUserId(session: any): string {
+  const rawId =
+    session?.user?.id ??
+    session?.user?.userid ??
+    session?.user?._id ??
+    session?.user?.user_id;
+
+  if (!rawId) return "";
+  if (typeof rawId === "string") return rawId;
+  if (typeof rawId === "number") return String(rawId);
+  if (typeof rawId === "object") {
+    if ("$oid" in rawId && typeof rawId.$oid === "string") return rawId.$oid;
+    if (
+      typeof rawId.toString === "function" &&
+      rawId.toString !== Object.prototype.toString
+    ) {
+      return rawId.toString();
+    }
+  }
+
+  return "";
+}
+
 export function formatDate(dateTimeString: string) {
   if (!dateTimeString) return ""; // handle case where dateTimeString is undefined or null
 
@@ -27,6 +50,14 @@ export function formatDateTiny(dateTimeString: string) {
   const date = new Date(dateTimeString);
   const options: any = { day: 'numeric', month: 'long', year: 'numeric' };
   return date.toLocaleDateString('en-US', options);
+}
+
+export function formatDateTimeShort(dateTimeString: string) {
+  if (!dateTimeString) return "";
+
+  const date = new Date(dateTimeString);
+  const options: any = { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: 'numeric' };
+  return date.toLocaleString('en-US', options);
 }
 
 export function generateOTP(): string {

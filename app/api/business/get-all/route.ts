@@ -1,14 +1,12 @@
+import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import Business from "@/models/business.model";
 import { NextResponse } from "next/server";
-import { authOptions } from "../../auth/[...nextauth]/route";
-import { getServerSession } from "next-auth";
-
 connectDB();
 
 export async function GET () {
     try {
-        const session = await getServerSession(authOptions);
+        const session = await auth();
         if(!session){
             return new NextResponse("Unauthorized", { status: 401 });
         }

@@ -22,6 +22,7 @@ import Area_dep_heads from "@/models/area_dep_heads.model";
 import Area_dep_staffs from "@/models/area_dep_staffs.model";
 import Location_dep_heads from "@/models/location_dep_heads.model";
 import Location_dep_staffs from "@/models/location_dep_staffs.model";
+import { isValidObjectId } from "mongoose";
 
 connectDB();
 
@@ -31,6 +32,10 @@ export async function GET (req: NextRequest) {
         const { searchParams } = new URL(req.url);
         const userid = searchParams.get('userid');
         const role = searchParams.get('role');
+
+        if (!userid || !isValidObjectId(userid) || !role) {
+            return NextResponse.json({ error: "Invalid user id or role" }, { status: 400 });
+        }
 
         const user = await Users.findById(userid);
         if (!user) {

@@ -20,6 +20,7 @@ export async function GET(req: NextRequest) {
     const camp_id = searchParams.get("camp_id");
     const enquiry_uuid = searchParams.get("enquiry_uuid");
     const camp_capacity = searchParams.get("capacity");
+    const search = searchParams.get("search");
     const page = Number(searchParams.get("page")) || 1;
     const limit = Number(searchParams.get("limit")) || 10;
 
@@ -60,6 +61,16 @@ export async function GET(req: NextRequest) {
 
     if (enquiry_uuid) filter.enquiry_uuid = { $regex: enquiry_uuid, $options: "i" };
 
+    if (search) {
+      const searchRegex = new RegExp(search, "i");
+      const campsForSearch = await Eq_camps.find({ camp_name: searchRegex }).select("_id").lean();
+      const campIdsForSearch = campsForSearch.map((camp) => camp._id);
+      filter.$or = [
+        { enquiry_uuid: { $regex: searchRegex } },
+        ...(campIdsForSearch.length ? [{ camp_id: { $in: campIdsForSearch } }] : []),
+      ];
+    }
+
     // --- NEW: Occupancy Filter (From Camps Schema) ---
     const occupancy = searchParams.get("occupancy");
 
@@ -76,11 +87,33 @@ export async function GET(req: NextRequest) {
       filter.camp_id = {$in: campIds};
     };
 
-    // Take count of total docs
-    const totalRecords = await Eq_enquiry.countDocuments(filter);
+    // Take count of total docs (cap at latest 200)
+    const maxRecords = 200;
+    const totalRecordsRaw = await Eq_enquiry.countDocuments(filter);
+    const totalRecords = Math.min(totalRecordsRaw, maxRecords);
+
+    const latestIds = await Eq_enquiry.find(filter)
+      .sort({ createdAt: -1 })
+      .limit(maxRecords)
+      .select("_id")
+      .lean();
+    const latestIdList = latestIds.map((entry) => entry._id);
+    if (latestIdList.length === 0) {
+      return NextResponse.json(
+        { status: 200, data: [], pagination: { page, limit, totalRecords: 0, totalPages: 0 } },
+        { status: 200 }
+      );
+    }
+
+    if (skip >= totalRecords) {
+      return NextResponse.json(
+        { status: 200, data: [], pagination: { page, limit, totalRecords, totalPages: Math.ceil(totalRecords / limit) } },
+        { status: 200 }
+      );
+    }
 
     // First fetch enquiries + populate camp
-    let enquiries = await Eq_enquiry.find(filter)
+    let enquiries = await Eq_enquiry.find({ _id: { $in: latestIdList } })
       .populate({
         path: "camp_id",
         model: Eq_camps,

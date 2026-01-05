@@ -1,6 +1,5 @@
 import connectDB from "@/lib/mongo";
 import Eq_camp_client_company from "@/models/eq_camp_client_company.model";
-import Eq_camp_headoffice from "@/models/eq_camp_headoffice.model";
 import Eq_camp_landlord from "@/models/eq_camp_landlord.model";
 import Eq_camp_realestate from "@/models/eq_camp_realestate.model";
 import Eq_camps from "@/models/eq_camps.model";
@@ -21,10 +20,7 @@ interface Body {
     province_id: string,
     city_id: string,
     area_id: string,
-    ho_phone: string,
-    ho_address: string,
-    ho_location: string,
-    ho_other_details: string
+    headoffice_id?: string
 };
 
 export async function POST(req:NextRequest){
@@ -34,8 +30,6 @@ export async function POST(req:NextRequest){
         let landlord_id = "";
         let real_estate_id = "";
         let client_company_id = "";
-        let headoffice_id = "";
-
         if(body.landlord){
             const isLandlordAvail:any = await Eq_camp_landlord.findOne({landlord_name: body.landlord.toLowerCase().trim()});
             if(!isLandlordAvail){
@@ -75,17 +69,6 @@ export async function POST(req:NextRequest){
             }
         }
 
-        if(body.ho_phone){
-            const headOffice = new Eq_camp_headoffice({
-                phone: body.ho_phone,
-                geo_location: body.ho_location,
-                other_details: body.ho_other_details,
-                address: body.ho_address
-            });
-            const newHeadOffice = await headOffice.save();
-            headoffice_id = newHeadOffice._id;
-        }
-
         const newCamp = new Eq_camps({
             country_id: body.country_id,
             region_id: body.region_id,
@@ -95,7 +78,7 @@ export async function POST(req:NextRequest){
             landlord_id: landlord_id || null,
             realestate_id: real_estate_id || null,
             client_company_id: client_company_id || null,
-            headoffice_id: headoffice_id || null,
+            headoffice_id: body.headoffice_id || null,
             camp_type: body.camp_type,
             camp_name: body.camp_name,
             camp_capacity: body.camp_capacity,

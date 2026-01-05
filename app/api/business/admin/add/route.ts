@@ -1,10 +1,9 @@
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import Admin_assign_business from "@/models/admin_assign_business.model";
 import Roles from "@/models/roles.model";
 import User_roles from "@/models/user_roles.model";
 import Users from "@/models/users.model";
-import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 
 connectDB();
@@ -20,7 +19,7 @@ interface Body {
 
 export async function POST (req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions);
+        const session = await auth();
         if(!session){
             return new NextResponse("Unauthorized", { status: 401 });
         }

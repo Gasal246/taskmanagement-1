@@ -189,6 +189,15 @@ export async function removeBusinessSkillFunc (BSkillId: string) {
     }
 }
 
+export async function updateBusinessSkillFunc (payload: any) {
+    try {
+        const res = await axios.post('/api/business/skills/update', payload);
+        return res.data;
+    } catch (error) {
+        console.log(error);
+    }
+}
+
 export async function addBusinessDepartmentFunc (payload: any) {
     try {
         const res = await axios.post('/api/business/departments/add', payload);
@@ -1001,6 +1010,15 @@ export async function GetFlowsByProjectFunc(project_id:string){
 export async function GetBusinessStaffsWithSkills(business_id:string){
     try{
         const res = await axios.get(`/api/staff/get-all-with-skill?business_id=${business_id}`)
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
+export async function GetBusinessStaffsBySkill(business_id: string, skill_id: string){
+    try{
+        const res = await axios.get(`/api/staff/get-all-with-skill?business_id=${business_id}&skill_id=${skill_id}`)
         return res.data;
     }catch(err){
         console.log(err);

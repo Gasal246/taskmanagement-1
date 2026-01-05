@@ -118,7 +118,7 @@ export async function GET(req: NextRequest, {params}: { params: { projectid: str
                     roleMap.set(uid, [...existing, roleName]);
                 });
 
-                const people = await Users.find({ _id: { $in: uniqueStaffIds } }).select({ name: 1, email: 1, avatar_url: 1 }).lean();
+                const people = await Users.find({ _id: { $in: uniqueStaffIds }, status: 1 }).select({ name: 1, email: 1, avatar_url: 1 }).lean();
                 projectUsers = people.map((p: any) => ({
                     ...p,
                     roles: roleMap.get(p?._id?.toString?.()) || []

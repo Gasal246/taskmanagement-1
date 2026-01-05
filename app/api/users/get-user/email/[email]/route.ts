@@ -4,10 +4,13 @@ import { NextRequest, NextResponse } from "next/server";
 
 connectDB();
 
-export async function GET (req: NextRequest, { params }: { params: { email: string } }) {
+export async function GET (
+    req: NextRequest,
+    { params }: { params: Promise<{ email: string }> }
+) {
     try {
-        const { email } = params;
-        const user = await Users.findOne({ email });
+        const { email } = await params;
+        const user = await Users.findOne({ email, status: 1 });
         return Response.json({ status: user ? true : false, user });
     } catch (error) {
         console.log(error);

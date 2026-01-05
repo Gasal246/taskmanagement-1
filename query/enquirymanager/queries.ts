@@ -1,16 +1,26 @@
 import { useMutation, useQuery } from "@tanstack/react-query"
-import { AcceptEnquiryEdits, ActivateDeactivateEqAgents, ActivateEqCamp, AddEqUser, AddNewCampContact, AddNewContactAgent, AddNewEnquiry, AddNewEqArea, AddNewEqCamp, AssignEqCamptoEnquiry, CloseEqnuiry, EnquiryToProject, ForwardEnquiryByStaff, ForwardHistory, GetAccessEnquiriesForStaffs, GetAgentEnquiries, GetAgentsByBusiness, GetAllEnquiryHistoryForStaffs, GetEnquiriesWithFilters, GetEnquiryById, GetEnquiryByIdForStaffs, GetEnquiryContacts, GetEnquiryHistories, GetEnquiryHistoryById, GetEqAgentByID, GetEqAreaById, GetEqAreaProfile, GetEqAreasByCity,
+import { AcceptEnquiryEdits, ActivateDeactivateEqAgents, ActivateEqCamp, AddEqUser, AddNewCampContact, AddNewContactAgent, AddNewEnquiry, AddNewEqArea, AddNewEqCamp, AddNewEqCity, AddNewEqCountry, AddNewEqHeadOffice, AddNewEqProvince, AddNewEqRegion, AssignEqCamptoEnquiry, CloseEqnuiry, EnquiryToProject, ForwardEnquiryByStaff, ForwardHistory, GetAccessEnquiriesForStaffs, GetAgentEnquiries, GetAgentsByBusiness, GetAllEnquiryHistoryForStaffs, GetEnquiriesWithFilters, GetEnquiryById, GetEnquiryByIdForStaffs, GetEnquiryContacts, GetEnquiryHistories, GetEnquiryHistoryById, GetEqAgentByID, GetEqAreaById, GetEqAreaProfile, GetEqAreasByCity,
      GetEqAreasFiltered,
      GetEqCampsByArea, 
      GetEqCampsByEnquiry, 
      GetEqCampsById, 
      GetEqCampsFiltered, 
      GetEqCitiesByProvince, 
+     GetEqCitiesFiltered,
+     GetEqCityProfile,
      GetEqCountries, 
+     GetEqCountriesFiltered,
+     GetEqCountryProfile,
      GetEqEdit, 
+     GetEqHeadOfficesFiltered,
+     GetEqHeadOfficeProfile,
      GetEqLatestActionForStaff, 
      GetEqProvincesByRegion, 
+     GetEqProvincesFiltered,
+     GetEqProvinceProfile,
      GetEqRegionsByCountry, 
+     GetEqRegionsFiltered,
+     GetEqRegionProfile,
      GetEqUserLogs, 
      GetEqUserProfile, 
      GetEqUsers,
@@ -20,11 +30,22 @@ import { AcceptEnquiryEdits, ActivateDeactivateEqAgents, ActivateEqCamp, AddEqUs
      RemoveEnquiryAgent,
      RemoveEqCamp,
      RemoveEqArea,
+     RemoveEqCity,
+     RemoveEqCountry,
+     RemoveEqContact,
+     RemoveEqHeadOffice,
+     RemoveEqProvince,
+     RemoveEqRegion,
      RemoveEqUsers,
      UpdateEnquiry,
      UpdateEqArea,
      UpdateEqCamp,
-     UpdateEqCampContact
+     UpdateEqCampContact,
+     UpdateEqCity,
+     UpdateEqCountry,
+     UpdateEqHeadOffice,
+     UpdateEqProvince,
+     UpdateEqRegion
     } from "./function"
 
 
@@ -35,12 +56,88 @@ export const useGetEqCountries = () => {
     })
 };
 
+//Get Countries filtered
+export const useGetEqCountriesFiltered = (queryParams: Record<string, string | number | undefined>) => {
+    return useQuery({
+        queryKey: ["countries", queryParams],
+        queryFn: () => GetEqCountriesFiltered(queryParams),
+    })
+}
+
+//Add New Country
+export const useAddNewEqCountry = () => {
+    return useMutation({
+        mutationFn: (payload: any) => AddNewEqCountry(payload),
+    })
+}
+
+//Update Country
+export const useUpdateEqCountry = () => {
+    return useMutation({
+        mutationFn: (payload: any) => UpdateEqCountry(payload),
+    })
+}
+
+//Get Country Profile
+export const useGetEqCountryProfile = (country_id: string) => {
+    return useQuery({
+        queryKey: ["country", country_id],
+        queryFn: () => GetEqCountryProfile(country_id),
+        enabled: !!country_id,
+    })
+}
+
+//Remove Country
+export const useRemoveEqCountry = () => {
+    return useMutation({
+        mutationFn: (country_id: string) => RemoveEqCountry(country_id),
+    })
+}
+
 //Get regions
 export const useGetEqRegions = (country_id: string) => {
     return useQuery({
         queryKey: ["regions", country_id],
         queryFn: () => GetEqRegionsByCountry(country_id),
         enabled: !!country_id,
+    })
+}
+
+//Get regions filtered
+export const useGetEqRegionsFiltered = (queryParams: Record<string, string | number | undefined>) => {
+    return useQuery({
+        queryKey: ["regions", queryParams],
+        queryFn: () => GetEqRegionsFiltered(queryParams),
+    })
+}
+
+//Add New Region
+export const useAddNewEqRegion = () => {
+    return useMutation({
+        mutationFn: (payload: any) => AddNewEqRegion(payload),
+    })
+}
+
+//Update Region
+export const useUpdateEqRegion = () => {
+    return useMutation({
+        mutationFn: (payload: any) => UpdateEqRegion(payload),
+    })
+}
+
+//Get Region Profile
+export const useGetEqRegionProfile = (region_id: string) => {
+    return useQuery({
+        queryKey: ["region", region_id],
+        queryFn: () => GetEqRegionProfile(region_id),
+        enabled: !!region_id,
+    })
+}
+
+//Remove Region
+export const useRemoveEqRegion = () => {
+    return useMutation({
+        mutationFn: (region_id: string) => RemoveEqRegion(region_id),
     })
 }
 
@@ -53,12 +150,126 @@ export const useGetEqProvince = (region_id: string) => {
     })
 }
 
+//Get Provinces filtered
+export const useGetEqProvincesFiltered = (queryParams: Record<string, string | number | undefined>) => {
+    return useQuery({
+        queryKey: ["provinces", queryParams],
+        queryFn: () => GetEqProvincesFiltered(queryParams),
+    })
+}
+
+//Add New Province
+export const useAddNewEqProvince = () => {
+    return useMutation({
+        mutationFn: (payload: any) => AddNewEqProvince(payload),
+    })
+}
+
+//Update Province
+export const useUpdateEqProvince = () => {
+    return useMutation({
+        mutationFn: (payload: any) => UpdateEqProvince(payload),
+    })
+}
+
+//Get Province Profile
+export const useGetEqProvinceProfile = (province_id: string) => {
+    return useQuery({
+        queryKey: ["province", province_id],
+        queryFn: () => GetEqProvinceProfile(province_id),
+        enabled: !!province_id,
+    })
+}
+
+//Remove Province
+export const useRemoveEqProvince = () => {
+    return useMutation({
+        mutationFn: (province_id: string) => RemoveEqProvince(province_id),
+    })
+}
+
 //Get Cities
 export const useGetEqCities = (province_id:string) => {
     return useQuery({
         queryKey: ["cities", province_id],
         queryFn: () => GetEqCitiesByProvince(province_id),
         enabled: !!province_id
+    })
+}
+
+//Get Head Offices filtered
+export const useGetEqHeadOfficesFiltered = (queryParams: Record<string, string | number | undefined>) => {
+    return useQuery({
+        queryKey: ["head-offices", queryParams],
+        queryFn: () => GetEqHeadOfficesFiltered(queryParams),
+    })
+}
+
+//Add New Head Office
+export const useAddNewEqHeadOffice = () => {
+    return useMutation({
+        mutationFn: (payload: any) => AddNewEqHeadOffice(payload),
+    })
+}
+
+//Update Head Office
+export const useUpdateEqHeadOffice = () => {
+    return useMutation({
+        mutationFn: (payload: any) => UpdateEqHeadOffice(payload),
+    })
+}
+
+//Get Head Office Profile
+export const useGetEqHeadOfficeProfile = (head_office_id: string) => {
+    return useQuery({
+        queryKey: ["head-office", head_office_id],
+        queryFn: () => GetEqHeadOfficeProfile(head_office_id),
+        enabled: !!head_office_id,
+    })
+}
+
+//Remove Head Office
+export const useRemoveEqHeadOffice = () => {
+    return useMutation({
+        mutationFn: (head_office_id: string) => RemoveEqHeadOffice(head_office_id),
+    })
+}
+
+//Get Cities filtered
+export const useGetEqCitiesFiltered = (queryParams: Record<string, string | number | undefined>) => {
+    return useQuery({
+        queryKey: ["cities", queryParams],
+        queryFn: () => GetEqCitiesFiltered(queryParams),
+    })
+}
+
+//Add New City
+export const useAddNewEqCity = () => {
+    return useMutation({
+        mutationFn: (payload: any) => AddNewEqCity(payload),
+    })
+}
+
+//Update City
+export const useUpdateEqCity = () => {
+    return useMutation({
+        mutationFn: (payload: any) => UpdateEqCity(payload),
+    })
+}
+
+//Get City Profile
+export const useGetEqCityProfile = (city_id: string) => {
+    return useQuery({
+        queryKey: ["city", city_id],
+        queryFn: () => GetEqCityProfile(city_id),
+        enabled: !!city_id,
+    })
+}
+
+//Remove City
+export const useRemoveEqCity = () => {
+    return useMutation({
+        mutationFn: (city_id: string) => RemoveEqCity(city_id),
     })
 }
 
@@ -399,6 +610,13 @@ export const useAddNewCampContact = () => {
 export const useAddNewContactAgent = () => {
     return useMutation({
         mutationFn: (payload: any) => AddNewContactAgent(payload),
+    })
+}
+
+//Remove Contact
+export const useRemoveEqContact = () => {
+    return useMutation({
+        mutationFn: (contact_id: string) => RemoveEqContact(contact_id),
     })
 }
 
