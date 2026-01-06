@@ -17,17 +17,14 @@ import { useCloseEqnuiry, useEnquiryToProject, useForwardHistory, useGetEqUsers 
 import { toast } from "sonner";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { useRouter } from "next/navigation";
-import { Dialog, DialogContent, DialogFooter, DialogHeader } from "@/components/ui/dialog";
-import { DialogTitle } from "@radix-ui/react-dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { z } from "zod";
-import { FormProvider, useForm } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { FormControl, FormField, FormLabel } from "@/components/ui/form";
-import FormItem from "antd/es/form/FormItem";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
-import { Form } from "antd";
 import { DEPARTMENT_TYPES } from "@/lib/constants";
-import { useGetBusinessClients, useGetBusinessRegions } from "@/query/business/queries";
+import { useGetAreasandDeptsForRegion, useGetBusinessClients, useGetBusinessRegions } from "@/query/business/queries";
 import { CheckCircle2 } from "lucide-react";
 
 // -------------------------------------------------------
@@ -43,6 +40,7 @@ export default function EscalatePage() {
 
   const { mutateAsync: getBusinessClients, isPending: loadingBusinessClients } = useGetBusinessClients();
   const { mutateAsync: getRegions, isPending: isRegionLoading } = useGetBusinessRegions();
+  const { mutateAsync: getAreasForRegion, isPending: loadingAreas } = useGetAreasandDeptsForRegion();
   const { mutateAsync: ForwardEnquiry, isPending } = useForwardHistory();
   const { mutateAsync: ConvertEnquiry, isPending: isConverting} = useEnquiryToProject();
   const { mutateAsync: CloseEnquiry, isPending: isClosing } = useCloseEqnuiry();
@@ -57,35 +55,44 @@ export default function EscalatePage() {
   const [nextDate, setNextDate] = useState("");
   const [businessClients, setBusinessClients] = React.useState<any[]>([]);
   const [businessRegions, setBusinessRegions] = useState<any[]>([]);
+  const [regionAreas, setRegionAreas] = useState<any[]>([]);
   const [closureFeedback, setClosureFeedback] = useState("");
   const [closureModal, setClosureModal] = useState(false);
 
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   const newProjectSchema = z.object({
+    project_name: z.string().min(1, "Project name is required"),
     project_description: z.string().optional(),
     start_date: z.string(),
-    end_date: z.string().optional(),
+    end_date: z.string(),
     type: z.string(),
     client_id: z.string().nullable().optional(),
     business_id: z.string(),
-    region_id: z.string().optional(),
-    enquiry_id: z.string()
-  })
+    priority: z.string().optional(),
+    region_id: z.string(),
+    area_id: z.string().nullable().optional(),
+    enquiry_id: z.string(),
+  });
 
   const form = useForm({
     resolver: zodResolver(newProjectSchema),
     defaultValues: {
+      project_name: "",
       project_description: "",
       start_date: "",
       end_date: "",
       type: "",
       client_id: "",
       business_id: businessData?._id,
+      priority: "normal",
       region_id: "",
-      enquiry_id: enquiry_id
-    }
-  })
+      area_id: "",
+      enquiry_id: enquiry_id,
+    },
+  });
+
+  const selectedRegionId = form.watch("region_id");
 
   const handleFetchBusinessClients = async () => {
     const res = await getBusinessClients(businessData?._id);
@@ -140,6 +147,26 @@ export default function EscalatePage() {
     handleFetchBusinessRegions();
   }, []);
 
+  useEffect(() => {
+    const fetchAreas = async () => {
+      if (!selectedRegionId) {
+        form.setValue("area_id", "");
+        setRegionAreas([]);
+        return;
+      }
+      setRegionAreas([]);
+      form.setValue("area_id", "");
+      const res = await getAreasForRegion(selectedRegionId);
+      if (res?.status === 200) {
+        setRegionAreas(res?.data?.areas ?? []);
+      } else {
+        setRegionAreas([]);
+      }
+    };
+
+    fetchAreas();
+  }, [selectedRegionId, getAreasForRegion, form]);
+
   // -------------------------------------------------------
   // SUBMIT (SHOW SAMPLE OUTPUT)
   // -------------------------------------------------------
@@ -168,11 +195,20 @@ export default function EscalatePage() {
   };
 
   const handleConvertToProject = async (data: any) => {
-    console.log("submit data: ", data);
+    const payload = {
+      ...data,
+      enquiry_id,
+      business_id: businessData?._id ?? data.business_id,
+      client_id: data?.client_id === "" ? null : data?.client_id,
+      area_id: data?.area_id === "" ? null : data?.area_id,
+    };
 
-    const res = await ConvertEnquiry(data);
+    console.log("submit data: ", payload);
+
+    const res = await ConvertEnquiry(payload);
     if(res?.status == 200){
       toast.success(res?.message || "Operation Success");
+      setConfirmOpen(false);
       return router.push(`/admin/projects/${res?.project_id}`);
     } else {
       toast.error(res?.message || "Operation Failed");
@@ -439,98 +475,240 @@ export default function EscalatePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      <FormProvider {...form}>
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent className="bg-slate-950 border border-slate-800 text-slate-100 max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Convert Enquiry to Project</DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Fill in the project details to continue.
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleConvertToProject)} className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="project_name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs text-slate-300 font-semibold">Project Name</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Enter project name"
+                          {...field}
+                          className="border-slate-700 bg-slate-900 text-slate-100"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-        <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-          <DialogContent className="bg-slate-900 border border-slate-700 text-slate-200">
-            <DialogHeader>
-              <DialogTitle>Confirmation</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={form.handleSubmit(handleConvertToProject)}>
+                <FormField
+                  control={form.control}
+                  name="priority"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs text-slate-300 font-semibold">Project Priority</FormLabel>
+                      <FormControl>
+                        <select
+                          {...field}
+                          className="w-full rounded-md border border-slate-700 bg-slate-900 text-white p-2 focus:border-slate-500 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                        >
+                          <option value="low">Low</option>
+                          <option value="normal">Normal</option>
+                          <option value="high">High</option>
+                        </select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-              <FormField
-                control={form.control}
-                name="project_description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs text-slate-400 font-semibold">Project Description</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Enter project description"
-                        {...field}
-                        className="text-slate-200" />
-                    </FormControl>
-                  </FormItem>
-                )} />
+                <FormField
+                  control={form.control}
+                  name="project_description"
+                  render={({ field }) => (
+                    <FormItem className="sm:col-span-2">
+                      <FormLabel className="text-xs text-slate-300 font-semibold">Project Description</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Enter project description"
+                          {...field}
+                          className="border-slate-700 bg-slate-900 text-slate-100"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
+                <FormField
+                  control={form.control}
+                  name="start_date"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs text-slate-300 font-semibold">Start Date</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="date"
+                          {...field}
+                          className="border-slate-700 bg-slate-900 text-slate-100"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-slate-400 font-medium">Project Start Date</label>
-                <Input type="date" {...form.register("start_date")} />
+                <FormField
+                  control={form.control}
+                  name="end_date"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs text-slate-300 font-semibold">End Date</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="date"
+                          {...field}
+                          className="border-slate-700 bg-slate-900 text-slate-100"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="type"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs text-slate-300 font-semibold">Project Type</FormLabel>
+                      <FormControl>
+                        <select
+                          {...field}
+                          className="w-full rounded-md border border-slate-700 bg-slate-900 text-white p-2 focus:border-slate-500 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                        >
+                          <option disabled value="">
+                            Select Type
+                          </option>
+                          {DEPARTMENT_TYPES.map((type) => (
+                            <option key={type.value} value={type.value}>
+                              {type.label}
+                            </option>
+                          ))}
+                        </select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="region_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs text-slate-300 font-semibold">Project Region</FormLabel>
+                      <FormControl>
+                        <select
+                          {...field}
+                          value={field.value ?? ""}
+                          className="w-full rounded-md border border-slate-700 bg-slate-900 text-white p-2 focus:border-slate-500 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                        >
+                          {businessRegions && businessRegions.length > 0 ? (
+                            <>
+                              <option value="">Select Region</option>
+                              {businessRegions.map((region: any) => (
+                                <option key={region._id} value={region._id}>
+                                  {region.region_name}
+                                </option>
+                              ))}
+                            </>
+                          ) : (
+                            <option value="">No Regions</option>
+                          )}
+                        </select>
+                      </FormControl>
+                      {selectedRegionId && loadingAreas && (
+                        <FormDescription className="text-xs text-slate-400">Loading areas...</FormDescription>
+                      )}
+                      {selectedRegionId && !loadingAreas && regionAreas.length === 0 && (
+                        <FormDescription className="text-xs text-slate-400">No areas for this region.</FormDescription>
+                      )}
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {selectedRegionId && regionAreas.length > 0 && (
+                  <FormField
+                    control={form.control}
+                    name="area_id"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs text-slate-300 font-semibold">Project Area (Optional)</FormLabel>
+                        <FormControl>
+                          <select
+                            {...field}
+                            value={field.value ?? ""}
+                            className="w-full rounded-md border border-slate-700 bg-slate-900 text-white p-2 focus:border-slate-500 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                          >
+                            <option value="">Select Area (Optional)</option>
+                            {regionAreas.map((area: any) => (
+                              <option key={area._id} value={area._id}>
+                                {area.area_name}
+                              </option>
+                            ))}
+                          </select>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+
+                <FormField
+                  control={form.control}
+                  name="client_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs text-slate-300 font-semibold">Project Client</FormLabel>
+                      <FormControl>
+                        <select
+                          {...field}
+                          value={field.value ?? ""}
+                          className="w-full rounded-md border border-slate-700 bg-slate-900 text-white p-2 focus:border-slate-500 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                        >
+                          {businessClients && businessClients.length > 0 ? (
+                            <>
+                              <option value="">Select Client</option>
+                              {businessClients.map((client: any) => (
+                                <option key={client._id} value={client._id}>
+                                  {client.client_name}
+                                </option>
+                              ))}
+                            </>
+                          ) : (
+                            <option value="">No Clients</option>
+                          )}
+                        </select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
 
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-slate-400 font-medium">Project End Date</label>
-                <Input type="date" {...form.register("end_date")} />
-              </div>
+              <p className="text-xs text-red-400 font-semibold">This action is irreversible.</p>
 
-              <FormField control={form.control} name="type" render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-xs text-slate-300 font-semibold">Project Type</FormLabel>
-                  <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger className="text-slate-200"><SelectValue placeholder="Select Project Type" /></SelectTrigger>
-                      <SelectContent>
-                        {DEPARTMENT_TYPES.map((t, i) => (
-                          <SelectItem key={i} value={t.value}>{t.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </FormItem>
-              )} />
-              
-              <FormField control={form.control} name="client_id" render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-xs text-slate-300 font-semibold">Project Client</FormLabel>
-                  <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger className="text-slate-200"><SelectValue placeholder="Select Client" /></SelectTrigger>
-                      <SelectContent>
-                        {businessClients.map((c) => (
-                          <SelectItem key={c._id} value={c._id}>{c.client_name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </FormItem>
-              )} />
-
-              <FormField control={form.control} name="region_id" render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-xs text-slate-300 font-semibold">Project Region</FormLabel>
-                  <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger className="text-slate-200"><SelectValue placeholder="Select Region" /></SelectTrigger>
-                      <SelectContent>
-                        {businessRegions.map((r) => (
-                          <SelectItem key={r._id} value={r._id}>{r.region_name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </FormItem>
-              )} />
-              
-
-              <p className="text-red-400 font-semibold">This action is irreversible.</p>
-
-              <DialogFooter className="mt-6 flex justify-end gap-3">
+              <DialogFooter className="flex justify-end gap-3">
                 <Button
                   variant="secondary"
                   type="button"
                   onClick={() => setConfirmOpen(false)}
-                  className="border border-slate-600"
+                  className="border border-slate-700"
                 >
                   Cancel
                 </Button>
@@ -543,9 +721,9 @@ export default function EscalatePage() {
                 </Button>
               </DialogFooter>
             </form>
-          </DialogContent>
-        </Dialog>
-      </FormProvider>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

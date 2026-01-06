@@ -23,7 +23,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DEPARTMENT_TYPES } from '@/lib/constants';
 import { useDispatch } from 'react-redux';
 import { AppDispatch } from '@/redux/store';
-import { loadDepartmentData, loadLocationData } from '@/redux/slices/application';
+import { loadAdminBusinessStaff, loadDepartmentData, loadLocationData } from '@/redux/slices/application';
 
 const RegionAreaPage = () => {
     const router = useRouter();
@@ -205,6 +205,14 @@ const RegionAreaPage = () => {
         router.push('/admin/regions/area/department');
     }
 
+    const handleViewStaff = async (user: any) => {
+        if (!user) {
+            return;
+        }
+        await dispatch(loadAdminBusinessStaff(user));
+        router.push(`/admin/staffs/view-staff`);
+    }
+
     return (
         <div className='p-4 mb-20'>
             <Breadcrumb>
@@ -282,7 +290,7 @@ const RegionAreaPage = () => {
                                             <motion.div
                                                 whileTap={{ scale: 0.98 }}
                                                 whileHover={{ scale: 1.02 }}
-                                                onClick={() => { }}
+                                                onClick={() => handleViewStaff(head?.user || head?.user_id)}
                                                 className='bg-slate-800/50 w-full p-1 py-2 text-cyan-500 cursor-pointer hover:text-cyan-700 flex items-center justify-center gap-1 border border-dashed border-slate-700 rounded-lg'>
                                                 <Eye size={14} />
                                                 <h1 className='text-xs font-semibold'>Profile</h1>
@@ -477,7 +485,7 @@ const RegionAreaPage = () => {
                                             <motion.div
                                                 whileTap={{ scale: 0.98 }}
                                                 whileHover={{ scale: 1.02 }}
-                                                onClick={() => { }}
+                                                onClick={() => handleViewStaff(staff?.user || staff?.user_id)}
                                                 className='bg-slate-800/50 w-full p-1 py-2 text-cyan-500 cursor-pointer hover:text-cyan-700 flex items-center justify-center gap-1 border border-dashed border-slate-700 rounded-lg'>
                                                 <Eye size={14} />
                                                 <h1 className='text-xs font-semibold'>Profile</h1>

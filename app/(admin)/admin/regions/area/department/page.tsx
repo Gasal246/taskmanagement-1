@@ -15,7 +15,7 @@ import LoaderSpin from '@/components/shared/LoaderSpin';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from '@/components/ui/input';
-import { loadDepartmentData, loadLocationData } from '@/redux/slices/application';
+import { loadAdminBusinessStaff, loadDepartmentData, loadLocationData } from '@/redux/slices/application';
 
 const AreaDepartmentPage = () => {
     const router = useRouter();
@@ -241,6 +241,14 @@ const AreaDepartmentPage = () => {
         router.push('/admin/regions/area/department');
     }
 
+    const handleViewStaff = async (user: any) => {
+        if (!user) {
+            return;
+        }
+        await dispatch(loadAdminBusinessStaff(user));
+        router.push(`/admin/staffs/view-staff`);
+    }
+
 
     return (
         <div className='p-4 pb-20'>
@@ -366,7 +374,7 @@ const AreaDepartmentPage = () => {
                                                 <motion.div
                                                     whileTap={{ scale: 0.98 }}
                                                     whileHover={{ scale: 1.02 }}
-                                                    onClick={() => { }}
+                                                    onClick={() => handleViewStaff(head?.user || head?.user_id)}
                                                     className='bg-slate-800/50 w-full p-1 py-2 text-cyan-500 cursor-pointer hover:text-cyan-700 flex items-center justify-center gap-1 border border-dashed border-slate-700 rounded-lg'>
                                                     <Eye size={14} />
                                                     <h1 className='text-xs font-semibold'>Profile</h1>
@@ -504,7 +512,7 @@ const AreaDepartmentPage = () => {
                                                 <motion.div
                                                     whileTap={{ scale: 0.98 }}
                                                     whileHover={{ scale: 1.02 }}
-                                                    onClick={() => { }}
+                                                    onClick={() => handleViewStaff(staff?.user || staff?.user_id)}
                                                     className='bg-slate-800/50 w-full p-1 py-2 text-cyan-500 cursor-pointer hover:text-cyan-700 flex items-center justify-center gap-1 border border-dashed border-slate-700 rounded-lg'>
                                                     <Eye size={14} />
                                                     <h1 className='text-xs font-semibold'>Profile</h1>

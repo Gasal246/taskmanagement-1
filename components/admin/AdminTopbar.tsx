@@ -16,10 +16,46 @@ import Cookies from "js-cookie";
 import { getBusinessByIdFunc } from '@/query/business/functions'
 import { loadBusinessData } from '@/redux/slices/userdata'
 
-const AdminTopbar = () => {
+type AdminTopbarProps = {
+    variant?: "classic" | "modern";
+};
+
+const AdminTopbar = ({ variant = "modern" }: AdminTopbarProps) => {
     const router = useRouter();
     const dispatch = useDispatch<AppDispatch>();
     const { businessData } = useSelector((state: RootState) => state.user);
+    const roleCookie = Cookies.get("user_role");
+    const domainCookie = Cookies.get("user_domain");
+    let roleLabel = "";
+    let domainLabel = "";
+
+    if (roleCookie) {
+        try {
+            const parsedRole = JSON.parse(roleCookie);
+            roleLabel = parsedRole?.role_name || parsedRole?.role || "";
+        } catch (error) {
+            roleLabel = "";
+        }
+    }
+
+    if (domainCookie) {
+        try {
+            const parsedDomain = JSON.parse(domainCookie);
+            domainLabel =
+                parsedDomain?.region_name ||
+                parsedDomain?.area_name ||
+                parsedDomain?.location_name ||
+                parsedDomain?.dept_name ||
+                parsedDomain?.name ||
+                "";
+        } catch (error) {
+            domainLabel = "";
+        }
+    }
+
+    const roleText = roleLabel ? `Role: ${roleLabel}` : "";
+    const domainText = domainLabel ? `Domain: ${domainLabel}` : "";
+    const roleDomainText = [roleText, domainText].filter(Boolean).join(" | ");
 
     const hydrateBusinessData = useCallback(async () => {
         const cookieValue = Cookies.get("user_domain");
@@ -44,15 +80,76 @@ const AdminTopbar = () => {
         signOut()
     }
 
-    return (
-        <div className='w-full h-16 dark:bg-slate-900 bg-slate-400 px-10 flex items-center fixed'>
-            <div className="flex items-center justify-center gap-2">
-                <Image src={'/logo.png'} alt='my_logo' width={35} height={35} />
-                <h1 className='font-semibold text-nowrap time-font'>Task Manager</h1>
+    if (variant === "classic") {
+        return (
+            <div className='w-full h-16 dark:bg-slate-900 bg-slate-400 px-10 flex items-center fixed'>
+                <div className="flex items-center justify-center gap-2">
+                    <Image src={'/logo.png'} alt='my_logo' width={35} height={35} />
+                    <h1 className='font-semibold text-nowrap time-font'>Task Manager</h1>
+                </div>
+                <div className="w-full flex justify-end">
+                    <NotificationPane trigger={
+                        <div className='pt-2 cursor-pointer'>
+                            <Tooltip title={'no new notifications.'}>
+                                <Badge count={0} size='small'>
+                                    <Bell className='text-primary' size={20} />
+                                </Badge>
+                            </Tooltip>
+                        </div>
+                    } />
+                    {
+                        businessData &&
+                        <Popover>
+                            <PopoverTrigger>
+                                <motion.div whileTap={{ scale: 0.98 }} className="px-3 flex gap-1 items-center hover:bg-black py-1 rounded-full">
+                                    <Avatar src={businessData?.business_logo || '/avatar.png'} />
+                                    <div className='text-start'>
+                                        <h1 className='font-medium text-sm leading-4 text-slate-300'>{businessData?.business_name}</h1>
+                                        <h1 className='font-medium text-xs text-slate-400'>{businessData?.business_email}</h1>
+                                        {roleDomainText && (
+                                            <h2 className='text-[10px] text-slate-500'>{roleDomainText}</h2>
+                                        )}
+                                    </div>
+                                </motion.div>
+                            </PopoverTrigger>
+                            <PopoverContent className='w-40 p-2 space-y-2'>
+                                <motion.button onClick={() => router.push(`/admin/profile`)} whileTap={{ scale: 0.98 }} className='w-full bg-secondary hover:bg-slate-700 rounded-sm p-1 text-sm flex gap-1 items-center justify-center'><Avatar src={businessData?.business_logo || '/avatar.png'} size={18} /> Profile </motion.button>
+                                <motion.button onClick={() => router.push(`/admin/todo`)} whileTap={{ scale: 0.98 }} className='w-full bg-secondary hover:bg-slate-700 rounded-sm p-1 text-sm flex gap-1 items-center justify-center'><ListTodo size={16} /> Your ToDo </motion.button>
+                                <AlertDialog>
+                                    <AlertDialogTrigger className='w-full'><motion.h1 whileTap={{ scale: 0.98 }} className='w-full bg-destructive text-destructive-foreground hover:bg-red-700 rounded-sm p-1 text-sm flex gap-1 items-center justify-center'><ExitIcon /> Sign Out</motion.h1></AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>Signing Out?</AlertDialogTitle>
+                                            <AlertDialogDescription>Are you trying to signOut of application ?</AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                            <AlertDialogCancel onClick={() => logOut()} >Yes</AlertDialogCancel>
+                                            <AlertDialogAction>No</AlertDialogAction>
+                                        </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
+                            </PopoverContent>
+                        </Popover>
+                    }
+                </div>
             </div>
-            <div className="w-full flex justify-end">
+        )
+    }
+
+    return (
+        <div className="w-full h-16 px-6 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+                <div className="flex h-10 w-10 items-center justify-center ">
+                    <Image src={'/logo.png'} alt='my_logo' width={35} height={35} />
+                </div>
+                <div className="leading-tight">
+                    <p className="text-[10px] uppercase tracking-[0.35em] text-slate-500">Admin Console</p>
+                    <h1 className="font-semibold text-sm text-slate-100 time-font">Task Manager</h1>
+                </div>
+            </div>
+            <div className="flex items-center gap-3">
                 <NotificationPane trigger={
-                    <div className='pt-2 cursor-pointer'>
+                    <div className="cursor-pointer rounded-xl p-2 transition-colors hover:bg-slate-800/60">
                         <Tooltip title={'no new notifications.'}>
                             <Badge count={0} size='small'>
                                 <Bell className='text-primary' size={20} />
@@ -64,19 +161,30 @@ const AdminTopbar = () => {
                     businessData &&
                     <Popover>
                         <PopoverTrigger>
-                            <motion.div whileTap={{ scale: 0.98 }} className="px-3 flex gap-1 items-center hover:bg-black py-1 rounded-full">
+                            <motion.div whileTap={{ scale: 0.98 }} className="px-3 py-2 flex gap-2 items-center rounded-2xl transition-colors hover:bg-slate-800/70">
                                 <Avatar src={businessData?.business_logo || '/avatar.png'} />
                                 <div className='text-start'>
-                                    <h1 className='font-medium text-sm leading-4 text-slate-300'>{businessData?.business_name}</h1>
+                                    <h1 className='font-medium text-sm leading-4 text-slate-200'>{businessData?.business_name}</h1>
                                     <h1 className='font-medium text-xs text-slate-400'>{businessData?.business_email}</h1>
+                                    {roleDomainText && (
+                                        <h2 className='text-[10px] text-slate-500'>{roleDomainText}</h2>
+                                    )}
                                 </div>
                             </motion.div>
                         </PopoverTrigger>
-                        <PopoverContent className='w-40 p-2 space-y-2'>
-                            <motion.button onClick={() => router.push(`/admin/profile`)} whileTap={{ scale: 0.98 }} className='w-full bg-secondary hover:bg-slate-700 rounded-sm p-1 text-sm flex gap-1 items-center justify-center'><Avatar src={businessData?.business_logo || '/avatar.png'} size={18} /> Profile </motion.button>
-                            <motion.button onClick={() => router.push(`/admin/todo`)} whileTap={{ scale: 0.98 }} className='w-full bg-secondary hover:bg-slate-700 rounded-sm p-1 text-sm flex gap-1 items-center justify-center'><ListTodo size={16} /> Your ToDo </motion.button>
+                        <PopoverContent className='w-56 space-y-2 border border-slate-800/70 bg-slate-950/95 p-2 shadow-xl'>
+                            <motion.button onClick={() => router.push(`/admin/profile`)} whileTap={{ scale: 0.98 }} className='w-full rounded-lg bg-secondary/70 px-2 py-1.5 text-sm flex gap-1 items-center justify-center transition-colors hover:bg-slate-800'>
+                                <Avatar src={businessData?.business_logo || '/avatar.png'} size={18} /> Profile
+                            </motion.button>
+                            <motion.button onClick={() => router.push(`/admin/todo`)} whileTap={{ scale: 0.98 }} className='w-full rounded-lg bg-secondary/70 px-2 py-1.5 text-sm flex gap-1 items-center justify-center transition-colors hover:bg-slate-800'>
+                                <ListTodo size={16} /> Your ToDo
+                            </motion.button>
                             <AlertDialog>
-                                <AlertDialogTrigger className='w-full'><motion.h1 whileTap={{ scale: 0.98 }} className='w-full bg-destructive text-destructive-foreground hover:bg-red-700 rounded-sm p-1 text-sm flex gap-1 items-center justify-center'><ExitIcon /> Sign Out</motion.h1></AlertDialogTrigger>
+                                <AlertDialogTrigger className='w-full'>
+                                    <motion.h1 whileTap={{ scale: 0.98 }} className='w-full rounded-lg bg-destructive/90 text-destructive-foreground px-2 py-1.5 text-sm flex gap-1 items-center justify-center transition-colors hover:bg-red-700'>
+                                        <ExitIcon /> Sign Out
+                                    </motion.h1>
+                                </AlertDialogTrigger>
                                 <AlertDialogContent>
                                     <AlertDialogHeader>
                                         <AlertDialogTitle>Signing Out?</AlertDialogTitle>
