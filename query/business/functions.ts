@@ -787,11 +787,28 @@ export async function postNewProjectFunc ( payload: any ) {
 
 export async function getProjectsFunc ( queryParams: any ) {
     try {
-        const queryString = new URLSearchParams(queryParams).toString();
+        const page = Math.max(1, Number(queryParams?.page) || 1);
+        const limit = Math.max(1, Number(queryParams?.limit) || 10);
+        const cleanedParams = Object.fromEntries(
+            Object.entries(queryParams || {})
+                .filter(([_key, value]) => value !== undefined && value !== null && value !== "")
+                .map(([key, value]) => [key, String(value)])
+        );
+        const queryString = new URLSearchParams(cleanedParams as Record<string, string>).toString();
         const res = await axios.get(`/api/project/get-projects?${queryString}`);
-        return res.data;
+        if (res?.data) return res.data;
+        return {
+            data: [],
+            pagination: { page, limit, total: 0, totalPages: 1 }
+        };
     } catch (error) {
         console.log(error);
+        const page = Math.max(1, Number(queryParams?.page) || 1);
+        const limit = Math.max(1, Number(queryParams?.limit) || 10);
+        return {
+            data: [],
+            pagination: { page, limit, total: 0, totalPages: 1 }
+        };
     }
 }
 
@@ -951,6 +968,15 @@ export async function UpdateBusinessTaskFunc(payload:any){
     }
 }
 
+export async function DeleteBusinessTaskFunc(task_id: string){
+    try{
+        const res = await axios.delete(`/api/task/delete/${task_id}`);
+        return res;
+    }catch(err){
+        console.log(err);
+    }
+}
+
 export async function GetTaskByIdFunc(taskid:string){
     try{
         const res = await axios.get(`/api/task/getid/${taskid}`);
@@ -962,11 +988,20 @@ export async function GetTaskByIdFunc(taskid:string){
 
 export async function GetAllTasks(searchParams:any){
     try{
-        const queryString = new URLSearchParams(searchParams).toString();
+        const cleanedParams = Object.fromEntries(
+            Object.entries(searchParams || {}).filter(([_, value]) => {
+                if (value === undefined || value === null) return false;
+                if (value === "") return false;
+                if (value === "undefined" || value === "null") return false;
+                return true;
+            })
+        );
+        const queryString = new URLSearchParams(cleanedParams as Record<string, string>).toString();
         const res = await axios.get(`/api/task/all-tasks/get-all-tasks?${queryString}`);
-        return res.data;
+        return res?.data ?? { data: [] };
     }catch(err){
         console.log(err);
+        return { data: [] };
     }
 }
 

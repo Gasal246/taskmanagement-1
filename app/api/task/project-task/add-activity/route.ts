@@ -12,6 +12,8 @@ interface Body {
     project_id: string | null,
     activity: string,
     description: string,
+    assigned_to?: string | null,
+    assigned_skill?: string | null,
 };
 
 export async function POST(req: NextRequest) {
@@ -24,7 +26,9 @@ export async function POST(req: NextRequest) {
             project_id: body.project_id,
             activity: body.activity,
             description: body.description,
-            is_done: false
+            is_done: false,
+            assigned_to: body.assigned_to || null,
+            assigned_skill: body.assigned_skill || null
         });
         const savedActivity = await newActivity.save();
 

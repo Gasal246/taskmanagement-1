@@ -10,8 +10,15 @@ export async function GET(req:NextRequest){
 
         const type = searchParams.get("type")
         const business_id = searchParams.get("business_id");
-        const startDate = searchParams.get("startDate");
-        const endDate = searchParams.get("endDate");
+        const startDateRaw = searchParams.get("startDate");
+        const endDateRaw = searchParams.get("endDate");
+        const parseDate = (value: string | null) => {
+            if (!value || value === "undefined" || value === "null") return null;
+            const date = new Date(value);
+            return Number.isNaN(date.valueOf()) ? null : date;
+        };
+        const startDate = parseDate(startDateRaw);
+        const endDate = parseDate(endDateRaw);
         
         const query:any = {};
         if(!business_id) return NextResponse.json({message: "Please Provide business_id"}, {status:400});
@@ -31,8 +38,8 @@ export async function GET(req:NextRequest){
 
         if(startDate || endDate ){
             query.start_date = {};
-            if(startDate) query.start_date.$gte = new Date(startDate);
-            if(endDate) query.start_date.$lte = new Date(endDate);
+            if(startDate) query.start_date.$gte = startDate;
+            if(endDate) query.start_date.$lte = endDate;
         }
         
         const tasks = await Business_Tasks.find(query).exec();

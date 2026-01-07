@@ -48,10 +48,15 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
         // find business docs
         const businessDocs = await Business_docs.find({ business_id: params.id });
 
+        const businessInfo = {
+            ...(business.toObject?.() ?? business),
+            admins: businessAdmins
+        };
+
         return Response.json({
             status: 200,
             data: {
-                info: business,
+                info: businessInfo,
                 plan: businessPlan,
                 admins: businessAdmins,
                 docs: businessDocs,

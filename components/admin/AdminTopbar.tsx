@@ -139,11 +139,11 @@ const AdminTopbar = ({ variant = "modern" }: AdminTopbarProps) => {
     return (
         <div className="w-full h-16 px-6 flex items-center justify-between">
             <div className="flex items-center gap-2">
-                <div className="flex h-10 w-10 items-center justify-center ">
+                <div className="flex h-10 w-10 items-center justify-center">
                     <Image src={'/logo.png'} alt='my_logo' width={35} height={35} />
                 </div>
                 <div className="leading-tight">
-                    <p className="text-[10px] uppercase tracking-[0.35em] text-slate-500">Admin Console</p>
+                    <p className="text-[10px] uppercase tracking-[0.35em] text-slate-400">Admin Console</p>
                     <h1 className="font-semibold text-sm text-slate-100 time-font">Task Manager</h1>
                 </div>
             </div>

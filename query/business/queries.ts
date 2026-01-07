@@ -38,6 +38,7 @@ import {
     AddTaskActivityFunc,
     ApproveProjectFunc,
     DeleteProjectTeam,
+    DeleteBusinessTaskFunc,
     deleteProjectFunc,
     DeleteTaskActivityFunc,
     editBusinessAdminFunc,
@@ -837,6 +838,12 @@ export const useGetBusinessTasks = (project_id:string)=>{
 export const useUpdateBusinessTask = () => {
     return useMutation({
         mutationFn: (payload:any) => UpdateBusinessTaskFunc(payload)
+    })
+}
+
+export const useDeleteBusinessTask = () => {
+    return useMutation({
+        mutationFn: (task_id: string) => DeleteBusinessTaskFunc(task_id)
     })
 }
 

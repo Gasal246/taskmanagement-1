@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Users from "@/models/users.model";
 import Business_Project from "@/models/business_project.model";
 import Project_Teams from "@/models/project_team.model";
+import "@/models/business_skills.model";
 connectDB();
 
 export async function GET(req:NextRequest, {params}: {params: {taskid:string}}){
@@ -14,7 +15,9 @@ export async function GET(req:NextRequest, {params}: {params: {taskid:string}}){
         let task = await Business_Tasks.findById(taskid);
         if(task){
             const taskObj = task.toObject();
-            const activities = await Task_Activities.find({task_id: taskid});
+            const activities = await Task_Activities.find({task_id: taskid})
+                .populate({ path: "assigned_to", select: "name email avatar_url" })
+                .populate({ path: "assigned_skill", select: "skill_name" });
             if(activities.length > 0) taskObj.activities = activities;
             if(task.is_project_task){
                 const assigned_teams = await Project_Teams.findById(task.assigned_teams).select("team_name");

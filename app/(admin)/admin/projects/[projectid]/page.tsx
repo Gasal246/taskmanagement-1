@@ -1,8 +1,8 @@
 "use client";
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { useParams, useRouter } from 'next/navigation';
-import { Building, CheckCircle, Files, FileText, ListTodo, Loader2, PanelsTopLeft, PencilRuler, Square, Trash2, Upload, Users, Workflow, X } from 'lucide-react';
+import { Building, CheckCircle, EllipsisVertical, Eye, Files, FileText, Loader2, PanelsTopLeft, PencilRuler, Square, Trash2, Upload, Users, Workflow, X } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useApproveProject, useGetProjectById, useUpdateProject, useAddProjectDoc, useRemoveProjectDoc, useDeleteProject, useGetBusinessRegions, useGetAreasandDeptsForRegion } from '@/query/business/queries';
+import { useApproveProject, useGetProjectById, useUpdateProject, useAddProjectDoc, useRemoveProjectDoc, useDeleteProject, useGetBusinessRegions, useGetAreasandDeptsForRegion, useGetTeamsForProjects } from '@/query/business/queries';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { DEPARTMENT_TYPES } from '@/lib/constants';
@@ -21,6 +21,7 @@ import { deleteObject, getDownloadURL, ref, uploadBytes } from 'firebase/storage
 import { storage } from '@/firebase/config';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useSession } from 'next-auth/react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 // Validation schema for project update form
 const formSchema = z.object({
@@ -45,7 +46,6 @@ const ProjectView = () => {
   const [updateProjectDialog, setUpdateProjectDialog] = useState(false);
   const [progress, setProgress] = useState<number>(0);
   const [projectDocs, setProjectDocs] = React.useState<any[]>([]);
-  const [projectPeople, setProjectPeople] = React.useState<any[]>([]);
   const [docFile, setDocFile] = React.useState<File | null>(null);
   const [docName, setDocName] = React.useState<string>('');
   const [docPreview, setDocPreview] = React.useState<string | null>(null);
@@ -62,6 +62,7 @@ const ProjectView = () => {
   const { data: session }:any = useSession();
 
   const { data: project, isLoading, refetch } = useGetProjectById(params.projectid);
+  const { data: teamsData, isLoading: loadingTeams } = useGetTeamsForProjects(params.projectid);
   const { mutateAsync: ApproveProject, isPending: isApproving } = useApproveProject();
   const { mutateAsync: UpdateProject, isPending: UpdatingProject } = useUpdateProject();
   const { mutateAsync: addProjectDoc } = useAddProjectDoc();
@@ -92,7 +93,6 @@ const ProjectView = () => {
       console.log("Fetched project data:", project);
       calculateProgress();
       setProjectDocs(project?.data?.docs || []);
-      setProjectPeople(project?.data?.project_users || []);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project]);
@@ -130,6 +130,60 @@ const ProjectView = () => {
     fetchAreas();
   }, [selectedRegionId, getAreasForRegion, form]);
 
+  const teams = teamsData?.data ?? [];
+
+  const projectTeamPeople = useMemo(() => {
+    const peopleMap = new Map<string, any>();
+
+    teams.forEach((team: any) => {
+      const teamName = team?.team_name;
+      const head = team?.team_head;
+      if (head?._id) {
+        const headId = head._id.toString();
+        const existing = peopleMap.get(headId) || {
+          _id: headId,
+          name: head?.name || "User",
+          email: head?.email || "",
+          avatar_url: head?.avatar_url || "",
+          roles: [],
+          teams: []
+        };
+        existing.roles.push("Team Lead");
+        if (teamName) existing.teams.push(teamName);
+        peopleMap.set(headId, existing);
+      }
+
+      (team?.members || []).forEach((member: any) => {
+        const user = member?.user_id;
+        if (!user?._id) return;
+        const memberId = user._id.toString();
+        const existing = peopleMap.get(memberId) || {
+          _id: memberId,
+          name: user?.name || "User",
+          email: user?.email || "",
+          avatar_url: user?.avatar_url || "",
+          roles: [],
+          teams: []
+        };
+        existing.roles.push("Team Member");
+        if (teamName) existing.teams.push(teamName);
+        peopleMap.set(memberId, existing);
+      });
+    });
+
+    return Array.from(peopleMap.values()).map((person) => ({
+      ...person,
+      roles: Array.from(new Set(person.roles)),
+      teams: Array.from(new Set(person.teams)),
+    }));
+  }, [teams]);
+
+  useEffect(() => {
+    if (docAccess === 'public') {
+      setSelectedPeople([]);
+    }
+  }, [docAccess]);
+
   const markAsApproved = async () => {
     const res = await ApproveProject(params.projectid);
     if (res?.status == 200) {
@@ -160,10 +214,6 @@ const ProjectView = () => {
     form.setValue("region_id", regionValue?.toString?.() ?? regionValue ?? "");
     form.setValue("area_id", areaValue?.toString?.() ?? areaValue ?? "");
     setUpdateProjectDialog(true);
-  };
-
-  const handleNavigateToChangeDetails = () => {
-    router.push(`/admin/projects/${params.projectid}/task`);
   };
 
   const handleNavigateToTeams = () => {
@@ -297,6 +347,10 @@ const ProjectView = () => {
     const accessList = docAccess === 'private'
       ? Array.from(new Set([...selectedPeople, uploaderId].filter(Boolean)))
       : [];
+    const accessToPeople = projectTeamPeople.filter((person: any) => {
+      const personId = person?._id?.toString?.() ?? person?._id;
+      return accessList.includes(personId);
+    });
 
     const optimisticId = `temp-${Date.now()}`;
     const optimisticDoc = {
@@ -306,7 +360,7 @@ const ProjectView = () => {
       doc_type: docType || docFile.type,
       storage_path: storagePath,
       access_type: docAccess,
-      access_to: projectPeople.filter((p: any) => accessList.includes(p?._id?.toString?.())),
+      access_to: accessToPeople,
       optimistic: true,
     };
 
@@ -449,15 +503,13 @@ const ProjectView = () => {
             </motion.div>
           </div>
         </div>
+        <div>
+          <div className="w-full lg:w-1/2 mb-2.5">
+            <p className='text-xl text-slate-300 font-semibold'>{project?.data?.project_name || "-"}</p>
+            <p className='text-sm text-slate-300 font-medium'>{project?.data?.project_description || "-"}</p>
+          </div>
+        </div>
         <div className="w-full flex flex-wrap items-center lg:w-1/2">
-          <div className="w-full lg:w-1/2 mb-2.5">
-            <p className='text-xs text-slate-400'>Project Name</p>
-            <p className='text-xs text-slate-300 font-semibold'>{project?.data?.project_name || "-"}</p>
-          </div>
-          <div className="w-full lg:w-1/2 mb-2.5">
-            <p className='text-xs text-slate-400'>Description</p>
-            <p className='text-xs text-slate-300 font-semibold'>{project?.data?.project_description || "-"}</p>
-          </div>
           <div className="w-full lg:w-1/2 mb-2.5">
             <p className='text-xs text-slate-400'>Progress</p>
             <p className='text-xs text-slate-300 font-semibold'>{progress || "0"}%</p>
@@ -472,7 +524,7 @@ const ProjectView = () => {
           </div>
           <div className="w-full lg:w-1/2 mb-2.5">
             <p className='text-xs text-slate-400'>Status</p>
-            <p className={`text-xs font-semibold capitalize ${project?.data?.status == "Pending" ? 'text-gray-600' : project?.data.status == "completed" ? 'text-green-600' : project?.data?.status == "approved" ? 'text-blue-600' : project?.data?.status == "cancelled" ? 'text-red-600' : 'text-gray-600'}`}>
+            <p className={`text-xs font-semibold capitalize ${project?.data?.status == "Pending" ? 'text-gray-600' : project?.data.status == "completed" ? 'text-green-600' : project?.data?.status == "approved" ? 'text-blue-400' : project?.data?.status == "cancelled" ? 'text-red-600' : 'text-gray-600'}`}>
               {project?.data?.status}
             </p>
           </div>
@@ -515,7 +567,7 @@ const ProjectView = () => {
             onClick={handleNavigateToDepts}
           >
             <PencilRuler size={12} />
-            Edit Departments
+            Manage Departments
           </motion.div>
         </div>
         <div className="flex flex-wrap">
@@ -543,40 +595,48 @@ const ProjectView = () => {
             onClick={handleNavigateToTeams}
           >
             <PencilRuler size={12} />
-            Edit Teams
+            Manage Teams
           </motion.div>
         </div>
         <div className="flex flex-wrap">
-          {project?.data?.teams?.map((member: any) => (
-            <div className="w-full lg:w-3/12 p-1" key={member?._id}>
-              <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg border border-slate-700 hover:border-cyan-800">
-                <h1 className="font-medium text-xs text-slate-300 flex items-center gap-1">{member?.team_name}</h1>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg min-h-[20vh] mb-2 border border-slate-700/50">
-        <div className="mb-2 flex items-center justify-between">
-          <h1 className="font-medium text-xs text-slate-300 flex items-center gap-1">
-            <ListTodo size={14} /> Tasks
-          </h1>
-          <motion.div
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            className='p-2 px-4 rounded-lg border border-slate-700 hover:border-slate-500 bg-gradient-to-tr from-slate-900 to-slate-800 cursor-pointer text-xs font-medium flex gap-1 items-center'
-            onClick={handleNavigateToChangeDetails}
-          >
-            <PencilRuler size={12} />
-            Changes
-          </motion.div>
-        </div>
-        <div className="flex flex-wrap">
-          {project?.data?.tasks?.map((task: any) => (
-            <div className="w-full lg:w-3/12 p-1" key={task?._id}>
-              <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg border border-slate-700 hover:border-cyan-800">
-                <h1 className="font-medium text-xs text-slate-300 flex items-center gap-1">{task?.task_name} ({task?.status})</h1>
+          {loadingTeams && (
+            <p className="text-xs text-slate-400">Loading teams...</p>
+          )}
+          {!loadingTeams && teams.length === 0 && (
+            <p className="text-xs text-slate-400">No teams added to this project.</p>
+          )}
+          {teams.map((team: any) => (
+            <div className="w-full lg:w-3/12 p-1" key={team?._id}>
+              <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg border border-slate-700 hover:border-cyan-800 relative">
+                <h1 className="font-medium text-xs text-slate-300 flex items-center gap-1">{team?.team_name}</h1>
+                <p className="text-xs text-slate-400">Department: {team?.project_dept_id?.department_name || "-"}</p>
+                <p className="text-xs text-slate-400">Lead: {team?.team_head?.name || "-"}</p>
+                <p className="text-xs text-slate-400">Members: {team?.members?.length ?? 0}</p>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <motion.button
+                      type="button"
+                      whileHover={{ scale: 1.04 }}
+                      whileTap={{ scale: 0.95 }}
+                      className='p-1 rounded-full hover:bg-slate-800 cursor-pointer text-xs font-medium flex gap-1 items-center absolute top-2 right-2'
+                    >
+                      <EllipsisVertical size={14} />
+                    </motion.button>
+                  </PopoverTrigger>
+                  <PopoverContent className='w-[120px] p-0 border border-slate-800 rounded-lg overflow-hidden'>
+                    <div className='flex flex-col items-start gap-1 bg-black rounded-lg'>
+                      <motion.div
+                        whileTap={{ scale: 0.98 }}
+                        whileHover={{ scale: 1.02 }}
+                        className='bg-slate-800/50 w-full p-1 py-2 text-cyan-500 cursor-pointer hover:text-cyan-700 flex items-center justify-center gap-1 border border-dashed border-slate-700 rounded-lg'
+                        onClick={() => router.push(`/admin/projects/${params.projectid}/teams/${team?._id}`)}
+                      >
+                        <Eye size={12} />
+                        <h1 className='text-xs font-medium'>View Team</h1>
+                      </motion.div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
           ))}
@@ -598,12 +658,20 @@ const ProjectView = () => {
             View All
           </motion.div>
         </div>
-        <div className="flex flex-col gap-2">
-          {project?.data?.flows?.map((log: any) => (
-            <div className="w-full p-1" key={log?._id}>
+        <div className="mt-2 space-y-3">
+          {project?.data?.flows?.length === 0 && (
+            <p className="text-xs text-slate-400">No activity logs yet.</p>
+          )}
+          {project?.data?.flows?.map((log: any, index: number) => (
+            <div className="relative pl-5" key={log?._id}>
+              <span className="absolute left-1 top-2 h-2 w-2 rounded-full bg-cyan-400" />
+              {index < project?.data?.flows?.length - 1 && (
+                <span className="absolute left-[6px] top-4 h-full w-px bg-slate-800" />
+              )}
               <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg border border-slate-700 hover:border-cyan-800">
-                <h1 className="font-medium text-xs text-slate-300 flex items-center gap-1">{log?.Log}</h1>
-                <p className="text-xs text-slate-400">{formatDateTiny(log?.createdAt)}</p>
+                <h1 className="font-medium text-xs text-slate-200">{log?.Log}</h1>
+                {log?.description && <p className="text-[11px] text-slate-400 mt-1">{log?.description}</p>}
+                <p className="text-[11px] text-slate-500 mt-2">{formatDateTiny(log?.createdAt)}</p>
               </div>
             </div>
           ))}
@@ -616,7 +684,7 @@ const ProjectView = () => {
             <h1 className="font-medium text-xs text-slate-300 flex items-center gap-1">
               <Files size={14} /> Project Documents
             </h1>
-            <p className="text-[11px] text-slate-400">Images or PDFs only • Max 5MB • Names must be unique</p>
+            <p className="text-[11px] text-slate-400">Images or PDFs only • Max 5MB • Names must be unique • Public = all project teams</p>
           </div>
           {uploadingDoc && (
             <div className="flex items-center gap-1 text-[11px] text-cyan-400">
@@ -680,12 +748,13 @@ const ProjectView = () => {
 
               {docAccess === 'private' && (
                 <div className="space-y-2 border border-slate-800 rounded-md p-2 max-h-36 overflow-y-auto bg-slate-900/40">
-                  <p className="text-[11px] text-slate-400">Select people in this project</p>
-                  {projectPeople?.length === 0 && <p className="text-[11px] text-slate-500">No project members found.</p>}
-                  {projectPeople?.map((person: any) => {
-                    const personId = person?._id?.toString?.();
+                  <p className="text-[11px] text-slate-400">Select team members who should see this document</p>
+                  {projectTeamPeople?.length === 0 && <p className="text-[11px] text-slate-500">No team members found.</p>}
+                  {projectTeamPeople?.map((person: any) => {
+                    const personId = person?._id?.toString?.() ?? person?._id ?? "";
                     const name = person?.name || person?.Name || 'User';
                     const roles = person?.roles || [];
+                    const teams = person?.teams || [];
                     return (
                       <div key={personId} className="flex flex-col gap-1 text-xs text-slate-200 cursor-pointer border-b border-slate-800/60 pb-2 last:border-b-0">
                         <label className="flex items-center gap-2">
@@ -708,6 +777,11 @@ const ProjectView = () => {
                             </span>
                           )) : (
                             <span className="text-[10px] text-slate-500">No roles</span>
+                          )}
+                          {teams.length > 0 && (
+                            <span className="px-2 py-0.5 rounded-full bg-slate-900/70 border border-slate-700 text-[10px] text-slate-400">
+                              {teams.length} team{teams.length > 1 ? "s" : ""}
+                            </span>
                           )}
                         </div>
                       </div>

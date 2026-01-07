@@ -1,174 +1,257 @@
-"use client"
-import React, { useEffect, useState } from 'react'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { useRouter } from 'next/navigation';
-import { CalendarPlus, ListTodo } from 'lucide-react';
-import { Label } from '@/components/ui/label';
-import { DatePicker, Space } from 'antd';
-import { Button } from '@/components/ui/button';
-import { useSelector } from 'react-redux';
-import { RootState } from '@/redux/store';
-import { useGetAllTasks } from '@/query/business/queries';
-import LoaderSpin from '@/components/shared/LoaderSpin';
+"use client";
+
+import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { CalendarPlus, ListTodo } from "lucide-react";
+import { DatePicker } from "antd";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useSelector } from "react-redux";
+import { RootState } from "@/redux/store";
+import { useGetAllTasks } from "@/query/business/queries";
+import LoaderSpin from "@/components/shared/LoaderSpin";
+
 const { RangePicker } = DatePicker;
 
-const taskTypes = [
-  { value: 'all', label: 'All Tasks' },
-  { value: "project", label: 'Project Tasks' },
-  { value: "single", label: 'Single Tasks' }
-]
+type TaskTab = "all" | "single" | "project";
+
+type RangeState = {
+  start: string;
+  end: string;
+};
+
+const statusStyles: Record<string, string> = {
+  Completed: "border-emerald-500/40 bg-emerald-500/15 text-emerald-200",
+  "In Progress": "border-amber-500/40 bg-amber-500/15 text-amber-200",
+  "To Do": "border-rose-500/40 bg-rose-500/15 text-rose-200",
+  Cancelled: "border-slate-500/40 bg-slate-500/15 text-slate-200",
+};
+
+const getProgressValue = (completed: number, total: number) => {
+  if (!total || total <= 0) return 0;
+  const value = Math.round((completed / total) * 100);
+  return Math.min(100, Math.max(0, value));
+};
+
+const getProgressClass = (value: number) => {
+  if (value < 30) return "bg-red-500";
+  if (value < 50) return "bg-yellow-500";
+  if (value < 70) return "bg-blue-500";
+  return "bg-emerald-500";
+};
 
 const TasksPage = () => {
   const router = useRouter();
   const { businessData } = useSelector((state: RootState) => state.user);
-  const [selectedTaskType, setSelectedTaskType] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [activeTab, setActiveTab] = useState<TaskTab>("all");
+  const [rangeValue, setRangeValue] = useState<any>(null);
+  const [draftRange, setDraftRange] = useState<RangeState>({ start: "", end: "" });
+  const [appliedRange, setAppliedRange] = useState<RangeState>({ start: "", end: "" });
   const [filters, setFilters] = useState<Record<string, string | undefined>>({});
-  const {data:tasks, isLoading, refetch} = useGetAllTasks(filters);
-  const handleDateChange = (dates: any, dateStrings: any) => {
-    setStartDate(dateStrings[0]);
-    setEndDate(dateStrings[1]);
+
+  useEffect(() => {
+    if (!businessData?._id) return;
+    setFilters({
+      business_id: businessData._id,
+      type: activeTab,
+      startDate: appliedRange.start || undefined,
+      endDate: appliedRange.end || undefined,
+    });
+  }, [businessData?._id, activeTab, appliedRange]);
+
+  const { data: tasks, isLoading } = useGetAllTasks(filters);
+
+  const handleDateChange = (dates: any, dateStrings: [string, string]) => {
+    setRangeValue(dates);
+    setDraftRange({
+      start: dateStrings?.[0] || "",
+      end: dateStrings?.[1] || "",
+    });
   };
 
-  useEffect(()=> {
-    console.log("fetched tasks ", tasks);
-  },[tasks])
-
-  const handleSearchTasks = async () => {
-    try {
-      setFilters({
-        business_id: businessData?._id,
-        type: selectedTaskType,
-        startDate,
-        endDate,
-      });
-    } catch (err) {
-      console.log(err);
-    }
+  const handleApplyFilters = () => {
+    setAppliedRange(draftRange);
   };
 
   const handleClearFilters = () => {
-    setSelectedTaskType('');
-    setStartDate('');
-    setEndDate('');
-    setFilters({ business_id: businessData?._id });
+    setDraftRange({ start: "", end: "" });
+    setAppliedRange({ start: "", end: "" });
+    setRangeValue(null);
   };
 
-  useEffect(() => {
-    console.log("Tasks data updated:", tasks);
-  }, [tasks]);
+  const taskList = tasks?.data ?? [];
 
   return (
-    <div className='p-4 pb-20'>
-      <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg mb-2 flex justify-between items-center">
-        <h1 className='font-semibold text-sm text-slate-300 flex items-center gap-1'>
-          <ListTodo size={16} /> Business Tasks
-        </h1>
-          <Button className='flex items-center gap-1' onClick={() => router.push('/admin/tasks/addtask')}>
+    <div className="p-4 pb-20 space-y-3">
+      <div className="rounded-xl border border-slate-800/70 bg-gradient-to-br from-slate-950/70 via-slate-900/50 to-slate-900/80 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-xs uppercase tracking-widest text-slate-400">Business Tasks</p>
+            <h1 className="text-lg font-semibold text-slate-100 flex items-center gap-2">
+              <ListTodo size={18} /> Task Overview
+            </h1>
+            <p className="text-xs text-slate-400 mt-1">
+              Track individual assignments and project workstreams across the business.
+            </p>
+          </div>
+          <Button
+            className="flex items-center gap-2 bg-cyan-600/20 text-cyan-100 border border-cyan-700/50 hover:bg-cyan-500/20"
+            onClick={() => router.push("/admin/tasks/addtask")}
+          >
             Add Task <CalendarPlus size={16} />
           </Button>
-
-        {startDate && endDate && (
-          <div className="flex items-center gap-2">
-            <p className="text-xs text-slate-400">From: {startDate}</p>
-            <p className="text-xs text-slate-400">To: {endDate}</p>
+        </div>
+        {appliedRange.start && appliedRange.end && (
+          <div className="mt-3 text-xs text-slate-400 flex flex-wrap items-center gap-2">
+            <span className="rounded-md border border-slate-700/60 bg-slate-900/60 px-2 py-1">
+              From {appliedRange.start}
+            </span>
+            <span className="rounded-md border border-slate-700/60 bg-slate-900/60 px-2 py-1">
+              To {appliedRange.end}
+            </span>
           </div>
         )}
       </div>
-      <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg min-h-[13vh] mb-2">
-        <h1 className='font-semibold text-xs text-slate-400 px-2'>Task Filters</h1>
-        <div className='flex flex-wrap'>
-          <div className="w-full lg:w-4/12 p-1">
-            <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
-              <Select value={selectedTaskType} onValueChange={setSelectedTaskType}>
-                <SelectTrigger className={`${selectedTaskType ? 'text-slate-200' : 'text-slate-400'}`}>
-                  <SelectValue placeholder="Select Task Type" />
-                </SelectTrigger>
-                <SelectContent>
-                  {taskTypes.map((item) => (
-                    <SelectItem key={item.value} value={item.value}>
-                      {item.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+
+      <div className="rounded-xl border border-slate-800/70 bg-gradient-to-br from-slate-950/60 to-slate-900/70 p-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="text-xs font-semibold text-slate-400">Task Filters</p>
+            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TaskTab)}>
+              <TabsList className="mt-2 bg-slate-900/70">
+                <TabsTrigger
+                  className="text-slate-400 data-[state=active]:bg-slate-200/10 data-[state=active]:text-slate-100"
+                  value="all"
+                >
+                  All Tasks
+                </TabsTrigger>
+                <TabsTrigger
+                  className="text-slate-400 data-[state=active]:bg-slate-200/10 data-[state=active]:text-slate-100"
+                  value="single"
+                >
+                  Individual Tasks
+                </TabsTrigger>
+                <TabsTrigger
+                  className="text-slate-400 data-[state=active]:bg-slate-200/10 data-[state=active]:text-slate-100"
+                  value="project"
+                >
+                  Project Tasks
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
           </div>
-          <div className="w-full lg:w-4/12 p-1">
-            <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg p-0.5 px-1">
-              <Label className='text-xs text-slate-400 px-2'>Within Period</Label>
-              <Space direction="vertical" size={12} style={{ width: '100%', border: 0 }} className='placeholder:text-white'>
-                <RangePicker onChange={handleDateChange} style={{ backgroundColor: '#1d293d', width: '100%', border: 0 }} className='text-white' />
-              </Space>
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="min-w-[240px]">
+              <p className="text-[11px] text-slate-400 mb-1">Within Period</p>
+              <RangePicker
+                onChange={handleDateChange}
+                value={rangeValue}
+                className="w-full text-slate-100"
+                style={{ backgroundColor: "#111827", border: "1px solid #1f2937" }}
+              />
             </div>
-          </div>
-          <div className="w-full lg:w-4/12 p-1 flex gap-2 justify-start items-center">
-            <Button variant='ghost' className='text-xs' onClick={handleClearFilters}>Clear All</Button>
-            <Button onClick={handleSearchTasks} className='text-xs '>Apply / Search</Button>
+            <Button
+              size="sm"
+              className="h-9 bg-slate-100/10 text-slate-100 border border-slate-700/80 hover:bg-slate-100/20"
+              onClick={handleApplyFilters}
+            >
+              Apply
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-9 text-slate-400 hover:text-slate-200"
+              onClick={handleClearFilters}
+            >
+              Clear
+            </Button>
           </div>
         </div>
       </div>
-      <div className="bg-slate-900/50 p-4 rounded-xl shadow-sm min-h-[13vh]">
-        <h1 className="font-semibold text-sm text-slate-300 flex items-center gap-2 mb-3">
-          <ListTodo size={16} /> Business Tasks
-        </h1>
+
+      <div className="rounded-xl border border-slate-800/70 bg-slate-900/40 p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
+            <ListTodo size={16} /> Tasks
+          </h2>
+          <p className="text-xs text-slate-400">{taskList.length} tasks</p>
+        </div>
+
         {isLoading && (
           <div className="flex items-center justify-center w-full h-[15vh]">
-              <LoaderSpin size={20} title="Loading Tasks..." />
-            </div>
+            <LoaderSpin size={20} title="Loading Tasks..." />
+          </div>
         )}
-        {tasks?.data?.length === 0 && !isLoading && (
+
+        {!isLoading && taskList.length === 0 && (
           <p className="text-xs text-slate-500 italic">No tasks found.</p>
         )}
-        <div className="space-y-2">
-          {tasks?.data?.map((task: any) => (
-            <div
-              key={task._id}
-              className="p-3 border border-slate-700 rounded-lg hover:bg-slate-800/60 transition cursor-pointer"
-              onClick={() => router.push(`/admin/tasks/${task._id}`)}
-            >
-              <h2 className="text-md font-medium text-slate-200 truncate">
-                {task.task_name}
-              </h2>
-              <div className="flex flex-wrap items-center gap-2 mt-1 text-xs">
-  {/* Status Tag */}
-  <span
-    className={`
-      px-2 py-1 rounded-md capitalize
-      font-semibold
-      ${
-        task.status === "Completed"
-          ? "bg-green-100 text-green-700"
-          : task.status === "In Progress"
-          ? "bg-yellow-100 text-yellow-700"
-          : task.status === "To Do"
-          ? "bg-red-100 text-red-700"
-          : "bg-gray-100 text-gray-600"
-      }
-    `}
-  >
-    {task.status}
-  </span>
 
-  {/* Progress Tag */}
-  <span className="px-2 py-1 rounded-md bg-blue-100 text-blue-700 capitalize">
-    Progress: {task.activity_count ? Math.round((task.completed_activity / task.activity_count) * 100) : 0}%
-  </span>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {taskList.map((task: any) => {
+            const progress = getProgressValue(
+              Number(task.completed_activity || 0),
+              Number(task.activity_count || 0)
+            );
+            return (
+              <div
+                key={task._id}
+                className="cursor-pointer rounded-xl border border-slate-800/70 bg-gradient-to-br from-slate-950/70 to-slate-900/60 p-4 transition hover:border-cyan-700/40"
+                onClick={() => router.push(`/admin/tasks/${task._id}`)}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-base font-semibold text-slate-100">
+                      {task.task_name}
+                    </h3>
+                    <p className="text-xs text-slate-400 mt-1">
+                      {task.task_description || "No description added."}
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-end gap-2">
+                    <span
+                      className={`text-[10px] uppercase tracking-wide px-2 py-1 rounded-md border ${
+                        statusStyles[task.status] ||
+                        "border-slate-600/40 bg-slate-700/30 text-slate-200"
+                      }`}
+                    >
+                      {task.status || "Unknown"}
+                    </span>
+                    {task.is_project_task && (
+                      <span className="text-[10px] uppercase tracking-wide px-2 py-1 rounded-md border border-indigo-500/40 bg-indigo-500/10 text-indigo-200">
+                        Project Based
+                      </span>
+                    )}
+                  </div>
+                </div>
 
-  {/* Date Tag */}
-  <span className="px-2 py-1 rounded-md bg-slate-100 text-slate-600">
-    Start: {task.start_date ? new Date(task.start_date).toLocaleDateString() : "N/A"} • 
-    End: {task.end_date ? new Date(task.end_date).toLocaleDateString() : "N/A"}
-  </span>
-</div>
+                <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-400">
+                  <span className="rounded-md bg-slate-900/60 border border-slate-800/60 px-2 py-1">
+                    Activities: {task.activity_count || 0}
+                  </span>
+                  <span className="rounded-md bg-slate-900/60 border border-slate-800/60 px-2 py-1">
+                    Completed: {task.completed_activity || 0}
+                  </span>
+                </div>
 
-            </div>
-          ))}
+                <div className="mt-3 flex items-center gap-3">
+                  <div className="h-2 flex-1 rounded-full bg-slate-800/80">
+                    <div
+                      className={`h-2 rounded-full ${getProgressClass(progress)}`}
+                      style={{ width: `${progress}%` }}
+                    />
+                  </div>
+                  <span className="text-xs font-semibold text-slate-200 w-12 text-right">
+                    {progress}%
+                  </span>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default TasksPage
+export default TasksPage;

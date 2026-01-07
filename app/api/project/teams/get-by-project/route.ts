@@ -12,11 +12,15 @@ export async function GET(req:NextRequest){
         const {searchParams} = new URL(req.url);
         const project_id = searchParams.get("project_id");
         
-        const teams = await Project_Teams.find({project_id: project_id}).populate('team_head', 'name').populate("project_dept_id", "department_name").lean();
+        const teams = await Project_Teams.find({project_id: project_id})
+            .populate('team_head', 'name email avatar_url')
+            .populate("project_dept_id", "department_name")
+            .lean();
         
         for (const team of teams){
-            const member = await Project_Team_Members.find({ project_team_id: team._id });
-            console.log("member", member);
+            const member = await Project_Team_Members.find({ project_team_id: team._id })
+                .populate("user_id", "name email avatar_url")
+                .lean();
             team.members = member;
         }
         

@@ -1,366 +1,525 @@
 "use client"
-import React, { useEffect, useState } from 'react'
-import { motion } from 'framer-motion';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, } from "@/components/ui/select"
-import { useRouter } from 'next/navigation';
-import { CalendarPlus, PanelsTopLeft } from 'lucide-react';
-import { Label } from '@/components/ui/label';
+import React, { useEffect, useMemo, useState } from 'react'
 import { DatePicker, Space } from 'antd';
-import { Button } from '@/components/ui/button';
+import { useRouter } from 'next/navigation';
+import { CalendarPlus, CheckCircle2, Clock3, Filter, PanelsTopLeft } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import { RootState } from '@/redux/store';
 import { useSession } from 'next-auth/react';
-import { useGetBusinessClients, useGetBusinessRegions, useGetProjects, useGetRegionComplete } from '@/query/business/queries';
+import { useGetAreasandDeptsForRegion, useGetBusinessClients, useGetBusinessRegions, useGetProjects } from '@/query/business/queries';
 import { DEPARTMENT_TYPES } from '@/lib/constants';
 import LoaderSpin from '@/components/shared/LoaderSpin';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+
 const { RangePicker } = DatePicker;
 
-const projectSections = [
-  { value: 'all', label: 'All Projects' },
-  { value: 'current', label: 'Current Projects' },
-  { value: 'previous', label: 'Previous Projects' },
-  { value: 'waiting', label: 'Waiting For Approval' },
-  
-]
+const statusTabs = [
+  { value: 'all', label: 'All' },
+  { value: 'ongoing', label: 'On Going' },
+  { value: 'waiting', label: 'Waiting for Approval' },
+  { value: 'completed', label: 'Completed' },
+];
 
-const domainWise = [
-  { value: 'client', label: 'Client Wise' },
-  { value: 'region', label: 'Region Wise' },
-  {value: 'department', label: 'Department Type Wise'}
-]
+const limit = 8;
 
 const ProjectsPage = () => {
   const router = useRouter();
-  const { mutateAsync: getRegions, isPending: loadingRegions } = useGetBusinessRegions();
-  const { mutateAsync: getBusinessClients, isPending: loadingBusinessClients } = useGetBusinessClients();
-  const { mutateAsync: fetchCompleteRegion, isPending: loadingCompleteRegion } = useGetRegionComplete();
   const { data: session }: any = useSession();
-  const [selectedSection, setSelectedSection] = useState('all');
-  const [selectedDomainWise, setSelectedDomainWise] = useState('');
-  const [selectedDomainId, setSelectedDomainId] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [canAdd, setCanAdd] = useState(false);
   const { businessData } = useSelector((state: RootState) => state.user);
-  const [domains, setDomains] = useState<any[]>([]);
-  const [isRegion, setIsRegion] = useState<boolean>(false);
-  const [departments, setDepartments] = useState<any[]>([]);
-  const [areas, setAreas] = useState<any[]>([]);
-  const [selectedDepartment, setSelectedDepartment] = useState<string>('');
-  const [selectedArea, setSelectedArea] = useState<string>('');
-  const [filters, setFilters] = useState<Record<string, string | undefined>>({});
-  const {data: projects, isLoading, refetch} = useGetProjects(filters);
 
-  const handleDateChange = (dates: any, dateStrings: any) => {
-    setStartDate(dateStrings[0]);
-    setEndDate(dateStrings[1]);
-  };
+  const [businessClients, setBusinessClients] = useState<any[]>([]);
+  const [businessRegions, setBusinessRegions] = useState<any[]>([]);
+  const [regionAreas, setRegionAreas] = useState<any[]>([]);
+  const [canAdd, setCanAdd] = useState(false);
+
+  const [tab, setTab] = useState('all');
+  const [filters, setFilters] = useState({
+    type: '',
+    client_id: '',
+    region_id: '',
+    area_id: '',
+    startDate: '',
+    endDate: '',
+  });
+  const [page, setPage] = useState(1);
+
+  const { mutateAsync: getRegions } = useGetBusinessRegions();
+  const { mutateAsync: getBusinessClients } = useGetBusinessClients();
+  const { mutateAsync: getAreasForRegion, isPending: loadingAreas } = useGetAreasandDeptsForRegion();
 
   useEffect(() => {
-    setFilters({
+    if (businessData) {
+      setCanAdd(businessData?.admins?.some((x: any) => x.user_id == session?.user?.id));
+    }
+  }, [businessData, session?.user?.id]);
+
+  useEffect(() => {
+    if (!businessData?._id) return;
+    const fetchFilters = async () => {
+      const [regionsRes, clientsRes] = await Promise.all([
+        getRegions({ business_id: businessData?._id }),
+        getBusinessClients(businessData?._id),
+      ]);
+      if (regionsRes?.status === 200) {
+        setBusinessRegions(regionsRes?.data ?? []);
+      }
+      if (clientsRes?.status === 200) {
+        setBusinessClients(clientsRes?.data ?? []);
+      }
+    };
+    fetchFilters();
+  }, [businessData?._id, getRegions, getBusinessClients]);
+
+  useEffect(() => {
+    const fetchAreas = async () => {
+      if (!filters.region_id) {
+        setRegionAreas([]);
+        return;
+      }
+      const res = await getAreasForRegion(filters.region_id);
+      if (res?.status === 200) {
+        setRegionAreas(res?.data?.areas ?? []);
+      } else {
+        setRegionAreas([]);
+      }
+    };
+
+    fetchAreas();
+  }, [filters.region_id, getAreasForRegion]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [tab, filters.type, filters.client_id, filters.region_id, filters.area_id, filters.startDate, filters.endDate]);
+
+  const queryParams = useMemo(() => {
+    return {
       business_id: businessData?._id,
-      ...(selectedSection !== 'all' ? { section: selectedSection } : {}),
+      tab: tab !== 'all' ? tab : undefined,
+      type: filters.type || undefined,
+      client_id: filters.client_id || undefined,
+      region_id: filters.region_id || undefined,
+      area_id: filters.area_id || undefined,
+      startDate: filters.startDate || undefined,
+      endDate: filters.endDate || undefined,
+      page: String(page),
+      limit: String(limit)
+    };
+  }, [businessData?._id, filters.area_id, filters.client_id, filters.endDate, filters.region_id, filters.startDate, filters.type, page, tab]);
+
+  const { data: projectsResponse, isLoading } = useGetProjects(queryParams);
+  const projects = projectsResponse?.data ?? [];
+  const pagination = projectsResponse?.pagination ?? { page: 1, totalPages: 1, total: 0, limit };
+  const totalPages = Math.max(1, pagination.totalPages || 1);
+
+  const pageItems = useMemo(() => {
+    if (totalPages <= 1) return [];
+    if (totalPages <= 10) return Array.from({ length: totalPages }, (_, i) => i + 1);
+
+    const tailSize = 4;
+    const mainSize = 5;
+    const tailStart = Math.max(totalPages - tailSize + 1, 1);
+    let mainStart = page <= 4 ? 1 : page + 1;
+
+    if (mainStart >= tailStart) {
+      mainStart = tailStart;
+    }
+    let mainEnd = Math.min(mainStart + mainSize - 1, totalPages);
+    if (mainEnd >= tailStart - 1) {
+      mainEnd = tailStart - 1;
+    }
+
+    const items: Array<number | "ellipsis"> = [];
+    for (let i = mainStart; i <= mainEnd; i += 1) {
+      items.push(i);
+    }
+    if (mainEnd > 0 && mainEnd < tailStart - 1) {
+      items.push("ellipsis");
+    }
+    for (let i = tailStart; i <= totalPages; i += 1) {
+      items.push(i);
+    }
+    return items;
+  }, [totalPages, page]);
+
+  const startIndex = pagination.total === 0 ? 0 : (page - 1) * limit + 1;
+  const endIndex = Math.min(page * limit, pagination.total);
+
+  const handleDateChange = (_dates: any, dateStrings: [string, string]) => {
+    setFilters((prev) => ({
+      ...prev,
+      startDate: dateStrings?.[0] ?? '',
+      endDate: dateStrings?.[1] ?? ''
+    }));
+  };
+
+  const clearFilters = () => {
+    setFilters({
+      type: '',
+      client_id: '',
+      region_id: '',
+      area_id: '',
+      startDate: '',
+      endDate: '',
     });
-    refetch();
-  }, []);
+  };
 
-  const handleClearAll = () => {
-    setStartDate('');
-    setEndDate('');
-    setSelectedSection('all');
-    setSelectedDomainWise('');
-    setSelectedDomainId('');
-    setFilters({business_id: businessData?._id});
-  }
+  const formatDate = (value?: string) => {
+    if (!value) return "-";
+    return new Date(value).toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  };
 
-  const handleDomainWiseChange = async(value: string) => {
-    setSelectedDomainWise(value);
-    
-    switch(value){
-      case 'region':
-        if(businessData?._id){
-          const res:any = await getRegions({business_id:businessData?._id})
-            if(res?.status == 200){
-              setDomains(res?.data);
-            }
-        }
-        break;
-      case 'client':
-        setIsRegion(false);
-        if(businessData?._id){
-          const res:any = await getBusinessClients(businessData?._id)
-            if(res?.status == 200){
-              console.log(res?.data);
-              setDomains(res?.data);
-              
-            }
-        }
-        break;
-      case 'department':
-        setIsRegion(false);
-        setDomains(DEPARTMENT_TYPES);
-    }
-  }
-
-  const handleDomainChange = async(value:string) => {
-    setSelectedDomainId(value);
-    
-    if(selectedDomainWise == 'region'){
-      setIsRegion(true);
-      const res:any = await fetchCompleteRegion(value);
-      if(res?.status == 200){
-        console.log(res?.data);
-        
-        setDepartments(res?.data?.departments || []);
-        setAreas(res?.data?.areas || []);
-    } else {
-      //add the client id to the filter
-      setIsRegion(false);
-    }
-  }
-}
-
-  useEffect(()=>{
-    if(businessData){
-      setCanAdd(businessData?.admins?.some((x:any) => x.user_id == session?.user?.id));
-    }
-  }, [])
-
-  const handleSearchProjects = async() => {
-    try{
-      const nextFilters: Record<string, string | undefined> = {
-        business_id: businessData?._id,
+  const getStatusBadge = (project: any) => {
+    if (!project?.is_approved) {
+      return {
+        label: "Waiting for approval",
+        className: "bg-amber-500/10 text-amber-200 border border-amber-500/30"
       };
-
-      if (selectedSection !== 'all') {
-        nextFilters.section = selectedSection;
-      }
-
-      if (selectedDomainWise) {
-        nextFilters.domainWise = selectedDomainWise;
-      }
-
-      if (selectedDomainId) {
-        nextFilters.domainId = selectedDomainId;
-      }
-
-      if (selectedDomainWise === 'region') {
-        if (selectedDepartment) {
-          nextFilters.department = selectedDepartment;
-        }
-        if (selectedArea) {
-          nextFilters.area = selectedArea;
-        }
-      }
-
-      if (startDate) {
-        nextFilters.startDate = startDate;
-      }
-
-      if (endDate) {
-        nextFilters.endDate = endDate;
-      }
-
-      setFilters(nextFilters);
-
-    //refetch(); 
-    //console.log("Filters applied:", projects);
-    
-    } catch(err){
-      console.log(err);
     }
-}
+    if (project?.status === "completed") {
+      return {
+        label: "Completed",
+        className: "bg-emerald-500/10 text-emerald-200 border border-emerald-500/30"
+      };
+    }
+    if (project?.status === "cancelled") {
+      return {
+        label: "Cancelled",
+        className: "bg-rose-500/10 text-rose-200 border border-rose-500/30"
+      };
+    }
+    return {
+      label: "On going",
+      className: "bg-cyan-500/10 text-cyan-200 border border-cyan-500/30"
+    };
+  };
 
-useEffect(() => {
-  console.log("Projects data updated:", projects);
-}, [projects]);
-  
-
-  // get business - regions, departments, areas, regions and clients, according to selected domain wise.
+  const selectedRegionName = businessRegions.find((r: any) => r._id === filters.region_id)?.region_name;
+  const selectedAreaName = regionAreas.find((a: any) => a._id === filters.area_id)?.area_name;
+  const selectedClientName = businessClients.find((c: any) => c._id === filters.client_id)?.client_name;
+  const selectedDomainLabel = DEPARTMENT_TYPES.find((d) => d.value === filters.type)?.label;
 
   return (
-    <div className='p-4 pb-20'>
-      <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg mb-2 flex justify-between items-center">
-        <h1 className='font-semibold text-sm text-slate-300 flex items-center gap-1'><PanelsTopLeft size={16} /> Business Projects</h1>
-        {canAdd && <Button className='flex items-center gap-1' onClick={() => router.push('/admin/projects/add')} >Add Project <CalendarPlus size={16} /></Button> }
-      <Button className='flex items-center gap-1' onClick={() => router.push('/admin/projects/add')} >Add Project <CalendarPlus size={16} /></Button>
-        {startDate && endDate && (
-          <div className="flex items-center gap-2">
-            <p className="text-xs text-slate-400">From: {startDate}</p>
-            <p className="text-xs text-slate-400">To: {endDate}</p>
-          </div>
+    <div className='space-y-4 pb-10'>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className='font-semibold text-lg text-slate-100 flex items-center gap-2'>
+            <PanelsTopLeft size={18} /> Projects
+          </h1>
+          <p className='text-xs text-slate-400'>Track approvals, timelines, and ownership across your business projects.</p>
+        </div>
+        {canAdd && (
+          <Button className='flex items-center gap-2' onClick={() => router.push('/admin/projects/add')}>
+            Add Project <CalendarPlus size={16} />
+          </Button>
         )}
       </div>
-      <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg min-h-[13vh] mb-2">
-        <h1 className='font-semibold text-xs text-slate-400 px-2'>Project Filtrations</h1>
-        <div className='flex flex-wrap'>
-          <div className="w-full lg:w-4/12 p-1">
-            <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50  rounded-lg">
-              <Select value={selectedSection} onValueChange={setSelectedSection}>
-                <SelectTrigger className={`${selectedSection ? 'text-slate-200' : 'text-slate-400'}`}>
-                  <SelectValue placeholder="Select Projects"/>
-                </SelectTrigger>
-                <SelectContent>
-                  {projectSections.map((item) => (
-                    <SelectItem key={item.value} value={item.value}>
-                      {item.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+
+      <div className="rounded-xl border border-slate-800 bg-gradient-to-tr from-slate-950/60 to-slate-900/60 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-xs text-slate-300">
+            <Filter size={14} className="text-cyan-300" />
+            Filter Projects
           </div>
-          <div className="w-full lg:w-4/12 p-1">
-            <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50  rounded-lg">
-              <Select value={selectedDomainWise} onValueChange={handleDomainWiseChange}>
-                <SelectTrigger className={`${selectedDomainWise ? 'text-slate-200' : 'text-slate-400'}`}>
-                  <SelectValue placeholder="Select Domain Wise" />
-                </SelectTrigger>
-                <SelectContent>
-                  {domainWise.map((item) => (
-                    <SelectItem key={item.value} value={item.value}>
-                      {item.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="w-full lg:w-4/12 p-1">
-            <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
-              <Select value={selectedDomainId} onValueChange={handleDomainChange}>
-                <SelectTrigger className={`${selectedDomainId ? 'text-slate-200' : 'text-slate-400'}`}>
-                  <SelectValue placeholder="Select Domain" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  {domains.map((item:any) => (
-                    <SelectItem key={item._id || item.value} value={item._id || item.value}>
-                      {item.client_name || item.region_name || item.label }
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <Button variant="ghost" className="text-xs" onClick={clearFilters}>Clear filters</Button>
+        </div>
+
+        <Tabs value={tab} onValueChange={setTab} className="mt-3">
+          <TabsList className="grid w-full grid-cols-2 gap-2 bg-slate-900/70 md:grid-cols-4">
+            {statusTabs.map((status) => (
+              <TabsTrigger key={status.value} value={status.value} className="text-xs">
+                {status.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+
+        <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+          <div className="space-y-1">
+            <p className="text-[11px] text-slate-400">Project Domain</p>
+            <Select
+              value={filters.type || "all"}
+              onValueChange={(value) => setFilters((prev) => ({ ...prev, type: value === "all" ? "" : value }))}
+            >
+              <SelectTrigger className="text-xs">
+                <SelectValue placeholder="All domains" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All domains</SelectItem>
+                {DEPARTMENT_TYPES.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
-          {isRegion && (
-            <>
-            <div className="w-full lg:w-4/12 p-1">
-            <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
-              <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-                <SelectTrigger className={`${selectedDomainId ? 'text-slate-200' : 'text-slate-400'}`}>
-                  <SelectValue placeholder="Select Department" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  {departments.map((item:any) => (
-                    <SelectItem key={item._id} value={item._id}>
-                      {item.dep_name }
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="space-y-1">
+            <p className="text-[11px] text-slate-400">Client</p>
+            <Select
+              value={filters.client_id || "all"}
+              onValueChange={(value) => setFilters((prev) => ({ ...prev, client_id: value === "all" ? "" : value }))}
+            >
+              <SelectTrigger className="text-xs">
+                <SelectValue placeholder="All clients" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All clients</SelectItem>
+                {businessClients.map((client: any) => (
+                  <SelectItem key={client._id} value={client._id}>
+                    {client.client_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
-          <div className="w-full lg:w-4/12 p-1">
-            <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
-              <Select value={selectedArea} onValueChange={setSelectedArea}>
-                <SelectTrigger className={`${selectedDomainId ? 'text-slate-200' : 'text-slate-400'}`}>
-                  <SelectValue placeholder="Select Area" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  {areas.map((item:any) => (
-                    <SelectItem key={item._id} value={item._id}>
-                      {item.area_name }
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="space-y-1">
+            <p className="text-[11px] text-slate-400">Region</p>
+            <Select
+              value={filters.region_id || "all"}
+              onValueChange={(value) =>
+                setFilters((prev) => ({
+                  ...prev,
+                  region_id: value === "all" ? "" : value,
+                  area_id: ""
+                }))
+              }
+            >
+              <SelectTrigger className="text-xs">
+                <SelectValue placeholder="All regions" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All regions</SelectItem>
+                {businessRegions.map((region: any) => (
+                  <SelectItem key={region._id} value={region._id}>
+                    {region.region_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-            </>
 
-          
-          )}
-          <div className="w-full lg:w-4/12 p-1">
-            <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg p-0.5 px-1">
-              <Label className='text-xs text-slate-400 px-2'>Within Period</Label>
-              <Space direction="vertical" size={12} style={{ width: '100%', border: 0 }} className='placeholder:text-white'>
-                <RangePicker onChange={handleDateChange} style={{ backgroundColor: '#1d293d', width: '100%', border: 0 }} className='text-white' />
+          <div className="space-y-1">
+            <p className="text-[11px] text-slate-400">Area</p>
+            <Select
+              value={filters.area_id || "all"}
+              onValueChange={(value) => setFilters((prev) => ({ ...prev, area_id: value === "all" ? "" : value }))}
+              disabled={!filters.region_id || loadingAreas}
+            >
+              <SelectTrigger className="text-xs">
+                <SelectValue placeholder={filters.region_id ? "All areas" : "Select a region first"} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All areas</SelectItem>
+                {regionAreas.map((area: any) => (
+                  <SelectItem key={area._id} value={area._id}>
+                    {area.area_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1 lg:col-span-2">
+            <p className="text-[11px] text-slate-400">Timeline</p>
+            <div className="rounded-md border border-slate-700 bg-slate-950/60 px-2 py-1 shadow-sm focus-within:ring-1 focus-within:ring-slate-400/50">
+              <Space direction="vertical" size={8} style={{ width: '100%' }}>
+                <RangePicker
+                  onChange={handleDateChange}
+                  style={{ width: '100%', border: 0, backgroundColor: 'transparent' }}
+                  className="admin-projects-range"
+                />
               </Space>
             </div>
           </div>
-          <div className="w-full lg:w-4/12 p-1 flex gap-2 justify-start items-end">
-            <Button onClick={handleClearAll} variant='ghost' className='text-xs mt-6'>Clear All</Button>
-            <Button onClick={handleSearchProjects} className='text-xs mt-6'>Apply / Search</Button>
-          </div>
         </div>
+
+        {(filters.type || filters.client_id || filters.region_id || filters.area_id || filters.startDate || filters.endDate) && (
+          <div className="mt-4 flex flex-wrap gap-2 text-[11px] text-slate-300">
+            {filters.type && <span className="rounded-full border border-slate-700 px-3 py-1">Domain: {selectedDomainLabel}</span>}
+            {filters.client_id && <span className="rounded-full border border-slate-700 px-3 py-1">Client: {selectedClientName}</span>}
+            {filters.region_id && <span className="rounded-full border border-slate-700 px-3 py-1">Region: {selectedRegionName}</span>}
+            {filters.area_id && <span className="rounded-full border border-slate-700 px-3 py-1">Area: {selectedAreaName}</span>}
+            {(filters.startDate || filters.endDate) && (
+              <span className="rounded-full border border-slate-700 px-3 py-1">
+                Date: {filters.startDate || "-"} to {filters.endDate || "-"}
+              </span>
+            )}
+          </div>
+        )}
       </div>
-      <div className="bg-slate-900/50 p-4 rounded-xl shadow-sm min-h-[13vh]">
-  <h1 className="font-semibold text-sm text-slate-300 flex items-center gap-2 mb-3">
-    <PanelsTopLeft size={16} /> Business Projects
-  </h1>
 
-  {isLoading && (
-    <div className="flex items-center justify-center w-full h-[15vh]">
-              <LoaderSpin size={20} title="Loading Projects...." />
-            </div>
-  )}
+      <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
+            <PanelsTopLeft size={16} className="text-cyan-400" />
+            Project List
+          </h2>
+          <div className="text-xs text-slate-400">{pagination.total || 0} projects</div>
+        </div>
 
-  {projects?.length === 0 && !isLoading && (
-    <p className="text-xs text-slate-500 italic">No projects found.</p>
-  )}
+        {isLoading && (
+          <div className="flex items-center justify-center w-full h-[18vh]">
+            <LoaderSpin size={20} title="Loading projects..." />
+          </div>
+        )}
 
-  <div className="space-y-2">
-    {projects?.map((proj: any) => (
-      <div
-        key={proj._id}
-        className="p-3 border border-slate-700 rounded-lg hover:bg-slate-800/60 transition cursor-pointer"
-        onClick={() => router.push(`/admin/projects/${proj._id}`)}
-      >
-        <h2 className="text-md font-medium text-slate-200 truncate">
-          {proj.project_name}
-        </h2>
-        <div className="flex items-center gap-2 mt-1 text-xs">
-  {/* Status Tag */}
-  <span
-    className={`
-      px-2 py-1 rounded-md capitalize
-      ${
-        proj.status === "completed"
-          ? "bg-green-100 text-green-700"
-          : proj.status === "in-progress"
-          ? "bg-yellow-100 text-yellow-700"
-          : proj.status === "pending"
-          ? "bg-red-100 text-red-700"
-          : "bg-gray-100 text-gray-600"
-      }
-    `}
-  >
-    {proj.status}
-  </span>
+        {!isLoading && projects?.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-10 text-xs text-slate-400">
+            <Clock3 size={18} className="mb-2 text-slate-500" />
+            No projects match the selected filters.
+          </div>
+        )}
 
-  {/* Date Tag */}
-  <span className="px-2 py-1 rounded-md bg-slate-100 text-slate-600">
-    Start:{" "}
-    {proj.start_date
-      ? new Date(proj.start_date).toLocaleDateString()
-      : "N/A"}{" "}
-    • End:{" "}
-    {proj.end_date
-      ? new Date(proj.end_date).toLocaleDateString()
-      : "N/A"}
-  </span>
-</div>
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          {projects?.map((proj: any) => {
+            const status = getStatusBadge(proj);
+            const regionName = proj?.region_id?.region_name || "-";
+            const areaName = proj?.area_id?.area_name || "-";
+            const clientName = proj?.client_id?.client_name || "-";
+            const createdBy = proj?.creator?.name || proj?.admin_id?.name || "-";
+            const typeLabel = DEPARTMENT_TYPES.find((t) => t.value === proj?.type)?.label || proj?.type || "-";
+            return (
+              <div
+                key={proj._id}
+                className="rounded-xl border border-slate-800 bg-gradient-to-tr from-slate-950/60 to-slate-900/60 p-4 hover:border-cyan-500/40 transition cursor-pointer"
+                onClick={() => router.push(`/admin/projects/${proj._id}`)}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-100">{proj.project_name}</h3>
+                    <p className="mt-1 text-[11px] text-slate-400 truncate">{proj.project_description || "No description provided"}</p>
+                  </div>
+                  <span className={`px-2 py-1 rounded-full text-[10px] ${status.className}`}>{status.label}</span>
+                </div>
 
+                <div className="mt-3 grid gap-2 text-[11px] text-slate-300 sm:grid-cols-2">
+                  <div>
+                    <span className="text-slate-500">Client</span>
+                    <p className="text-slate-200">{clientName}</p>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Domain</span>
+                    <p className="text-slate-200">{typeLabel}</p>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Region</span>
+                    <p className="text-slate-200">{regionName}</p>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Area</span>
+                    <p className="text-slate-200">{areaName}</p>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Priority</span>
+                    <p className="text-slate-200 capitalize">{proj.priority || "normal"}</p>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Timeline</span>
+                    <p className="text-slate-200">{formatDate(proj.start_date)} - {formatDate(proj.end_date)}</p>
+                  </div>
+                </div>
+
+                <div className="mt-3 flex items-center justify-between text-[11px] text-slate-400">
+                  <span>Created by {createdBy}</span>
+                  <span className="flex items-center gap-1 text-slate-500">
+                    <CheckCircle2 size={12} /> {formatDate(proj.createdAt)}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {totalPages > 1 && (
+          <div className="flex flex-col gap-2 mt-6 text-xs text-slate-400">
+            <p>Showing {startIndex}-{endIndex} of {pagination.total} projects</p>
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    href="#"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      setPage((prev) => Math.max(prev - 1, 1));
+                    }}
+                    className={page === 1 ? "pointer-events-none opacity-40" : ""}
+                  />
+                </PaginationItem>
+                {pageItems.map((item, index) => (
+                  <PaginationItem key={`${item}-${index}`}>
+                    {item === "ellipsis" ? (
+                      <PaginationEllipsis />
+                    ) : (
+                      <PaginationLink
+                        href="#"
+                        isActive={item === page}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          setPage(item as number);
+                        }}
+                      >
+                        {item}
+                      </PaginationLink>
+                    )}
+                  </PaginationItem>
+                ))}
+                <PaginationItem>
+                  <PaginationNext
+                    href="#"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      setPage((prev) => Math.min(prev + 1, totalPages));
+                    }}
+                    className={page === totalPages ? "pointer-events-none opacity-40" : ""}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
+        )}
       </div>
-    ))}
-  </div>
-</div>
-
+      <style jsx global>{`
+        .admin-projects-range.ant-picker {
+          background: transparent;
+          border: 0;
+          color: #e2e8f0;
+          box-shadow: none;
+        }
+        .admin-projects-range .ant-picker-input > input {
+          color: #e2e8f0;
+        }
+        .admin-projects-range .ant-picker-input > input::placeholder {
+          color: #94a3b8;
+        }
+        .admin-projects-range .ant-picker-separator,
+        .admin-projects-range .ant-picker-suffix,
+        .admin-projects-range .ant-picker-clear {
+          color: #cbd5f5;
+        }
+        .admin-projects-range .ant-picker-clear {
+          background: transparent;
+        }
+        .admin-projects-range.ant-picker-focused {
+          box-shadow: none;
+        }
+      `}</style>
     </div>
   )
 }
