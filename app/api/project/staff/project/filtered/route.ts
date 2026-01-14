@@ -2,16 +2,22 @@ import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import Area_dep_heads from "@/models/area_dep_heads.model";
 import Area_heads from "@/models/area_heads.model";
+import Area_departments from "@/models/area_departments.model";
 import Business_Project from "@/models/business_project.model";
 import Location_dep_heads from "@/models/location_dep_heads.model";
 import Location_heads from "@/models/location_heads.model";
-import Project_Departments from "@/models/project_departments.model";
+import Location_departments from "@/models/location_departments.model";
 import Project_Teams from "@/models/project_team.model";
 import Project_Team_Members from "@/models/project_team_members.model";
 import Region_dep_heads from "@/models/region_dep_heads.model";
 import Region_heads from "@/models/region_heads.model";
+import Region_departments from "@/models/region_departments.model";
 import Roles from "@/models/roles.model";
-import mongoose from "mongoose";
+import User_roles from "@/models/user_roles.model";
+import "@/models/business_clients.model";
+import "@/models/business_regions.model";
+import "@/models/business_areas.model";
+import "@/models/users.model";
 import { NextRequest, NextResponse } from "next/server";
 
 connectDB();
@@ -19,157 +25,253 @@ connectDB();
 export async function GET(req: NextRequest) {
     try {
         const session: any = await auth();
-        if (!session) return NextResponse.json({ message: "Un-Authorized Access", status: 401 }, { status: 401 });
+        if (!session) {
+            return NextResponse.json({ message: "Un-Authorized Access", status: 401 }, { status: 401 });
+        }
 
         const { searchParams } = new URL(req.url);
-        const section = searchParams.get("section"); // current | waiting | approved
-        const domainWise = searchParams.get("domainWise"); // client | region | department
-        const domainId = searchParams.get("domainId"); // followed Id for selected domain
+        const business_id = searchParams.get("business_id");
+        const role_id_param = searchParams.get("role_id");
+        const org_id = searchParams.get("org_id");
+        const tab = searchParams.get("tab") || searchParams.get("status") || searchParams.get("section");
+        const type = searchParams.get("type");
+        const client_id = searchParams.get("client_id");
+        const region_id = searchParams.get("region_id");
+        const area_id = searchParams.get("area_id");
         const startDate = searchParams.get("startDate");
         const endDate = searchParams.get("endDate");
-        const role_id = searchParams.get("role_id");
-        const org_id = searchParams.get("org_id"); // current user's department-ID
-        console.log("role_id: ", role_id);
+        const pageRaw = searchParams.get("page");
+        const limitRaw = searchParams.get("limit");
 
-        const role = await Roles.findById(role_id).select("role_name");
+        const page = Math.max(1, Number(pageRaw) || 1);
+        const limit = Math.min(50, Math.max(1, Number(limitRaw) || 10));
+        const skip = (page - 1) * limit;
 
-        const query: any = {};
-        console.log("roleData: ", role);
-        // Initialize OR query
-        const orArray: any[] = [];
-
-        switch (role?.role_name) {
-            case "REGION_HEAD": {
-                const region: any = await Region_heads.find({ user_id: session?.user?.id });
-                if (region?.length > 0) {
-                    query.region_id = { $in: region?.map((rg: any) => rg?.region_id) };
-                    query.is_approved = true;
-                }
-                console.log("regionprojs: ", region);
-                break;
-            }
-            case "AREA_HEAD": {
-                const area: any = await Area_heads.find({ user_id: session?.user?.id });
-                if (area?.length > 0){
-                    query.area_id = { $in: area?.area_id };
-                    query.is_approved = true;
-                } 
-                break;
-            } case "LOCATION_HEAD": {
-                const location: any = await Location_heads.find({ user_id: session?.user?.id });
-                if (location.length > 0){
-                    query.location_id = { $in: location?.location_id };
-                    query.is_approved = true;
-                } 
-                break;
-            }
-            default: {
-                if (
-                    role?.role_name === "REGION_DEP_HEAD" ||
-                    role?.role_name === "AREA_DEP_HEAD" ||
-                    role?.role_name === "LOCATION_DEP_HEAD"
-                ) {
-                    let deptField = ""; // field name in dep_heads collection
-                    let userDeptModel;
-
-                    switch (role?.role_name) {
-                        case "REGION_DEP_HEAD":
-                            deptField = "reg_dep_id";
-                            userDeptModel = Region_dep_heads;
-                            break;
-                        case "AREA_DEP_HEAD":
-                            deptField = "area_dep_id";
-                            userDeptModel = Area_dep_heads;
-                            break;
-                        case "LOCATION_DEP_HEAD":
-                            deptField = "location_dep_id";
-                            userDeptModel = Location_dep_heads;
-                            break;
-                    }
-
-                    // Check if user belongs to this department
-                    const userDept = await userDeptModel?.findOne({
-                        user_id: session?.user?.id,
-                        [deptField]: org_id,
-                    });
-
-                    // Collect project IDs from teams
-                    const teamIds = await Project_Team_Members.find({ user_id: session?.user?.id })
-                        .select("project_team_id")
-                        .lean();
-
-                    const teamProjectIds = await Project_Teams.find({
-                        _id: { $in: teamIds.map((t) => t.project_team_id) },
-                    })
-                        .select("project_id")
-                        .lean();
-
-                    // 🧩 NEW LOGIC: Fetch projects linked to the department
-                    if (userDept) {
-                        const projectDepartments = await Project_Departments.find({
-                            department_id: new mongoose.Types.ObjectId(org_id!),
-                        }).select("project_id");
-
-                        if (projectDepartments.length > 0) {
-                            const deptProjectIds = projectDepartments.map((pd) => pd.project_id);
-                            orArray.push({ _id: { $in: deptProjectIds } });
-                        }
-                    }
-
-                    // Include team projects if any
-                    if (teamProjectIds.length > 0) {
-                        orArray.push({ _id: { $in: teamProjectIds.map((p) => p.project_id) } });
-                    }
+        let roleId = role_id_param;
+        if (!roleId) {
+            const roleCookie = req.cookies.get("user_role")?.value;
+            if (roleCookie) {
+                try {
+                    roleId = JSON.parse(roleCookie)?._id;
+                } catch {
+                    roleId = undefined;
                 }
             }
         }
 
-        if (section) {
-            switch (section) {
+        let roleName: string | undefined;
+        if (roleId) {
+            const role = await Roles.findById(roleId).select("role_name").lean();
+            roleName = role?.role_name as string | undefined;
+        }
+
+        if (!roleName) {
+            const userRole = await User_roles.findOne({ user_id: session?.user?.id, status: 1 })
+                .populate({ path: "role_id", select: { role_name: 1 } })
+                .lean();
+            roleName = (userRole as any)?.role_id?.role_name;
+        }
+
+        const query: any = {};
+        if (business_id) {
+            query.business_id = business_id;
+        }
+
+        const scopeOr: any[] = [];
+        const addScope = (condition: any) => {
+            if (condition) scopeOr.push(condition);
+        };
+
+        switch (roleName) {
+            case "REGION_HEAD": {
+                const regions = await Region_heads.find({ user_id: session?.user?.id, status: 1 })
+                    .select("region_id")
+                    .lean();
+                const regionIds = regions.map((rg: any) => rg?.region_id).filter(Boolean);
+                if (regionIds.length > 0) {
+                    addScope({ region_id: { $in: regionIds } });
+                }
+                break;
+            }
+            case "AREA_HEAD": {
+                const areas = await Area_heads.find({ user_id: session?.user?.id, status: 1 })
+                    .select("area_id")
+                    .lean();
+                const areaIds = areas.map((ar: any) => ar?.area_id).filter(Boolean);
+                if (areaIds.length > 0) {
+                    addScope({ area_id: { $in: areaIds } });
+                }
+                break;
+            }
+            case "LOCATION_HEAD": {
+                const locations = await Location_heads.find({ user_id: session?.user?.id, status: 1 })
+                    .select("location_id")
+                    .lean();
+                const locationIds = locations.map((loc: any) => loc?.location_id).filter(Boolean);
+                if (locationIds.length > 0) {
+                    addScope({ location_id: { $in: locationIds } });
+                }
+                break;
+            }
+            case "REGION_DEP_HEAD": {
+                const regionDeptHeads = await Region_dep_heads.find({
+                    user_id: session?.user?.id,
+                    status: 1,
+                    ...(org_id ? { reg_dep_id: org_id } : {}),
+                })
+                    .select("reg_dep_id")
+                    .lean();
+                const deptIds = regionDeptHeads.map((head: any) => head?.reg_dep_id).filter(Boolean);
+                if (deptIds.length > 0) {
+                    const departments = await Region_departments.find({ _id: { $in: deptIds } })
+                        .select("region_id type")
+                        .lean();
+                    departments.forEach((dept: any) => {
+                        if (dept?.region_id && dept?.type) {
+                            addScope({ region_id: dept.region_id, type: dept.type });
+                        }
+                    });
+                }
+                break;
+            }
+            case "AREA_DEP_HEAD": {
+                const areaDeptHeads = await Area_dep_heads.find({
+                    user_id: session?.user?.id,
+                    status: 1,
+                    ...(org_id ? { area_dep_id: org_id } : {}),
+                })
+                    .select("area_dep_id")
+                    .lean();
+                const deptIds = areaDeptHeads.map((head: any) => head?.area_dep_id).filter(Boolean);
+                if (deptIds.length > 0) {
+                    const departments = await Area_departments.find({ _id: { $in: deptIds } })
+                        .select("area_id type")
+                        .lean();
+                    departments.forEach((dept: any) => {
+                        if (dept?.area_id && dept?.type) {
+                            addScope({ area_id: dept.area_id, type: dept.type });
+                        }
+                    });
+                }
+                break;
+            }
+            case "LOCATION_DEP_HEAD": {
+                const locationDeptHeads = await Location_dep_heads.find({
+                    user_id: session?.user?.id,
+                    status: 1,
+                    ...(org_id ? { location_dep_id: org_id } : {}),
+                })
+                    .select("location_dep_id")
+                    .lean();
+                const deptIds = locationDeptHeads.map((head: any) => head?.location_dep_id).filter(Boolean);
+                if (deptIds.length > 0) {
+                    const departments = await Location_departments.find({ _id: { $in: deptIds } })
+                        .select("location_id type")
+                        .lean();
+                    departments.forEach((dept: any) => {
+                        if (dept?.location_id && dept?.type) {
+                            addScope({ location_id: dept.location_id, type: dept.type });
+                        }
+                    });
+                }
+                break;
+            }
+            case "REGION_STAFF":
+            case "AREA_STAFF":
+            case "LOCATION_STAFF":
+            case "REGION_DEP_STAFF":
+            case "AREA_DEP_STAFF":
+            case "LOCATION_DEP_STAFF":
+            case "AGENT": {
+                const teamIds = await Project_Team_Members.find({ user_id: session?.user?.id })
+                    .select("project_team_id")
+                    .lean();
+                const teamProjectIds = await Project_Teams.find({
+                    _id: { $in: teamIds.map((t: any) => t.project_team_id) },
+                })
+                    .select("project_id")
+                    .lean();
+                const assignedProjectIds = teamProjectIds.map((p: any) => p?.project_id).filter(Boolean);
+                if (assignedProjectIds.length > 0) {
+                    addScope({ _id: { $in: assignedProjectIds } });
+                }
+                addScope({ creator: session?.user?.id });
+                break;
+            }
+            default:
+                addScope({ creator: session?.user?.id });
+                break;
+        }
+
+        if (scopeOr.length > 0) {
+            query.$or = scopeOr;
+        } else {
+            return NextResponse.json({
+                data: [],
+                pagination: { page, limit, total: 0, totalPages: 1 },
+            });
+        }
+
+        if (tab) {
+            switch (tab) {
                 case "waiting":
+                case "waiting-for-approval":
+                case "waiting_for_approval":
                     query.is_approved = false;
-                    query.creator = session?.user?.id;
                     break;
                 case "current":
+                case "ongoing":
+                case "on-going":
+                case "on_going":
                     query.is_approved = true;
                     query.status = { $in: ["approved", "pending"] };
                     break;
                 case "previous":
+                case "completed":
                     query.status = "completed";
                     break;
             }
         }
 
-        if (domainWise && domainId) {
-            switch (domainWise) {
-                case "client":
-                    query.client_id = new mongoose.Types.ObjectId(domainId)
-                    break;
-                case "region":
-                    query.region_id = new mongoose.Types.ObjectId(domainId)
-                    break;
-                case "department":
-                    query.type = new mongoose.Types.ObjectId(domainId)
-                    break;
-            }
-        }
+        if (type) query.type = type;
+        if (client_id) query.client_id = client_id;
+        if (region_id) query.region_id = region_id;
+        if (area_id) query.area_id = area_id;
 
         if (startDate || endDate) {
             query.start_date = {};
             if (startDate) query.start_date.$gte = new Date(startDate);
             if (endDate) query.start_date.$lte = new Date(endDate);
         }
-        console.log("query: ", query);
 
-        if (orArray.length > 0) {
-            query.$or = orArray;
-        }
+        const [projects, total] = await Promise.all([
+            Business_Project.find(query)
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit)
+                .populate("client_id", "client_name")
+                .populate("region_id", "region_name")
+                .populate("area_id", "area_name region_id")
+                .populate("creator", "name email avatar_url")
+                .populate("admin_id", "name email avatar_url")
+                .lean(),
+            Business_Project.countDocuments(query),
+        ]);
 
-        const projects = await Business_Project.find(query).exec();
-        return NextResponse.json({ data: projects, status: 200 }, { status: 200 });
-
+        return NextResponse.json(
+            {
+                data: projects,
+                pagination: {
+                    page,
+                    limit,
+                    total,
+                    totalPages: Math.max(1, Math.ceil(total / limit)),
+                },
+            },
+            { status: 200 }
+        );
     } catch (err) {
         console.log("Error while getting staff projects: ", err);
-        return NextResponse.json({ message: "Internal Server Error", status: 500 }, { status: 500 })
+        return NextResponse.json({ message: "Internal Server Error", status: 500 }, { status: 500 });
     }
 }

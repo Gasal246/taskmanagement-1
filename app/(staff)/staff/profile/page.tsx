@@ -300,7 +300,7 @@ const ProfilPage = () => {
     try {
       const croppedBlob = await getCroppedImageBlob(avatarSrc, croppedAreaPixels);
       const extension = avatarFile.type.split("/")[1] || "jpg";
-      const storagePath = `user-avatars/${userData.userData._id}/${Date.now()}.${extension}`;
+      const storagePath = `user-avatars/${userData.userData._id}/profilepic.${extension}`;
       const imageRef = ref(storage, storagePath);
       await uploadBytes(imageRef, croppedBlob, {
         contentType: avatarFile.type || "image/jpeg",

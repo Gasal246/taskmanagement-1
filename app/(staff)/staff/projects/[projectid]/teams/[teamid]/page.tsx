@@ -15,7 +15,7 @@ import { ArrowUpRight, PlusCircle, Users, Workflow } from "lucide-react";
 import {
   useAddBusinessTask,
   useGetBusinessTasks,
-  useGetProjectById,
+  useGetProjectsbyIdForStaffs,
   useGetTeamsForProjects,
 } from "@/query/business/queries";
 import LoaderSpin from "@/components/shared/LoaderSpin";
@@ -42,8 +42,6 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { TASK_STATUS } from "@/lib/constants";
 import { toast } from "sonner";
-import { useSelector } from "react-redux";
-import { RootState } from "@/redux/store";
 
 const formatDateTiny = (date: string) => {
   if (!date) return "-";
@@ -73,7 +71,7 @@ const TeamDetailsPage = () => {
   const router = useRouter();
   const params = useParams<{ projectid: string; teamid: string }>();
 
-  const { data: project, isLoading: loadingProject } = useGetProjectById(params.projectid);
+  const { data: project, isLoading: loadingProject } = useGetProjectsbyIdForStaffs(params.projectid);
   const { data: teamsData, isLoading: loadingTeams } = useGetTeamsForProjects(params.projectid);
   const {
     data: tasksData,
@@ -81,8 +79,8 @@ const TeamDetailsPage = () => {
     refetch: refetchTasks,
   } = useGetBusinessTasks(params.projectid);
   const { mutateAsync: addTask, isPending: addingTask } = useAddBusinessTask();
-  const { businessData } = useSelector((state: RootState) => state.user);
   const [addTaskDialog, setAddTaskDialog] = useState(false);
+  const businessId = project?.data?.business_id?.toString?.() ?? project?.data?.business_id;
 
   const team = useMemo(() => {
     return teamsData?.data?.find((item: any) => item?._id === params.teamid);
@@ -136,7 +134,7 @@ const TeamDetailsPage = () => {
   };
 
   const handleCreateTask = async (values: z.infer<typeof taskSchema>) => {
-    if (!businessData?._id) {
+    if (!businessId) {
       toast.error("Business details not available yet.");
       return;
     }
@@ -148,7 +146,7 @@ const TeamDetailsPage = () => {
       start_date: values.start_date,
       end_date: values.end_date,
       status: values.status.trim(),
-      business_id: businessData._id,
+      business_id: businessId,
       is_project_task: true,
     };
 
@@ -176,7 +174,7 @@ const TeamDetailsPage = () => {
         <Breadcrumb className='mb-3'>
           <BreadcrumbList>
             <BreadcrumbItem>
-              <BreadcrumbLink onClick={() => router.replace('/admin/projects')}>Manage Projects</BreadcrumbLink>
+              <BreadcrumbLink onClick={() => router.replace('/staff/projects')}>Manage Projects</BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
@@ -190,7 +188,7 @@ const TeamDetailsPage = () => {
         </Breadcrumb>
         <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
           <p className="text-xs text-slate-400">Team not found for this project.</p>
-          <Button className="mt-3 text-xs" onClick={() => router.push(`/admin/projects/${params.projectid}/teams`)}>
+          <Button className="mt-3 text-xs" onClick={() => router.push(`/staff/projects/${params.projectid}/teams`)}>
             Back to Teams
           </Button>
         </div>
@@ -203,7 +201,7 @@ const TeamDetailsPage = () => {
       <Breadcrumb className="mb-3">
         <BreadcrumbList>
           <BreadcrumbItem>
-            <BreadcrumbLink onClick={() => router.replace("/admin/projects")}>
+            <BreadcrumbLink onClick={() => router.replace("/staff/projects")}>
               Manage Projects
             </BreadcrumbLink>
           </BreadcrumbItem>
@@ -216,7 +214,7 @@ const TeamDetailsPage = () => {
           <BreadcrumbSeparator />
           <BreadcrumbItem>
             <BreadcrumbLink
-              onClick={() => router.push(`/admin/projects/${params.projectid}/teams`)}
+              onClick={() => router.push(`/staff/projects/${params.projectid}/teams`)}
             >
               Teams
             </BreadcrumbLink>
@@ -246,7 +244,7 @@ const TeamDetailsPage = () => {
               <Button
                 variant="outline"
                 className="text-xs border-slate-700 text-slate-200"
-                onClick={() => router.push(`/admin/projects/${params.projectid}/teams`)}
+                onClick={() => router.push(`/staff/projects/${params.projectid}/teams`)}
               >
                 Manage Teams
                 <ArrowUpRight size={14} className="ml-2" />
@@ -398,7 +396,7 @@ const TeamDetailsPage = () => {
                         size="sm"
                         variant="ghost"
                         className="text-xs text-slate-300"
-                        onClick={() => router.push(`/admin/tasks/${task?._id}`)}
+                        onClick={() => router.push(`/staff/tasks/${task?._id}`)}
                       >
                         View
                       </Button>

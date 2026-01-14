@@ -941,9 +941,9 @@ export const useGetAllStaffTasks = (queryParams: Record<string, string | undefin
 //Get Staff-Projects by filter
 export const useGetStaffProjects = (queryParams: Record<string, string | undefined>) => {
     return useQuery({
-        queryKey: ["projects", queryParams],
+        queryKey: ["staff-projects", queryParams],
         queryFn: () => GetStaffProjects(queryParams),
-        enabled: !!queryParams
+        enabled: !!queryParams?.business_id
     })
 }
 

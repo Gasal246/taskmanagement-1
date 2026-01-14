@@ -156,7 +156,7 @@ const TasksPage = () => {
       <Breadcrumb className='mb-3'>
         <BreadcrumbList>
           <BreadcrumbItem>
-            <BreadcrumbLink onClick={() => router.replace('/admin/projects')}>Manage Projects</BreadcrumbLink>
+            <BreadcrumbLink onClick={() => router.replace('/staff/projects')}>Manage Projects</BreadcrumbLink>
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>

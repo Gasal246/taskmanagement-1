@@ -1,6 +1,8 @@
 import connectDB from "@/lib/mongo";
 import Business_staffs from "@/models/business_staffs.model";
 import User_skills from "@/models/user_skills.model";
+import Business_Tasks from "@/models/business_tasks.model";
+import Task_Activities from "@/models/task_activities.model";
 import { NextRequest, NextResponse } from "next/server";
 import '@/models/business_skills.model';
 
@@ -38,6 +40,41 @@ export async function GET(req:NextRequest){
             }
             staff.skills = skills;
             filteredStaffs.push(staff);
+        }
+
+        const staffUserIds = filteredStaffs
+            .map((staff: any) => staff?.user_id?._id)
+            .filter(Boolean);
+
+        if (staffUserIds.length > 0) {
+            const [taskCounts, activityCounts] = await Promise.all([
+                Business_Tasks.aggregate([
+                    { $match: { assigned_to: { $in: staffUserIds } } },
+                    { $group: { _id: "$assigned_to", count: { $sum: 1 } } },
+                ]),
+                Task_Activities.aggregate([
+                    { $match: { assigned_to: { $in: staffUserIds } } },
+                    { $group: { _id: "$assigned_to", count: { $sum: 1 } } },
+                ]),
+            ]);
+
+            const taskCountMap = new Map(
+                taskCounts.map((item: any) => [item._id.toString(), item.count])
+            );
+            const activityCountMap = new Map(
+                activityCounts.map((item: any) => [item._id.toString(), item.count])
+            );
+
+            for (const staff of filteredStaffs) {
+                const staffId = staff?.user_id?._id?.toString();
+                staff.task_count = staffId ? taskCountMap.get(staffId) || 0 : 0;
+                staff.activity_count = staffId ? activityCountMap.get(staffId) || 0 : 0;
+            }
+        } else {
+            for (const staff of filteredStaffs) {
+                staff.task_count = 0;
+                staff.activity_count = 0;
+            }
         }
 
         return NextResponse.json({ data: filteredStaffs, status: 200 }, { status: 200 });

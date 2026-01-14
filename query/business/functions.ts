@@ -1100,11 +1100,19 @@ export async function GetStaffTasksByFilter(queryParams: any) {
 //Staff Projects
 export async function GetStaffProjects(queryParams: any) {
     try{
-        const queryString = new URLSearchParams(queryParams).toString();
+        const params = new URLSearchParams();
+        Object.entries(queryParams || {}).forEach(([key, value]) => {
+            if (value === undefined || value === null) return;
+            const stringValue = String(value);
+            if (!stringValue || stringValue === "undefined") return;
+            params.set(key, stringValue);
+        });
+        const queryString = params.toString();
         const res = await axios.get(`/api/project/staff/project/filtered?${queryString}`);
         return res.data;
     }catch(err){
         console.log(err);
+        return { data: [], status: 500 };
     }
 }
 
