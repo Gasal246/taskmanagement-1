@@ -269,7 +269,7 @@ const RegionAreaPage = () => {
                     {heads?.map((head: any) => 
                     <div className="w-full lg:w-4/12 p-1" key={head?._id}>
                         <div className="bg-gradient-to-tr from-slate-950/50 to-slate-950/70 rounded-lg p-2 border border-slate-700 hover:border-cyan-600 flex items-center gap-1 select-none relative">
-                            <Avatar src={head?.user?.AvatarUrl} size={40} />
+                            <Avatar src={head?.user?.avatar_url} size={40} />
                             <div>
                                 <h1 className='text-xs font-medium text-slate-300 capitalize flex items-center gap-1'>{head?.user?.name}</h1>
                                 <p className='text-xs font-medium text-slate-400 flex items-center gap-1'>{head?.user?.email}</p>

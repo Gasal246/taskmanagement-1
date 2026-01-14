@@ -72,7 +72,7 @@ const ProjectComments = ({ projectid }: { projectid: string }) => {
                 {projectData?.Comments?.map((comment: any) => (
                     <div className='mb-3 bg-slate-950/50 p-3 rounded-lg' key={comment?._id}>
                         <div className="flex gap-1 items-center">
-                            <Avatar src={comment?.Creator?.AvatarUrl || '/avatar.png'} size={20} />
+                            <Avatar src={comment?.Creator?.avatar_url || '/avatar.png'} size={20} />
                             <h3 className="text-xs font-semibold text-slate-300 leading-3">{comment?.Creator?.Email}</h3>
                             {(session?.user?.id == comment?.Creator?._id || session?.user?.id == projectData?.AdminId) && (<Popconfirm title="Delete Comment ?" description="Are you sure you wanna delete this comment ?" onConfirm={() => handleDeleteComment(comment?._id)}>
                                 <motion.h1 className='cursor-pointer flex justify-center items-center gap-1 text-xs font-medium text-red-700' whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.98 }}>Delete <Trash2 size={14} /></motion.h1>

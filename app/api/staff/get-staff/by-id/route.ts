@@ -10,9 +10,13 @@ import Location_staffs from "@/models/location_staffs.model";
 import Region_dep_heads from "@/models/region_dep_heads.model";
 import Region_dep_staffs from "@/models/region_dep_staffs.model";
 import Region_staffs from "@/models/region_staffs.model";
+import Business_Tasks from "@/models/business_tasks.model";
 import Roles from "@/models/roles.model";
+import Task_Activities from "@/models/task_activities.model";
 import User_roles from "@/models/user_roles.model";
+import User_skills from "@/models/user_skills.model";
 import "@/models/users.model";
+import "@/models/business_skills.model";
 import "@/models/region_departments.model";
 import "@/models/area_departments.model";
 import "@/models/location_departments.model";
@@ -148,11 +152,22 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    const [skills, taskCount, activityCount] = await Promise.all([
+      User_skills.find({ user_id: staffUser._id, status: 1 })
+        .populate("skill_id", "skill_name")
+        .lean(),
+      Business_Tasks.countDocuments({ assigned_to: staffUser._id }),
+      Task_Activities.countDocuments({ assigned_to: staffUser._id }),
+    ]);
+
     return NextResponse.json(
       {
         message: "Staff details fetched successfully",
         data: staffDetails,
         role: user_role,
+        skills,
+        task_count: taskCount,
+        activity_count: activityCount,
       },
       { status: 200 }
     );

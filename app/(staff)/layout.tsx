@@ -61,7 +61,7 @@ const AdminLayout = async ({ children }: {
             <StaffTopbar />
           </div>
           <main className="flex-1 min-h-0 overflow-y-auto px-4 pb-24 pt-4 md:px-6">
-            <div className="mx-auto w-full max-w-[1200px]">
+            <div className="mx-auto w-full max-w-[1400px] ">
               {children}
             </div>
           </main>

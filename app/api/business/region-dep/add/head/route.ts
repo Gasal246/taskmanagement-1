@@ -18,8 +18,6 @@ export async function POST ( req: NextRequest ) {
         const { body } = Object.fromEntries(formData) as { body: string };
         const bodyData = await JSON.parse(body) as Body;
 
-        console.log("body data: ", bodyData);
-
         const user = await Users.findById(bodyData.user_id);
         if(!user || user?.status === 0) {
             return NextResponse.json({ error: "User Not Found", status: 404 }, { status: 404 });
@@ -34,6 +32,10 @@ export async function POST ( req: NextRequest ) {
                 role_id: role?._id,
             })
             await newUserRole.save();
+        }
+        const SDRole = user_roles.find(r => r?.role_id?.role_name === "REGION_DEP_HEAD" && r?.status === 0 );
+        if(SDRole) {
+            await User_roles.findByIdAndUpdate(SDRole._id, { status: 1 });
         }
 
         const data = await Region_dep_heads.findOne({ reg_dep_id: bodyData.reg_dep_id, user_id: bodyData.user_id });

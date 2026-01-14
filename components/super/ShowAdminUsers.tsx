@@ -12,7 +12,7 @@ const ShowAdminUsers = ({ trigger, adminData }: { trigger: React.ReactNode, admi
                     <SheetTitle>Showing Admin Users</SheetTitle>
                     <SheetDescription>
                         <div className="flex gap-1 items-center">
-                            <Avatar src={adminData?.AdminId?.AvatarUrl || '/avatar.png'} />
+                            <Avatar src={adminData?.AdminId?.avatar_url || '/avatar.png'} />
                             <div>
                                 <h1 className='text-sm leading-4 font-medium'>{adminData?.AdminId?.Name}</h1>
                                 <h1 className='text-xs'>{adminData?.AdminId?.Email}</h1>
@@ -24,7 +24,7 @@ const ShowAdminUsers = ({ trigger, adminData }: { trigger: React.ReactNode, admi
                     {adminData?.adminUsers?.map((user: any) => (
                         <div className="bg-slate-800 hover:bg-slate-900 border border-slate-700 p-2 rounded-md w-full lg:w-[80%] gap-2 flex justify-between items-center" key={user?._id}>
                             <div className="flex gap-1 items-center lg:w-[250px]">
-                                <Avatar src={user?.AvatarUrl || '/avatar.png'} />
+                                <Avatar src={user?.avatar_url || '/avatar.png'} />
                                 <div>
                                     <h1 className='text-xs leading-3 font-medium'>{user?.Name}</h1>
                                     <h1 className='text-xs'>{user?.Email}</h1>

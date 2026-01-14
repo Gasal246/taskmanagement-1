@@ -1,248 +1,277 @@
-'use client';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Space, DatePicker } from 'antd';
-import { ListTodo, Clock, CheckCircle2, AlertCircle, CalendarPlus } from 'lucide-react';
-import React, { useEffect, useState } from 'react';
-import { useGetAllStaffTasks } from '@/query/business/queries';
-import { useRouter } from 'next/navigation';
+"use client";
+
+import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { CalendarPlus, ListTodo } from "lucide-react";
+import { DatePicker } from "antd";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useGetAllStaffTasks } from "@/query/business/queries";
 import Cookies from "js-cookie";
-import { toast } from 'sonner';
+import { toast } from "sonner";
+import LoaderSpin from "@/components/shared/LoaderSpin";
+
 const { RangePicker } = DatePicker;
 
-interface Task {
-  id: string;
-  title: string;
-  type: 'project' | 'single';
-  status: 'pending' | 'completed';
-  dueDate: string;
-}
+type TaskTab = "all" | "single" | "project";
 
-const taskTypes = [
-  { value: 'all', label: 'All Tasks' },
-  { value: 'project', label: 'Project Tasks' },
-  { value: 'single', label: 'Single Tasks' },
-];
+type RangeState = {
+  start: string;
+  end: string;
+};
+
+const statusStyles: Record<string, string> = {
+  Completed: "border-emerald-500/40 bg-emerald-500/15 text-emerald-200",
+  "In Progress": "border-amber-500/40 bg-amber-500/15 text-amber-200",
+  "To Do": "border-rose-500/40 bg-rose-500/15 text-rose-200",
+  Cancelled: "border-slate-500/40 bg-slate-500/15 text-slate-200",
+};
+
+const getProgressValue = (completed: number, total: number) => {
+  if (!total || total <= 0) return 0;
+  const value = Math.round((completed / total) * 100);
+  return Math.min(100, Math.max(0, value));
+};
+
+const getProgressClass = (value: number) => {
+  if (value < 30) return "bg-red-500";
+  if (value < 50) return "bg-yellow-500";
+  if (value < 70) return "bg-blue-500";
+  return "bg-emerald-500";
+};
 
 const StaffTasks = () => {
-    const router = useRouter();
-  const [selectedTaskType, setSelectedTaskType] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [filters, setFilters] = useState<Record<string, string | undefined>>({});
+  const router = useRouter();
+  const [activeTab, setActiveTab] = useState<TaskTab>("all");
+  const [rangeValue, setRangeValue] = useState<any>(null);
+  const [draftRange, setDraftRange] = useState<RangeState>({ start: "", end: "" });
+  const [appliedRange, setAppliedRange] = useState<RangeState>({ start: "", end: "" });
+  const [filters, setFilters] = useState<Record<string, string | undefined>>({
+    taskType: "all",
+  });
   const [canAdd, setCanAdd] = useState(false);
-  const {data: tasks, isLoading, refetch} = useGetAllStaffTasks(filters);
 
-  const fetchCookies = () => {
+  const { data: tasks, isLoading } = useGetAllStaffTasks(filters);
+
+  useEffect(() => {
     const roleCookies = Cookies.get("user_role");
-    if(!roleCookies) return toast.error("Cookies not available");
-    const roleJson = JSON.parse(roleCookies);
-    setCanAdd(roleJson.role_name.endsWith("HEAD"));
-  }
+    if (!roleCookies) {
+      toast.error("Cookies not available");
+      return;
+    }
+    try {
+      const roleJson = JSON.parse(roleCookies);
+      setCanAdd(Boolean(roleJson?.role_name?.endsWith("HEAD")));
+    } catch (error) {
+      toast.error("Invalid role data");
+    }
+  }, []);
 
-  useEffect(()=>{
-    fetchCookies();
-  },[]);
-
-  const handleDateChange = (dates: any, dateStrings: any) => {
-    setStartDate(dateStrings[0]);
-    setEndDate(dateStrings[1]);
-  };
-
-  const handleClearFilters = () => {
-    setSelectedTaskType('');
-    setStartDate('');
-    setEndDate('');
-    setFilters({});
-  };
-
-  const handleSearchTasks = () => {
+  useEffect(() => {
     setFilters({
-      taskType: selectedTaskType || undefined,
-      startDate: startDate || undefined,
-      endDate: endDate || undefined,
+      taskType: activeTab,
+      start_date: appliedRange.start || undefined,
+      end_date: appliedRange.end || undefined,
+    });
+  }, [activeTab, appliedRange]);
+
+  const handleDateChange = (dates: any, dateStrings: [string, string]) => {
+    setRangeValue(dates);
+    setDraftRange({
+      start: dateStrings?.[0] || "",
+      end: dateStrings?.[1] || "",
     });
   };
 
-  const filteredTasks = tasks?.data?.filter((task:any) => {
-    const matchesTaskType = selectedTaskType === 'all' || !selectedTaskType || task.type === selectedTaskType;
-    const matchesDate =
-      !startDate ||
-      !endDate ||
-      (new Date(task.dueDate) >= new Date(startDate) && new Date(task.dueDate) <= new Date(endDate));
-    return matchesTaskType && matchesDate;
-  });
+  const handleApplyFilters = () => {
+    setAppliedRange(draftRange);
+  };
 
-  const navigateToTask = (id:string) => {
-    router.push(`/staff/tasks/${id}`);
-  }
+  const handleClearFilters = () => {
+    setDraftRange({ start: "", end: "" });
+    setAppliedRange({ start: "", end: "" });
+    setRangeValue(null);
+  };
+
+  const taskList = tasks?.data ?? [];
 
   return (
-    <div className="p-4 pb-20">
-      {/* Custom CSS for DatePicker */}
-      <style jsx global>{`
-        /* Ensure the date picker dropdown stays within viewport */
-        .ant-picker-dropdown {
-          max-width: 100vw !important;
-          width: auto !important;
-          min-width: 250px !important;
-          box-sizing: border-box;
-          padding: 0 8px;
-        }
-
-        /* Adjust dropdown for mobile */
-        @media (max-width: 640px) {
-          .ant-picker-dropdown {
-            left: 8px !important;
-            right: 8px !important;
-            width: calc(100vw - 16px) !important;
-            transform: translateX(0) !important;
-          }
-
-          /* Ensure the calendar panels fit */
-          .ant-picker-panel-container {
-            overflow-x: auto;
-            max-width: 100%;
-          }
-
-          .ant-picker-panel {
-            width: 100%;
-            min-width: 0;
-          }
-
-          /* Adjust date cells for smaller screens */
-          .ant-picker-cell {
-            padding: 2px !important;
-          }
-
-          .ant-picker-date-panel {
-            width: 100% !important;
-          }
-        }
-
-        /* Fix RangePicker input styling */
-        .ant-picker-range {
-          width: 100% !important;
-          background-color: #1d293d !important;
-          border: none !important;
-          color: white !important;
-        }
-
-        .ant-picker-input > input {
-          color: white !important;
-          font-size: 12px !important;
-        }
-
-        .ant-picker-input > input::placeholder {
-          color: #94a3b8 !important;
-        }
-      `}</style>
-
-      {/* Filter Section */}
-      <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg mb-2 flex justify-between items-center">
-        <h1 className="font-semibold text-sm text-slate-300 flex items-center gap-1">
-          <ListTodo size={16} /> Tasks
-        </h1>
-        {canAdd && (
-          <Button className='flex items-center gap-1' onClick={() => router.push('/staff/tasks/add-task')}>
-                      Add Task <CalendarPlus size={16} />
-                    </Button>
+    <div className="p-4 pb-20 space-y-3">
+      <div className="rounded-xl border border-slate-800/70 bg-gradient-to-br from-slate-950/70 via-slate-900/50 to-slate-900/80 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-xs uppercase tracking-widest text-slate-400">Staff Tasks</p>
+            <h1 className="text-lg font-semibold text-slate-100 flex items-center gap-2">
+              <ListTodo size={18} /> Task Overview
+            </h1>
+            <p className="text-xs text-slate-400 mt-1">
+              Track personal assignments and project workstreams at a glance.
+            </p>
+          </div>
+          {canAdd && (
+            <Button
+              className="flex items-center gap-2 bg-cyan-600/20 text-cyan-100 border border-cyan-700/50 hover:bg-cyan-500/20"
+              onClick={() => router.push("/staff/tasks/add-task")}
+            >
+              Add Task <CalendarPlus size={16} />
+            </Button>
+          )}
+        </div>
+        {appliedRange.start && appliedRange.end && (
+          <div className="mt-3 text-xs text-slate-400 flex flex-wrap items-center gap-2">
+            <span className="rounded-md border border-slate-700/60 bg-slate-900/60 px-2 py-1">
+              From {appliedRange.start}
+            </span>
+            <span className="rounded-md border border-slate-700/60 bg-slate-900/60 px-2 py-1">
+              To {appliedRange.end}
+            </span>
+          </div>
         )}
       </div>
 
-      <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg min-h-[13vh] mb-4">
-        <h1 className="font-semibold text-xs text-slate-400 px-2">Task Filters</h1>
-        <div className="flex flex-col sm:flex-row flex-wrap gap-2">
-          <div className="w-full sm:w-1/3 min-w-[200px]">
-            <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
-              <Select value={selectedTaskType} onValueChange={setSelectedTaskType}>
-                <SelectTrigger className={`${selectedTaskType ? 'text-slate-200' : 'text-slate-400'}`}>
-                  <SelectValue placeholder="Select Task Type" />
-                </SelectTrigger>
-                <SelectContent>
-                  {taskTypes.map((item) => (
-                    <SelectItem key={item.value} value={item.value}>
-                      {item.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+      <div className="rounded-xl border border-slate-800/70 bg-gradient-to-br from-slate-950/60 to-slate-900/70 p-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="text-xs font-semibold text-slate-400">Task Filters</p>
+            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TaskTab)}>
+              <TabsList className="mt-2 bg-slate-900/70">
+                <TabsTrigger
+                  className="text-slate-400 data-[state=active]:bg-slate-200/10 data-[state=active]:text-slate-100"
+                  value="all"
+                >
+                  All Tasks
+                </TabsTrigger>
+                <TabsTrigger
+                  className="text-slate-400 data-[state=active]:bg-slate-200/10 data-[state=active]:text-slate-100"
+                  value="single"
+                >
+                  Individual Tasks
+                </TabsTrigger>
+                <TabsTrigger
+                  className="text-slate-400 data-[state=active]:bg-slate-200/10 data-[state=active]:text-slate-100"
+                  value="project"
+                >
+                  Project Tasks
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
           </div>
-          <div className="w-full sm:w-1/3 min-w-[200px]">
-            <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg p-0.5 px-1">
-              <Label className="text-xs text-slate-400 px-2">Within Period</Label>
-              <Space direction="vertical" size={12} style={{ width: '100%', border: 0 }}>
-                <RangePicker
-                  onChange={handleDateChange}
-                  style={{ backgroundColor: '#1d293d', width: '100%', border: 0 }}
-                  className="text-white"
-                  popupStyle={{ zIndex: 9999 }}
-                  getPopupContainer={(trigger) => trigger.parentNode as HTMLElement}
-                />
-              </Space>
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="min-w-[240px]">
+              <p className="text-[11px] text-slate-400 mb-1">Within Period</p>
+              <RangePicker
+                onChange={handleDateChange}
+                value={rangeValue}
+                className="w-full text-slate-100"
+                style={{ backgroundColor: "#111827", border: "1px solid #1f2937" }}
+              />
             </div>
-          </div>
-          <div className="w-full sm:w-1/3 min-w-[200px] flex gap-2 justify-start items-end">
-            <Button variant="ghost" className="text-xs" onClick={handleClearFilters}>
-              Clear All
+            <Button
+              size="sm"
+              className="h-9 bg-slate-100/10 text-slate-100 border border-slate-700/80 hover:bg-slate-100/20"
+              onClick={handleApplyFilters}
+            >
+              Apply
             </Button>
-            <Button onClick={handleSearchTasks} className="text-xs">
-              Apply / Search
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-9 text-slate-400 hover:text-slate-200"
+              onClick={handleClearFilters}
+            >
+              Clear
             </Button>
           </div>
         </div>
       </div>
 
-      {/* Task List Section */}
-      <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg mb-2">
-        <h2 className="font-semibold text-sm text-slate-300 flex items-center gap-1">
-          <Clock size={16} /> Task List
-        </h2>
-      </div>
-      <div className="space-y-3">
-        {filteredTasks?.length > 0 ? (
-          filteredTasks?.map((task:any) => (
-            <Card
-              onClick={()=> navigateToTask(task?._id)}
-              key={task._id}
-              className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 p-4 rounded-lg border-none hover:bg-slate-900/70 transition-colors duration-200"
-            >
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                <div className="flex-1">
-                  <h3 className="text-sm font-medium text-slate-200">{task.task_name}</h3>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Badge
-                      variant={task?.is_project_task ? 'default' : 'secondary'}
-                      className={`text-xs ${
-                        task?.is_project_task ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-200'
+      <div className="rounded-xl border border-slate-800/70 bg-slate-900/40 p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
+            <ListTodo size={16} /> Tasks
+          </h2>
+          <p className="text-xs text-slate-400">{taskList.length} tasks</p>
+        </div>
+
+        {isLoading && (
+          <div className="flex items-center justify-center w-full h-[15vh]">
+            <LoaderSpin size={20} title="Loading Tasks..." />
+          </div>
+        )}
+
+        {!isLoading && taskList.length === 0 && (
+          <p className="text-xs text-slate-500 italic">No tasks found.</p>
+        )}
+
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {taskList.map((task: any) => {
+            const progress = getProgressValue(
+              Number(task.completed_activity || 0),
+              Number(task.activity_count || 0)
+            );
+            const endDateLabel = task?.end_date
+              ? new Date(task.end_date).toLocaleDateString()
+              : null;
+
+            return (
+              <div
+                key={task._id}
+                className="cursor-pointer rounded-xl border border-slate-800/70 bg-gradient-to-br from-slate-950/70 to-slate-900/60 p-4 transition hover:border-cyan-700/40"
+                onClick={() => router.push(`/staff/tasks/${task._id}`)}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-base font-semibold text-slate-100">
+                      {task.task_name}
+                    </h3>
+                    <p className="text-xs text-slate-400 mt-1">
+                      {task.task_description || "No description added."}
+                    </p>
+                    {endDateLabel && (
+                      <p className="text-[11px] text-slate-500 mt-2">Due: {endDateLabel}</p>
+                    )}
+                  </div>
+                  <div className="flex flex-col items-end gap-2">
+                    <span
+                      className={`text-[10px] uppercase tracking-wide px-2 py-1 rounded-md border ${
+                        statusStyles[task.status] ||
+                        "border-slate-600/40 bg-slate-700/30 text-slate-200"
                       }`}
                     >
-                      {/* {task?.type?.charAt(0).toUpperCase() + task.type.slice(1)} */}
-                      {task?.is_project_task ? "Project Task" : "Single Task"}
-                    </Badge>
-                    <span className="text-xs text-slate-400">Due: {new Date(task?.end_date).toLocaleDateString()}</span>
+                      {task.status || "Unknown"}
+                    </span>
+                    {task.is_project_task && (
+                      <span className="text-[10px] uppercase tracking-wide px-2 py-1 rounded-md border border-indigo-500/40 bg-indigo-500/10 text-indigo-200">
+                        Project Based
+                      </span>
+                    )}
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  {task.status === 'Completed' ? (
-                    <CheckCircle2 size={16} className="text-green-500" />
-                  ) : (
-                    <AlertCircle size={16} className="text-yellow-500" />
-                  )}
-                  <span className={`text-xs ${task?.status === 'Completed' ? 'text-green-500' : 'text-yellow-500'}`}>
-                    {task.status.charAt(0).toUpperCase() + task.status.slice(1)}
+
+                <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-400">
+                  <span className="rounded-md bg-slate-900/60 border border-slate-800/60 px-2 py-1">
+                    Activities: {task.activity_count || 0}
+                  </span>
+                  <span className="rounded-md bg-slate-900/60 border border-slate-800/60 px-2 py-1">
+                    Completed: {task.completed_activity || 0}
+                  </span>
+                </div>
+
+                <div className="mt-3 flex items-center gap-3">
+                  <div className="h-2 flex-1 rounded-full bg-slate-800/80">
+                    <div
+                      className={`h-2 rounded-full ${getProgressClass(progress)}`}
+                      style={{ width: `${progress}%` }}
+                    />
+                  </div>
+                  <span className="text-xs font-semibold text-slate-200 w-12 text-right">
+                    {progress}%
                   </span>
                 </div>
               </div>
-            </Card>
-          ))
-        ) : (
-          <div className="text-center text-sm text-slate-400">No tasks match the selected filters.</div>
-        )}
+            );
+          })}
+        </div>
       </div>
     </div>
   );

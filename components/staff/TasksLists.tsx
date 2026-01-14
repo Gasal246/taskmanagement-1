@@ -43,7 +43,7 @@ const TasksLists = ({ currentUser, tasktype }: { currentUser: any, tasktype: Tas
                                         </div>
                                     </div>
                                     <div className="flex gap-1 items-center p-1 mb-1">
-                                        <Avatar src={task?.Creator?.AvatarUrl || "/avatar.png"} size={30} />
+                                        <Avatar src={task?.Creator?.avatar_url || "/avatar.png"} size={30} />
                                         <div>
                                             <h1 className='text-xs font-medium text-neutral-300 capitalize'>from: <span className='text-neutral-200'>{task?.Creator?._id == currentUser?._id ? 'Yourself' : task?.Creator?.Role}</span></h1>
                                             <h1 className='text-xs font-medium text-neutral-200'>{task?.Creator?.Email} <span className='italic font-normal text-neutral-300'>&#x2022; {multiFormatDateString(task?.createdAt)}</span></h1>

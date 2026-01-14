@@ -37,7 +37,7 @@ const ProjectFlow = ({ projectid }: { projectid: string }) => {
         </div>,
         children: <div className='bg-neutral-700/40 p-2 rounded-lg flex gap-2 items-center flex-wrap m-1'>
             <div className='flex items-center gap-1 flex-wrap'>
-                <Avatar src={flow?.Creator?.AvatarUrl || '/avatar.png'} size={24} />
+                <Avatar src={flow?.Creator?.avatar_url || '/avatar.png'} size={24} />
                 <div className="">
                     <pre className='text-xs text-slate-300 text-wrap'>{flow?.Creator?.Email}</pre>
                     <p className="text-xs text-slate-400 text-wrap">{formatDate(flow?.createdAt)}</p>

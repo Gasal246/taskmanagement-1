@@ -21,7 +21,7 @@ const ViewSkillSlider = ({ trigger, skill, companyid }: { trigger: React.ReactNo
                         allUsers?.map((user: any) => (
                             <div className='bg-slate-900 p-2 rounded-lg' key={user?._id}>
                                 <div className="flex gap-2 items-center">
-                                    <Avatar src={user?.AvatarUrl || `/avatar.png`} />
+                                    <Avatar src={user?.avatar_url || `/avatar.png`} />
                                     <div>
                                         <h1 className='font-medium text-sm leading-3'>{user?.Name}</h1>
                                         <h1 className='font-medium text-xs leading-3'>{user?.Email}</h1>

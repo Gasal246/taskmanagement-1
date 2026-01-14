@@ -33,10 +33,10 @@ export const columns: ColumnDef<any>[] = [
         enableHiding: false,
     },
     {
-        accessorKey: "AvatarUrl",
+        accessorKey: "avatar_url",
         header: () => <div className="text-left">Avatar</div>,
         cell: ({ row }) => {
-            const avatarUrl = row.getValue("AvatarUrl");
+            const avatarUrl = row.getValue("avatar_url");
             return (
                 <Tooltip title={avatarUrl ? 'user-profile' : 'default avatar'}>
                     <Avatar src={avatarUrl ? `${avatarUrl}` : '/avatar.png'} />

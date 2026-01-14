@@ -66,5 +66,5 @@ npm run dev
 
 ### Release Version
 
-- **Current:** alpha.1.26
-- **Last Updated:** Alpha 26.1.1
+- **Current:** alpha.26.1.2
+- **Last Updated:** Alpha 26.1.2

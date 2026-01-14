@@ -23,7 +23,7 @@ const NotificationCard = ({ notification }:{ notification: any }) => {
             <div className="flex justify-between items-center">
                 <h5 className='text-xs text-slate-400 '>{multiFormatDateString(notification?.createdAt)}</h5>
                 <div className='flex justify-between items-center gap-1'>
-                    <Avatar src={notification?.SenderId?.AvatarUrl || '/avatar.png'} size={20} />
+                    <Avatar src={notification?.SenderId?.avatar_url || '/avatar.png'} size={20} />
                     <h1 className='text-xs font-semibold'>{notification?.SenderId?.Email}</h1>
                 </div>
             </div>

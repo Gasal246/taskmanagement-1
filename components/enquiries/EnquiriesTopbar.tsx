@@ -42,7 +42,7 @@ const StaffTopbar = () => {
               <h1 className='text-slate-400 text-end text-sm leading-3'>{userData?.name}</h1>
               <h2 className='text-slate-400 text-end text-xs'>{userData?.email}</h2>
             </div>
-            <Avatar src={userData?.AvatarUrl || '/avatar.png'} />
+            <Avatar src={userData?.avatar_url || '/avatar.png'} />
           </div>
         </PopoverTrigger>
 

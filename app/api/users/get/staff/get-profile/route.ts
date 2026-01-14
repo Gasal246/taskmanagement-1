@@ -9,6 +9,7 @@ import Region_departments from "@/models/region_departments.model";
 import Roles from "@/models/roles.model";
 import User_skills from "@/models/user_skills.model";
 import Users from "@/models/users.model";
+import "@/models/business_skills.model";
 import { NextRequest, NextResponse } from "next/server";
 
 connectDB();

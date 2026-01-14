@@ -61,7 +61,7 @@ const AddDepartmentHead = ({ trigger, departmentId }: { trigger: React.ReactNode
                                                 staffs?.map((staff: any) => (
                                                     <SelectItem key={staff?._id} value={staff?._id}>
                                                         <div className="flex gap-1">
-                                                            <Avatar src={staff?.AvatarUrl ? staff?.AvatarUrl : '/avatar.png'} />
+                                                            <Avatar src={staff?.avatar_url ? staff?.avatar_url : '/avatar.png'} />
                                                             <div>
                                                                 <h1 className='text-xs leading-4'>{staff?.Name}</h1>
                                                                 <h1 className='text-xs'>{staff?.Email }</h1>

@@ -1,7 +1,7 @@
 "use client"
 import ProfilPageSkeleton from '@/components/skeletons/ProfilPageSkeleton'
 import { Edit2, Key, EyeOff, Eye } from 'lucide-react'
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import {
   Dialog,
@@ -25,6 +25,9 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { useGetStaffProfile, useUpdateStaffProfile } from '@/query/user/queries'
 import Cookies from "js-cookie"
 import { toast } from 'sonner'
+import Cropper, { Area } from 'react-easy-crop'
+import { getDownloadURL, ref, uploadBytes } from 'firebase/storage'
+import { storage } from '@/firebase/config'
 
 // ──────────────────────────────────────────────
 // Zod Schemas
@@ -37,6 +40,49 @@ const changePasswordSchema = z.object({
   oldPassword: z.string().min(1, "Old password is required"),
   newPassword: z.string().min(6, "New password must be at least 6 characters"),
 })
+
+const createImage = (url: string) =>
+  new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.addEventListener("load", () => resolve(image));
+    image.addEventListener("error", (error) => reject(error));
+    image.setAttribute("crossOrigin", "anonymous");
+    image.src = url;
+  });
+
+const getCroppedImageBlob = async (imageSrc: string, crop: Area) => {
+  const image = await createImage(imageSrc);
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+
+  if (!ctx) {
+    throw new Error("Canvas is not supported.");
+  }
+
+  canvas.width = crop.width;
+  canvas.height = crop.height;
+  ctx.drawImage(
+    image,
+    crop.x,
+    crop.y,
+    crop.width,
+    crop.height,
+    0,
+    0,
+    crop.width,
+    crop.height
+  );
+
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        reject(new Error("Failed to crop image."));
+        return;
+      }
+      resolve(blob);
+    }, "image/jpeg", 0.92);
+  });
+};
 
 // ──────────────────────────────────────────────
 // Component
@@ -77,7 +123,15 @@ const ProfilPage = () => {
   const [editNameOpen, setEditNameOpen] = useState(false)
   const [changePwOpen, setChangePwOpen] = useState(false)
 
-  const [showPassword, setShowPassword] = React.useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [avatarDialogOpen, setAvatarDialogOpen] = useState(false);
+  const [avatarSrc, setAvatarSrc] = useState<string | null>(null);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement | null>(null);
 
   //Api
   const { mutateAsync: GetProfile, isPending: loadingUser } = useGetStaffProfile();
@@ -161,6 +215,14 @@ const ProfilPage = () => {
     fetchUserProfile();
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (avatarSrc) {
+        URL.revokeObjectURL(avatarSrc);
+      }
+    };
+  }, [avatarSrc]);
+
   const refetchUser = async () => {
     const res = await GetProfile({ role_id: creds.role_id, org_id: creds.org_id });
     if (res?.status == 200) setUserData(res);
@@ -175,6 +237,90 @@ const ProfilPage = () => {
     changePwForm.reset()
     setChangePwOpen(true)
   }
+
+  const onAvatarCropComplete = useCallback((_: Area, croppedAreaPixels: Area) => {
+    setCroppedAreaPixels(croppedAreaPixels);
+  }, []);
+
+  const openAvatarPicker = () => {
+    avatarInputRef.current?.click();
+  };
+
+  const resetAvatarDialog = () => {
+    setAvatarDialogOpen(false);
+    setAvatarSrc(null);
+    setAvatarFile(null);
+    setCrop({ x: 0, y: 0 });
+    setZoom(1);
+    setCroppedAreaPixels(null);
+    if (avatarInputRef.current) {
+      avatarInputRef.current.value = "";
+    }
+  };
+
+  const handleAvatarDialogChange = (open: boolean) => {
+    if (!open) {
+      resetAvatarDialog();
+      return;
+    }
+    setAvatarDialogOpen(true);
+  };
+
+  const handleAvatarFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select an image file.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image size exceeds 5MB.");
+      return;
+    }
+    const nextUrl = URL.createObjectURL(file);
+    setAvatarSrc(nextUrl);
+    setAvatarFile(file);
+    setCrop({ x: 0, y: 0 });
+    setZoom(1);
+    setCroppedAreaPixels(null);
+    setAvatarDialogOpen(true);
+  };
+
+  const handleAvatarUpload = async () => {
+    if (!avatarSrc || !avatarFile || !croppedAreaPixels) {
+      toast.error("Select and crop an image first.");
+      return;
+    }
+    if (!userData?.userData?._id) {
+      toast.error("User information not available yet.");
+      return;
+    }
+
+    setUploadingAvatar(true);
+    try {
+      const croppedBlob = await getCroppedImageBlob(avatarSrc, croppedAreaPixels);
+      const extension = avatarFile.type.split("/")[1] || "jpg";
+      const storagePath = `user-avatars/${userData.userData._id}/${Date.now()}.${extension}`;
+      const imageRef = ref(storage, storagePath);
+      await uploadBytes(imageRef, croppedBlob, {
+        contentType: avatarFile.type || "image/jpeg",
+      });
+      const url = await getDownloadURL(imageRef);
+      const res = await UpdateProfile({ is_password: false, avatar_url: url });
+      if (res?.status === 201) {
+        toast.success("Profile photo updated.");
+        await refetchUser();
+        resetAvatarDialog();
+      } else {
+        toast.error(res?.message || "Failed to update profile photo.");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to upload profile photo.");
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
 
   // Submit Handlers (Plug your logic here)
   const onEditNameSubmit = async (data: z.infer<typeof editNameSchema>) => {
@@ -228,6 +374,7 @@ const ProfilPage = () => {
   };
 
   const statusLabel = userData?.userData?.status === 1 ? "Active" : "Blocked";
+  const avatarUrl = userData?.userData?.avatar_url || "/avatar.png";
 
   return (
     <div className='w-full min-h-screen p-4 sm:p-6 space-y-4'>
@@ -250,7 +397,7 @@ const ProfilPage = () => {
                   `}
                 >
                   <img
-                    src={userData?.AvatarUrl || '/avatar.png'}
+                    src={avatarUrl}
                     alt="Profile"
                     className="w-full h-full object-cover"
                   />
@@ -272,6 +419,22 @@ const ProfilPage = () => {
                 </div>
               </div>
               <div className="flex flex-wrap gap-2 lg:ml-auto">
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarFileChange}
+                  className="hidden"
+                />
+                <motion.button
+                  type="button"
+                  onClick={openAvatarPicker}
+                  whileTap={{ scale: 0.98 }}
+                  whileHover={{ scale: 1.02 }}
+                  className="bg-gradient-to-tr from-slate-950/60 to-slate-900/60 p-2 px-3 rounded-lg border border-slate-700 hover:border-cyan-600 text-xs font-semibold"
+                >
+                  Change Photo
+                </motion.button>
                 <motion.button
                   type="button"
                   onClick={openEditName}
@@ -538,6 +701,66 @@ const ProfilPage = () => {
               </div>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={avatarDialogOpen} onOpenChange={handleAvatarDialogChange}>
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle>Update Profile Photo</DialogTitle>
+            <DialogDescription>Crop the image to a square before uploading.</DialogDescription>
+          </DialogHeader>
+          <div className="relative h-[320px] w-full overflow-hidden rounded-xl border border-slate-800 bg-slate-950/60">
+            {avatarSrc ? (
+              <Cropper
+                image={avatarSrc}
+                crop={crop}
+                zoom={zoom}
+                aspect={1}
+                onCropChange={setCrop}
+                onZoomChange={setZoom}
+                onCropComplete={onAvatarCropComplete}
+                showGrid={false}
+              />
+            ) : (
+              <div className="flex h-full items-center justify-center text-xs text-slate-400">
+                Select an image to preview.
+              </div>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-slate-400">Zoom</span>
+            <input
+              type="range"
+              min={1}
+              max={3}
+              step={0.1}
+              value={zoom}
+              onChange={(event) => setZoom(Number(event.target.value))}
+              className="w-full accent-cyan-600"
+            />
+          </div>
+          <div className="flex w-full items-center justify-end gap-2">
+            <motion.button
+              type="button"
+              onClick={resetAvatarDialog}
+              whileTap={{ scale: 0.98 }}
+              whileHover={{ scale: 1.02 }}
+              className="bg-gradient-to-tr from-slate-950/60 to-slate-900/60 p-2 px-4 rounded-lg border border-slate-700 hover:border-slate-400 text-sm font-semibold"
+            >
+              Cancel
+            </motion.button>
+            <motion.button
+              type="button"
+              onClick={handleAvatarUpload}
+              whileTap={{ scale: 0.98 }}
+              whileHover={{ scale: 1.02 }}
+              className="bg-gradient-to-tr from-cyan-950/60 to-cyan-900/60 p-2 px-4 rounded-lg border border-cyan-700 hover:border-cyan-400 text-sm font-semibold"
+              disabled={uploadingAvatar}
+            >
+              {uploadingAvatar ? "Uploading..." : "Upload Photo"}
+            </motion.button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

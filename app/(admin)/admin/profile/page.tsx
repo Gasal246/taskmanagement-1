@@ -198,7 +198,7 @@ const ProfilPage = () => {
                   `}
                 >
                   <Image
-                    src={userData?.AvatarUrl || '/avatar.png'}
+                    src={userData?.user_details?.avatar_url || '/avatar.png'}
                     alt="Profile"
                     width={200}
                     height={200}

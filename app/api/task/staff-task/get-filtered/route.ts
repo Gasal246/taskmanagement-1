@@ -20,9 +20,12 @@ export async function GET(req: NextRequest) {
     const type = searchParams.get("taskType");
     const startDate = searchParams.get("start_date");
     const endDate = searchParams.get("end_date");
+    const hasValidStart = Boolean(startDate && startDate !== "undefined");
+    const hasValidEnd = Boolean(endDate && endDate !== "undefined");
+    const hasType = Boolean(type);
 
     // ✅ Prevent fetching everything if no filters are provided
-    if (!type && !startDate && !endDate) {
+    if (!hasType && !hasValidStart && !hasValidEnd) {
       return NextResponse.json(
         { message: "No filters provided", data: [], status: 203 },
         { status: 203 }
@@ -32,11 +35,11 @@ export async function GET(req: NextRequest) {
     const query: any = {};
 
     // 📅 Date Filter
-    if (startDate || endDate) {
+    if (hasValidStart || hasValidEnd) {
       query.start_date = {};
-      if (startDate && startDate !== "undefined")
+      if (hasValidStart)
         query.start_date.$gte = new Date(startDate);
-      if (endDate && endDate !== "undefined")
+      if (hasValidEnd)
         query.start_date.$lte = new Date(endDate);
     }
 

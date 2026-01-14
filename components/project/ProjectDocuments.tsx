@@ -19,7 +19,7 @@ interface Document {
         _id: string;
         Email: string;
         Name: string;
-        AvatarUrl: string;
+        avatar_url: string;
     }[];
     DocName: string;
     DocUrl: string;
@@ -29,7 +29,7 @@ interface User {
     _id: string;
     Name: string;
     Email: string;
-    AvatarUrl: string;
+    avatar_url: string;
     Department?: {
         DepartmentName: string;
     }
@@ -72,7 +72,7 @@ const ProjectDocuments = ({ projectId, documents, allUsers, creatorid, adminid }
                             <Link target='_blank' href={doc?.DocUrl}><h1 className='text-sm font-medium text-slate-300 flex gap-1 mb-1'><FileText size={18} />{doc?.DocName}</h1></Link>
                             <h3 className='text-xs font-medium text-slate-400 flex items-center gap-2'>Access To:
                                 <Avatar.Group max={{ count: 3 }} size={20}>{doc?.AccessTo?.map(user => (
-                                    <Tooltip key={user?._id} title={user?.Name} placement="top"><Avatar src={user?.AvatarUrl || '/avatar.png'} /></Tooltip>
+                                    <Tooltip key={user?._id} title={user?.Name} placement="top"><Avatar src={user?.avatar_url || '/avatar.png'} /></Tooltip>
                                 ))}</Avatar.Group>
                             </h3>
                             <motion.div whileTap={{ scale: 0.98 }} whileHover={{ scale: 1.05 }} className='absolute top-2 right-2'>

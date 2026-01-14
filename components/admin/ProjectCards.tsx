@@ -23,7 +23,7 @@ export const ProjectCard = ({ project, userRole }: { project: any, userRole: str
                 <h1 className='text-sm font-medium'>{project?.Title}</h1>
             </div>
             <Link href={userRole == 'admin' ? `/admin/staffs/${project?.Creator?._id}` : `/staff/profile/${project?.Creator?._id}`}><div className="flex gap-1 bg-slate-950/50 p-2 rounded-lg items-center mt-2 mb-1">
-                <Avatar src={project?.Creator?.AvatarUrl || '/avatar.png'} size={26} />
+                <Avatar src={project?.Creator?.avatar_url || '/avatar.png'} size={26} />
                 <div>
                     <h1 className='text-xs font-medium leading-3'>{project?.Creator?.Name}</h1>
                     <h1 className='text-xs'>{project?.Creator?.Email}</h1>

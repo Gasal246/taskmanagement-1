@@ -27,7 +27,7 @@ interface User {
     _id: string;
     Name: string;
     Email: string;
-    AvatarUrl: string;
+    avatar_url: string;
     Department?: {
         DepartmentName: string;
     }
@@ -174,7 +174,7 @@ const AddProjectDocDialog = ({ trigger, projectId, users, creatorid, adminid, do
                                                                 </FormControl>
                                                                 <FormLabel className="font-normal">
                                                                     <div className="flex gap-1 items-center">
-                                                                        <Avatar src={user?.AvatarUrl || '/avatar.png'} size={24} />
+                                                                        <Avatar src={user?.avatar_url || '/avatar.png'} size={24} />
                                                                         <div>
                                                                             <h3 className='text-neutral-200 text-xs leading-3 font-medium'>{user?.Name}</h3>
                                                                             <h3 className='text-neutral-300 text-xs '>{user?.Email}</h3>

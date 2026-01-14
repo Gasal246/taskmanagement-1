@@ -1081,11 +1081,19 @@ export async function GetUserDetails(role_id:string, org_id:string){
 //Staff-Tasks
 export async function GetStaffTasksByFilter(queryParams: any) {
     try{
-        const queryString = new URLSearchParams(queryParams).toString();
+        const params = new URLSearchParams();
+        Object.entries(queryParams || {}).forEach(([key, value]) => {
+            if (value === undefined || value === null) return;
+            const stringValue = String(value);
+            if (!stringValue || stringValue === "undefined") return;
+            params.set(key, stringValue);
+        });
+        const queryString = params.toString();
         const res = await axios.get(`/api/task/staff-task/get-filtered?${queryString}`);
         return res.data;
     }catch(err) {
         console.log(err);
+        return { data: [], status: 500 };
     }
 }
 
@@ -1111,9 +1119,13 @@ export async function GetBusinessForStaff(domain_id: string){
 }
 
 //Get All Staffs in StaffView
-export async function GetAllStaffsForStaff(role_id:string){
+export async function GetAllStaffsForStaff({ role_id, domain_id }: { role_id: string; domain_id: string }){
     try{
-        const res = await axios.get(`/api/staff/get-for-heads?role_id=${role_id}`, {
+        if (!role_id || !domain_id) {
+            return { status: 400, message: "Role id and domain id are required" };
+        }
+        const params = new URLSearchParams({ role_id, domain_id });
+        const res = await axios.get(`/api/staff/get-for-heads?${params.toString()}`, {
             withCredentials:true,
         });
         return res.data;

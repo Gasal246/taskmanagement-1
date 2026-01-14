@@ -27,7 +27,7 @@ const TaskAnalyticsSheet = ({ taskData, currentUser }: { taskData: any, currentU
                     <div className="flex flex-col gap-1 py-2">
                         {taskData?.EnrolledBy?.map((user: any) => (
                             <div key={user?._id} className="flex gap-1 items-center bg-cyan-950/50 p-2 rounded-lg hover:bg-cyan-950/70 cursor-pointer" onClick={() => router.push('/staff/profile/userid')}>
-                                <Avatar src={user?.AvatarUrl || "/avatar.png"} />
+                                <Avatar src={user?.avatar_url || "/avatar.png"} />
                                 <div>
                                     <h1 className="text-xs leading-3 font-medium text-slate-200 flex items-center gap-1">{user?.Name} &#9679; <span className='text-cyan-500'>{user?.Role}</span></h1>
                                     <h1 className="text-xs text-slate-300">{user?.Email}</h1>

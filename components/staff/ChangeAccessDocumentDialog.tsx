@@ -108,7 +108,7 @@ const ChangeAccessDocumentDialog = ({ trigger, projectid, doc, creatorid, admini
                                                             </FormControl>
                                                             <FormLabel className="font-normal">
                                                                 <div className="flex gap-1 items-center p-2 rounded-lg bg-slate-950/50">
-                                                                    <Avatar src={user?.AvatarUrl || '/avatar.png'} />
+                                                                    <Avatar src={user?.avatar_url || '/avatar.png'} />
                                                                     <div>
                                                                         <h1 className='text-xs leading-3 font-medium'>{user?.Name}</h1>
                                                                         <h1 className='text-xs'>{user?.Email}</h1>

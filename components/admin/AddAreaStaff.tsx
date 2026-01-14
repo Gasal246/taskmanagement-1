@@ -72,7 +72,7 @@ const AddAreaStaff = ({ trigger, depId, regId, areaId }: { trigger: React.ReactN
                                                     stafflist?.map((staff: any) => (
                                                         <SelectItem value={staff?._id} key={staff?._id}>
                                                             <div className="flex gap-1 items-center">
-                                                                <Avatar src={staff?.AvatarUrl || '/avatar.png'} />
+                                                                <Avatar src={staff?.avatar_url || '/avatar.png'} />
                                                                 <div>
                                                                     <h2 className='text-sm font-medium leading-3'>{staff?.Name}</h2>
                                                                     <h2 className='text-xs'>{staff?.Email}</h2>

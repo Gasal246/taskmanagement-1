@@ -62,7 +62,7 @@ const UpdateAreaHeadDialog = ({ trigger, areaId }: { trigger: React.ReactNode, a
                                                     <Tooltip title={`Skills: ${staff?.Skills?.join(', ')}`}>
                                                         <div className='flex justify-between w-full items-center'>
                                                             <div className="flex gap-1 items-center">
-                                                                <Avatar src={staff?.AvatarUrl ? staff?.AvatarUrl : '/avatar.png'} size={30} />
+                                                                <Avatar src={staff?.avatar_url ? staff?.avatar_url : '/avatar.png'} size={30} />
                                                                 <div>
                                                                     <h4 className='text-xs leading-3'>{staff?.Name}</h4>
                                                                     <h4 className='text-xs'>{staff?.Email}</h4>

@@ -1,3 +1,29 @@
+export const ALL_ROLES = [
+    'BUSINESS_ADMIN',
+    'REGION_HEAD', 
+    'REGION_STAFF', 
+    'REGION_DEP_HEAD', 
+    'REGION_DEP_STAFF', 
+    'AREA_HEAD', 
+    'AREA_STAFF', 
+    'AREA_DEP_HEAD', 
+    'AREA_DEP_STAFF', 
+    'LOCATION_HEAD', 
+    'LOCATION_STAFF', 
+    'LOCATION_DEP_HEAD', 
+    'LOCATION_DEP_STAFF', 
+    'AGENT'
+];
+
+export const HEAD_ROLES = [
+    "REGION_HEAD", 
+    "REGION_DEP_HEAD", 
+    "AREA_HEAD", 
+    "AREA_DEP_HEAD", 
+    "LOCATION_HEAD", 
+    "LOCATION_DEP_HEAD"
+];
+
 export const DEPARTMENT_TYPES = [
     { label: "Sales", value: "sales" },
     { label: "Marketing", value: "marketing" },
@@ -12,7 +38,6 @@ export const DEPARTMENT_TYPES = [
     { label: "Procurement", value: "procurement" },
     { label: "Other", value: "other" }
 ];
-
 
 export const TASK_STATUS = [
     {label: "To Do", value: "To Do"},

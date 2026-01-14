@@ -957,7 +957,7 @@ export const useGetStaffBusinessDetails = () => {
 //Get All Staffs in StaffsView
 export const useGetAllStaffsForStaff = () => {
     return useMutation({
-        mutationFn: (role_id:string) => GetAllStaffsForStaff(role_id),
+        mutationFn: (payload: { role_id: string; domain_id: string }) => GetAllStaffsForStaff(payload),
     })
 }
 

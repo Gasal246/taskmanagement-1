@@ -66,7 +66,7 @@ export const columns: ColumnDef<any>[] = [
           </div>
         }>
           <div className="flex gap-1 items-center w-[250px] bg-slate-950 rounded-lg p-2 select-none cursor-pointer">
-            <Avatar src={data?.AvatarUrl || '/avatar.png'} />
+            <Avatar src={data?.avatar_url || '/avatar.png'} />
             <div className="">
               <h1 className="text-xs leading-3">{data?.Name}</h1>
               <h1 className="text-xs">{data?.Email}</h1>

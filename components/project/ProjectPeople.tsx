@@ -39,7 +39,7 @@ const ProjectPeople = ({ trigger, OpenedByArray, AccessToArray, currentDep }: { 
                                             <div key={user?._id} className={`${user?.Department?._id == currentDep?._id ? 'bg-green-300/30' : 'bg-orange-300/30'} p-3 rounded-lg flex justify-between items-center`}>
                                                 <Link href={`/admin/staffs/${user?._id}`}>
                                                     <div className="flex gap-1 items-center">
-                                                        <Avatar src={user?.AvatarUrl || '/avatar.png'} />
+                                                        <Avatar src={user?.avatar_url || '/avatar.png'} />
                                                         <div>
                                                             <h1 className="text-xs font-semibold leading-3">{user?.Name}</h1>
                                                             <h1 className="text-xs ">{user?.Email}</h1>
@@ -64,7 +64,7 @@ const ProjectPeople = ({ trigger, OpenedByArray, AccessToArray, currentDep }: { 
                                             <div key={user?._id} className={`${user?.Department?._id == currentDep?._id ? 'bg-green-300/30' : 'bg-orange-300/30'} p-3 rounded-lg flex justify-between items-center`}>
                                                 <Link href={`/admin/staffs/${user?._id}`}>
                                                     <div className="flex gap-1 items-center">
-                                                        <Avatar src={user?.AvatarUrl || '/avatar.png'} />
+                                                        <Avatar src={user?.avatar_url || '/avatar.png'} />
                                                         <div>
                                                             <h1 className="text-xs font-semibold leading-3">{user?.Name}</h1>
                                                             <h1 className="text-xs ">{user?.Email}</h1>
