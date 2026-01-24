@@ -36,6 +36,7 @@
     "clsx": "^2.1.1",
     "date-fns": "^3.6.0",
     "firebase": "^10.13.0",
+    "firebase-admin": "^13.6.0",
     "formidable": "^3.5.1",
     "formidable-serverless": "^1.1.1",
     "framer-motion": "^12.23.26",
@@ -75,6 +76,7 @@
     "tailwind-merge": "^2.3.0",
     "tailwindcss-animate": "^1.0.7",
     "vaul": "^1.1.2",
+    "xlsx": "^0.18.5",
     "zod": "^3.23.8"
   },
   "devDependencies": {

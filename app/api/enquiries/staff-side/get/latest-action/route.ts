@@ -15,7 +15,14 @@ export async function GET(req:NextRequest){
 
         const latestAction:any = await Eq_enquiry_histories.findOne({enquiry_id: enquiry_id}).populate("camp_id").sort({step_number: -1}).lean();
 
-        if(latestAction?.assigned_to != session?.user?.id) return NextResponse.json({message: "Unauthorized Access", status: 401}, {status: 401});
+        const assignedList = Array.isArray(latestAction?.assigned_to)
+            ? latestAction.assigned_to
+            : latestAction?.assigned_to
+                ? [latestAction.assigned_to]
+                : [];
+        if(!assignedList.some((id: any) => String(id) === String(session?.user?.id))) {
+            return NextResponse.json({message: "Unauthorized Access", status: 401}, {status: 401});
+        }
 
         return NextResponse.json({action: latestAction, status: 200}, {status: 200});
 

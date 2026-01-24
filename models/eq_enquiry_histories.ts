@@ -4,7 +4,7 @@ export interface IEq_enquiry_histories extends Document {
     _id: ObjectId,
     camp_id: ObjectId,
     enquiry_id: ObjectId,
-    assigned_to: ObjectId,
+    assigned_to: ObjectId[],
     forwarded_by: ObjectId,
     step_number: Number,
     priority: Number,
@@ -19,7 +19,7 @@ export interface IEq_enquiry_histories extends Document {
 const Eq_enquiry_historiesSchema: Schema = new Schema({
     camp_id: {type:Schema.Types.ObjectId, ref: "eq_camps"},
     enquiry_id: {type: Schema.Types.ObjectId, ref: "eq_enquiry"},
-    assigned_to: {type: Schema.Types.ObjectId, ref: "users"},
+    assigned_to: { type: [Schema.Types.ObjectId], ref: "users", default: [] },
     forwarded_by: {type: Schema.Types.ObjectId, ref: "users"},
     step_number: {type: Number},
     priority: {type: Number},

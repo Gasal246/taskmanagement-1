@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Building2, FileText, Loader2, Plus, Trash2, Upload, Wifi, PhoneCall, X, Info } from "lucide-react";
 import { useForm, useFieldArray } from "react-hook-form";
@@ -9,13 +9,6 @@ import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import {
-    Select,
-    SelectTrigger,
-    SelectContent,
-    SelectItem,
-    SelectValue
-} from "@/components/ui/select";
 import { motion } from "framer-motion";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -29,17 +22,22 @@ import {
     useGetEqCountries,
     useGetEqProvince,
     useGetEqRegions,
+    useGetEqUsers,
     useUpdateEnquiry
 } from "@/query/enquirymanager/queries";
 import { toast } from "sonner";
 import { EQ_CAMP_TYPES, EQ_CAPACITY_LIMITS, Eq_CAPACITY_OPTIONS } from "@/lib/constants";
 import { useParams, useRouter } from "next/navigation";
 import LocationPicker from "@/components/enquiries/LocationPicker";
+import EnquiryUserMultiSelect from "@/components/enquiries/EnquiryUserMultiSelect";
 import Image from "next/image";
 import { deleteObject, getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { storage } from "@/firebase/config";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "antd";
+import { useSelector } from "react-redux";
+import { RootState } from "@/redux/store";
+import { useQueryClient } from "@tanstack/react-query";
 
 const priorityLevels = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"];
 
@@ -68,6 +66,12 @@ const enquirySchema = z.object({
 
     latitude: z.string(),
     longitude: z.string(),
+    enquiry_brought_by: z.array(z.string()).optional(),
+    meeting_initiated_by: z.array(z.string()).optional(),
+    project_closed_by: z.array(z.string()).optional(),
+    project_managed_by: z.array(z.string()).optional(),
+    enquiry_user_notes: z.string().optional(),
+    coordinates: z.string().optional(),
 
     camp_capacity: z.string().optional(),
     camp_occupancy: z.string().optional(),
@@ -109,7 +113,7 @@ const enquirySchema = z.object({
     competition_status: z.string().optional(),
     competition_notes: z.string().optional(),
 
-    priority: z.enum(priorityLevels as [string, ...string[]]).optional(),
+    priority: z.enum(priorityLevels as [string, ...string[]]).optional().or(z.literal("")),
 
     followup_status: z.enum(["Pending", "In Progress", "Closed"]),
     alert_date: z.string().optional(),
@@ -138,6 +142,8 @@ const enquirySchema = z.object({
 export default function EditEnquiry() {
     const router = useRouter();
     const params = useParams<{ enquiry_id: string }>();
+    const { businessData } = useSelector((state: RootState) => state.user);
+    const queryClient = useQueryClient();
     const [showHeadOffice, setShowHeadOffice] = useState(false);
     const [countries, setCountries] = useState([]);
     const [docFile, setDocFile] = useState<File | null>(null);
@@ -156,6 +162,7 @@ export default function EditEnquiry() {
     const { mutateAsync: UpdateEnquiry, isPending: isUpdating } = useUpdateEnquiry();
     const { data: enquiry, isLoading: isEnquiryLoading } = useGetEnquiryById(params.enquiry_id);
     const { data: contactsData } = useGetEnquiryContacts(params.enquiry_id);
+    const { data: eqUsers } = useGetEqUsers(businessData?._id, "users");
 
     const form = useForm({
         resolver: zodResolver(enquirySchema),
@@ -207,7 +214,13 @@ export default function EditEnquiry() {
             comments: "",
             latitude: "",
             longitude: "",
-            contacts: []
+            coordinates: "",
+            contacts: [],
+            enquiry_brought_by: [],
+            meeting_initiated_by: [],
+            project_closed_by: [],
+            project_managed_by: [],
+            enquiry_user_notes: ""
         }
     });
 
@@ -226,6 +239,12 @@ export default function EditEnquiry() {
     const campInputMode = form.watch("camp_input_mode");
     const isNewCamp = campInputMode === "new" || areaInputMode == "new";
     const isExistingCampMode = areaInputMode === "existing" && campInputMode === "existing";
+    const coordinatesValue = form.watch("coordinates");
+    const { latitude: coordinatesLat, longitude: coordinatesLng } = parseCoordinates(coordinatesValue || "");
+    const coordsForDisplay = {
+        lat: toNumberOrNull(coordinatesLat),
+        lng: toNumberOrNull(coordinatesLng),
+    };
     const campCapacityMissing = isExistingCampMode
         && !!activeCampId
         && !!selectedCamp
@@ -240,10 +259,24 @@ export default function EditEnquiry() {
     const { data: cities, isLoading: isCityLoading } = useGetEqCities(province_id);
     const { data: areas, isLoading: isAreaLoading } = useGetEqAreas(city_id);
     const { data: camps, isLoading: isCampListLoading } = useGetEqCampsByArea(area_id);
+    const userOptions = useMemo(() => {
+        return (eqUsers?.users || [])
+            .map((userEntry: any) => {
+                const user = userEntry?.user_id || userEntry;
+                if (!user?._id) return null;
+                return {
+                    id: String(user._id),
+                    name: user?.name || "Unknown User",
+                    email: user?.email || "",
+                };
+            })
+            .filter(Boolean);
+    }, [eqUsers?.users]);
 
 
     const { control, handleSubmit } = form;
     const { fields, append, remove, replace } = useFieldArray({ control, name: "contacts" });
+    const selectClassName = "w-full rounded-md border border-slate-700 bg-slate-900 text-slate-200 p-2 focus:border-slate-500 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0";
 
     const formatDate = (dateString?: string | null) => {
         if (!dateString) return "";
@@ -260,6 +293,24 @@ export default function EditEnquiry() {
         const resolved = value?.$numberDecimal ?? value;
         return String(resolved);
     };
+    const normalizeUserIds = (value: any) => {
+        if (!Array.isArray(value)) return [];
+        return value
+            .map((entry) => (typeof entry === "string" ? entry : entry?._id))
+            .filter(Boolean);
+    };
+    function toNumberOrNull(value: string) {
+        if (!value) return null;
+        const num = Number(value);
+        return Number.isFinite(num) ? num : null;
+    }
+    function parseCoordinates(value: string) {
+        const [lat, lng] = value.split(",").map((item) => item.trim());
+        return {
+            latitude: lat || "",
+            longitude: lng || "",
+        };
+    }
 
     const fetchCountries = async () => {
         const res = await GetCountries();
@@ -276,6 +327,10 @@ export default function EditEnquiry() {
         if (!enquiry?.enquiry) return;
 
         const camp = campData?.camp;
+        const initialLatitudeRaw = camp?.latitude ?? enquiry?.enquiry?.latitude ?? "";
+        const initialLongitudeRaw = camp?.longitude ?? enquiry?.enquiry?.longitude ?? "";
+        const initialLatitude = initialLatitudeRaw === "" ? "" : String(initialLatitudeRaw);
+        const initialLongitude = initialLongitudeRaw === "" ? "" : String(initialLongitudeRaw);
         const headOffice = camp?.headoffice_id;
         const mappedContacts = (contactsData?.contacts || campData?.contacts || []).map((contact: any) => ({
             name: contact?.contact_name || "",
@@ -310,8 +365,9 @@ export default function EditEnquiry() {
             client_company: camp?.client_company_id?.client_company_name || "",
             landlord: camp?.landlord_id?.landlord_name || "",
             real_estate: camp?.realestate_id?.company_name || "",
-            latitude: camp?.latitude || enquiry?.enquiry?.latitude || "",
-            longitude: camp?.longitude || enquiry?.enquiry?.longitude || "",
+            latitude: initialLatitude,
+            longitude: initialLongitude,
+            coordinates: (initialLatitude || initialLongitude) ? `${initialLatitude}, ${initialLongitude}` : "",
             camp_capacity: camp?.camp_capacity || "",
             camp_occupancy: camp?.camp_occupancy ? String(camp?.camp_occupancy) : "",
             contacts: mappedContacts,
@@ -347,7 +403,12 @@ export default function EditEnquiry() {
             alert_date: formatDate(enquiry?.enquiry?.alert_date) || "",
             next_action: enquiry?.enquiry?.next_action || "",
             next_action_due: formatDate(enquiry?.enquiry?.next_action_due) || "",
-            comments: enquiry?.enquiry?.comments || ""
+            comments: enquiry?.enquiry?.comments || "",
+            enquiry_brought_by: normalizeUserIds(enquiry?.enquiry?.enquiry_brought_by),
+            meeting_initiated_by: normalizeUserIds(enquiry?.enquiry?.meeting_initiated_by),
+            project_closed_by: normalizeUserIds(enquiry?.enquiry?.project_closed_by),
+            project_managed_by: normalizeUserIds(enquiry?.enquiry?.project_managed_by),
+            enquiry_user_notes: enquiry?.enquiry?.enquiry_user_notes || ""
         });
 
         replace(mappedContacts);
@@ -475,16 +536,26 @@ export default function EditEnquiry() {
             }
         }
         const payload = { ...data, enquiry_id: params.enquiry_id };
+        if (payload.coordinates) {
+            const { latitude, longitude } = parseCoordinates(payload.coordinates);
+            payload.latitude = latitude;
+            payload.longitude = longitude;
+        }
+        delete payload.coordinates;
         if (uploadedDoc?.url) {
             payload.images = [uploadedDoc.url];
         }
         const res = await UpdateEnquiry(payload);
         if (res?.status == 200) {
             toast.success(res?.message || "Enquiry Updated");
+            queryClient.invalidateQueries({ queryKey: ["enquiry", params.enquiry_id] });
             return router.replace(`/admin/enquiries/${params.enquiry_id}`);
         } else {
             toast.error(res?.message || "Failed to update enquiry");
         }
+    };
+    const onInvalid = () => {
+        toast.error("Please check the required fields before updating.");
     };
 
     if (isEnquiryLoading || isCampDetailsLoading) {
@@ -519,7 +590,7 @@ export default function EditEnquiry() {
             <div className="mt-2 bg-gradient-to-tr from-slate-950/60 to-slate-900/60 p-4 rounded-lg pb-16">
 
                 <Form {...form}>
-                    <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+                    <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="space-y-8">
 
                         {/* ------------------------------------ LOCATION ------------------------------------ */}
                         <div className="flex flex-wrap gap-3">
@@ -527,18 +598,18 @@ export default function EditEnquiry() {
                             <FormField control={form.control} name="country" render={({ field }) => (
                                 <FormItem>
                                     <FormLabel className="text-xs text-slate-300 font-semibold">Country</FormLabel>
-                                    <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
-                                        <Select value={field.value} onValueChange={field.onChange}>
-                                            <SelectTrigger className={field.value ? "text-slate-200" : "text-slate-400"}>
-                                                <SelectValue placeholder="Select Country" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {countries?.map((country: any) => (
-                                                    <SelectItem key={country._id} value={country._id}>{country.country_name}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
+                                    <FormControl>
+                                        <select
+                                            value={field.value ?? ""}
+                                            onChange={field.onChange}
+                                            className={selectClassName}
+                                        >
+                                            <option value="">Select Country</option>
+                                            {countries?.map((country: any) => (
+                                                <option key={country._id} value={country._id}>{country.country_name}</option>
+                                            ))}
+                                        </select>
+                                    </FormControl>
                                 </FormItem>
                             )} />
 
@@ -546,16 +617,18 @@ export default function EditEnquiry() {
                             <FormField control={form.control} name="region" render={({ field }) => (
                                 <FormItem>
                                     <FormLabel className="text-xs text-slate-300 font-semibold">Region / Territory</FormLabel>
-                                    <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
-                                        <Select value={field.value} onValueChange={field.onChange}>
-                                            <SelectTrigger className="text-slate-200"><SelectValue placeholder="Select Region" /></SelectTrigger>
-                                            <SelectContent>
-                                                {regions?.region?.map((rg: any) => (
-                                                    <SelectItem key={rg._id} value={rg._id}>{rg.region_name}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
+                                    <FormControl>
+                                        <select
+                                            value={field.value ?? ""}
+                                            onChange={field.onChange}
+                                            className={selectClassName}
+                                        >
+                                            <option value="">{country_id ? "Select Region" : "Select Country first"}</option>
+                                            {regions?.region?.map((rg: any) => (
+                                                <option key={rg._id} value={rg._id}>{rg.region_name}</option>
+                                            ))}
+                                        </select>
+                                    </FormControl>
                                 </FormItem>
                             )} />
 
@@ -563,31 +636,35 @@ export default function EditEnquiry() {
                             <FormField control={form.control} name="province" render={({ field }) => (
                                 <FormItem>
                                     <FormLabel className="text-xs text-slate-300 font-semibold">Province</FormLabel>
-                                    <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
-                                        <Select value={field.value} onValueChange={field.onChange}>
-                                            <SelectTrigger className="text-slate-200"><SelectValue placeholder="Select Province" /></SelectTrigger>
-                                            <SelectContent>
-                                                {provinces?.provinces?.map((p: any) => (
-                                                    <SelectItem key={p._id} value={p._id}>{p.province_name}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
+                                    <FormControl>
+                                        <select
+                                            value={field.value ?? ""}
+                                            onChange={field.onChange}
+                                            className={selectClassName}
+                                        >
+                                            <option value="">{region_id ? "Select Province" : "Select Region first"}</option>
+                                            {provinces?.provinces?.map((p: any) => (
+                                                <option key={p._id} value={p._id}>{p.province_name}</option>
+                                            ))}
+                                        </select>
+                                    </FormControl>
                                 </FormItem>
                             )} />
                             <FormField control={form.control} name="city" render={({ field }) => (
                                 <FormItem>
                                     <FormLabel className="text-xs text-slate-300 font-semibold">City</FormLabel>
-                                    <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
-                                        <Select value={field.value} onValueChange={field.onChange}>
-                                            <SelectTrigger className="text-slate-200"><SelectValue placeholder="Select Province" /></SelectTrigger>
-                                            <SelectContent>
-                                                {cities?.cities?.map((c: any) => (
-                                                    <SelectItem key={c._id} value={c._id}>{c.city_name}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
+                                    <FormControl>
+                                        <select
+                                            value={field.value ?? ""}
+                                            onChange={field.onChange}
+                                            className={selectClassName}
+                                        >
+                                            <option value="">{province_id ? "Select City" : "Select Province first"}</option>
+                                            {cities?.cities?.map((c: any) => (
+                                                <option key={c._id} value={c._id}>{c.city_name}</option>
+                                            ))}
+                                        </select>
+                                    </FormControl>
                                 </FormItem>
                             )} />
 
@@ -606,16 +683,18 @@ export default function EditEnquiry() {
                                 <FormField control={form.control} name="area" render={({ field }) => (
                                     <FormItem>
                                         <FormLabel className="text-xs text-slate-300 font-semibold">Area</FormLabel>
-                                        <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
-                                            <Select value={field.value} onValueChange={field.onChange}>
-                                                <SelectTrigger><SelectValue placeholder="Select Area" /></SelectTrigger>
-                                                <SelectContent>
-                                                    {areas?.areas?.map((a: any) => (
-                                                        <SelectItem key={a._id} value={a._id}>{a.area_name}</SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
+                                        <FormControl>
+                                            <select
+                                                value={field.value ?? ""}
+                                                onChange={field.onChange}
+                                                className={selectClassName}
+                                            >
+                                                <option value="">{city_id ? "Select Area" : "Select City first"}</option>
+                                                {areas?.areas?.map((a: any) => (
+                                                    <option key={a._id} value={a._id}>{a.area_name}</option>
+                                                ))}
+                                            </select>
+                                        </FormControl>
                                     </FormItem>
                                 )} />
                             )}
@@ -677,20 +756,20 @@ export default function EditEnquiry() {
                                 render={({ field }) => (
                                     <FormItem className="w-full mt-3">
                                         <FormLabel className="text-xs text-slate-300 font-semibold">Camp Name</FormLabel>
-                                        <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
-                                            <Select value={field.value} onValueChange={field.onChange}>
-                                                <SelectTrigger className={field.value ? "text-slate-200" : "text-slate-400"}>
-                                                    <SelectValue placeholder="Select Camp Name" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {camps?.camps?.map((c: any) => (
-                                                        <SelectItem key={c._id} value={c._id}>
-                                                            {c.camp_name}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
+                                        <FormControl>
+                                            <select
+                                                value={field.value ?? ""}
+                                                onChange={field.onChange}
+                                                className={selectClassName}
+                                            >
+                                                <option value="">{area_id ? "Select Camp Name" : "Select Area first"}</option>
+                                                {camps?.camps?.map((c: any) => (
+                                                    <option key={c._id} value={c._id}>
+                                                        {c.camp_name}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </FormControl>
                                         <FormMessage />
                                     </FormItem>
                                 )}
@@ -730,20 +809,20 @@ export default function EditEnquiry() {
                                 render={({ field }) => (
                                     <FormItem className="w-full lg:w-[48%]">
                                         <FormLabel className="text-xs text-slate-300 font-semibold">Camp Type</FormLabel>
-                                        <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
-                                            <Select value={field.value} onValueChange={field.onChange}>
-                                                <SelectTrigger className="text-slate-200">
-                                                    <SelectValue placeholder="Select Camp Type" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {EQ_CAMP_TYPES.map((c) => (
-                                                        <SelectItem key={c} value={c}>
-                                                            {c}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
+                                        <FormControl>
+                                            <select
+                                                value={field.value ?? ""}
+                                                onChange={field.onChange}
+                                                className={selectClassName}
+                                            >
+                                                <option value="">Select Camp Type</option>
+                                                {EQ_CAMP_TYPES.map((c) => (
+                                                    <option key={c} value={c}>
+                                                        {c}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </FormControl>
                                         <FormMessage />
                                     </FormItem>
                                 )}
@@ -886,12 +965,18 @@ export default function EditEnquiry() {
                                 <FormField control={form.control} name="camp_capacity" render={({ field }) => (
                                     <FormItem>
                                         <FormLabel className="text-xs text-slate-300">Camp Capacity</FormLabel>
-                                        <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
-                                            <Select value={field.value} onValueChange={field.onChange}>
-                                                <SelectTrigger><SelectValue placeholder="Select Capacity" /></SelectTrigger>
-                                                <SelectContent>{Eq_CAPACITY_OPTIONS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-                                            </Select>
-                                        </div>
+                                        <FormControl>
+                                            <select
+                                                value={field.value ?? ""}
+                                                onChange={field.onChange}
+                                                className={selectClassName}
+                                            >
+                                                <option value="">Select Capacity</option>
+                                                {Eq_CAPACITY_OPTIONS.map((c) => (
+                                                    <option key={c} value={c}>{c}</option>
+                                                ))}
+                                            </select>
+                                        </FormControl>
                                         <FormMessage />
                                     </FormItem>
                                 )} />
@@ -931,41 +1016,31 @@ export default function EditEnquiry() {
                                 {/* Is Decision Maker? */}
                                 <div>
                                     <FormLabel className="text-xs text-slate-300 font-semibold">Is Decision Maker?</FormLabel>
-                                    <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
-                                        <Select
-                                            value={form.watch(`contacts.${i}.is_decision_maker`)}
-                                            onValueChange={(val) => form.setValue(`contacts.${i}.is_decision_maker`, val)}
-                                        >
-                                            <SelectTrigger className="text-slate-200">
-                                                <SelectValue placeholder="Select" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="Yes">Yes</SelectItem>
-                                                <SelectItem value="No">No</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
+                                    <select
+                                        value={form.watch(`contacts.${i}.is_decision_maker`) ?? ""}
+                                        onChange={(event) => form.setValue(`contacts.${i}.is_decision_maker`, event.target.value)}
+                                        className={selectClassName}
+                                    >
+                                        <option value="">Select</option>
+                                        <option value="Yes">Yes</option>
+                                        <option value="No">No</option>
+                                    </select>
                                 </div>
 
                                 {/* Authority Level */}
                                 <div>
                                     <FormLabel className="text-xs text-slate-300 font-semibold">Authority Level</FormLabel>
-                                    <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
-                                        <Select
-                                            value={form.watch(`contacts.${i}.authority_level`)}
-                                            onValueChange={(val) => form.setValue(`contacts.${i}.authority_level`, val)}
-                                        >
-                                            <SelectTrigger className="text-slate-200">
-                                                <SelectValue placeholder="Authority Level" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="Operational">Operational</SelectItem>
-                                                <SelectItem value="Manager">Manager</SelectItem>
-                                                <SelectItem value="Director">Director</SelectItem>
-                                                <SelectItem value="C-Level">C-Level</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
+                                    <select
+                                        value={form.watch(`contacts.${i}.authority_level`) ?? ""}
+                                        onChange={(event) => form.setValue(`contacts.${i}.authority_level`, event.target.value)}
+                                        className={selectClassName}
+                                    >
+                                        <option value="">Authority Level</option>
+                                        <option value="Operational">Operational</option>
+                                        <option value="Manager">Manager</option>
+                                        <option value="Director">Director</option>
+                                        <option value="C-Level">C-Level</option>
+                                    </select>
                                 </div>
 
                                 <button
@@ -980,15 +1055,28 @@ export default function EditEnquiry() {
                         <button type="button" onClick={() => append({ name: "", phone: "" })} className="text-cyan-400 text-xs flex items-center gap-1">
                             <Plus size={14} /> Add Another Contact
                         </button>
+
                         {/* Location */}
                         <LocationPicker
                             onChange={(loc: any) => {
-                                form.setValue("latitude", loc.lat);
-                                form.setValue("longitude", loc.lng);
-                            }} />
+                                form.setValue("latitude", String(loc.lat));
+                                form.setValue("longitude", String(loc.lng));
+                                form.setValue("coordinates", `${loc.lat}, ${loc.lng}`);
+                            }}
+                            value={coordsForDisplay}
+                        />
 
-                        <Input type="text" {...form.register("latitude")} placeholder="Latitude" />
-                        <Input type="text" {...form.register("longitude")} placeholder="Longitude" />
+                        <Input
+                            type="text"
+                            {...form.register("coordinates", {
+                                onChange: (event) => {
+                                    const { latitude, longitude } = parseCoordinates(event.target.value);
+                                    form.setValue("latitude", latitude);
+                                    form.setValue("longitude", longitude);
+                                },
+                            })}
+                            placeholder="Latitude,Longitude"
+                        />
 
                         {/* WIFI */}
                         <div className="text-xs text-slate-400 font-semibold flex items-center gap-1"><Wifi size={14} /> Wi-Fi / Internet</div>
@@ -996,16 +1084,18 @@ export default function EditEnquiry() {
                         <FormField control={form.control} name="wifi_available" render={({ field }) => (
                             <FormItem>
                                 <FormLabel className="text-xs text-slate-300 font-semibold">Wi-Fi Available?</FormLabel>
-                                <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
-                                    <Select value={field.value} onValueChange={field.onChange}>
-                                        <SelectTrigger><SelectValue placeholder="Select Wi-Fi Availability" /></SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="Yes">Yes</SelectItem>
-                                            <SelectItem value="No">No</SelectItem>
-                                            <SelectItem value="not-specified">Not Specified</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
+                                <FormControl>
+                                    <select
+                                        value={field.value ?? ""}
+                                        onChange={field.onChange}
+                                        className={selectClassName}
+                                    >
+                                        <option value="">Select Wi-Fi Availability</option>
+                                        <option value="Yes">Yes</option>
+                                        <option value="No">No</option>
+                                        <option value="not-specified">Not Specified</option>
+                                    </select>
+                                </FormControl>
                             </FormItem>
                         )} />
 
@@ -1018,16 +1108,18 @@ export default function EditEnquiry() {
                                 <FormField control={form.control} name="wifi_type" render={({ field }) => (
                                     <FormItem>
                                         <FormLabel className="text-xs text-slate-300 font-semibold">Wi-Fi Type</FormLabel>
-                                        <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
-                                            <Select value={field.value} onValueChange={field.onChange}>
-                                                <SelectTrigger><SelectValue placeholder="Select Type" /></SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="Existing Contractor">Existing Contractor</SelectItem>
-                                                    <SelectItem value="Personal WiFi">Personal WiFi</SelectItem>
-                                                    <SelectItem value="Other Sources">Other Sources</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
+                                        <FormControl>
+                                            <select
+                                                value={field.value ?? ""}
+                                                onChange={field.onChange}
+                                                className={selectClassName}
+                                            >
+                                                <option value="">Select Type</option>
+                                                <option value="Existing Contractor">Existing Contractor</option>
+                                                <option value="Personal WiFi">Personal WiFi</option>
+                                                <option value="Other Sources">Other Sources</option>
+                                            </select>
+                                        </FormControl>
                                     </FormItem>
                                 )} />
 
@@ -1096,12 +1188,17 @@ export default function EditEnquiry() {
                         <FormField control={form.control} name="competition_status" render={({ field }) => (
                             <FormItem>
                                 <FormLabel className="text-xs text-slate-300 font-semibold">Competition Presence</FormLabel>
-                                <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
-                                    <Select value={field.value} onValueChange={field.onChange}>
-                                        <SelectTrigger><SelectValue placeholder="Competition Status" /></SelectTrigger>
-                                        <SelectContent><SelectItem value="Yes">Yes</SelectItem><SelectItem value="No">No</SelectItem></SelectContent>
-                                    </Select>
-                                </div>
+                                <FormControl>
+                                    <select
+                                        value={field.value ?? ""}
+                                        onChange={field.onChange}
+                                        className={selectClassName}
+                                    >
+                                        <option value="">Competition Status</option>
+                                        <option value="Yes">Yes</option>
+                                        <option value="No">No</option>
+                                    </select>
+                                </FormControl>
                             </FormItem>
                         )} />
 
@@ -1137,12 +1234,18 @@ export default function EditEnquiry() {
                                         Priority (1 - Low, 10 - High)
                                     </FormLabel>
                                 </Tooltip>
-                                <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
-                                    <Select value={field.value} onValueChange={field.onChange}>
-                                        <SelectTrigger><SelectValue placeholder="Priority" /></SelectTrigger>
-                                        <SelectContent>{priorityLevels.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
-                                    </Select>
-                                </div>
+                                <FormControl>
+                                    <select
+                                        value={field.value ?? ""}
+                                        onChange={field.onChange}
+                                        className={selectClassName}
+                                    >
+                                        <option value="">Priority</option>
+                                        {priorityLevels.map((p) => (
+                                            <option key={p} value={p}>{p}</option>
+                                        ))}
+                                    </select>
+                                </FormControl>
                             </FormItem>
                         )} />
 
@@ -1150,12 +1253,18 @@ export default function EditEnquiry() {
                         <FormField control={form.control} name="followup_status" render={({ field }) => (
                             <FormItem>
                         <FormLabel className="text-xs text-slate-300 font-semibold">Follow-up Status</FormLabel>
-                        <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
-                            <Select value={field.value} onValueChange={field.onChange}>
-                                <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
-                                <SelectContent><SelectItem value="Pending">Pending</SelectItem><SelectItem value="In Progress">In Progress</SelectItem><SelectItem value="Closed">Closed</SelectItem></SelectContent>
-                            </Select>
-                        </div>
+                        <FormControl>
+                            <select
+                                value={field.value ?? ""}
+                                onChange={field.onChange}
+                                className={selectClassName}
+                            >
+                                <option value="">Status</option>
+                                <option value="Pending">Pending</option>
+                                <option value="In Progress">In Progress</option>
+                                <option value="Closed">Closed</option>
+                            </select>
+                        </FormControl>
                     </FormItem>
                 )} />
 
@@ -1170,6 +1279,79 @@ export default function EditEnquiry() {
                                 <Input type="date" {...field} />
                             </FormItem>
                         )} />
+
+                        {/* ENQUIRY USERS */}
+                        <div className="border border-slate-700 p-3 rounded-lg space-y-3 bg-slate-900/40">
+                            <div className="text-xs text-slate-400 font-semibold">Enquiry Users</div>
+                            <FormField
+                                control={form.control}
+                                name="enquiry_brought_by"
+                                render={({ field }) => (
+                                    <FormItem className="w-full">
+                                        <EnquiryUserMultiSelect
+                                            label="Enquiry Brought By"
+                                            value={field.value || []}
+                                            options={userOptions}
+                                            onChange={field.onChange}
+                                        />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="meeting_initiated_by"
+                                render={({ field }) => (
+                                    <FormItem className="w-full">
+                                        <EnquiryUserMultiSelect
+                                            label="Meeting Initiated By"
+                                            value={field.value || []}
+                                            options={userOptions}
+                                            onChange={field.onChange}
+                                        />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="project_closed_by"
+                                render={({ field }) => (
+                                    <FormItem className="w-full">
+                                        <EnquiryUserMultiSelect
+                                            label="Project Closed By"
+                                            value={field.value || []}
+                                            options={userOptions}
+                                            onChange={field.onChange}
+                                        />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="project_managed_by"
+                                render={({ field }) => (
+                                    <FormItem className="w-full">
+                                        <EnquiryUserMultiSelect
+                                            label="Project Managed By"
+                                            value={field.value || []}
+                                            options={userOptions}
+                                            onChange={field.onChange}
+                                        />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="enquiry_user_notes"
+                                render={({ field }) => (
+                                    <FormItem className="w-full">
+                                        <FormLabel className="text-xs text-slate-300 font-semibold">Enquiry User Notes</FormLabel>
+                                        <FormControl>
+                                            <Textarea placeholder="Comments..." {...field} />
+                                        </FormControl>
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
 
                         {/* IMAGES */}
                         <div className="grid gap-3 md:grid-cols-3 mt-2">

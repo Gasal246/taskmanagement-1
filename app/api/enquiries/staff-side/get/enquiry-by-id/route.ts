@@ -48,7 +48,12 @@ export async function GET(req:NextRequest){
 
         const isAssigned:any = await Eq_enquiry_histories.findOne({enquiry_id: enquiry_id}).sort({step_number: -1}).lean();
 
-        const canForward = isAssigned?.assigned_to == session?.user?.id;
+        const assignedList = Array.isArray(isAssigned?.assigned_to)
+            ? isAssigned.assigned_to
+            : isAssigned?.assigned_to
+                ? [isAssigned.assigned_to]
+                : [];
+        const canForward = assignedList.some((id: any) => String(id) === String(session?.user?.id));
 
         return NextResponse.json({enquiry, contacts, head_office, external_provider, personal_provider, canForward, status: 200}, {status: 200});
 

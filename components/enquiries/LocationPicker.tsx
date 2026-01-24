@@ -1,14 +1,13 @@
 "use client";
 
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 
-export default function LocationPicker({ onChange }: any) {
-  const [coords, setCoords] = useState<{ lat: number | null; lng: number | null }>({
-    lat: null,
-    lng: null,
-  });
+type LocationPickerProps = {
+  onChange: (coords: { lat: number; lng: number }) => void;
+  value?: { lat: number | null; lng: number | null };
+};
 
+export default function LocationPicker({ onChange, value }: LocationPickerProps) {
   const getLocation = () => {
     if (!navigator.geolocation) {
       alert("Geolocation is not supported by your browser");
@@ -18,7 +17,6 @@ export default function LocationPicker({ onChange }: any) {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const { latitude, longitude } = pos.coords;
-        setCoords({ lat: latitude, lng: longitude });
         onChange({ lat: latitude, lng: longitude });
       },
       () => alert("Unable to retrieve your location")
@@ -31,10 +29,10 @@ export default function LocationPicker({ onChange }: any) {
         Get Current Location
       </Button>
 
-      {coords.lat && coords.lng && (
+      {value?.lat !== null && value?.lng !== null && (
         <div className="text-sm text-slate-300">
-          <p>Latitude: {coords.lat}</p>
-          <p>Longitude: {coords.lng}</p>
+          <p>Latitude: {value.lat}</p>
+          <p>Longitude: {value.lng}</p>
         </div>
       )}
     </div>

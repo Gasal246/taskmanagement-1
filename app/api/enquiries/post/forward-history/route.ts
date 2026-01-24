@@ -10,7 +10,7 @@ connectDB();
 interface Body {
     enquiry_id: string,
     access_users: string[],
-    assigned_to: string,
+    assigned_to: string | string[],
     priority: number,
     action: string,
     feedback: string,
@@ -29,6 +29,11 @@ export async function POST(req: NextRequest) {
         if (!Array.isArray(body.access_users)) {
             body.access_users = [];
         }
+        const assignedToList = Array.isArray(body.assigned_to)
+            ? body.assigned_to
+            : body.assigned_to
+                ? [body.assigned_to]
+                : [];
 
         const ogEnq:any = await Eq_enquiry.findById(body.enquiry_id);
 
@@ -43,7 +48,7 @@ export async function POST(req: NextRequest) {
             const newHistory = new Eq_enquiry_histories({
                 camp_id: campId.camp_id,
                 enquiry_id: body.enquiry_id,
-                assigned_to: body.assigned_to,
+                assigned_to: assignedToList,
                 step_number: 1,
                 priority: body.priority,
                 action: body.action,
@@ -54,9 +59,10 @@ export async function POST(req: NextRequest) {
 
             const savedHistory = await newHistory.save();
 
-            body.access_users.push(body.assigned_to);
+            body.access_users.push(...assignedToList);
             if (body.access_users.length > 0) {
-                const newAccess = body.access_users.map((x) => ({
+                const uniqueAccess = Array.from(new Set(body.access_users.filter(Boolean)));
+                const newAccess = uniqueAccess.map((x) => ({
                     history_id: savedHistory._id,
                     enquiry_id: body.enquiry_id,
                     camp_id: campId.camp_id,
@@ -80,7 +86,7 @@ export async function POST(req: NextRequest) {
         const newHistory = new Eq_enquiry_histories({
             camp_id: existingEnq.camp_id,
             enquiry_id: existingEnq.enquiry_id,
-            assigned_to: body.assigned_to,
+            assigned_to: assignedToList,
             step_number: ++existingEnq.step_number,
             priority: body.priority,
             is_finished: body.is_finished,
@@ -93,9 +99,11 @@ export async function POST(req: NextRequest) {
         const savedHistory = await newHistory.save();
 
         const newAccess: any = [];
-        body.access_users.push(body.assigned_to);
+        body.access_users.push(...assignedToList);
 
-        body.access_users.forEach(x => {
+        const uniqueAccess = Array.from(new Set(body.access_users.filter(Boolean)));
+
+        uniqueAccess.forEach(x => {
             const singleAccess = {
                 history_id: savedHistory._id,
                 enquiry_id: savedHistory.enquiry_id,

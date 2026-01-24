@@ -26,17 +26,18 @@ import { Textarea } from "@/components/ui/textarea";
 import { DEPARTMENT_TYPES } from "@/lib/constants";
 import { useGetAreasandDeptsForRegion, useGetBusinessClients, useGetBusinessRegions } from "@/query/business/queries";
 import { CheckCircle2 } from "lucide-react";
+import EnquiryUserMultiSelect from "@/components/enquiries/EnquiryUserMultiSelect";
 
 // -------------------------------------------------------
 
 export default function EscalatePage() {
   const router = useRouter();
-  const [user_type, setUser_type] = useState("users");
   const { enquiry_id } = useParams();
 
   const { businessData } = useSelector((state: RootState) => state.user);
-  const { data: users, isLoading } = useGetEqUsers(businessData?._id, user_type);
-  const { data: view_users, isLoading: isViewUsersLoading } = useGetEqUsers(businessData?._id, "users");
+  const { data: users } = useGetEqUsers(businessData?._id, "users");
+  const { data: agents } = useGetEqUsers(businessData?._id, "agents");
+  const { data: view_users } = useGetEqUsers(businessData?._id, "users");
 
   const { mutateAsync: getBusinessClients, isPending: loadingBusinessClients } = useGetBusinessClients();
   const { mutateAsync: getRegions, isPending: isRegionLoading } = useGetBusinessRegions();
@@ -48,7 +49,8 @@ export default function EscalatePage() {
   // Form state
   const [search, setSearch] = useState("");
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
-  const [assignedTo, setAssignedTo] = useState("");
+  const [assignedUsers, setAssignedUsers] = useState<string[]>([]);
+  const [assignedAgents, setAssignedAgents] = useState<string[]>([]);
   const [priority, setPriority] = useState("");
   const [action, setAction] = useState(""); // Visit or Call
   const [feedback, setFeedback] = useState("");
@@ -127,7 +129,34 @@ export default function EscalatePage() {
     return view_users.users.filter((u: any) =>
       u?.user_id?.name.toLowerCase().includes(search.toLowerCase())
     );
-  }, [search, users]);
+  }, [search, view_users?.users]);
+
+  const assignUserOptions = useMemo(() => {
+    return (users?.users || [])
+      .map((entry: any) => {
+        const user = entry?.user_id;
+        if (!user?._id) return null;
+        return {
+          id: String(user._id),
+          name: user?.name || "Unknown User",
+          email: user?.email || "",
+        };
+      })
+      .filter(Boolean);
+  }, [users?.users]);
+
+  const assignAgentOptions = useMemo(() => {
+    return (agents?.agents || [])
+      .map((user: any) => {
+        if (!user?._id) return null;
+        return {
+          id: String(user._id),
+          name: user?.name || "Unknown Agent",
+          email: user?.email || "",
+        };
+      })
+      .filter(Boolean);
+  }, [agents?.agents]);
 
   // -------------------------------------------------------
   // TOGGLE USER SELECTION
@@ -171,9 +200,13 @@ export default function EscalatePage() {
   // SUBMIT (SHOW SAMPLE OUTPUT)
   // -------------------------------------------------------
   const handleSubmit = async () => {
+    const assignedTo = [...assignedUsers, ...assignedAgents].filter(Boolean);
+    const accessUsers = Array.from(
+      new Set([...selectedUsers, ...assignedTo].filter(Boolean))
+    );
     const finalPayload = {
       enquiry_id,
-      users: selectedUsers,
+      access_users: accessUsers,
       priority: Number(priority),
       assigned_to: assignedTo,
       action,
@@ -291,72 +324,20 @@ export default function EscalatePage() {
 
         <div className="bg-slate-900/40 p-4 rounded-lg">
           <h2 className="font-semibold mb-2 text-sm">Assign To</h2>
-
-          <div className="flex items-center gap-6 m-3">
-
-            {/* USER */}
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="radio"
-                name="type"
-                value="user"
-                checked={user_type === "users"}
-                onChange={() => setUser_type("users")}
-                className="accent-blue-500"
-              />
-              <span className="text-sm text-slate-200">User</span>
-            </label>
-
-            {/* AGENT */}
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="radio"
-                name="type"
-                value="agent"
-                checked={user_type === "agents"}
-                onChange={() => setUser_type("agents")}
-                className="accent-blue-500"
-              />
-              <span className="text-sm text-slate-200">Agent</span>
-            </label>
+          <div className="space-y-3">
+            <EnquiryUserMultiSelect
+              label="Users"
+              value={assignedUsers}
+              options={assignUserOptions}
+              onChange={setAssignedUsers}
+            />
+            <EnquiryUserMultiSelect
+              label="Agents"
+              value={assignedAgents}
+              options={assignAgentOptions}
+              onChange={setAssignedAgents}
+            />
           </div>
-
-          {user_type === "users" && (
-            <Select
-              value={assignedTo === "" ? undefined : assignedTo}
-              onValueChange={(v) => setAssignedTo(v)}
-            >
-              <SelectTrigger className="text-slate-200">
-                <SelectValue placeholder="Select user to assign" />
-              </SelectTrigger>
-
-              <SelectContent>
-                {users?.users?.map((u: any) => (
-                  <SelectItem key={u?.user_id?._id} value={u?.user_id?._id}>
-                    {u?.user_id?.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-          {user_type === "agents" && (
-            <Select
-              value={assignedTo === "" ? undefined : assignedTo}
-              onValueChange={(v) => setAssignedTo(v)}
-            >
-              <SelectTrigger className="text-slate-200">
-                <SelectValue placeholder="Select agent to assign" />
-              </SelectTrigger>
-
-              <SelectContent>
-                {users?.agents?.map((u: any) => (
-                  <SelectItem key={u?._id} value={u?._id}>
-                    {u?.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
         </div>
 
 
@@ -429,7 +410,7 @@ export default function EscalatePage() {
           <Button
             className="w-full py-3 text-md"
             onClick={handleSubmit}
-            disabled={!priority || !assignedTo || !action}
+            disabled={!priority || (!assignedUsers.length && !assignedAgents.length) || !action}
           >
             Submit Escalation
           </Button>

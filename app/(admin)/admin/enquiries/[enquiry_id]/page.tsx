@@ -55,6 +55,25 @@ export default function SingleEnquiryPage() {
     return "Not specified";
   };
 
+  const renderAssignedUsers = (value: any, fallback = "Unassigned") => {
+    if (!value) return fallback;
+    const list = Array.isArray(value) ? value : [value];
+    const names = list
+      .map((item) => item?.name || item?.email || item)
+      .filter(Boolean)
+      .map((entry) => String(entry));
+    return names.length ? names.join(", ") : fallback;
+  };
+
+  const renderUserList = (users: any[]) => {
+    if (!Array.isArray(users) || users.length === 0) return "Not specified";
+    const names = users
+      .map((user) => user?.name || user?.email || user)
+      .filter(Boolean)
+      .map((entry) => String(entry));
+    return names.length > 0 ? names.join(", ") : "Not specified";
+  };
+
   const InfoRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
     <div className="flex items-center justify-between gap-4 rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2">
       <span className="text-xs text-slate-400">{label}</span>
@@ -213,7 +232,7 @@ export default function SingleEnquiryPage() {
               <InfoRow label="Region" value={renderValue(enquiry?.enquiry?.region_id?.region_name)} />
               <InfoRow label="Wi-Fi" value={wifiStatusLabel} />
               <InfoRow label="Next Action Due" value={renderDate(enquiry?.enquiry?.next_action_due)} />
-              <InfoRow label="Assigned To" value={renderValue(enquiry?.assigned?.assigned_to?.name, "Unassigned")} />
+              <InfoRow label="Assigned To" value={renderAssignedUsers(enquiry?.assigned?.assigned_to)} />
             </div>
           </div>
 
@@ -245,6 +264,32 @@ export default function SingleEnquiryPage() {
               <InfoRow label="Landlord" value={renderValue(camp?.landlord_id?.landlord_name)} />
               <InfoRow label="Real Estate" value={renderValue(camp?.realestate_id?.company_name)} />
               <InfoRow label="Client Company" value={renderValue(camp?.client_company_id?.client_company_name)} />
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <h2 className="font-semibold text-lg">Enquiry Users</h2>
+            <div className="grid gap-2 md:grid-cols-2">
+              <InfoRow
+                label="Enquiry Brought By"
+                value={renderUserList(enquiry?.enquiry?.enquiry_brought_by)}
+              />
+              <InfoRow
+                label="Meeting Initiated By"
+                value={renderUserList(enquiry?.enquiry?.meeting_initiated_by)}
+              />
+              <InfoRow
+                label="Project Closed By"
+                value={renderUserList(enquiry?.enquiry?.project_closed_by)}
+              />
+              <InfoRow
+                label="Project Managed By"
+                value={renderUserList(enquiry?.enquiry?.project_managed_by)}
+              />
+              <InfoRow
+                label="Enquiry User Notes"
+                value={renderValue(enquiry?.enquiry?.enquiry_user_notes)}
+              />
             </div>
           </div>
 
@@ -398,7 +443,7 @@ export default function SingleEnquiryPage() {
               <div className="flex items-center gap-3 border border-slate-800 p-3 rounded-xl bg-slate-900/40">
                 <Avatar size={45} src="https://api.dicebear.com/7.x/personas/svg" />
                 <div>
-                  <h3 className="font-semibold text-sm">{renderValue(enquiry?.assigned?.assigned_to?.name, "Unassigned")}</h3>
+                  <h3 className="font-semibold text-sm">{renderAssignedUsers(enquiry?.assigned?.assigned_to)}</h3>
                 </div>
               </div>
             </div>

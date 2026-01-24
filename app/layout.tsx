@@ -7,6 +7,7 @@ import { Toaster } from "@/components/ui/sonner";
 import TanstackProvider from "@/query/TanstackProvider";
 import ReduxProvider from "@/redux/ReduxProvider";
 import UserActivityTracker from "@/components/shared/UserActivityTracker";
+import FcmNotifications from "@/components/shared/FcmNotifications";
 
 const ar_one_sans = AR_One_Sans({ subsets: ["latin"] });
 
@@ -30,6 +31,7 @@ export default async function RootLayout({
           <TanstackProvider>
             <ReduxProvider>
               <UserActivityTracker />
+              <FcmNotifications />
               {children}
             </ReduxProvider>
           </TanstackProvider>

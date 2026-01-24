@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Building2, FileText, Loader2, Plus, Trash2, Upload, Wifi, PhoneCall, X, Info } from "lucide-react";
 import { useForm, useFieldArray } from "react-hook-form";
@@ -13,16 +13,19 @@ import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@
 import { motion } from "framer-motion";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useAddNewEnquiry, useGetEqAreas, useGetEqCampsByArea, useGetEqCities, useGetEqCountries, useGetEqProvince, useGetEqRegions } from "@/query/enquirymanager/queries";
+import { useAddNewEnquiry, useGetEqAreas, useGetEqCampsByArea, useGetEqCities, useGetEqCountries, useGetEqProvince, useGetEqRegions, useGetEqUsers } from "@/query/enquirymanager/queries";
 import { toast } from "sonner";
 import { EQ_CAMP_TYPES, EQ_CAPACITY_LIMITS, Eq_CAPACITY_OPTIONS } from "@/lib/constants";
 import { useRouter } from "next/navigation";
 import LocationPicker from "@/components/enquiries/LocationPicker";
+import EnquiryUserMultiSelect from "@/components/enquiries/EnquiryUserMultiSelect";
 import Image from "next/image";
 import { deleteObject, getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { storage } from "@/firebase/config";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "antd";
+import { useSelector } from "react-redux";
+import { RootState } from "@/redux/store";
 
 const priorityLevels = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"];
 
@@ -50,6 +53,12 @@ const enquirySchema = z.object({
 
     latitude: z.string(),
     longitude: z.string(),
+    coordinates: z.string().optional(),
+    enquiry_brought_by: z.array(z.string()).optional(),
+    meeting_initiated_by: z.array(z.string()).optional(),
+    project_closed_by: z.array(z.string()).optional(),
+    project_managed_by: z.array(z.string()).optional(),
+    enquiry_user_notes: z.string().optional(),
 
     camp_capacity: z.string().optional(),
     camp_occupancy: z.string().optional(),
@@ -91,7 +100,7 @@ const enquirySchema = z.object({
     competition_status: z.string().optional(),
     competition_notes: z.string().optional(),
 
-    priority: z.enum(priorityLevels as [string, ...string[]]).optional(),
+    priority: z.enum(priorityLevels as [string, ...string[]]).optional().or(z.literal("")),
 
     followup_status: z.enum(["Pending", "In Progress", "Closed"]),
     alert_date: z.string().optional(),
@@ -119,6 +128,7 @@ const enquirySchema = z.object({
 /* =========== COMPONENT =========== */
 export default function AddEnquiry() {
     const router = useRouter();
+    const { businessData } = useSelector((state: RootState) => state.user);
     const [showHeadOffice, setShowHeadOffice] = useState(false);
     const [countries, setCountries] = useState([]);
     const [docFile, setDocFile] = useState<File | null>(null);
@@ -135,6 +145,7 @@ export default function AddEnquiry() {
 
     const { mutateAsync: GetCountries, isPending: isCountryLoading } = useGetEqCountries();
     const { mutateAsync: AddNewEnquiry, isPending: isEqAdding } = useAddNewEnquiry();
+    const { data: eqUsers } = useGetEqUsers(businessData?._id, "users");
 
     const form = useForm({
         resolver: zodResolver(enquirySchema),
@@ -153,7 +164,13 @@ export default function AddEnquiry() {
             other_wifi_details: "",
             latitude: "",
             longitude: "",
-            comments: ""
+            coordinates: "",
+            comments: "",
+            enquiry_brought_by: [],
+            meeting_initiated_by: [],
+            project_closed_by: [],
+            project_managed_by: [],
+            enquiry_user_notes: ""
         }
     });
 
@@ -166,6 +183,12 @@ export default function AddEnquiry() {
     const areaInputMode = form.watch("area_input_mode");
     const campInputMode = form.watch("camp_input_mode");
     const isExistingCampMode = areaInputMode === "existing" && campInputMode === "existing";
+    const coordinatesValue = form.watch("coordinates");
+    const { latitude: coordinatesLat, longitude: coordinatesLng } = parseCoordinates(coordinatesValue || "");
+    const coordsForDisplay = {
+        lat: toNumberOrNull(coordinatesLat),
+        lng: toNumberOrNull(coordinatesLng),
+    };
 
     const { data: regions, isLoading: isRegionLoading } = useGetEqRegions(country_id);
     const { data: provinces, isLoading: isProvinceLoading } = useGetEqProvince(region_id);
@@ -173,6 +196,19 @@ export default function AddEnquiry() {
     const { data: areas, isLoading: isAreaLoading } = useGetEqAreas(city_id);
     const { data: camps, isLoading: isCampLoading } = useGetEqCampsByArea(area_id);
     const selectedCamp = camps?.camps?.find((c: any) => c._id === camp_id);
+    const userOptions = useMemo(() => {
+        return (eqUsers?.users || [])
+            .map((userEntry: any) => {
+                const user = userEntry?.user_id || userEntry;
+                if (!user?._id) return null;
+                return {
+                    id: String(user._id),
+                    name: user?.name || "Unknown User",
+                    email: user?.email || "",
+                };
+            })
+            .filter(Boolean);
+    }, [eqUsers?.users]);
     const campCapacityMissing = isExistingCampMode
         && !!camp_id
         && !!selectedCamp
@@ -238,6 +274,18 @@ export default function AddEnquiry() {
             .toLowerCase()
             .replace(/[^a-z0-9]+/g, '-')
             .replace(/(^-|-$)+/g, '') || `file-${Date.now()}`;
+    function toNumberOrNull(value: string) {
+        if (!value) return null;
+        const num = Number(value);
+        return Number.isFinite(num) ? num : null;
+    }
+    function parseCoordinates(value: string) {
+        const [lat, lng] = value.split(",").map((item) => item.trim());
+        return {
+            latitude: lat || "",
+            longitude: lng || "",
+        };
+    }
 
     const handleEnquiryFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -326,6 +374,12 @@ export default function AddEnquiry() {
             }
         }
         const payload = { ...data };
+        if (payload.coordinates) {
+            const { latitude, longitude } = parseCoordinates(payload.coordinates);
+            payload.latitude = latitude;
+            payload.longitude = longitude;
+        }
+        delete payload.coordinates;
         if (uploadedDoc?.url) {
             payload.images = [uploadedDoc.url];
         }
@@ -804,15 +858,28 @@ export default function AddEnquiry() {
                         <button type="button" onClick={() => append({ name: "", phone: "" })} className="text-cyan-400 text-xs flex items-center gap-1">
                             <Plus size={14} /> Add Another Contact
                         </button>
+
                         {/* Location */}
                         <LocationPicker
                             onChange={(loc: any) => {
                                 form.setValue("latitude", loc.lat);
                                 form.setValue("longitude", loc.lng);
-                            }} />
+                                form.setValue("coordinates", `${loc.lat}, ${loc.lng}`);
+                            }}
+                            value={coordsForDisplay}
+                        />
 
-                        <Input type="text" {...form.register("latitude")} placeholder="Latitude" />
-                        <Input type="text" {...form.register("longitude")} placeholder="Longitude" />
+                        <Input
+                            type="text"
+                            {...form.register("coordinates", {
+                                onChange: (event) => {
+                                    const { latitude, longitude } = parseCoordinates(event.target.value);
+                                    form.setValue("latitude", latitude);
+                                    form.setValue("longitude", longitude);
+                                },
+                            })}
+                            placeholder="Latitude,Longitude"
+                        />
 
                         {/* WIFI */}
                         <div className="text-xs text-slate-400 font-semibold flex items-center gap-1"><Wifi size={14} /> Wi-Fi / Internet</div>
@@ -992,6 +1059,79 @@ export default function AddEnquiry() {
                                 <Input type="date" {...field} />
                             </FormItem>
                         )} />
+
+                        {/* ENQUIRY USERS */}
+                        <div className="border border-slate-700 p-3 rounded-lg space-y-3 bg-slate-900/40">
+                            <div className="text-xs text-slate-400 font-semibold">Enquiry Users</div>
+                            <FormField
+                                control={form.control}
+                                name="enquiry_brought_by"
+                                render={({ field }) => (
+                                    <FormItem className="w-full">
+                                        <EnquiryUserMultiSelect
+                                            label="Enquiry Brought By"
+                                            value={field.value || []}
+                                            options={userOptions}
+                                            onChange={field.onChange}
+                                        />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="meeting_initiated_by"
+                                render={({ field }) => (
+                                    <FormItem className="w-full">
+                                        <EnquiryUserMultiSelect
+                                            label="Meeting Initiated By"
+                                            value={field.value || []}
+                                            options={userOptions}
+                                            onChange={field.onChange}
+                                        />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="project_closed_by"
+                                render={({ field }) => (
+                                    <FormItem className="w-full">
+                                        <EnquiryUserMultiSelect
+                                            label="Project Closed By"
+                                            value={field.value || []}
+                                            options={userOptions}
+                                            onChange={field.onChange}
+                                        />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="project_managed_by"
+                                render={({ field }) => (
+                                    <FormItem className="w-full">
+                                        <EnquiryUserMultiSelect
+                                            label="Project Managed By"
+                                            value={field.value || []}
+                                            options={userOptions}
+                                            onChange={field.onChange}
+                                        />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="enquiry_user_notes"
+                                render={({ field }) => (
+                                    <FormItem className="w-full">
+                                        <FormLabel className="text-xs text-slate-300 font-semibold">Enquiry User Notes</FormLabel>
+                                        <FormControl>
+                                            <Textarea placeholder="Comments..." {...field} />
+                                        </FormControl>
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
 
                         {/* IMAGES */}
                         <div className="grid gap-3 md:grid-cols-3 mt-2">

@@ -1,6 +1,7 @@
 import connectDB from "@/lib/mongo";
 import Eq_camps from "@/models/eq_camps.model";
 import Eq_enquiry from "@/models/eq_enquiries.model";
+import Eq_enquiry_histories from "@/models/eq_enquiry_histories";
 import { NextRequest, NextResponse } from "next/server";
 
 connectDB();
@@ -35,7 +36,10 @@ export async function GET(req: NextRequest) {
 
     // --- Status / Boolean filters ---
     const status = searchParams.get("status");
-    if (status) filter.status = status;
+    if (status && status !== "all") filter.status = status;
+
+    const next_action = searchParams.get("next_action");
+    const actionFilter = next_action && next_action !== "all" ? next_action : "";
 
     const wifi_available = searchParams.get("wifi_available");
     if (wifi_available !== null) {
@@ -90,14 +94,33 @@ export async function GET(req: NextRequest) {
     // Take count of total docs (cap at latest 200)
     const maxRecords = 200;
     const totalRecordsRaw = await Eq_enquiry.countDocuments(filter);
-    const totalRecords = Math.min(totalRecordsRaw, maxRecords);
+    let totalRecords = Math.min(totalRecordsRaw, maxRecords);
 
     const latestIds = await Eq_enquiry.find(filter)
       .sort({ createdAt: -1 })
       .limit(maxRecords)
       .select("_id")
       .lean();
-    const latestIdList = latestIds.map((entry) => entry._id);
+    let latestIdList = latestIds.map((entry) => entry._id);
+    if (latestIdList.length === 0) {
+      return NextResponse.json(
+        { status: 200, data: [], pagination: { page, limit, totalRecords: 0, totalPages: 0 } },
+        { status: 200 }
+      );
+    }
+
+    if (actionFilter) {
+      const latestActions = await Eq_enquiry_histories.aggregate([
+        { $match: { enquiry_id: { $in: latestIdList } } },
+        { $sort: { createdAt: -1 } },
+        { $group: { _id: "$enquiry_id", action: { $first: "$action" } } },
+        { $match: { action: actionFilter } },
+      ]);
+      const allowedIds = new Set(latestActions.map((entry) => String(entry._id)));
+      latestIdList = latestIdList.filter((entry) => allowedIds.has(String(entry)));
+      totalRecords = latestIdList.length;
+    }
+
     if (latestIdList.length === 0) {
       return NextResponse.json(
         { status: 200, data: [], pagination: { page, limit, totalRecords: 0, totalPages: 0 } },

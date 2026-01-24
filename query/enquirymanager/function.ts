@@ -339,13 +339,25 @@ export async function GetEnquiriesWithFilters(queryParams: any) {
   }
 }
 
+//Export Enquiries (selected or filtered)
+export async function ExportEnquiries(payload: any) {
+  try {
+    const res = await axios.post("/api/enquiries/get/enquiries/export", payload);
+    return res.data;
+  } catch (err) {
+    console.log(err);
+    return (err as any)?.response?.data;
+  }
+}
+
 //Get Enquiry by iD
 export async function GetEnquiryById(enquiry_id:string){
     try{
         const res = await axios.get(`/api/enquiries/get/enquiries/by-id?enquiry_id=${enquiry_id}`);
-        return res.data;
+        return res?.data ?? { status: 500, message: "Failed to fetch enquiry" };
     }catch(err){
         console.log(err);
+        return (err as any)?.response?.data ?? { status: 500, message: "Failed to fetch enquiry" };
     }
 }
 
@@ -414,9 +426,10 @@ export async function GetAccessEnquiriesForStaffs(queryParams: any) {
 export async function GetEnquiryByIdForStaffs(enquiry_id: string){
     try{
         const res = await axios.get(`/api/enquiries/staff-side/get/enquiry-by-id?enquiry_id=${enquiry_id}`);
-        return res.data;
+        return res?.data ?? { status: 500, message: "Failed to fetch enquiry" };
     }catch(err){
         console.log(err);
+        return (err as any)?.response?.data ?? { status: 500, message: "Failed to fetch enquiry" };
     }
 }
 

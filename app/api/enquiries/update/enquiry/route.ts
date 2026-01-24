@@ -86,6 +86,12 @@ interface Body {
     next_action: string;
     next_action_due: string;
     comments?: string;
+
+    enquiry_brought_by?: string[];
+    meeting_initiated_by?: string[];
+    project_closed_by?: string[];
+    project_managed_by?: string[];
+    enquiry_user_notes?: string;
 }
 
 export async function PUT(req: NextRequest) {
@@ -334,6 +340,21 @@ export async function PUT(req: NextRequest) {
         enquiry.latitude = body.latitude;
         enquiry.longitude = body.longitude;
         enquiry.is_active = body.area_input_mode === "existing" && body.camp_input_mode === "existing";
+        if (Array.isArray(body.enquiry_brought_by)) {
+            enquiry.enquiry_brought_by = body.enquiry_brought_by;
+        }
+        if (Array.isArray(body.meeting_initiated_by)) {
+            enquiry.meeting_initiated_by = body.meeting_initiated_by;
+        }
+        if (Array.isArray(body.project_closed_by)) {
+            enquiry.project_closed_by = body.project_closed_by;
+        }
+        if (Array.isArray(body.project_managed_by)) {
+            enquiry.project_managed_by = body.project_managed_by;
+        }
+        if (body.enquiry_user_notes !== undefined) {
+            enquiry.enquiry_user_notes = body.enquiry_user_notes;
+        }
 
         await enquiry.save();
 

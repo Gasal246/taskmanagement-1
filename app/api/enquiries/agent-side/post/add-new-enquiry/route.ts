@@ -87,7 +87,13 @@ interface Body {
     provider_plan: string | null,
     personal_wifi_start: Date | null,
     personal_wifi_expiry: Date | null,
-    personal_wifi_price: Decimal128 | null
+    personal_wifi_price: Decimal128 | null,
+
+    enquiry_brought_by?: string[],
+    meeting_initiated_by?: string[],
+    project_closed_by?: string[],
+    project_managed_by?: string[],
+    enquiry_user_notes?: string
 
 }
 
@@ -285,6 +291,11 @@ export async function POST(req:NextRequest){
             rent_terms: body.rent_terms,
             enquiry_uuid: uuid,
             wifi_setup: wifiAvailability === true && body.wifi_type == "Other Sources" ? body.other_wifi_details : null,
+            enquiry_brought_by: Array.isArray(body.enquiry_brought_by) ? body.enquiry_brought_by : [],
+            meeting_initiated_by: Array.isArray(body.meeting_initiated_by) ? body.meeting_initiated_by : [],
+            project_closed_by: Array.isArray(body.project_closed_by) ? body.project_closed_by : [],
+            project_managed_by: Array.isArray(body.project_managed_by) ? body.project_managed_by : [],
+            enquiry_user_notes: body.enquiry_user_notes || null
         });
 
         const savedEnquiry = await newEnquiry.save();

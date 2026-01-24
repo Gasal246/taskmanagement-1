@@ -17,6 +17,16 @@ export default function EnquiryHistoryPage() {
         console.log("history: ", histories);
     }, [histories]);
 
+    const renderAssignedUsers = (value: any) => {
+        if (!value) return "Unassigned";
+        const list = Array.isArray(value) ? value : [value];
+        const names = list
+            .map((item) => item?.name || item?.email || item)
+            .filter(Boolean)
+            .map((entry) => String(entry));
+        return names.length ? names.join(", ") : "Unassigned";
+    };
+
   return (
     <div className="p-5 text-slate-200">
 
@@ -68,7 +78,7 @@ export default function EnquiryHistoryPage() {
               <p className="flex items-center gap-2 text-slate-300">
                 <User size={14} className="text-blue-400" />
                 <span>Assigned To:</span>
-                <b>{h.assigned_to?.name}</b>
+                <b>{renderAssignedUsers(h.assigned_to)}</b>
               </p>
 
               <p className="flex items-center gap-2 text-slate-300">

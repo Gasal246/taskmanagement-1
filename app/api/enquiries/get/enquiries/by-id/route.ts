@@ -29,7 +29,11 @@ export async function GET(req:NextRequest){
             .populate("city_id")
             .populate("area_id")
             .populate("camp_id")
-            .populate("createdBy");
+            .populate("createdBy")
+            .populate({ path: "enquiry_brought_by", select: "name email", strictPopulate: false })
+            .populate({ path: "meeting_initiated_by", select: "name email", strictPopulate: false })
+            .populate({ path: "project_closed_by", select: "name email", strictPopulate: false })
+            .populate({ path: "project_managed_by", select: "name email", strictPopulate: false });
 
         const contacts = await Eq_camp_contacts.find({enquiry_id: enquiry_id}).limit(1);
         const head_office = await Eq_camp_headoffice.findById(enquiry?.camp_id?.headoffice_id).limit(1);

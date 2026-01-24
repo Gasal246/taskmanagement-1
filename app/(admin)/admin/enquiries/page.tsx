@@ -2,31 +2,67 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { useQuery } from "@tanstack/react-query";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DatePicker, Space } from "antd";
-import { PanelsTopLeft, SlidersHorizontal } from "lucide-react";
+import { Download, PanelsTopLeft, SlidersHorizontal } from "lucide-react";
 import LoaderSpin from "@/components/shared/LoaderSpin";
-import { useGetEnquiriesWithFilters, useGetEqAreas, useGetEqCampsByArea, useGetEqCities, useGetEqCountries, useGetEqProvince, useGetEqRegions } from "@/query/enquirymanager/queries";
-import { ENQUIRY_STATUS, Eq_CAPACITY_OPTIONS } from "@/lib/constants";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
+import { toast } from "sonner";
+import { GetEnquiriesWithFilters } from "@/query/enquirymanager/function";
+import { useExportEnquiries, useGetEnquiriesWithFilters, useGetEqAreas, useGetEqCampsByArea, useGetEqCities, useGetEqCountries, useGetEqProvince, useGetEqRegions } from "@/query/enquirymanager/queries";
+import { Eq_CAPACITY_OPTIONS } from "@/lib/constants";
+import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 
 const { RangePicker } = DatePicker;
+
+const NEXT_ACTION_OPTIONS = [
+  { _id: "all", name: "All" },
+  { _id: "Call", name: "Call" },
+  { _id: "Visit", name: "Visit" },
+];
+
+const STATUS_OPTIONS = [
+  { _id: "all", name: "All" },
+  { _id: "In Progress", name: "In Progress" },
+  { _id: "Closed", name: "Closed" },
+];
+
+const EXPORT_HEADERS = [
+  "ENQUIRY ID",
+  "CITY",
+  "AREA",
+  "CAMP NAME",
+  "CAMP OCCUPANCY",
+  "LOCATION COORDINATES",
+  "CONTACT INFORMATION",
+  "HEAD OFFICE DETAILS",
+  "WIFI STATUS",
+  "CURRENT STATUS",
+  "PRIORITY",
+  "NEXT ACTION",
+  "COMMENTS",
+];
+
+const EXPORT_COL_WIDTHS = [
+  { wch: 18 },
+  { wch: 16 },
+  { wch: 16 },
+  { wch: 24 },
+  { wch: 18 },
+  { wch: 22 },
+  { wch: 40 },
+  { wch: 40 },
+  { wch: 16 },
+  { wch: 16 },
+  { wch: 10 },
+  { wch: 22 },
+  { wch: 28 },
+];
 
 /* -------------------------------------------------------
                       PAGE START
@@ -43,7 +79,8 @@ export default function EnquiriesPage() {
     city_id: "",
     area_id: "",
     camp_id: "",
-    status: "",
+    status: "all",
+    next_action: "all",
     occupancy: "",
     capacity: "",
     wifi_available: "",
@@ -63,10 +100,21 @@ export default function EnquiriesPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [rangeValue, setRangeValue] = useState<any>(null);
   const [leaseValue, setLeaseValue] = useState<any>(null);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportSearch, setExportSearch] = useState("");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [exportScope, setExportScope] = useState<"selected" | "filtered" | null>(null);
   const limit = 10;
 
+  const normalizedFilters = useMemo(() => ({
+    ...filters,
+    status: filters.status === "all" ? "" : filters.status,
+    next_action: filters.next_action === "all" ? "" : filters.next_action,
+  }), [filters]);
+
   // Queries
-  const { data: enquiries, isLoading } = useGetEnquiriesWithFilters({...filters, page, limit});
+  const { data: enquiries, isLoading } = useGetEnquiriesWithFilters({...normalizedFilters, page: page.toString(), limit: limit.toString()});
+  const { mutateAsync: exportEnquiries, isPending: isExporting } = useExportEnquiries();
   const { mutateAsync: GetCountries, isPending: isCompanyLoading } = useGetEqCountries();
   const { data: regions, isLoading: isRegionLoading } = useGetEqRegions(filters?.country_id);
   const { data: provinces, isLoading: isProvinceLoading } = useGetEqProvince(filters?.region_id);
@@ -74,7 +122,27 @@ export default function EnquiriesPage() {
   const { data: areas, isLoading: isAreaLoading } = useGetEqAreas(filters.city_id);
   const { data: camps, isLoading: isCampLoading } = useGetEqCampsByArea(filters?.area_id);
 
+  const exportSearchValue = exportSearch.trim();
+  const { data: exportResults, isLoading: isExportSearchLoading } = useQuery({
+    queryKey: ["enquiries-export-search", exportSearchValue],
+    queryFn: () => GetEnquiriesWithFilters({ search: exportSearchValue, page: "1", limit: "20" }),
+    enabled: exportOpen && exportSearchValue.length > 0,
+  });
+
   const pagination = enquiries?.pagination;
+  const filteredCount = pagination?.totalRecords ?? 0;
+
+  const hasActiveFilters = useMemo(() => {
+    return Object.entries(filters).some(([key, value]) => {
+      if (key === "search") return false;
+      if ((key === "status" || key === "next_action") && value === "all") return false;
+      return value !== "" && value !== null && value !== undefined;
+    });
+  }, [filters]);
+
+  const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+  const exportList = exportSearchValue ? exportResults?.data : enquiries?.data;
+  const exportListLoading = exportSearchValue ? isExportSearchLoading : isLoading;
 
   const fetchCountries = async () => {
     const res = await GetCountries();
@@ -87,18 +155,27 @@ export default function EnquiriesPage() {
 
   useEffect(() => {
     fetchCountries();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
   setPage(1);
 }, [filters]);
 
+  useEffect(() => {
+    if (!exportOpen) {
+      setExportSearch("");
+      setSelectedIds([]);
+      setExportScope(null);
+    }
+  }, [exportOpen]);
+
 
   /* -------------------------------------------------------
      HANDLE FILTER UPDATES (auto triggers useQuery)
   ---------------------------------------------------------*/
 
-  const updateFilter = (key, value) => {
+  const updateFilter = (key: string, value: any) => {
     setFilters(prev => ({
       ...prev,
       [key]: value === undefined ? "" : value,   // force string or ""
@@ -150,13 +227,13 @@ export default function EnquiriesPage() {
           DATE HANDLERS
   ---------------------------------------------------------*/
 
-  const handleRangeChange = (dates: any, [from, to]) => {
+  const handleRangeChange = (dates: any, [from, to]: any) => {
     setRangeValue(dates || null);
     updateFilter("from_date", from || "");
     updateFilter("due_date", to || "");
   };
 
-  const handleLeaseChange = (date: any, dateString: string) => {
+  const handleLeaseChange: any = (date: any, dateString: string) => {
     setLeaseValue(date || null);
     updateFilter("lease_expiry", dateString || "");
   };
@@ -199,18 +276,164 @@ export default function EnquiriesPage() {
     return items;
   }, [pagination?.totalPages, page]);
 
+  const toggleSelection = (enquiryId: string) => {
+    setSelectedIds((prev) => (
+      prev.includes(enquiryId) ? prev.filter((id) => id !== enquiryId) : [...prev, enquiryId]
+    ));
+  };
+
+  const clearSelection = () => {
+    setSelectedIds([]);
+  };
+
+  const formatCoordinates = (latitude?: string, longitude?: string) => {
+    const lat = latitude ? String(latitude).trim() : "";
+    const lon = longitude ? String(longitude).trim() : "";
+    if (!lat && !lon) return "N/A";
+    if (lat && lon) return `${lat}, ${lon}`;
+    return lat || lon;
+  };
+
+  const formatContacts = (contacts: any[]) => {
+    if (!Array.isArray(contacts) || contacts.length === 0) return "N/A";
+    const entries = contacts.map((contact) => {
+      const parts = [
+        contact?.contact_name ? `Name: ${contact.contact_name}` : null,
+        contact?.contact_phone ? `Phone: ${contact.contact_phone}` : null,
+        contact?.contact_email ? `Email: ${contact.contact_email}` : null,
+        contact?.contact_designation ? `Designation: ${contact.contact_designation}` : null,
+        contact?.contact_authorization ? `Authorization: ${contact.contact_authorization}` : null,
+      ].filter(Boolean);
+      if (typeof contact?.is_decision_maker === "boolean") {
+        parts.push(`Decision Maker: ${contact.is_decision_maker ? "Yes" : "No"}`);
+      }
+      return parts.length ? parts.join(" | ") : null;
+    }).filter(Boolean);
+    return entries.length ? entries.join("\n") : "N/A";
+  };
+
+  const formatHeadOffice = (headOffice: any) => {
+    if (!headOffice) return "N/A";
+    const parts = [
+      headOffice?.phone ? `Phone: ${headOffice.phone}` : null,
+      headOffice?.address ? `Address: ${headOffice.address}` : null,
+      headOffice?.geo_location ? `Geo: ${headOffice.geo_location}` : null,
+      headOffice?.other_details ? `Other: ${headOffice.other_details}` : null,
+    ].filter(Boolean);
+    return parts.length ? parts.join("\n") : "N/A";
+  };
+
+  const normalizeValue = (value: any) => {
+    if (value === null || value === undefined || value === "") return "N/A";
+    return String(value);
+  };
+
+  const buildExportRows = (data: any[]) => {
+    return data.map((entry) => ([
+      normalizeValue(entry?.enquiry_uuid),
+      normalizeValue(entry?.city_id?.city_name),
+      normalizeValue(entry?.area_id?.area_name),
+      normalizeValue(entry?.camp_id?.camp_name),
+      normalizeValue(entry?.camp_id?.camp_occupancy),
+      formatCoordinates(entry?.camp_id?.latitude, entry?.camp_id?.longitude),
+      formatContacts(entry?.contacts),
+      formatHeadOffice(entry?.camp_id?.headoffice_id),
+      normalizeValue(entry?.wifi_type),
+      normalizeValue(entry?.status),
+      normalizeValue(entry?.priority),
+      normalizeValue(entry?.next_action),
+      normalizeValue(entry?.comments),
+    ]));
+  };
+
+  const exportToExcel = async (data: any[], fileName: string) => {
+    const XLSX = await import("xlsx");
+    const worksheet = XLSX.utils.aoa_to_sheet([EXPORT_HEADERS, ...buildExportRows(data)]);
+    worksheet["!cols"] = EXPORT_COL_WIDTHS;
+    if (worksheet["!ref"]) {
+      worksheet["!autofilter"] = { ref: worksheet["!ref"] };
+    }
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Enquiries");
+    XLSX.writeFile(workbook, fileName, { compression: true });
+  };
+
+  const buildExportFileName = (label: "selected" | "filtered") => {
+    const stamp = new Date().toISOString().slice(0, 10);
+    return `enquiries_${label}_${stamp}.xlsx`;
+  };
+
+  const handleExportSelected = async () => {
+    if (!selectedIds.length) {
+      toast.error("Select at least one enquiry to export.");
+      return;
+    }
+
+    setExportScope("selected");
+    try {
+      const response = await exportEnquiries({ enquiry_ids: selectedIds });
+      if (response?.status !== 200) {
+        toast.error(response?.message || "Failed to export enquiries.");
+        return;
+      }
+      const exportData = response?.data ?? [];
+      console.log("exportData: ", exportData);
+      if (!exportData.length) {
+        toast.error("No enquiries found to export.");
+        return;
+      }
+      await exportToExcel(exportData, buildExportFileName("selected"));
+      toast.success(`Exported ${exportData.length} enquiries.`);
+      setExportOpen(false);
+    } catch (err) {
+      console.log(err);
+      toast.error("Failed to export enquiries.");
+    } finally {
+      setExportScope(null);
+    }
+  };
+
+  const handleExportFiltered = async () => {
+    if (!filteredCount) {
+      toast.error("No enquiries found to export.");
+      return;
+    }
+
+    setExportScope("filtered");
+    try {
+      const response = await exportEnquiries({ filters: normalizedFilters });
+      if (response?.status !== 200) {
+        toast.error(response?.message || "Failed to export enquiries.");
+        return;
+      }
+      const exportData = response?.data ?? [];
+      console.log("exportData: ", exportData);
+      if (!exportData.length) {
+        toast.error("No enquiries found to export.");
+        return;
+      }
+      await exportToExcel(exportData, buildExportFileName("filtered"));
+      toast.success(`Exported ${exportData.length} enquiries.`);
+    } catch (err) {
+      console.log(err);
+      toast.error("Failed to export enquiries.");
+    } finally {
+      setExportScope(null);
+    }
+  };
+
   /* -------------------------------------------------------
           UI START
   ---------------------------------------------------------*/
   return (
     <div className="p-4 pb-20">
       {/* HEADER */}
-      <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg mb-4 flex justify-between items-center">
+      <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg mb-4 flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center">
         <h1 className="font-semibold text-sm text-slate-300 flex items-center gap-1">
           <PanelsTopLeft size={16} /> Enquiries
         </h1>
 
-        <div className="flex items-center gap-2">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
           <Button variant="ghost" className="text-xs" onClick={() => router.push("/admin/enquiries/agents")}>
             Manage Agents
           </Button>
@@ -246,6 +469,94 @@ export default function EnquiriesPage() {
         <div className="flex items-center justify-between px-2 mb-2 cursor-pointer" onClick={() => setShowFilters((prev) => !prev)}>
           <h2 className="font-semibold text-xs text-slate-400">Enquiry Filters</h2>
           <div className="flex items-center gap-2">
+            <Dialog open={exportOpen} onOpenChange={setExportOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className="text-xs"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <Download size={14} className="mr-1" />
+                  Export
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-h-[90dvh] overflow-hidden">
+                <DialogHeader>
+                  <DialogTitle>Export enquiries</DialogTitle>
+                  <DialogDescription>
+                    Search by camp name or enquiry UUID, then select one or more enquiries to export.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-3">
+                  <Input
+                    placeholder="Search enquiries..."
+                    value={exportSearch}
+                    onChange={(event) => setExportSearch(event.target.value)}
+                  />
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
+                    <span>Selected: {selectedIds.length}</span>
+                    <Button
+                      variant="ghost"
+                      className="text-xs"
+                      onClick={clearSelection}
+                      disabled={!selectedIds.length}
+                    >
+                      Clear selection
+                    </Button>
+                  </div>
+                  <div className="max-h-[320px] overflow-y-auto rounded-md border border-slate-800">
+                    {exportListLoading && (
+                      <div className="p-4 text-xs text-slate-400">Loading enquiries...</div>
+                    )}
+                    {!exportListLoading && (!exportList || exportList.length === 0) && (
+                      <div className="p-4 text-xs text-slate-400">No enquiries found.</div>
+                    )}
+                    {!exportListLoading && exportList?.map((entry: any) => {
+                      const entryId = String(entry?._id);
+                      const isSelected = selectedIdSet.has(entryId);
+                      return (
+                        <div
+                          key={entryId}
+                          className="flex items-start gap-3 px-3 py-2 text-left text-sm hover:bg-slate-800/60 cursor-pointer"
+                          onClick={() => toggleSelection(entryId)}
+                        >
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() => toggleSelection(entryId)}
+                            onClick={(event) => event.stopPropagation()}
+                            className="mt-1"
+                          />
+                          <div className="min-w-0">
+                            <p className="text-slate-200 whitespace-normal break-words">
+                              Camp: {entry?.camp_id?.camp_name ?? "N/A"}
+                            </p>
+                            <p className="text-xs text-slate-400 whitespace-normal break-all">
+                              UUID: {entry?.enquiry_uuid ?? "N/A"}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button
+                    variant="ghost"
+                    className="text-xs"
+                    onClick={() => setExportOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    className="text-xs"
+                    onClick={handleExportSelected}
+                    disabled={!selectedIds.length || isExporting}
+                  >
+                    {exportScope === "selected" ? "Exporting..." : "Export selected"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
             <Button
               variant="ghost"
               className="text-xs"
@@ -267,169 +578,193 @@ export default function EnquiriesPage() {
         </div>
 
         {showFilters && (
-          <div className="flex flex-wrap -m-1">
-          {/* COUNTRY */}
-          <FilterSelect
-            label="Country"
-            value={filters.country_id}
-            options={countries}
-            onChange={(v) => updateFilter("country_id", v)}
-            disabled={false}
-          />
-
-          {/* REGION */}
-          <FilterSelect
-            label="Region"
-            value={filters.region_id}
-            options={regions?.region}
-            onChange={(v) => updateFilter("region_id", v)}
-            disabled={!filters.country_id}
-          />
-
-          {/* PROVINCE */}
-          <FilterSelect
-            label="Province"
-            value={filters.province_id}
-            options={provinces?.provinces}
-            onChange={(v) => updateFilter("province_id", v)}
-            disabled={!filters.region_id}
-          />
-
-          {/* CITY */}
-          <FilterSelect
-            label="City"
-            value={filters.city_id}
-            options={cities?.cities}
-            onChange={(v) => updateFilter("city_id", v)}
-            disabled={!filters.province_id}
-          />
-
-          {/* AREA */}
-          <FilterSelect
-            label="Area"
-            value={filters.area_id}
-            options={areas?.areas}
-            onChange={(v) => updateFilter("area_id", v)}
-            disabled={!filters.city_id}
-          />
-
-          {/* CAMP */}
-          <FilterSelect
-            label="Camp"
-            value={filters.camp_id}
-            options={camps?.camps}
-            onChange={(v) => updateFilter("camp_id", v)}
-            disabled={!filters.area_id}
-          />
-
-          {/* STATUS */}
-          <FilterSelect
-            label="Status"
-            value={filters.status}
-            disabled={false}
-            options={ENQUIRY_STATUS}
-            onChange={(v) => updateFilter("status", v)}
-          />
-
-          {/* Occupancy */}
-          <div className="w-full lg:w-1/4 p-1">
-            <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg p-2">
-              <Label className="text-xs text-slate-400">Minimum Occupancy</Label>
-              <input
-                type="number"
-                value={filters.occupancy}
-                onChange={(e) => updateFilter("occupancy", e.target.value)}
-                placeholder="e.g. 600"
-                className="mt-1 w-full bg-transparent border rounded p-2 text-slate-200"
-              />
-            </div>
-          </div>
-
-          {/* WIFI */}
-          <FilterSelect
-            label="WiFi Available"
-            value={filters.wifi_available}
-            disabled={false}
-            options={[
-              { _id: "true", name: "Yes" },
-              { _id: "false", name: "No" },
-            ]}
-            onChange={(v) => updateFilter("wifi_available", v)}
-          />
-
-          {/* Competition */}
-          <FilterSelect
-            label="Competition"
-            value={filters.competition}
-            disabled={false}
-            options={[
-              { _id: "true", name: "Active" },
-              { _id: "false", name: "None" },
-            ]}
-            onChange={(v) => updateFilter("competition", v)}
-          />
-
-            {/* Camp Capacity */}
-          <FilterCapacity
-            label="Camp Capacity"
-            value={filters.capacity}
-            disabled={false}
-            options={Eq_CAPACITY_OPTIONS}
-            onChange={(v)=> updateFilter("capacity", v)}
+          <>
+            <div className="flex flex-wrap -m-1">
+            {/* COUNTRY */}
+            <FilterSelect
+              label="Country"
+              value={filters.country_id}
+              options={countries}
+              onChange={(v:any) => updateFilter("country_id", v)}
+              disabled={false}
             />
 
-          {/* Priority */}
-          <div className="w-full lg:w-1/4 p-1">
-            <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg p-2">
-              <Label className="text-xs text-slate-400">Priority</Label>
-              <input
-                value={filters.priority}
-                onChange={(e) => updateFilter("priority", e.target.value)}
-                placeholder="e.g. 1 - 10"
-                className="mt-1 w-full bg-transparent border rounded p-2 text-slate-200"
+            {/* REGION */}
+            <FilterSelect
+              label="Region"
+              value={filters.region_id}
+              options={regions?.region}
+              onChange={(v:any) => updateFilter("region_id", v)}
+              disabled={!filters.country_id}
+            />
+
+            {/* PROVINCE */}
+            <FilterSelect
+              label="Province"
+              value={filters.province_id}
+              options={provinces?.provinces}
+              onChange={(v:any) => updateFilter("province_id", v)}
+              disabled={!filters.region_id}
+            />
+
+            {/* CITY */}
+            <FilterSelect
+              label="City"
+              value={filters.city_id}
+              options={cities?.cities}
+              onChange={(v:any) => updateFilter("city_id", v)}
+              disabled={!filters.province_id}
+            />
+
+            {/* AREA */}
+            <FilterSelect
+              label="Area"
+              value={filters.area_id}
+              options={areas?.areas}
+              onChange={(v:any) => updateFilter("area_id", v)}
+              disabled={!filters.city_id}
+            />
+
+            {/* CAMP */}
+            <FilterSelect
+              label="Camp"
+              value={filters.camp_id}
+              options={camps?.camps}
+              onChange={(v:any) => updateFilter("camp_id", v)}
+              disabled={!filters.area_id}
+            />
+
+            {/* STATUS */}
+            <FilterSelect
+              label="Status"
+              value={filters.status}
+              disabled={false}
+              options={STATUS_OPTIONS}
+              onChange={(v:any) => updateFilter("status", v)}
+            />
+
+            {/* NEXT ACTION */}
+            <FilterSelect
+              label="Next Action"
+              value={filters.next_action}
+              disabled={false}
+              options={NEXT_ACTION_OPTIONS}
+              onChange={(v:any) => updateFilter("next_action", v)}
+            />
+
+            {/* Occupancy */}
+            <div className="w-full lg:w-1/4 p-1">
+              <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg p-2">
+                <Label className="text-xs text-slate-400">Minimum Occupancy</Label>
+                <input
+                  type="number"
+                  value={filters.occupancy}
+                  onChange={(e) => updateFilter("occupancy", e.target.value)}
+                  placeholder="e.g. 600"
+                  className="mt-1 w-full bg-transparent border rounded p-2 text-slate-200"
+                />
+              </div>
+            </div>
+
+            {/* WIFI */}
+            <FilterSelect
+              label="WiFi Available"
+              value={filters.wifi_available}
+              disabled={false}
+              options={[
+                { _id: "true", name: "Yes" },
+                { _id: "false", name: "No" },
+              ]}
+              onChange={(v:any) => updateFilter("wifi_available", v)}
+            />
+
+            {/* Competition */}
+            <FilterSelect
+              label="Competition"
+              value={filters.competition}
+              disabled={false}
+              options={[
+                { _id: "true", name: "Active" },
+                { _id: "false", name: "None" },
+              ]}
+              onChange={(v:any) => updateFilter("competition", v)}
+            />
+
+            {/* Camp Capacity */}
+            <FilterCapacity
+              label="Camp Capacity"
+              value={filters.capacity}
+              disabled={false}
+              options={Eq_CAPACITY_OPTIONS}
+              onChange={(v:any)=> updateFilter("capacity", v)}
               />
-            </div>
-          </div>
 
-          {/* SEARCH BY ENQUIRY UUID */}
-          <div className="w-full lg:w-1/4 p-1">
-            <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg p-2">
-              <Label className="text-xs text-slate-400">Enquiry UUID</Label>
-              <input
-                type="text"
-                placeholder="Search by Enquiry UUID..."
-                value={filters.enquiry_uuid}
-                onChange={(e) =>
-                  setFilters((prev) => ({
-                    ...prev,
-                    enquiry_uuid: e.target.value,
-                  }))
-                }
-                className="mt-1 w-full bg-transparent border rounded p-2 text-slate-200"
-              />
+            {/* Priority */}
+            <div className="w-full lg:w-1/4 p-1">
+              <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg p-2">
+                <Label className="text-xs text-slate-400">Priority</Label>
+                <input
+                  value={filters.priority}
+                  onChange={(e) => updateFilter("priority", e.target.value)}
+                  placeholder="e.g. 1 - 10"
+                  className="mt-1 w-full bg-transparent border rounded p-2 text-slate-200"
+                />
+              </div>
             </div>
-          </div>
 
-          {/* Dates */}
-          <div className="w-full lg:w-1/3 p-1">
-            <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg p-2">
-              <Label className="text-xs text-slate-400">Within Period</Label>
-              <Space direction="vertical" size={12} style={{ width: "100%" }}>
-                <RangePicker value={rangeValue} onChange={handleRangeChange} style={{ width: "100%" }} />
-              </Space>
+            {/* SEARCH BY ENQUIRY UUID */}
+            <div className="w-full lg:w-1/4 p-1">
+              <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg p-2">
+                <Label className="text-xs text-slate-400">Enquiry UUID</Label>
+                <input
+                  type="text"
+                  placeholder="Search by Enquiry UUID..."
+                  value={filters.enquiry_uuid}
+                  onChange={(e) =>
+                    setFilters((prev) => ({
+                      ...prev,
+                      enquiry_uuid: e.target.value,
+                    }))
+                  }
+                  className="mt-1 w-full bg-transparent border rounded p-2 text-slate-200"
+                />
+              </div>
             </div>
-          </div>
 
-          {/* Lease Expiry */}
-          <div className="w-full lg:w-1/4 p-1">
-            <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg p-2">
-              <Label className="text-xs text-slate-400">Lease Expiry</Label>
-              <Space direction="vertical" size={12} style={{ width: "100%" }}>
-                <DatePicker value={leaseValue} onChange={handleLeaseChange} style={{ width: "100%" }} />
-              </Space>
+            {/* Dates */}
+            <div className="w-full lg:w-1/3 p-1">
+              <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg p-2">
+                <Label className="text-xs text-slate-400">Within Period</Label>
+                <Space direction="vertical" size={12} style={{ width: "100%" }}>
+                  <RangePicker value={rangeValue} onChange={handleRangeChange} style={{ width: "100%" }} />
+                </Space>
+              </div>
+            </div>
+
+            {/* Lease Expiry */}
+            <div className="w-full lg:w-1/4 p-1">
+              <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg p-2">
+                <Label className="text-xs text-slate-400">Lease Expiry</Label>
+                <Space direction="vertical" size={12} style={{ width: "100%" }}>
+                  <DatePicker value={leaseValue} onChange={handleLeaseChange} style={{ width: "100%" }} />
+                </Space>
+              </div>
             </div>
           </div>
-        </div>
+          {hasActiveFilters && (
+            <div className="mt-2 px-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
+              <span>Export filtered: {filteredCount} result{filteredCount === 1 ? "" : "s"}</span>
+              <Button
+                variant="ghost"
+                className="text-xs"
+                onClick={handleExportFiltered}
+                disabled={!filteredCount || isExporting}
+              >
+                {exportScope === "filtered" ? "Exporting..." : "Export filtered"}
+              </Button>
+            </div>
+          )}
+          </>
         )}
       </div>
 
@@ -543,7 +878,7 @@ export default function EnquiriesPage() {
 /* -------------------------------------------------------
      REUSABLE FILTER SELECT COMPONENT
 ---------------------------------------------------------*/
-function FilterSelect({ label, value, options, onChange, disabled }) {
+function FilterSelect({ label, value, options, onChange, disabled }:any) {
   return (
     <div className="w-full lg:w-1/4 p-1">
       <div
@@ -554,7 +889,7 @@ function FilterSelect({ label, value, options, onChange, disabled }) {
 
         <Select
           value={value === "" ? undefined : value}
-          onValueChange={(v) => onChange(v)}
+          onValueChange={(v:any) => onChange(v)}
           disabled={disabled}
         >
           <SelectTrigger className={`${value ? "text-slate-200" : "text-slate-400"}`}>
@@ -562,7 +897,7 @@ function FilterSelect({ label, value, options, onChange, disabled }) {
           </SelectTrigger>
 
           <SelectContent>
-            {options?.map((o) => (
+            {options?.map((o: any) => (
               <SelectItem key={o._id} value={o._id}>
                 {o.country_name ||
                   o.region_name ||
@@ -581,7 +916,7 @@ function FilterSelect({ label, value, options, onChange, disabled }) {
   );
 }
 
-function FilterCapacity({ label, value, options, onChange, disabled }) {
+function FilterCapacity({ label, value, options, onChange, disabled }:any) {
   return (
     <div className="w-full lg:w-1/4 p-1">
       <div
@@ -592,7 +927,7 @@ function FilterCapacity({ label, value, options, onChange, disabled }) {
 
         <Select
           value={value === "" ? undefined : value}
-          onValueChange={(v) => onChange(v)}
+          onValueChange={(v:any) => onChange(v)}
           disabled={disabled}
         >
           <SelectTrigger className={`${value ? "text-slate-200" : "text-slate-400"}`}>
@@ -600,7 +935,7 @@ function FilterCapacity({ label, value, options, onChange, disabled }) {
           </SelectTrigger>
 
           <SelectContent>
-            {options?.map((o, i:number) => (
+            {options?.map((o: any, i:number) => (
               <SelectItem key={i} value={o}>
                 {o}
               </SelectItem>

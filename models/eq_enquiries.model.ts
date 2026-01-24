@@ -30,6 +30,11 @@ export interface IEq_enquiries extends Document{
     is_edit_req: Boolean,
     wifi_setup: String,
     is_converted: Boolean,
+    enquiry_brought_by: ObjectId[],
+    meeting_initiated_by: ObjectId[],
+    project_closed_by: ObjectId[],
+    project_managed_by: ObjectId[],
+    enquiry_user_notes: String,
     createdAt: Date,
     updatedAt: Date
 }
@@ -62,7 +67,12 @@ const Eq_enquiriesSchema:Schema = new Schema({
     longitude: {type: String},
     is_edit_req: {type: Boolean},
     wifi_setup: {type: String},
-    is_converted: {type: Boolean, default: false}
+    is_converted: {type: Boolean, default: false},
+    enquiry_brought_by: { type: [Schema.Types.ObjectId], ref: "users", default: [] },
+    meeting_initiated_by: { type: [Schema.Types.ObjectId], ref: "users", default: [] },
+    project_closed_by: { type: [Schema.Types.ObjectId], ref: "users", default: [] },
+    project_managed_by: { type: [Schema.Types.ObjectId], ref: "users", default: [] },
+    enquiry_user_notes: { type: String }
 }, {timestamps: true});
 
 const Eq_enquiry = mongoose.models?.eq_enquiry || mongoose.model<IEq_enquiries>("eq_enquiry", Eq_enquiriesSchema);

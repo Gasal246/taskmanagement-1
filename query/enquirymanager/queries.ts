@@ -25,6 +25,7 @@ import { AcceptEnquiryEdits, ActivateDeactivateEqAgents, ActivateEqCamp, AddEqUs
      GetEqUserProfile, 
      GetEqUsers,
      GetUserAssignedEnquiries,
+     ExportEnquiries,
      PutEnquiryEditReq,
      RemoveEnquiry,
      RemoveEnquiryAgent,
@@ -350,6 +351,13 @@ export const useGetEnquiriesWithFilters = (queryParams: Record<string, string | 
     return useQuery({
         queryKey: ["enquiries", queryParams],
         queryFn: () => GetEnquiriesWithFilters(queryParams),
+    })
+}
+
+//Export Enquiries (selected or filtered)
+export const useExportEnquiries = () => {
+    return useMutation({
+        mutationFn: (payload: any) => ExportEnquiries(payload),
     })
 }
 
