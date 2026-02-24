@@ -41,3 +41,5 @@ next-env.d.ts
 # admin UI
 # /app/(admin)
 
+firebase/*.json
+*.json
