@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import Eq_enquiry_access from "@/models/eq_enquiry_access.model";
 import Eq_enquiry from "@/models/eq_enquiries.model";
+import Eq_enquiry_histories from "@/models/eq_enquiry_histories";
 import { NextRequest, NextResponse } from "next/server";
 import "@/models/eq_camps.model";
 
@@ -28,6 +29,9 @@ export async function GET(req: NextRequest) {
     const wifi_available = searchParams.get("wifi_available");
     const competition_status = searchParams.get("competition");
     const enquiry_uuid = searchParams.get("enquiry_uuid");
+    const page = Number(searchParams.get("page")) || 1;
+    const limit = Number(searchParams.get("limit")) || 10;
+    const skip = (page - 1) * limit;
 
     /* ----------------------------------------------------------------
        STEP 1: Get unique enquiry_ids from access table
@@ -40,16 +44,20 @@ export async function GET(req: NextRequest) {
       ...new Set(accessDocs.map((d: any) => String(d.enquiry_id))),
     ];
 
-    if (uniqueEnquiryIds.length === 0) {
-      return NextResponse.json({ enquiries: [], status: 200 });
-    }
-
     /* ----------------------------------------------------------------
        STEP 2: Build MongoDB filter for enquiries
     -----------------------------------------------------------------*/
-    const match: any = {
-      _id: { $in: uniqueEnquiryIds },
-    };
+    const membershipFilters: any[] = [{ createdBy: session.user.id }];
+    if (uniqueEnquiryIds.length > 0) {
+      membershipFilters.push({ _id: { $in: uniqueEnquiryIds } });
+    }
+
+    const match: any = {};
+    if (membershipFilters.length === 1) {
+      Object.assign(match, membershipFilters[0]);
+    } else {
+      match.$or = membershipFilters;
+    }
 
     if (status) match.status = status;
     if (priority) match.priority = priority;
@@ -74,11 +82,52 @@ export async function GET(req: NextRequest) {
        STEP 3: Fetch only the real enquiries (NO DUPLICATES)
     -----------------------------------------------------------------*/
 
+    const totalRecords = await Eq_enquiry.countDocuments(match);
+    const totalPages = totalRecords > 0 ? Math.ceil(totalRecords / limit) : 0;
+
+    if (skip >= totalRecords && totalRecords > 0) {
+      return NextResponse.json(
+        { status: 200, data: [], enquiries: [], pagination: { page, limit, totalRecords, totalPages } },
+        { status: 200 }
+      );
+    }
+
     const enquiries = await Eq_enquiry.find(match)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
       .populate("camp_id")
       .lean();
 
-    return NextResponse.json({ enquiries, status: 200 });
+    const enquiryIds = enquiries.map((entry: any) => entry?._id).filter(Boolean);
+    let latestPriorityByEnquiry = new Map<string, number>();
+
+    if (enquiryIds.length) {
+      const histories = await Eq_enquiry_histories.find({
+        enquiry_id: { $in: enquiryIds },
+        assigned_to: session.user.id,
+      })
+        .sort({ createdAt: -1 })
+        .select("enquiry_id priority")
+        .lean();
+
+      for (const history of histories as any[]) {
+        const enquiryId = String(history?.enquiry_id || "");
+        if (!enquiryId || latestPriorityByEnquiry.has(enquiryId)) continue;
+        if (history?.priority === undefined || history?.priority === null || history?.priority === "") continue;
+        latestPriorityByEnquiry.set(enquiryId, Number(history.priority));
+      }
+    }
+
+    const enrichedEnquiries = enquiries.map((entry: any) => ({
+      ...entry,
+      forwarded_priority: latestPriorityByEnquiry.get(String(entry?._id)) ?? null,
+    }));
+
+    return NextResponse.json(
+      { status: 200, data: enrichedEnquiries, enquiries: enrichedEnquiries, pagination: { page, limit, totalRecords, totalPages } },
+      { status: 200 }
+    );
   } catch (err) {
     console.log("Error while getting staff enquiries:", err);
     return NextResponse.json(

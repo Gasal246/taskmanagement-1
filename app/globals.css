@@ -116,3 +116,88 @@
 .time-font {
   font-family: "Tektur", sans-serif;
 }
+
+.google-translate {
+  display: flex;
+  align-items: center;
+}
+
+.google-translate--icon {
+  position: relative;
+}
+
+.google-translate__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #e2e8f0;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.google-translate__select {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+}
+
+.google-translate .goog-te-gadget {
+  font-size: 12px;
+  color: #e2e8f0;
+  line-height: 1;
+  margin: 0;
+}
+
+.google-translate .goog-te-combo {
+  min-width: 140px;
+  max-width: 160px;
+  background: #0b1220;
+  color: #e2e8f0;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 4px 8px;
+  margin: 0;
+  height: 28px;
+  font-size: 12px;
+  outline: none;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.5);
+}
+
+.google-translate .goog-te-gadget span {
+  color: #94a3b8;
+}
+
+.google-translate .goog-te-gadget .goog-te-combo:focus {
+  border-color: #475569;
+}
+
+.google-translate .goog-te-gadget .goog-te-combo:hover {
+  border-color: #475569;
+}
+
+.google-translate .goog-logo-link,
+.google-translate .goog-te-gadget span {
+  display: none;
+}
+
+.google-translate--icon .goog-te-gadget {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.google-translate--icon .goog-te-combo {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  max-width: none;
+  opacity: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  cursor: pointer;
+  appearance: none;
+}

@@ -15,11 +15,13 @@ import { AppDispatch, RootState } from '@/redux/store'
 import Cookies from "js-cookie";
 import { getBusinessByIdFunc } from '@/query/business/functions'
 import { loadBusinessData } from '@/redux/slices/userdata'
+import GoogleTranslate from '../shared/GoogleTranslate'
 
 const AdminTopbar = () => {
     const router = useRouter();
     const dispatch = useDispatch<AppDispatch>();
     const { businessData } = useSelector((state: RootState) => state.user);
+    const unreadCount = useSelector((state: RootState) => state.notifications.unreadCount);
     const roleCookie = Cookies.get("user_role");
     const domainCookie = Cookies.get("user_domain");
     let roleLabel = "";
@@ -88,10 +90,16 @@ const AdminTopbar = () => {
                 </div>
             </div>
             <div className="flex items-center gap-3">
+                <GoogleTranslate
+                    id="google_translate_admin"
+                    variant="icon"
+                    triggerLabel="Translate"
+                    className="rounded-xl bg-slate-900/60 px-2 py-1.5 shadow-sm ring-1 ring-slate-800/80 transition-colors hover:bg-slate-900"
+                />
                 <NotificationPane trigger={
                     <div className="cursor-pointer rounded-xl p-2 transition-colors hover:bg-slate-800/60">
-                        <Tooltip title={'no new notifications.'}>
-                            <Badge count={0} size='small'>
+                        <Tooltip title={unreadCount <= 0 ? 'no new notifications.' : `${unreadCount} new notifications`}>
+                            <Badge count={unreadCount} size='small'>
                                 <Bell className='text-primary' size={20} />
                             </Badge>
                         </Tooltip>

@@ -4,6 +4,8 @@ import Eq_camp_headoffice from "@/models/eq_camp_headoffice.model";
 import Eq_camps from "@/models/eq_camps.model";
 import Eq_enquiry from "@/models/eq_enquiries.model";
 import Eq_enquiry_histories from "@/models/eq_enquiry_histories";
+import "@/models/eq_city.model";
+import "@/models/eq_area.model";
 import { NextRequest, NextResponse } from "next/server";
 
 connectDB();

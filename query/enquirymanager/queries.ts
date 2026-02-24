@@ -1,10 +1,11 @@
 import { useMutation, useQuery } from "@tanstack/react-query"
-import { AcceptEnquiryEdits, ActivateDeactivateEqAgents, ActivateEqCamp, AddEqUser, AddNewCampContact, AddNewContactAgent, AddNewEnquiry, AddNewEqArea, AddNewEqCamp, AddNewEqCity, AddNewEqCountry, AddNewEqHeadOffice, AddNewEqProvince, AddNewEqRegion, AssignEqCamptoEnquiry, CloseEqnuiry, EnquiryToProject, ForwardEnquiryByStaff, ForwardHistory, GetAccessEnquiriesForStaffs, GetAgentEnquiries, GetAgentsByBusiness, GetAllEnquiryHistoryForStaffs, GetEnquiriesWithFilters, GetEnquiryById, GetEnquiryByIdForStaffs, GetEnquiryContacts, GetEnquiryHistories, GetEnquiryHistoryById, GetEqAgentByID, GetEqAreaById, GetEqAreaProfile, GetEqAreasByCity,
+import { AcceptEnquiryEdits, ActivateDeactivateEqAgents, ActivateEqCamp, AddEqUser, AddNewCampContact, AddNewContactAgent, AddNewEnquiry, AddNewEqArea, AddNewEqCamp, AddNewEqCity, AddNewEqCountry, AddNewEqHeadOffice, AddNewEqProvince, AddNewEqRegion, AddNewStaffEqHeadOffice, AssignEqCamptoEnquiry, CloseEqnuiry, EnquiryToProject, ForwardEnquiryByStaff, ForwardHistory, GetAccessEnquiriesForStaffs, GetAgentEnquiries, GetAgentsByBusiness, GetAllEnquiryHistoryForStaffs, GetEnquiriesWithFilters, GetEnquiryById, GetEnquiryByIdForStaffs, GetEnquiryContacts, GetEnquiryHistories, GetEnquiryHistoryById, GetEqAgentByID, GetEqAreaById, GetEqAreaProfile, GetEqAreasByCity,
      GetEqAreasFiltered,
      GetEqCampsByArea, 
      GetEqCampsByEnquiry, 
      GetEqCampsById, 
      GetEqCampsFiltered, 
+     GetStaffEqCampsFiltered,
      GetEqCitiesByProvince, 
      GetEqCitiesFiltered,
      GetEqCityProfile,
@@ -24,6 +25,8 @@ import { AcceptEnquiryEdits, ActivateDeactivateEqAgents, ActivateEqCamp, AddEqUs
      GetEqUserLogs, 
      GetEqUserProfile, 
      GetEqUsers,
+     GetStaffEqHeadOfficeProfile,
+     GetStaffEqHeadOfficesFiltered,
      GetUserAssignedEnquiries,
      ExportEnquiries,
      PutEnquiryEditReq,
@@ -35,6 +38,7 @@ import { AcceptEnquiryEdits, ActivateDeactivateEqAgents, ActivateEqCamp, AddEqUs
      RemoveEqCountry,
      RemoveEqContact,
      RemoveEqHeadOffice,
+     RemoveStaffEqHeadOffice,
      RemoveEqProvince,
      RemoveEqRegion,
      RemoveEqUsers,
@@ -45,6 +49,7 @@ import { AcceptEnquiryEdits, ActivateDeactivateEqAgents, ActivateEqCamp, AddEqUs
      UpdateEqCity,
      UpdateEqCountry,
      UpdateEqHeadOffice,
+     UpdateStaffEqHeadOffice,
      UpdateEqProvince,
      UpdateEqRegion
     } from "./function"
@@ -206,6 +211,14 @@ export const useGetEqHeadOfficesFiltered = (queryParams: Record<string, string |
     })
 }
 
+//Get Staff Head Offices filtered
+export const useGetStaffEqHeadOfficesFiltered = (queryParams: Record<string, string | number | undefined>) => {
+    return useQuery({
+        queryKey: ["staff-head-offices", queryParams],
+        queryFn: () => GetStaffEqHeadOfficesFiltered(queryParams),
+    })
+}
+
 //Add New Head Office
 export const useAddNewEqHeadOffice = () => {
     return useMutation({
@@ -213,10 +226,24 @@ export const useAddNewEqHeadOffice = () => {
     })
 }
 
+//Add New Head Office (Staff)
+export const useAddNewStaffEqHeadOffice = () => {
+    return useMutation({
+        mutationFn: (payload: any) => AddNewStaffEqHeadOffice(payload),
+    })
+}
+
 //Update Head Office
 export const useUpdateEqHeadOffice = () => {
     return useMutation({
         mutationFn: (payload: any) => UpdateEqHeadOffice(payload),
+    })
+}
+
+//Update Head Office (Staff)
+export const useUpdateStaffEqHeadOffice = () => {
+    return useMutation({
+        mutationFn: (payload: any) => UpdateStaffEqHeadOffice(payload),
     })
 }
 
@@ -229,10 +256,26 @@ export const useGetEqHeadOfficeProfile = (head_office_id: string) => {
     })
 }
 
+//Get Staff Head Office Profile
+export const useGetStaffEqHeadOfficeProfile = (head_office_id: string) => {
+    return useQuery({
+        queryKey: ["staff-head-office", head_office_id],
+        queryFn: () => GetStaffEqHeadOfficeProfile(head_office_id),
+        enabled: !!head_office_id,
+    })
+}
+
 //Remove Head Office
 export const useRemoveEqHeadOffice = () => {
     return useMutation({
         mutationFn: (head_office_id: string) => RemoveEqHeadOffice(head_office_id),
+    })
+}
+
+//Remove Staff Head Office
+export const useRemoveStaffEqHeadOffice = () => {
+    return useMutation({
+        mutationFn: (head_office_id: string) => RemoveStaffEqHeadOffice(head_office_id),
     })
 }
 
@@ -312,6 +355,14 @@ export const useGetEqCampsFiltered = (queryParams: Record<string, string | numbe
     return useQuery({
         queryKey: ["camps", queryParams],
         queryFn: () => GetEqCampsFiltered(queryParams),
+    })
+}
+
+//Get Camps filtered (Staff)
+export const useGetStaffEqCampsFiltered = (queryParams: Record<string, string | number | undefined>) => {
+    return useQuery({
+        queryKey: ["staff-camps", queryParams],
+        queryFn: () => GetStaffEqCampsFiltered(queryParams),
     })
 }
 

@@ -10,7 +10,7 @@ export interface IDep_staffs extends Document {
 }
 
 const Dep_staffsSchema: Schema = new Schema({
-  dep_id: { type: Schema.Types.ObjectId, ref: "business_departments" },
+  dep_id: { type: Schema.Types.ObjectId },
   staff_id: { type: Schema.Types.ObjectId, ref: "users" },
   status: { type: Number, default: 1, enum: [0, 1] },
 }, { timestamps: true });

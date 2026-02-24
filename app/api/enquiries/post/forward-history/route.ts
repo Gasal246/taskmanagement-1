@@ -3,7 +3,9 @@ import connectDB from "@/lib/mongo";
 import Eq_enquiry from "@/models/eq_enquiries.model";
 import Eq_enquiry_access from "@/models/eq_enquiry_access.model";
 import Eq_enquiry_histories from "@/models/eq_enquiry_histories";
+import Users from "@/models/users.model";
 import { NextRequest, NextResponse } from "next/server";
+import { notifyEnquiryForward } from "@/app/api/helpers/enquiry-notifications";
 
 connectDB();
 
@@ -25,6 +27,7 @@ export async function POST(req: NextRequest) {
         if(!session) return NextResponse.json({message: "Unauthorized Access", status: 401}, {status: 401});
 
         const body: Body = await req.json();
+        const actor = await Users.findById(session?.user?.id).select("name");
 
         if (!Array.isArray(body.access_users)) {
             body.access_users = [];
@@ -70,6 +73,18 @@ export async function POST(req: NextRequest) {
                 }));
 
                 await Eq_enquiry_access.insertMany(newAccess);
+
+                if (actor?._id) {
+                    await notifyEnquiryForward({
+                        req,
+                        recipientIds: uniqueAccess.map((id) => String(id)),
+                        enquiryId: body.enquiry_id,
+                        action: body.action,
+                        priority: body.priority,
+                        actorId: String(actor._id),
+                        actorName: actor?.name || "User",
+                    });
+                }
             }
 
             if (body.is_finished) {
@@ -114,6 +129,18 @@ export async function POST(req: NextRequest) {
         })
 
         await Eq_enquiry_access.insertMany(newAccess);
+
+        if (actor?._id) {
+            await notifyEnquiryForward({
+                req,
+                recipientIds: uniqueAccess.map((id) => String(id)),
+                enquiryId: savedHistory.enquiry_id,
+                action: body.action,
+                priority: body.priority,
+                actorId: String(actor._id),
+                actorName: actor?.name || "User",
+            });
+        }
 
         if (body.is_finished) {
             console.log("FINISHED: ", body.enquiry_id);

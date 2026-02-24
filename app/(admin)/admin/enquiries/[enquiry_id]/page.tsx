@@ -102,7 +102,7 @@ export default function SingleEnquiryPage() {
   const wifiAvailability = enquiry?.enquiry?.wifi_available;
   const wifiStatusLabel = wifiAvailability === true ? "Available" : wifiAvailability === false ? "No WiFi" : "Not Specified";
   const priorityLabel = enquiry?.enquiry?.priority ? `${enquiry?.enquiry?.priority}/10` : "Not set";
-  const statusLabel = enquiry?.enquiry?.status || "Pending";
+  const statusLabel = enquiry?.enquiry?.status || "Lead Received";
   const activeLabel = enquiry?.enquiry?.is_active ? "Active" : "Inactive";
   const conversionLabel = enquiry?.enquiry?.is_converted ? "Yes" : "Not Yet";
 

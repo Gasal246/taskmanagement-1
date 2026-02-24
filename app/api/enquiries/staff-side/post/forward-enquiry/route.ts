@@ -7,6 +7,7 @@ import Eq_enquiry_histories from "@/models/eq_enquiry_histories";
 import Eq_users_log from "@/models/eq_users_log.model";
 import Users from "@/models/users.model";
 import { NextRequest, NextResponse } from "next/server";
+import { notifyEnquiryForward } from "@/app/api/helpers/enquiry-notifications";
 
 connectDB();
 
@@ -80,6 +81,18 @@ export async function POST(req: NextRequest) {
         })
 
         await Eq_enquiry_access.insertMany(newAccess);
+
+        if (user?._id) {
+            await notifyEnquiryForward({
+                req,
+                recipientIds: uniqueAccess.map((id) => String(id)),
+                enquiryId: savedHistory.enquiry_id,
+                action: body.action,
+                priority: body.priority,
+                actorId: String(user._id),
+                actorName: user?.name || "User",
+            });
+        }
 
         if (body.is_finished) {
             console.log("FINISHED: ", body.enquiry_id);

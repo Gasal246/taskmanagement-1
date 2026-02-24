@@ -19,6 +19,15 @@ export async function getUserByUserId ( userid: string ) {
     }
 }
 
+export async function getUserByUserIdWithMeta(payload: { user_id: string; roleLabel: string }) {
+    try {
+        const res = await axios.post(`/api/users/get-user/id-with-meta`, payload);
+        return res.data;
+    } catch (error) {
+        console.log(error);
+    }
+}
+
 export async function sendEmailVerification ( email: string ) {
     try {
         const res = await axios.post(`/api/users/verification/send-mail`, { email });
@@ -152,6 +161,15 @@ export async function removeUserRoleFunc (URoleId: string) {
     }
 }
 
+export async function removeUserRolePermanentFunc(URoleId: string) {
+    try {
+        const res = await axios.post(`/api/users/role/permanent-remove`, { URoleId });
+        return res.data;
+    } catch (error) {
+        console.log(error)
+    }
+}
+
 export async function addUserAreaFunc (payload: any) {
     try {
         const res = await axios.post(`/api/users/area/add`, payload);
@@ -218,6 +236,15 @@ export async function addUserDocFunc (payload: any) {
 export async function removeUserDocFunc (UDocId: string) {
     try {
         const res = await axios.post(`/api/users/docs/remove`, { UDocId });
+        return res.data;
+    } catch (error) {
+        console.log(error)
+    }
+}
+
+export async function removeDepartmentAssignmentPermanentFunc(payload: { assignmentId: string; assignmentModel: string }) {
+    try {
+        const res = await axios.post(`/api/users/department/permanent-remove`, payload);
         return res.data;
     } catch (error) {
         console.log(error)

@@ -40,6 +40,14 @@ import { RootState } from "@/redux/store";
 import { useQueryClient } from "@tanstack/react-query";
 
 const priorityLevels = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"];
+const ENQUIRY_STATUS_OPTIONS = [
+    "Lead Received",
+    "Initial Meeting Over",
+    "Survey Completed",
+    "Proposal Submitted",
+    "Waiting For Client Response",
+    "Project Awarded",
+] as const;
 
 const MAX_DOC_SIZE = 5 * 1024 * 1024; // 5MB
 
@@ -48,8 +56,8 @@ const enquirySchema = z.object({
     enquiry_id: z.string(),
     country: z.string().min(1, "Select country"),
     region: z.string().min(1, "Select region"),
-    province: z.string().optional(),
-    city: z.string().optional(),
+    province: z.string().min(1, "Select province"),
+    city: z.string().min(1, "Select city"),
 
     area_input_mode: z.enum(["existing", "new"]).default("existing"),
     area: z.string().optional(),
@@ -59,7 +67,7 @@ const enquirySchema = z.object({
     camp: z.string().optional(),
     camp_name_request: z.string().optional(),
 
-    camp_type: z.string().optional(),
+    camp_type: z.string().min(1, "Select camp type"),
     client_company: z.string().optional(),
     landlord: z.string().optional(),
     real_estate: z.string().optional(),
@@ -73,19 +81,19 @@ const enquirySchema = z.object({
     enquiry_user_notes: z.string().optional(),
     coordinates: z.string().optional(),
 
-    camp_capacity: z.string().optional(),
-    camp_occupancy: z.string().optional(),
+    camp_capacity: z.string().min(1, "Camp capacity is required"),
+    camp_occupancy: z.string().min(1, "Current occupancy is required"),
 
     contacts: z.array(z.object({
-        name: z.string().min(1, "Contact name required"),
-        phone: z.string().min(5, "Phone required"),
+        name: z.string().optional(),
+        phone: z.string().optional(),
         email: z.string().optional(),
         designation: z.string().optional(),
         is_decision_maker: z.string().optional(),
         authority_level: z.string().optional(),
     })).optional(),
 
-    wifi_available: z.enum(["Yes", "No", "not-specified"]),
+    wifi_available: z.string().optional(),
     expected_monthly_price: z.string().optional(),
     other_wifi_details: z.string().optional(),
     wifi_type: z.string().optional(),
@@ -115,7 +123,7 @@ const enquirySchema = z.object({
 
     priority: z.enum(priorityLevels as [string, ...string[]]).optional().or(z.literal("")),
 
-    followup_status: z.enum(["Pending", "In Progress", "Closed"]),
+    followup_status: z.string().optional(),
     alert_date: z.string().optional(),
     next_action: z.string().optional(),
     next_action_due: z.string().optional(),
@@ -124,6 +132,38 @@ const enquirySchema = z.object({
     images: z.any().optional(),
 
 }).superRefine((values, ctx) => {
+    if (values.area_input_mode === "existing" && !values.area) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["area"],
+            message: "Select area",
+        });
+    }
+
+    if (values.area_input_mode === "new" && !values.area_name_request?.trim()) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["area_name_request"],
+            message: "Area name is required",
+        });
+    }
+
+    if (values.area_input_mode === "existing" && values.camp_input_mode === "existing" && !values.camp) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["camp"],
+            message: "Select camp",
+        });
+    }
+
+    if (!values.camp_name_request?.trim()) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["camp_name_request"],
+            message: "Camp name is required",
+        });
+    }
+
     if (values.camp_capacity && values.camp_occupancy) {
         const limit = EQ_CAPACITY_LIMITS[values.camp_capacity];
         const occupancy = Number(values.camp_occupancy);
@@ -194,7 +234,7 @@ export default function EditEnquiry() {
             personal_wifi_start: "",
             personal_wifi_expiry: "",
             personal_wifi_price: "",
-            followup_status: "Pending",
+            followup_status: ENQUIRY_STATUS_OPTIONS[0],
             area_input_mode: "existing",
             camp_input_mode: "existing",
             expected_monthly_price: "",
@@ -399,7 +439,7 @@ export default function EditEnquiry() {
             competition_status: enquiry?.enquiry?.competition_status ? "Yes" : "No",
             competition_notes: enquiry?.enquiry?.competition_notes || "",
             priority: enquiry?.enquiry?.priority ? String(enquiry?.enquiry?.priority) : undefined,
-            followup_status: enquiry?.enquiry?.status || "Pending",
+            followup_status: enquiry?.enquiry?.status || ENQUIRY_STATUS_OPTIONS[0],
             alert_date: formatDate(enquiry?.enquiry?.alert_date) || "",
             next_action: enquiry?.enquiry?.next_action || "",
             next_action_due: formatDate(enquiry?.enquiry?.next_action_due) || "",
@@ -1252,17 +1292,17 @@ export default function EditEnquiry() {
                         {/* FOLLOW-UP */}
                         <FormField control={form.control} name="followup_status" render={({ field }) => (
                             <FormItem>
-                        <FormLabel className="text-xs text-slate-300 font-semibold">Follow-up Status</FormLabel>
+                        <FormLabel className="text-xs text-slate-300 font-semibold">Enquiry Status</FormLabel>
                         <FormControl>
                             <select
                                 value={field.value ?? ""}
                                 onChange={field.onChange}
                                 className={selectClassName}
                             >
-                                <option value="">Status</option>
-                                <option value="Pending">Pending</option>
-                                <option value="In Progress">In Progress</option>
-                                <option value="Closed">Closed</option>
+                                <option value="">Enquiry Status</option>
+                                {ENQUIRY_STATUS_OPTIONS.map((status) => (
+                                    <option key={status} value={status}>{status}</option>
+                                ))}
                             </select>
                         </FormControl>
                     </FormItem>

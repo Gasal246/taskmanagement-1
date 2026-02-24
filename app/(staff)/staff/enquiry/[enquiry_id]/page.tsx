@@ -1,14 +1,14 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Mail, Phone, User, Clock, BadgeCheck, UserCircle2 } from "lucide-react";
+import { Mail, Phone, User, UserCircle2, MapPin, Wifi } from "lucide-react";
 import { Avatar } from "antd";
-import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useGetEnquiryByIdForStaffs } from "@/query/enquirymanager/queries";
+import { useGetEnquiryByIdForStaffs, useGetEnquiryContacts, useGetEqCampsById } from "@/query/enquirymanager/queries";
 import { formatDateTiny } from "@/lib/utils";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 
 export default function SingleEnquiryPage() {
@@ -17,14 +17,83 @@ export default function SingleEnquiryPage() {
   const params2 = useSearchParams();
   const from = params2.get("from");
   const { data: enquiry, isLoading } = useGetEnquiryByIdForStaffs(params.enquiry_id);
-  useEffect(() => {
-    console.log("enquiry: ", enquiry);
-  }, [enquiry]);
+  const { data: contactsData } = useGetEnquiryContacts(params.enquiry_id);
+  const baseCampId = enquiry?.enquiry?.camp_id?._id ?? enquiry?.enquiry?.camp_id;
+  const { data: campData, isLoading: isCampLoading } = useGetEqCampsById(baseCampId || "");
+  const camp = campData?.camp || enquiry?.enquiry?.camp_id;
+  const contacts = contactsData?.contacts ?? enquiry?.contacts ?? [];
+  const latitude = camp?.latitude || enquiry?.enquiry?.latitude;
+  const longitude = camp?.longitude || enquiry?.enquiry?.longitude;
 
 
   const openMap = () => {
-    window.open(`https://www.google.com/maps?q=${enquiry.enquiry.camp_id?.latitude},${enquiry.enquiry.camp_id?.longitude}`, "_blank");
+    if (!latitude || !longitude) {
+      toast.error("Location not available.");
+      return;
+    }
+    window.open(`https://www.google.com/maps?q=${latitude},${longitude}`, "_blank");
   };
+
+  const renderValue = (value: any, fallback = "Not specified") => {
+    if (value === null || value === undefined || value === "") return fallback;
+    return value;
+  };
+
+  const renderDate = (value?: string | Date | null, fallback = "Not set") => {
+    if (!value) return fallback;
+    return formatDateTiny(value);
+  };
+
+  const renderDecimal = (value: any, fallback = "Not specified") => {
+    const resolved = value?.$numberDecimal ?? value;
+    return renderValue(resolved, fallback);
+  };
+
+  const renderBool = (value: any) => {
+    if (value === true) return "Yes";
+    if (value === false) return "No";
+    return "Not specified";
+  };
+
+  const renderAssignedUsers = (value: any, fallback = "Unassigned") => {
+    if (!value) return fallback;
+    const list = Array.isArray(value) ? value : [value];
+    const names = list
+      .map((item) => item?.name || item?.email || item)
+      .filter(Boolean)
+      .map((entry) => String(entry));
+    return names.length ? names.join(", ") : fallback;
+  };
+
+  const renderUserList = (users: any[]) => {
+    if (!Array.isArray(users) || users.length === 0) return "Not specified";
+    const names = users
+      .map((user) => user?.name || user?.email || user)
+      .filter(Boolean)
+      .map((entry) => String(entry));
+    return names.length > 0 ? names.join(", ") : "Not specified";
+  };
+
+  const InfoRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
+    <div className="flex items-center justify-between gap-4 rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2">
+      <span className="text-xs text-slate-400">{label}</span>
+      <span className="text-xs text-slate-200 text-right">{value}</span>
+    </div>
+  );
+
+  if (isLoading || (baseCampId && isCampLoading)) {
+    return (
+      <div className="flex items-center justify-center h-40">
+        <div className="animate-spin rounded-full h-8 w-8 border-4 border-slate-700 border-t-cyan-400" />
+      </div>
+    );
+  }
+
+  const wifiAvailability = enquiry?.enquiry?.wifi_available;
+  const wifiStatusLabel = wifiAvailability === true ? "Available" : wifiAvailability === false ? "No WiFi" : "Not Specified";
+  const priorityLabel = enquiry?.enquiry?.priority ? `${enquiry?.enquiry?.priority}/10` : "Not set";
+  const statusLabel = enquiry?.enquiry?.status || "Lead Received";
+  const conversionLabel = enquiry?.enquiry?.is_converted ? "Yes" : "Not Yet";
 
   return (
     <div className='p-4 pb-10'>
@@ -32,7 +101,7 @@ export default function SingleEnquiryPage() {
       <Breadcrumb>
         <BreadcrumbList>
           <BreadcrumbItem>
-            {from == "accessible" ? <BreadcrumbLink onClick={() => router.replace("/staff/enquiry")}>Enquiries</BreadcrumbLink> : <BreadcrumbLink onClick={() => router.replace("/staff/enquiry/assigns")}>Enquiries assigned</BreadcrumbLink>}
+            <BreadcrumbLink onClick={() => router.replace("/staff/enquiry")}>All Enquiries</BreadcrumbLink>
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
@@ -41,169 +110,262 @@ export default function SingleEnquiryPage() {
         </BreadcrumbList>
       </Breadcrumb>
       <div className="p-4 pb-10 text-slate-100">
-        {/* HEADER */}
-        <div className="flex flex-col justify-center gap-3 mb-4">
-          <h1 className="text-xl font-bold flex items-center">
-            <UserCircle2 size={20} /> Enquiry Details
-          </h1>
-          <p className="text-sm">Enquiry UUID: {enquiry?.enquiry?.enquiry_uuid}</p>
+        <div className="mb-4 space-y-2">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h1 className="text-xl font-bold flex items-center gap-2">
+                <UserCircle2 size={20} /> Enquiry Details
+              </h1>
+              <p className="text-sm text-slate-400 mt-1">
+                Enquiry ID: {enquiry?.enquiry?.enquiry_uuid}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
+                {!enquiry?.enquiry?.is_active && (
+                  <span className="rounded-full border border-amber-400/40 bg-amber-950/50 px-2 py-1 font-semibold text-amber-300">
+                    Action Required
+                  </span>
+                )}
+                <span className="rounded-full border border-slate-800 bg-slate-900/50 px-2 py-1 text-slate-300">
+                  Status: {statusLabel}
+                </span>
+                <span className="rounded-full border border-slate-800 bg-slate-900/50 px-2 py-1 text-slate-300">
+                  Priority: {priorityLabel}
+                </span>
+                <span className="rounded-full border border-slate-800 bg-slate-900/50 px-2 py-1 text-slate-300">
+                  Project: {conversionLabel}
+                </span>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {enquiry?.canForward && (
+                <Button
+                  onClick={() => router.replace(`/staff/enquiry/${params.enquiry_id}/view-assigned`)}
+                  className="flex items-center gap-1"
+                >
+                  View Assigned Action
+                </Button>
+              )}
+            </div>
+          </div>
         </div>
 
-        {/* CARD */}
-        <div className="bg-gradient-to-tr from-slate-950/60 to-slate-900/60 p-5 rounded-xl border border-slate-800 space-y-5">
-          {/* BASIC INFO */}
-
-          {/* LOCATION DETAILS */}
-          <div className="mt-5 space-y-2">
-            <h2 className="font-semibold text-lg mb-2">Location Details</h2>
-            <p className="text-sm">Country: {enquiry?.enquiry?.country_id?.country_name}</p>
-            <p className="text-sm">Region: {enquiry?.enquiry?.region_id?.region_name}</p>
-            <p className="text-sm">Province: {enquiry?.enquiry?.province_id?.province_name}</p>
-            <p className="text-sm">City: {enquiry?.enquiry?.city_id?.city_name}</p>
-            <p className="text-sm">Area: {enquiry?.enquiry?.area_id?.area_name}</p>
-            <p className="text-sm">Camp: {enquiry?.enquiry?.camp_id?.camp_name}</p>
-            <p className="text-sm">Latitude: {enquiry?.enquiry?.camp_id?.latitude}</p>
-            <p className="text-sm">Longitude: {enquiry?.enquiry?.camp_id?.longitude}</p>
-            <Button onClick={openMap}>Go to Location</Button>
-          </div>
-
-          {enquiry?.head_office &&
-            <div className="mt-5 space-y-2">
-              <h2 className="font-semibold text-lg mb-2">Head Office Details</h2>
-
-              <p className="text-sm">Phone: {enquiry?.head_office?.phone}</p>
-              <p className="text-sm">
-                Geo Location:{" "}
-                {enquiry?.head_office?.geo_location ? (
-                  <a
-                    href={enquiry.head_office.geo_location}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-500 hover:underline"
-                  >
-                    View Location
-                  </a>
-                ) : (
-                  "-"
-                )}
-              </p>
-              <p className="text-sm">Address: {enquiry?.head_office?.address}</p>
-              <p className="text-sm">Other details: {enquiry?.head_office?.other_details}</p>
+        <div className="bg-gradient-to-tr from-slate-950/60 to-slate-900/60 p-5 rounded-xl border border-slate-800 space-y-6">
+          <div className="rounded-lg border border-slate-800 bg-slate-900/40 p-4">
+            <h2 className="text-sm font-semibold text-slate-300">At a glance</h2>
+            <div className="mt-3 grid gap-2 md:grid-cols-2 lg:grid-cols-3">
+              <InfoRow label="Camp" value={renderValue(camp?.camp_name || enquiry?.enquiry?.camp_id?.camp_name)} />
+              <InfoRow label="Area" value={renderValue(enquiry?.enquiry?.area_id?.area_name)} />
+              <InfoRow label="Region" value={renderValue(enquiry?.enquiry?.region_id?.region_name)} />
+              <InfoRow label="Wi-Fi" value={wifiStatusLabel} />
+              <InfoRow label="Next Action Due" value={renderDate(enquiry?.enquiry?.next_action_due)} />
+              <InfoRow label="Assigned To" value={renderAssignedUsers(enquiry?.assigned?.assigned_to)} />
             </div>
-          }
+          </div>
 
           <div className="space-y-3">
-            <h2 className="font-semibold text-lg mb-2">Contact Information</h2>
-
-            <div className="flex items-center gap-2 text-sm">
-              <User size={16} />
-              <span>{enquiry?.contacts[0]?.contact_name}</span>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="font-semibold text-lg">Location & Camp</h2>
+              <Button variant="outline" size="sm" className="gap-2" onClick={openMap}>
+                <MapPin size={14} /> Open Map
+              </Button>
             </div>
-
-            <div className="flex items-center gap-2 text-sm">
-              <Mail size={16} />
-              <span>{enquiry?.contacts[0]?.contact_email}</span>
+            <div className="grid gap-2 md:grid-cols-2">
+              <InfoRow label="Country" value={renderValue(enquiry?.enquiry?.country_id?.country_name)} />
+              <InfoRow label="Region" value={renderValue(enquiry?.enquiry?.region_id?.region_name)} />
+              <InfoRow label="Province" value={renderValue(enquiry?.enquiry?.province_id?.province_name)} />
+              <InfoRow label="City" value={renderValue(enquiry?.enquiry?.city_id?.city_name)} />
+              <InfoRow label="Area" value={renderValue(enquiry?.enquiry?.area_id?.area_name)} />
+              <InfoRow label="Camp" value={renderValue(camp?.camp_name || enquiry?.enquiry?.camp_id?.camp_name)} />
+              <InfoRow label="Camp Type" value={renderValue(camp?.camp_type)} />
+              <InfoRow label="Camp Capacity" value={renderValue(camp?.camp_capacity)} />
+              <InfoRow label="Camp Occupancy" value={renderValue(camp?.camp_occupancy)} />
+              <InfoRow label="Latitude" value={renderValue(latitude)} />
+              <InfoRow label="Longitude" value={renderValue(longitude)} />
             </div>
-            <div className="flex items-center gap-2 text-sm">
-              <Phone size={16} />
-              <span>{enquiry?.contacts[0]?.contact_phone}</span>
-            </div>
-
-            <div className="flex items-center gap-2 text-sm">
-              <BadgeCheck size={16} />
-              <span className="text-yellow-400">Is Decision Maker: {enquiry?.contacts[0]?.is_decision_maker ? "Yes" : "No"}</span>
-            </div>
-
-            <Button
-              onClick={() => router.push(`/staff/enquiry/${params.enquiry_id}/contacts`)}
-            >Show More</Button>
           </div>
 
-          {/* CREATED BY */}
-          <div className="mt-5">
-            <h2 className="font-semibold text-lg mb-2">Created By</h2>
-            <div className="flex items-center gap-3 border border-slate-800 p-3 rounded-xl bg-slate-900/40">
-              <Avatar size={50} src="https://api.dicebear.com/7.x/personas/svg" />
-              <div>
-                <h3 className="font-semibold text-sm">{enquiry?.enquiry?.createdBy?.name}</h3>
-                <p className="text-xs text-slate-400">Agent</p>
+          <div className="space-y-3">
+            <h2 className="font-semibold text-lg">Camp Stakeholders</h2>
+            <div className="grid gap-2 md:grid-cols-3">
+              <InfoRow label="Landlord" value={renderValue(camp?.landlord_id?.landlord_name)} />
+              <InfoRow label="Real Estate" value={renderValue(camp?.realestate_id?.company_name)} />
+              <InfoRow label="Client Company" value={renderValue(camp?.client_company_id?.client_company_name)} />
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <h2 className="font-semibold text-lg">Enquiry Users</h2>
+            <div className="grid gap-2 md:grid-cols-2">
+              <InfoRow label="Enquiry Brought By" value={renderUserList(enquiry?.enquiry?.enquiry_brought_by)} />
+              <InfoRow label="Meeting Initiated By" value={renderUserList(enquiry?.enquiry?.meeting_initiated_by)} />
+              <InfoRow label="Project Closed By" value={renderUserList(enquiry?.enquiry?.project_closed_by)} />
+              <InfoRow label="Project Managed By" value={renderUserList(enquiry?.enquiry?.project_managed_by)} />
+              <InfoRow label="Enquiry User Notes" value={renderValue(enquiry?.enquiry?.enquiry_user_notes)} />
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="font-semibold text-lg">Contact Information</h2>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={() => router.push(`/staff/enquiry/${params.enquiry_id}/contacts`)}
+              >
+                View Contacts
+              </Button>
+            </div>
+            {contacts.length === 0 && (
+              <div className="border border-dashed border-slate-800 rounded-lg p-3 text-xs text-slate-400">
+                No contacts added yet.
+              </div>
+            )}
+            {contacts.length > 0 && (
+              <div className="grid gap-3 md:grid-cols-2">
+                {contacts.map((contact: any, index: number) => (
+                  <div
+                    key={contact?._id || `${contact?.contact_name || "contact"}-${index}`}
+                    className="rounded-lg border border-slate-800 bg-slate-900/40 p-3 space-y-2"
+                  >
+                    <div className="flex items-center gap-2 text-sm font-semibold text-slate-200">
+                      <User size={14} /> {renderValue(contact?.contact_name, "Unnamed Contact")}
+                    </div>
+                    <div className="flex flex-wrap gap-3 text-xs text-slate-300">
+                      <span className="flex items-center gap-1"><Phone size={12} /> {renderValue(contact?.contact_phone)}</span>
+                      <span className="flex items-center gap-1"><Mail size={12} /> {renderValue(contact?.contact_email)}</span>
+                    </div>
+                    <div className="grid gap-2 md:grid-cols-2">
+                      <InfoRow label="Designation" value={renderValue(contact?.contact_designation)} />
+                      <InfoRow label="Decision Maker" value={contact?.is_decision_maker ? "Yes" : "No"} />
+                      <InfoRow label="Authority" value={renderValue(contact?.contact_authorization)} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-3">
+            <h2 className="font-semibold text-lg">Head Office</h2>
+            {enquiry?.head_office ? (
+              <div className="grid gap-2 md:grid-cols-2">
+                <InfoRow label="Phone" value={renderValue(enquiry?.head_office?.phone)} />
+                <InfoRow
+                  label="Geo Location"
+                  value={enquiry?.head_office?.geo_location ? (
+                    <a
+                      href={enquiry.head_office.geo_location}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-cyan-400 hover:underline"
+                    >
+                      View Location
+                    </a>
+                  ) : (
+                    "Not specified"
+                  )}
+                />
+                <InfoRow label="Address" value={renderValue(enquiry?.head_office?.address)} />
+                <InfoRow label="Other Details" value={renderValue(enquiry?.head_office?.other_details)} />
+              </div>
+            ) : (
+              <div className="border border-dashed border-slate-800 rounded-lg p-3 text-xs text-slate-400">
+                Head office details haven’t been added yet.
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-3">
+            <h2 className="font-semibold text-lg flex items-center gap-2"><Wifi size={16} /> Wi-Fi / Internet</h2>
+            <div className="grid gap-2 md:grid-cols-2">
+              <InfoRow label="Status" value={wifiStatusLabel} />
+              <InfoRow label="Type" value={renderValue(enquiry?.enquiry?.wifi_type, "Not specified")} />
+            </div>
+            {wifiAvailability === true && (
+              <>
+                {enquiry?.enquiry?.wifi_type === "Existing Contractor" && (
+                  <div className="grid gap-2 md:grid-cols-2">
+                    <InfoRow label="Contractor" value={renderValue(enquiry?.external_provider?.contractor_name)} />
+                    <InfoRow label="Plan / Package" value={renderValue(enquiry?.external_provider?.contract_package)} />
+                    <InfoRow label="Speed (Mbps)" value={renderValue(enquiry?.external_provider?.contract_speed)} />
+                    <InfoRow label="Contract Start" value={renderDate(enquiry?.external_provider?.contract_start_date)} />
+                    <InfoRow label="Contract End" value={renderDate(enquiry?.external_provider?.contract_end_date)} />
+                    <InfoRow label="Pain Points" value={renderValue(enquiry?.external_provider?.plain_points || enquiry?.external_provider?.pain_points)} />
+                  </div>
+                )}
+                {enquiry?.enquiry?.wifi_type === "Personal WiFi" && (
+                  <div className="grid gap-2 md:grid-cols-2">
+                    <InfoRow label="Provider / Plan" value={renderValue(enquiry?.personal_provider?.personal_plan)} />
+                    <InfoRow label="Start Date" value={renderDate(enquiry?.personal_provider?.personal_start_date)} />
+                    <InfoRow label="End Date" value={renderDate(enquiry?.personal_provider?.personal_end_date)} />
+                    <InfoRow label="Monthly Price" value={renderDecimal(enquiry?.personal_provider?.personal_monthly_price)} />
+                  </div>
+                )}
+                {enquiry?.enquiry?.wifi_type === "Other Sources" && (
+                  <InfoRow label="Setup Details" value={renderValue(enquiry?.enquiry?.wifi_setup)} />
+                )}
+              </>
+            )}
+            {wifiAvailability === false && (
+              <InfoRow label="Expected Monthly Price" value={renderDecimal(enquiry?.enquiry?.expected_wifi_cost)} />
+            )}
+            {(wifiAvailability === null || wifiAvailability === undefined) && (
+              <div className="border border-dashed border-slate-800 rounded-lg p-3 text-xs text-slate-400">
+                Wi-Fi information hasn’t been specified yet.
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-3">
+            <h2 className="font-semibold text-lg">Lease & Competition</h2>
+            <div className="grid gap-2 md:grid-cols-2">
+              <InfoRow label="Lease Expiry" value={renderDate(enquiry?.enquiry?.lease_expiry_due)} />
+              <InfoRow label="Rent Terms" value={renderValue(enquiry?.enquiry?.rent_terms)} />
+              <InfoRow label="Competition Presence" value={renderBool(enquiry?.enquiry?.competition_status)} />
+              <InfoRow label="Competition Notes" value={renderValue(enquiry?.enquiry?.competition_notes)} />
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <h2 className="font-semibold text-lg">Follow-up & Notes</h2>
+            <div className="grid gap-2 md:grid-cols-2">
+              <InfoRow label="Status" value={statusLabel} />
+              <InfoRow label="Priority" value={priorityLabel} />
+              <InfoRow label="Alert Date" value={renderDate(enquiry?.enquiry?.alert_date)} />
+              <InfoRow label="Next Action" value={renderValue(enquiry?.enquiry?.next_action)} />
+              <InfoRow label="Next Action Due" value={renderDate(enquiry?.enquiry?.next_action_due)} />
+              <InfoRow label="Comments" value={renderValue(enquiry?.enquiry?.comments)} />
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <h2 className="font-semibold text-lg mb-2">Created By</h2>
+              <div className="flex items-center gap-3 border border-slate-800 p-3 rounded-xl bg-slate-900/40">
+                <Avatar size={45} src="https://api.dicebear.com/7.x/personas/svg" />
+                <div>
+                  <h3 className="font-semibold text-sm">{renderValue(enquiry?.enquiry?.createdBy?.name, "Unknown")}</h3>
+                </div>
+              </div>
+            </div>
+            <div>
+              <h2 className="font-semibold text-lg mb-2">Assigned To</h2>
+              <div className="flex items-center gap-3 border border-slate-800 p-3 rounded-xl bg-slate-900/40">
+                <Avatar size={45} src="https://api.dicebear.com/7.x/personas/svg" />
+                <div>
+                  <h3 className="font-semibold text-sm">{renderAssignedUsers(enquiry?.assigned?.assigned_to)}</h3>
+                </div>
               </div>
             </div>
           </div>
 
-
-
-          {/* MESSAGE */}
-          <div className="mt-5">
-            <h2 className="font-semibold text-lg mb-2">WiFi Information</h2>
-            <div className="text-sm text-slate-300 border border-slate-800 p-3 rounded-lg bg-slate-900/40 font-semibold space-y-2">
-              <p className="text-sm">WiFi Status: {enquiry?.enquiry?.wifi_available ? "Available" : "No WiFi"}</p>
-              {enquiry?.enquiry?.wifi_available ? (
-                <>
-                  <p className="text-sm">WiFi Type: {enquiry?.enquiry?.wifi_type}</p>
-                  {enquiry?.enquiry?.wifi_type == "Existing Contractor" ? (
-                    <>
-                      <p className="text-sm">WiFi Contractor: {enquiry?.external_provider?.contractor_name || "N/A"}</p>
-                      <p className="text-sm">Contract start date: {formatDateTiny(enquiry?.external_provider?.contract_start_date) || "N/A"}</p>
-                      <p className="text-sm">Contract end date: {formatDateTiny(enquiry?.external_provider?.contract_end_date) || "N/A"}</p>
-                      <p className="text-sm">WiFi Plan: {enquiry?.external_provider?.contract_package || "N/A"}</p>
-                      <p className="text-sm">WiFi Speed: {enquiry?.external_provider?.contract_speed || "N/A"} MBPS</p>
-                    </>
-                  ) : (
-                    <>
-                      <p className="text-sm">WiFi Plan: {enquiry?.personal_provider?.personal_plan || "N/A"}</p>
-                      <p className="text-sm">Start date: {formatDateTiny(enquiry?.personal_provider?.personal_start_date) || "N/A"}</p>
-                      <p className="text-sm">End date: {formatDateTiny(enquiry?.personal_provider?.personal_end_date) || "N/A"}</p>
-                      <p className="text-sm">Monthly Price: {enquiry?.personal_provider?.personal_monthly_price?.$numberDecimal ?? enquiry?.personal_provider?.personal_monthly_price}</p>
-                    </>
-                  )}
-                </>
-              ) : (
-                <p className="text-sm">WiFi Expected Cost: {enquiry?.enquiry?.expected_wifi_cost?.$numberDecimal ?? enquiry?.enquiry?.expected_wifi_cost}</p>
-              )}
-            </div>
-          </div>
-
-          {/* ENQUIRY DETAILS */}
-          <div className="mt-5">
-            <h2 className="font-semibold text-lg mb-2">Enquiry Information</h2>
-            <div className="text-sm text-slate-300 border border-slate-800 p-3 rounded-lg bg-slate-900/40 font-semibold space-y-2">
-              <p className="text-sm">Enquiry Priority: {enquiry?.enquiry?.priority}/10</p>
-              <p className="text-sm">Enquiry Status: {enquiry?.enquiry?.status}</p>
-              <p className="text-sm">Competition Status: {enquiry?.enquiry?.competition_status ? "Yes" : "No"}</p>
-              <p className="text-sm">Competition Notes: {enquiry?.enquiry?.competition_notes}</p>
-              <p className="text-sm">Rent Terms: {enquiry?.enquiry?.rent_terms}</p>
-              <p className="text-sm">Lease Expiry: {formatDateTiny(enquiry?.enquiry?.lease_expiry_due)}</p>
-              <p className="text-sm">Next Action: {enquiry?.enquiry?.next_action}</p>
-              <p className="text-sm">Next Action Due Date: {formatDateTiny(enquiry?.enquiry?.next_action_due)}</p>
-            </div>
-          </div>
-
-          {/* DATES */}
-          <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="flex items-center gap-2 text-sm">
-              <Clock size={16} />
-              <span>Created: {formatDateTiny(enquiry?.enquiry?.createdAt)}</span>
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              <Clock size={16} />
-              <span>Last Updated: {formatDateTiny(enquiry?.enquiry?.updatedAt)}</span>
-            </div>
+          <div className="grid gap-2 md:grid-cols-2">
+            <InfoRow label="Created" value={renderDate(enquiry?.enquiry?.createdAt)} />
+            <InfoRow label="Last Updated" value={renderDate(enquiry?.enquiry?.updatedAt)} />
           </div>
 
           <div className="flex items-center gap-3">
-
-            {/* Forward Enquiry Button */}
-            {enquiry?.canForward && (
-              <Button
-                onClick={() => router.replace(`/staff/enquiry/${params.enquiry_id}/view-assigned`)}
-                className="flex items-center gap-1"
-              >
-                View Assigned Action
-              </Button>
-            )}
-
-            {/* View History Button (smaller) */}
             <motion.div
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.97 }}
@@ -215,9 +377,7 @@ export default function SingleEnquiryPage() {
             >
               View History
             </motion.div>
-
           </div>
-
         </div>
       </div>
     </div>

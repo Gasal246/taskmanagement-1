@@ -6,6 +6,7 @@ interface ApplicationState {
     businessAdmins: any[];
     businessDocs: any[];
     businessStaff: any;
+    user_info: any;
     regionData: any;
     departmentData: any;
     areaData: any;
@@ -20,6 +21,7 @@ const initialState: ApplicationState = {
     businessAdmins: [],
     businessDocs: [],
     businessStaff: null,
+    user_info: null,
     regionData: null,
     departmentData: null,
     areaData: null,
@@ -46,6 +48,9 @@ const applicationSlice = createSlice({
         },
         loadAdminBusinessStaff: (state, action: PayloadAction<any>) => {
             state.businessStaff = action.payload
+        },
+        loadUserInfo: (state, action: PayloadAction<any>) => {
+            state.user_info = action.payload
         },
         loadRegionData: (state, action: PayloadAction<any>) => {
             state.regionData = action.payload
@@ -74,6 +79,7 @@ export const {
     loadAdminBusinessAdmins,
     loadAdminBusinessDocs,
     loadAdminBusinessStaff,
+    loadUserInfo,
     loadRegionData,
     loadDepartmentData,
     loadAreaData,
@@ -82,4 +88,3 @@ export const {
     loadStaffFilterValues
 } = applicationSlice.actions
 export default applicationSlice.reducer
-

@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { mutationOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { 
     addBusinessStaff,
     AddNewAgent,
@@ -17,13 +17,16 @@ import {
     GetFullStaffProfile,
     getUserByEmail,
     getUserByUserId,
+    getUserByUserIdWithMeta,
     getUserCompleteProfileFunc,
     getUserDomainByRole,
     getUserRolesAndDomains,
     PostTodo,
     removeUserAreaFunc,
+    removeDepartmentAssignmentPermanentFunc,
     removeUserDocFunc,
     removeUserLocationFunc,
+    removeUserRolePermanentFunc,
     removeUserRegionFunc,
     removeUserRoleFunc,
     removeUserSkillFunc,
@@ -35,7 +38,6 @@ import {
     verifyUserOtp
 } from "./function";
 import { USER_KEYS } from "./keys";
-import Roles from "@/models/roles.model";
 
 export const useGetUserByEmail = () => {
     return useMutation({
@@ -46,6 +48,12 @@ export const useGetUserByEmail = () => {
 export const useGetUserByUserId = () => {
     return useMutation({
         mutationFn: (userid: string) => getUserByUserId(userid)
+    })
+}
+
+export const useGetUserByUserIdWithMeta = () => {
+    return useMutation({
+        mutationFn: (payload: { user_id: string; roleLabel: string }) => getUserByUserIdWithMeta(payload)
     })
 }
 
@@ -156,6 +164,12 @@ export const useRemoveUserRole = () => {
     })
 }
 
+export const useRemoveUserRolePermanent = () => {
+    return useMutation({
+        mutationFn: (URoleId: string) => removeUserRolePermanentFunc(URoleId)
+    })
+}
+
 export const useAddUserRegion = () => {
     return useMutation({
         mutationFn: (payload: any) => addUserRegionFunc(payload)
@@ -213,6 +227,13 @@ export const useAddUserDoc = () => {
 export const useRemoveUserDoc = () => {
     return useMutation({
         mutationFn: (UDocId: string) => removeUserDocFunc(UDocId)
+    })
+}
+
+export const useRemoveDepartmentAssignmentPermanent = () => {
+    return useMutation({
+        mutationFn: (payload: { assignmentId: string; assignmentModel: string }) =>
+            removeDepartmentAssignmentPermanentFunc(payload)
     })
 }
 

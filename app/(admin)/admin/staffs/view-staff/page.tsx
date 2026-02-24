@@ -9,7 +9,7 @@ import { Avatar, Popconfirm, Tooltip } from 'antd';
 import { formatDateTiny } from '@/lib/utils';
 import { motion } from 'framer-motion';
 import { Popover, PopoverContent, PopoverTrigger, } from "@/components/ui/popover"
-import { useDeleteBusinessStaff, useGetUserCompleteProfile, useUpdateStaffStatus, useUpdateUserInfo } from '@/query/user/queries';
+import { useDeleteBusinessStaff, useGetUserCompleteProfile, useRemoveDepartmentAssignmentPermanent, useRemoveUserRolePermanent, useUpdateStaffStatus, useUpdateUserInfo } from '@/query/user/queries';
 import { toast } from 'sonner';
 import { useDispatch } from 'react-redux';
 import { loadAdminBusinessStaff } from '@/redux/slices/application';
@@ -19,12 +19,11 @@ import { useForm } from "react-hook-form"
 import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, } from "@/components/ui/form";
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "name must be at least 2 characters." }),
   email: z.string().email({ message: "email is required" }),
-  phone: z.string().min(8, { message: "phone is required" }).max(12, { message: "not a valid phone number" }),
+  phone: z.string(),
   country: z.string().optional(),
   province: z.string().optional(),
   city: z.string().optional(),
@@ -42,6 +41,8 @@ const StaffPage = () => {
   const { mutateAsync: updateUserInfo } = useUpdateUserInfo()
   const { mutateAsync: updateStaffStatus } = useUpdateStaffStatus();
   const { mutateAsync: deleteBusinessStaff } = useDeleteBusinessStaff();
+  const { mutateAsync: removeUserRolePermanent } = useRemoveUserRolePermanent();
+  const { mutateAsync: removeDepartmentAssignmentPermanent } = useRemoveDepartmentAssignmentPermanent();
 
   const [updateUserDialog, setUpdateUserDialog] = useState(false);
   const currentStatus = userData?.status ?? businessStaff?.status ?? 1;
@@ -61,13 +62,16 @@ const StaffPage = () => {
   })
 
   const handleClickEdit = () => {
+    const dobValue = userData?.details?.dob
+      ? new Date(userData.details.dob).toISOString().split("T")[0]
+      : "";
     form.setValue("name", userData?.name || "");
     form.setValue("email", userData?.email || "");
     form.setValue("phone", userData?.phone || "");
     form.setValue("country", userData?.details?.country || "");
     form.setValue("province", userData?.details?.province || "");
     form.setValue("city", userData?.details?.city || "");
-    form.setValue("dob", new Date(userData?.details?.dob).toISOString() || "");
+    form.setValue("dob", dobValue);
     form.setValue("gender", userData?.details?.gender || "");
     setUpdateUserDialog(true);
   }
@@ -173,6 +177,74 @@ const StaffPage = () => {
       }
     } catch (error) {
       toast.error("Failed to delete staff.");
+    }
+  };
+
+  const handleRemoveAssignedRole = async (userRoleId?: string) => {
+    if (!userRoleId) {
+      toast.error("Role assignment not found.");
+      return;
+    }
+
+    try {
+      const response = await removeUserRolePermanent(userRoleId);
+      if (response?.status === 200) {
+        toast.success("Role assignment deleted permanently.");
+        await handleGetCompleteProfile();
+      } else {
+        const projects = response?.usage?.projects?.map((item: any) => item?.project_name).filter(Boolean) || [];
+        const tasks = response?.usage?.tasks?.map((item: any) => item?.task_name).filter(Boolean) || [];
+        const descriptionParts = [];
+        if (projects.length) descriptionParts.push(`Projects: ${projects.join(", ")}`);
+        if (tasks.length) descriptionParts.push(`Tasks: ${tasks.join(", ")}`);
+        toast.error(response?.error || "Failed to delete role assignment.", {
+          description: descriptionParts.length ? `${descriptionParts.join(" | ")}. Remove these first.` : undefined,
+        });
+      }
+    } catch (error: any) {
+      const response = error?.response?.data;
+      const projects = response?.usage?.projects?.map((item: any) => item?.project_name).filter(Boolean) || [];
+      const tasks = response?.usage?.tasks?.map((item: any) => item?.task_name).filter(Boolean) || [];
+      const descriptionParts = [];
+      if (projects.length) descriptionParts.push(`Projects: ${projects.join(", ")}`);
+      if (tasks.length) descriptionParts.push(`Tasks: ${tasks.join(", ")}`);
+      toast.error(response?.error || "Failed to delete role assignment.", {
+        description: descriptionParts.length ? `${descriptionParts.join(" | ")}. Remove these first.` : undefined,
+      });
+    }
+  };
+
+  const handleRemoveAssignedDepartment = async (assignmentId?: string, assignmentModel?: string) => {
+    if (!assignmentId || !assignmentModel) {
+      toast.error("Department assignment details are missing.");
+      return;
+    }
+
+    try {
+      const response = await removeDepartmentAssignmentPermanent({ assignmentId, assignmentModel });
+      if (response?.status === 200) {
+        toast.success("Department assignment deleted permanently.");
+        await handleGetCompleteProfile();
+      } else {
+        const projects = response?.usage?.projects?.map((item: any) => item?.project_name).filter(Boolean) || [];
+        const tasks = response?.usage?.tasks?.map((item: any) => item?.task_name).filter(Boolean) || [];
+        const descriptionParts = [];
+        if (projects.length) descriptionParts.push(`Projects: ${projects.join(", ")}`);
+        if (tasks.length) descriptionParts.push(`Tasks: ${tasks.join(", ")}`);
+        toast.error(response?.error || "Failed to delete department assignment.", {
+          description: descriptionParts.length ? `${descriptionParts.join(" | ")}. Remove these first.` : undefined,
+        });
+      }
+    } catch (error: any) {
+      const response = error?.response?.data;
+      const projects = response?.usage?.projects?.map((item: any) => item?.project_name).filter(Boolean) || [];
+      const tasks = response?.usage?.tasks?.map((item: any) => item?.task_name).filter(Boolean) || [];
+      const descriptionParts = [];
+      if (projects.length) descriptionParts.push(`Projects: ${projects.join(", ")}`);
+      if (tasks.length) descriptionParts.push(`Tasks: ${tasks.join(", ")}`);
+      toast.error(response?.error || "Failed to delete department assignment.", {
+        description: descriptionParts.length ? `${descriptionParts.join(" | ")}. Remove these first.` : undefined,
+      });
     }
   };
 
@@ -433,10 +505,37 @@ const StaffPage = () => {
               ].filter(Boolean).join(" | ");
               return (
                 <div className="w-full lg:w-3/12 p-1" key={dept?._id || deptName}>
-                  <div className="bg-gradient-to-tr from-slate-900/60 to-slate-950/60 p-3 rounded-lg border border-slate-700">
+                  <div className="bg-gradient-to-tr from-slate-900/60 to-slate-950/60 p-3 rounded-lg border border-slate-700 relative">
                     <h1 className="font-semibold text-xs text-slate-300">{deptName}</h1>
                     {meta && <p className="text-[11px] text-slate-400 mt-1 uppercase">{meta}</p>}
                     {locationMeta && <p className="text-[11px] text-slate-500 mt-1">{locationMeta}</p>}
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <motion.div
+                          whileHover={{ scale: 1.04 }}
+                          whileTap={{ scale: 0.95 }}
+                          className='p-1 rounded-full hover:bg-slate-800 cursor-pointer text-xs font-medium flex gap-1 items-center absolute top-1 right-2'
+                        >
+                          <EllipsisVertical size={16} />
+                        </motion.div>
+                      </PopoverTrigger>
+                      <PopoverContent className='w-[100px] p-0 border border-slate-800 rounded-lg overflow-hidden'>
+                        <div className='flex flex-col items-start gap-1 bg-black rounded-lg'>
+                          <div className='w-full p-0.5 space-y-1'>
+                            <Popconfirm
+                              title="Delete this department assignment permanently?"
+                              description="This cannot be undone."
+                              onConfirm={() => handleRemoveAssignedDepartment(dept?._id, dept?.assignment_model)}
+                            >
+                              <motion.div whileTap={{ scale: 0.98 }} whileHover={{ scale: 1.02 }} className='bg-slate-800/50 w-full p-1 py-2 text-red-600 cursor-pointer hover:text-red-400 flex items-center justify-center gap-1 border border-dashed border-slate-700 rounded-lg'>
+                                <Trash2 size={12} />
+                                <h1 className='text-xs font-medium'>Delete</h1>
+                              </motion.div>
+                            </Popconfirm>
+                          </div>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
                   </div>
                 </div>
               );
@@ -456,8 +555,35 @@ const StaffPage = () => {
           <div className="flex flex-wrap">
             {userData?.roles?.map((role: any) => (
               <div className="w-full lg:w-3/12 p-1" key={role?._id || role?.role_id?._id}>
-                <div className="bg-gradient-to-tr from-slate-900/60 to-slate-950/60 p-3 rounded-lg border border-slate-700">
+                <div className="bg-gradient-to-tr from-slate-900/60 to-slate-950/60 p-3 rounded-lg border border-slate-700 relative">
                   <h1 className="font-semibold text-xs text-slate-300">{role?.role_id?.role_name || "Role"}</h1>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <motion.div
+                        whileHover={{ scale: 1.04 }}
+                        whileTap={{ scale: 0.95 }}
+                        className='p-1 rounded-full hover:bg-slate-800 cursor-pointer text-xs font-medium flex gap-1 items-center absolute top-1 right-2'
+                      >
+                        <EllipsisVertical size={16} />
+                      </motion.div>
+                    </PopoverTrigger>
+                    <PopoverContent className='w-[100px] p-0 border border-slate-800 rounded-lg overflow-hidden'>
+                      <div className='flex flex-col items-start gap-1 bg-black rounded-lg'>
+                        <div className='w-full p-0.5 space-y-1'>
+                          <Popconfirm
+                            title="Delete this role assignment permanently?"
+                            description="This cannot be undone."
+                            onConfirm={() => handleRemoveAssignedRole(role?._id)}
+                          >
+                            <motion.div whileTap={{ scale: 0.98 }} whileHover={{ scale: 1.02 }} className='bg-slate-800/50 w-full p-1 py-2 text-red-600 cursor-pointer hover:text-red-400 flex items-center justify-center gap-1 border border-dashed border-slate-700 rounded-lg'>
+                              <Trash2 size={12} />
+                              <h1 className='text-xs font-medium'>Delete</h1>
+                            </motion.div>
+                          </Popconfirm>
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                 </div>
               </div>
             ))}

@@ -175,13 +175,20 @@ export async function GET (req: NextRequest) {
         const depRegionMap = new Map(depRegions.map((dep: any) => [dep?.department_id?.toString?.(), dep]));
         const depAreaMap = new Map(depAreas.map((dep: any) => [dep?.dep_id?.toString?.(), dep]));
 
-        const mapDepartment = (entry: any, depKey: string, scope: string, role: string) => {
+        const mapDepartment = (
+            entry: any,
+            depKey: string,
+            scope: string,
+            role: string,
+            assignmentModel: string
+        ) => {
             const dep = entry?.[depKey];
             if (!dep) return null;
             return {
                 _id: entry?._id,
                 scope,
                 role,
+                assignment_model: assignmentModel,
                 department: {
                     _id: dep?._id,
                     dep_name: dep?.dep_name,
@@ -200,12 +207,12 @@ export async function GET (req: NextRequest) {
         };
 
         const user_departments = [
-            ...regionDepHeads.map((entry: any) => mapDepartment(entry, "reg_dep_id", "region", "head")),
-            ...regionDepStaffs.map((entry: any) => mapDepartment(entry, "region_dep_id", "region", "staff")),
-            ...areaDepHeads.map((entry: any) => mapDepartment(entry, "area_dep_id", "area", "head")),
-            ...areaDepStaffs.map((entry: any) => mapDepartment(entry, "area_dep_id", "area", "staff")),
-            ...locationDepHeads.map((entry: any) => mapDepartment(entry, "location_dep_id", "location", "head")),
-            ...locationDepStaffs.map((entry: any) => mapDepartment(entry, "location_dep_id", "location", "staff")),
+            ...regionDepHeads.map((entry: any) => mapDepartment(entry, "reg_dep_id", "region", "head", "region_dep_heads")),
+            ...regionDepStaffs.map((entry: any) => mapDepartment(entry, "region_dep_id", "region", "staff", "region_dep_staffs")),
+            ...areaDepHeads.map((entry: any) => mapDepartment(entry, "area_dep_id", "area", "head", "area_dep_heads")),
+            ...areaDepStaffs.map((entry: any) => mapDepartment(entry, "area_dep_id", "area", "staff", "area_dep_staffs")),
+            ...locationDepHeads.map((entry: any) => mapDepartment(entry, "location_dep_id", "location", "head", "location_dep_heads")),
+            ...locationDepStaffs.map((entry: any) => mapDepartment(entry, "location_dep_id", "location", "staff", "location_dep_staffs")),
             ...depStaffs.map((entry: any) => {
                 const depId = entry?.dep_id?.toString?.();
                 if (!depId) return null;
@@ -215,6 +222,7 @@ export async function GET (req: NextRequest) {
                         _id: entry?._id,
                         scope: "region",
                         role: "staff",
+                        assignment_model: "dep_staffs",
                         department: { _id: dep?._id, dep_name: dep?.dep_name, type: dep?.type },
                         region: dep?.region_id ? { _id: dep?.region_id?._id, region_name: dep?.region_id?.region_name } : null,
                         area: null,
@@ -227,6 +235,7 @@ export async function GET (req: NextRequest) {
                         _id: entry?._id,
                         scope: "area",
                         role: "staff",
+                        assignment_model: "dep_staffs",
                         department: { _id: dep?._id, dep_name: dep?.dep_name, type: dep?.type },
                         region: dep?.region_id ? { _id: dep?.region_id?._id, region_name: dep?.region_id?.region_name } : null,
                         area: dep?.area_id ? { _id: dep?.area_id?._id, area_name: dep?.area_id?.area_name } : null,
@@ -239,6 +248,7 @@ export async function GET (req: NextRequest) {
                         _id: entry?._id,
                         scope: "location",
                         role: "staff",
+                        assignment_model: "dep_staffs",
                         department: { _id: dep?._id, dep_name: dep?.dep_name, type: dep?.type },
                         region: dep?.region_id ? { _id: dep?.region_id?._id, region_name: dep?.region_id?.region_name } : null,
                         area: dep?.area_id ? { _id: dep?.area_id?._id, area_name: dep?.area_id?.area_name } : null,
@@ -252,6 +262,7 @@ export async function GET (req: NextRequest) {
                     _id: entry?._id,
                     scope: depRegion ? "region" : depArea ? "area" : "business",
                     role: "staff",
+                    assignment_model: "dep_staffs",
                     department: { _id: dep?._id, dep_name: dep?.dep_name },
                     region: depRegion?.business_region_id
                         ? { _id: depRegion?.business_region_id?._id, region_name: depRegion?.business_region_id?.region_name }

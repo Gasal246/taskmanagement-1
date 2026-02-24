@@ -46,6 +46,7 @@ interface Body {
     head_office_contact: string | null,
     head_office_details: string | null,
     head_office_location: string | null,
+    selected_head_office_id?: string | null,
 
     //Other camp details
     landlord: string | null,
@@ -123,10 +124,10 @@ export async function POST(req:NextRequest){
         const country = await Eq_Countries.findById(body.country).select("country_name");
         const region = await Eq_region.findById(body.region).select("region_name");
 
-        switch(country.country_name){
+        switch(country?.country_name){
             case "KSA": {
                 uuid = "KSA"
-                switch(region?.region_name.toLowerCase()){
+                switch((region?.region_name || "").toLowerCase()){
                     case "central region": {
                         uuid += "-CR";
                         break;
@@ -152,6 +153,10 @@ export async function POST(req:NextRequest){
             }
             case "Oman": {
                 uuid = "OMN"
+                break;
+            }
+            default: {
+                uuid = "EQ";
                 break;
             }
         }
@@ -230,12 +235,39 @@ export async function POST(req:NextRequest){
                 }
             }
 
-            if(body.head_office_contact || body.head_office_address || body.head_office_location){
+            const headOfficePhone = body.head_office_contact?.trim?.() || "";
+            const headOfficeAddress = body.head_office_address?.trim?.() || "";
+            const headOfficeLocation = body.head_office_location?.trim?.() || "";
+            const headOfficeDetails = body.head_office_details?.trim?.() || "";
+            const hasHeadOfficeDetails = Boolean(headOfficePhone || headOfficeAddress || headOfficeLocation || headOfficeDetails);
+
+            if (body.selected_head_office_id) {
+                const selectedHeadOffice: any = await Eq_camp_headoffice.findOne({
+                    _id: body.selected_head_office_id,
+                    $or: [{ created_by: session?.user?.id }, { createdBy: session?.user?.id }],
+                }).lean();
+
+                if (selectedHeadOffice) {
+                    const unchanged =
+                        (selectedHeadOffice.phone || "") === headOfficePhone &&
+                        (selectedHeadOffice.address || "") === headOfficeAddress &&
+                        (selectedHeadOffice.geo_location || "") === headOfficeLocation &&
+                        (selectedHeadOffice.other_details || "") === headOfficeDetails;
+
+                    if (unchanged) {
+                        headOfficeId = selectedHeadOffice._id;
+                    }
+                }
+            }
+
+            if (!headOfficeId && hasHeadOfficeDetails) {
                 const newHeadOffice = new Eq_camp_headoffice({
-                    phone: body.head_office_contact,
-                    geo_location: body.head_office_location,
-                    other_details: body.head_office_details,
-                    address: body.head_office_address
+                    created_by: session?.user?.id,
+                    createdBy: session?.user?.id,
+                    phone: headOfficePhone,
+                    geo_location: headOfficeLocation,
+                    other_details: headOfficeDetails,
+                    address: headOfficeAddress
                 });
                 const savedHeadOffice = await newHeadOffice.save();
                 headOfficeId = savedHeadOffice._id;
@@ -300,8 +332,9 @@ export async function POST(req:NextRequest){
 
         const savedEnquiry = await newEnquiry.save();
 
-        const newContacts: any[] = []
-        body.contacts.forEach((x:any)=> {
+        const newContacts: any[] = [];
+        const contacts = Array.isArray(body.contacts) ? body.contacts : [];
+        contacts.forEach((x:any)=> {
             const newContact: any = {
                 contact_name: x.name,
                 contact_phone: x.phone,
@@ -330,7 +363,7 @@ export async function POST(req:NextRequest){
                         contract_end_date: body.contract_expiry,
                         contract_speed: body.speed_mbps,
                         contract_package: body.wifi_plan,
-                        plain_points: body.plain_points
+                        plain_points: (body as any).pain_points || body.plain_points || null
                     });
 
                     await newExistingWifi.save();

@@ -9,63 +9,78 @@ import { motion } from 'framer-motion';
 import { Bell, CircleUser } from 'lucide-react';
 import { ExitIcon } from '@radix-ui/react-icons';
 import NotificationPane from '../shared/NotificationPane';
-import { useFindUserById, useGetUserByUserId } from '@/query/user/queries';
+import { useGetUserByUserIdWithMeta } from '@/query/user/queries';
 import Cookies from "js-cookie";
 import Image from 'next/image';
+import GoogleTranslate from '../shared/GoogleTranslate';
+import { useDispatch, useSelector } from 'react-redux';
+import type { RootState } from '@/redux/store';
+import { loadUserInfo } from '@/redux/slices/application';
 
 const StaffTopbar = () => {
     const router = useRouter();
     const { data: session, status }: any = useSession();
+    const dispatch = useDispatch();
     const [userData, setUserData] = useState<any>({});
-    const roleCookie = Cookies.get("user_role");
-    const domainCookie = Cookies.get("user_domain");
-    let roleLabel = "";
-    let domainLabel = "";
-
-    if (roleCookie) {
-        try {
-            const parsedRole = JSON.parse(roleCookie);
-            roleLabel = parsedRole?.role_name || parsedRole?.role || "";
-        } catch (error) {
-            roleLabel = "";
-        }
-    }
-
-    if (domainCookie) {
-        try {
-            const parsedDomain = JSON.parse(domainCookie);
-            domainLabel =
-                parsedDomain?.region_name ||
-                parsedDomain?.area_name ||
-                parsedDomain?.location_name ||
-                parsedDomain?.dept_name ||
-                parsedDomain?.name ||
-                "";
-        } catch (error) {
-            domainLabel = "";
-        }
-    }
+    const [roleLabel, setRoleLabel] = useState("");
+    const [domainLabel, setDomainLabel] = useState("");
 
     const roleText = roleLabel ? `Role: ${roleLabel}` : "";
     const domainText = domainLabel ? `Domain: ${domainLabel}` : "";
     const roleDomainText = [roleText, domainText].filter(Boolean).join(" | ");
 
-    const { mutateAsync: GetuserData, isPending: userLoading } = useGetUserByUserId();
-    const [newNotifications, setNewNotifications] = useState(0);
+    const { mutateAsync: GetuserData, isPending: userLoading } = useGetUserByUserIdWithMeta();
+    const unreadCount = useSelector((state: RootState) => state.notifications.unreadCount);
 
     useEffect(() => {
         if (status === "authenticated" && session?.user?.id) {
             fetchUserData(session?.user?.id);
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [status, session]);
+    }, [status, session, roleLabel]);
+
+    useEffect(() => {
+        const roleCookie = Cookies.get("user_role");
+        const domainCookie = Cookies.get("user_domain");
+
+        if (roleCookie) {
+            try {
+                const parsedRole = JSON.parse(roleCookie);
+                setRoleLabel(parsedRole?.role_name || parsedRole?.role || "");
+            } catch (error) {
+                setRoleLabel("");
+            }
+        } else {
+            setRoleLabel("");
+        }
+
+        if (domainCookie) {
+            try {
+                const parsedDomain = JSON.parse(domainCookie);
+                setDomainLabel(
+                    parsedDomain?.region_name ||
+                    parsedDomain?.area_name ||
+                    parsedDomain?.location_name ||
+                    parsedDomain?.dept_name ||
+                    parsedDomain?.name ||
+                    ""
+                );
+            } catch (error) {
+                setDomainLabel("");
+            }
+        } else {
+            setDomainLabel("");
+        }
+    }, []);
 
     const fetchUserData = async (user_id: string) => {
-        const res = await GetuserData(user_id);
+        const res = await GetuserData({ user_id, roleLabel });
         setUserData(res);
+        dispatch(loadUserInfo(res || null));
     }
 
     const logOut = async () => {
+        dispatch(loadUserInfo(null));
         Object.keys(Cookies.get()).forEach(cookieName => {
             Cookies.remove(cookieName);
 
@@ -85,10 +100,16 @@ const StaffTopbar = () => {
                 </div>
             </div>
             <div className='flex gap-3 items-center'>
+                <GoogleTranslate
+                    id="google_translate_staff"
+                    variant="icon"
+                    triggerLabel="Translate"
+                    className="rounded-xl bg-slate-900/60 px-2 py-1.5 shadow-sm ring-1 ring-slate-800/80 transition-colors hover:bg-slate-900"
+                />
                 <NotificationPane trigger={
                     <div className='cursor-pointer rounded-xl p-2 transition-colors hover:bg-slate-800/60'>
-                        <Tooltip title={newNotifications <= 0 ? 'no new notifications.' : `${newNotifications} new notifications`}>
-                            <Badge count={newNotifications} size='small'>
+                        <Tooltip title={unreadCount <= 0 ? 'no new notifications.' : `${unreadCount} new notifications`}>
+                            <Badge count={unreadCount} size='small'>
                                 <Bell className='text-primary' size={20} />
                             </Badge>
                         </Tooltip>

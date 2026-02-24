@@ -124,6 +124,27 @@ export async function GetEqHeadOfficesFiltered(queryParams: any){
     }
 }
 
+//Get Staff Head Offices filtered
+export async function GetStaffEqHeadOfficesFiltered(queryParams: any){
+    try{
+        const safeParams: Record<string, string> = {};
+
+        for (const key in queryParams) {
+            const rawValue = queryParams[key];
+            const value = typeof rawValue === "string" ? rawValue.trim() : rawValue;
+            if (value !== "" && value !== null && value !== undefined) {
+                safeParams[key] = String(value);
+            }
+        }
+
+        const queryString = new URLSearchParams(safeParams).toString();
+        const res = await axios.get(`/api/enquiries/staff-side/get/head-offices/filtered?${queryString}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
 //Get Cities filtered
 export async function GetEqCitiesFiltered(queryParams: any){
     try{
@@ -241,6 +262,17 @@ export async function AddNewEqHeadOffice(payload: any){
     }
 }
 
+//Add New Head Office (Staff)
+export async function AddNewStaffEqHeadOffice(payload: any){
+    try{
+        const res = await axios.post("/api/enquiries/staff-side/post/add-head-office", payload);
+        return res.data;
+    }catch(err){
+        console.log(err);
+        return (err as any)?.response?.data;
+    }
+}
+
 //Add New Area
 export async function AddNewEqArea(payload: any){
     try{
@@ -272,6 +304,27 @@ export async function GetEqCampsFiltered(queryParams:any){
     }
 }
 
+//Get Camps filtered (Staff - created by current user)
+export async function GetStaffEqCampsFiltered(queryParams:any){
+    try{
+        const safeParams: Record<string, string> = {};
+
+        for (const key in queryParams) {
+            const rawValue = queryParams[key];
+            const value = typeof rawValue === "string" ? rawValue.trim() : rawValue;
+            if (value !== "" && value !== null && value !== undefined) {
+                safeParams[key] = String(value);
+            }
+        }
+
+        const queryString = new URLSearchParams(safeParams).toString();
+        const res = await axios.get(`/api/enquiries/staff-side/get/camps/filtered?${queryString}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+    }
+}
+
 //Add new camp
 export async function AddNewEqCamp(payload: any){
     try{
@@ -289,6 +342,7 @@ export async function AddNewEnquiry(payload: any){
         return res.data;
     }catch(err){
         console.log(err);
+        return (err as any)?.response?.data;
     }
 }
 
@@ -509,6 +563,17 @@ export async function UpdateEqHeadOffice(payload: any) {
     }
 }
 
+//Update Head Office (Staff)
+export async function UpdateStaffEqHeadOffice(payload: any) {
+    try{
+        const res = await axios.put("/api/enquiries/staff-side/update/head-office", payload);
+        return res.data;
+    }catch(err){
+        console.log(err);
+        return (err as any)?.response?.data;
+    }
+}
+
 //Update / Activate Area
 export async function UpdateEqArea(payload: any) {
     try{
@@ -686,6 +751,17 @@ export async function GetEqHeadOfficeProfile(head_office_id: string){
         return res.data;
     }catch(err){
         console.log(err);
+    }
+}
+
+//Get Eq Head Office Profile (Staff)
+export async function GetStaffEqHeadOfficeProfile(head_office_id: string){
+    try{
+        const res = await axios.get(`/api/enquiries/staff-side/get/head-office/profile-by-id?head_office_id=${head_office_id}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+        return (err as any)?.response?.data;
     }
 }
 
@@ -868,6 +944,17 @@ export async function RemoveEqCity(city_id: string){
 export async function RemoveEqHeadOffice(head_office_id: string){
     try{
         const res = await axios.delete(`/api/enquiries/delete/head-office?head_office_id=${head_office_id}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+        return (err as any)?.response?.data;
+    }
+}
+
+//Delete Head Office (Staff)
+export async function RemoveStaffEqHeadOffice(head_office_id: string){
+    try{
+        const res = await axios.delete(`/api/enquiries/staff-side/delete/head-office?head_office_id=${head_office_id}`);
         return res.data;
     }catch(err){
         console.log(err);

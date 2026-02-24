@@ -28,8 +28,12 @@ const NEXT_ACTION_OPTIONS = [
 
 const STATUS_OPTIONS = [
   { _id: "all", name: "All" },
-  { _id: "In Progress", name: "In Progress" },
-  { _id: "Closed", name: "Closed" },
+  { _id: "Lead Received", name: "Lead Received" },
+  { _id: "Initial Meeting Over", name: "Initial Meeting Over" },
+  { _id: "Survey Completed", name: "Survey Completed" },
+  { _id: "Proposal Submitted", name: "Proposal Submitted" },
+  { _id: "Waiting For Client Response", name: "Waiting For Client Response" },
+  { _id: "Project Awarded", name: "Project Awarded" },
 ];
 
 const EXPORT_HEADERS = [
@@ -98,6 +102,7 @@ export default function EnquiriesPage() {
   const [countries, setCountries] = useState([]);
   const [page, setPage] = useState(1);
   const [showFilters, setShowFilters] = useState(false);
+  const [activeListFilter, setActiveListFilter] = useState<"all" | "waitingApproval">("all");
   const [rangeValue, setRangeValue] = useState<any>(null);
   const [leaseValue, setLeaseValue] = useState<any>(null);
   const [exportOpen, setExportOpen] = useState(false);
@@ -275,6 +280,14 @@ export default function EnquiriesPage() {
     }
     return items;
   }, [pagination?.totalPages, page]);
+
+  const enquiryListData = enquiries?.data ?? [];
+  const waitingApprovalEnquiries = enquiryListData.filter((e: any) => !e?.is_active);
+  const visibleEnquiries = activeListFilter === "waitingApproval" ? waitingApprovalEnquiries : enquiryListData;
+  const listFilterBadges = [
+    { key: "all" as const, label: "All Enquiries", count: enquiryListData.length },
+    { key: "waitingApproval" as const, label: "Waiting Approval", count: waitingApprovalEnquiries.length },
+  ];
 
   const toggleSelection = (enquiryId: string) => {
     setSelectedIds((prev) => (
@@ -789,15 +802,44 @@ export default function EnquiriesPage() {
           </div>
         )}
 
-        {!isLoading && enquiries?.length === 0 && (
+        <div className="mb-4 flex flex-wrap gap-2">
+          {listFilterBadges.map((badge) => {
+            const isActive = activeListFilter === badge.key;
+            return (
+              <button
+                key={badge.key}
+                type="button"
+                onClick={() => setActiveListFilter(badge.key)}
+                className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs transition ${
+                  isActive
+                    ? "border-cyan-400/40 bg-gradient-to-r from-cyan-900/40 via-slate-900 to-emerald-900/30 text-white shadow-sm"
+                    : "border-slate-700/80 bg-gradient-to-r from-slate-900/80 to-slate-950/80 text-slate-300 hover:border-slate-600"
+                }`}
+              >
+                <span className="font-medium">{badge.label}</span>
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                    isActive ? "bg-white/15 text-white" : "bg-white/10 text-slate-100"
+                  }`}
+                >
+                  {badge.count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {!isLoading && visibleEnquiries.length === 0 && (
           <p className="text-xs text-slate-500 italic">No enquiries found.</p>
         )}
 
         <div className="space-y-2">
-          {enquiries?.data?.map((e: any, index: any) => {
+          {visibleEnquiries.map((e: any, index: any) => {
             const currentPage = pagination?.page ?? page;
             const totalRecords = pagination?.totalRecords ?? 0;
-            const enquiryNumber = Math.max(totalRecords - ((currentPage - 1) * limit + index), 0);
+            const enquiryNumber = activeListFilter === "all"
+              ? Math.max(totalRecords - ((currentPage - 1) * limit + index), 0)
+              : Math.max(visibleEnquiries.length - index, 0);
             return (
               <div
                 key={e._id}
@@ -805,12 +847,18 @@ export default function EnquiriesPage() {
                 onClick={() => router.replace(`/admin/enquiries/${e._id}`)}
               >
                 <div className="absolute top-3 left-3 text-xs font-bold text-slate-400 p-1">{String(enquiryNumber).padStart(2, '0')} )</div>
-                <h2 className="text-md font-medium text-slate-200 truncate ml-8">
+                {!e?.is_active && (
+                  <div className="absolute top-3 right-3">
+                    <span className="inline-flex items-center rounded-full border border-amber-500/40 bg-amber-950/30 px-2.5 py-1 text-[11px] font-semibold text-amber-300">
+                      Action Required
+                    </span>
+                  </div>
+                )}
+                <h2 className={`text-md font-medium text-slate-200 truncate ml-8 ${!e?.is_active ? "pr-32" : ""}`}>
                   Camp: {e.camp_id?.camp_name ?? "N/A"}
                 </h2>
-                {!e?.is_active && <p className="text-sm font-medium truncate text-red-500">Action Required</p>}
                 <div className="mt-1 text-xs text-slate-400 flex flex-wrap gap-2">
-                  <p className={`bg-gradient-to-br ${e.status ==='Closed' ? 'from-green-700 to-green-900' : 'from-slate-700 to-slate-900'} px-2 py-1 rounded-sm font-bold`}>Status: <span className={`text-white/80 font-normal`}>{e.status}</span></p>
+                  <p className={`bg-gradient-to-br ${e.status === "Project Awarded" ? "from-green-700 to-green-900" : "from-slate-700 to-slate-900"} px-2 py-1 rounded-sm font-bold`}>Status: <span className={`text-white/80 font-normal`}>{e.status}</span></p>
                   <p className="bg-gradient-to-br from-slate-700 to-slate-900 px-2 py-1 rounded-sm font-bold">Priority: <span className="text-white/80 font-normal">{e.priority}</span></p>
                   <p className="bg-gradient-to-br from-slate-700 to-slate-900 px-2 py-1 rounded-sm font-bold">Occupancy: <span className="text-white/80 font-normal">{e.camp_id?.camp_occupancy ?? "N/A"}</span></p>
                   <p className="bg-gradient-to-br from-slate-700 to-slate-900 px-2 py-1 rounded-sm font-bold">UUID: <span className="text-white/80 font-normal">{e.enquiry_uuid}</span></p>

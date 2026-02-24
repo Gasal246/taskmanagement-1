@@ -10,10 +10,15 @@ import { signOut } from 'next-auth/react'
 import Cookies from 'js-cookie';
 import { toast } from 'sonner';
 import { HEAD_ROLES } from '@/lib/constants'
+import { useSelector } from 'react-redux';
+import type { RootState } from '@/redux/store';
 
 const StaffSidebar = () => {
     const pathname = usePathname();
     const [userRole, setUserRole] = useState<string>("");
+    const { user_info } = useSelector((state: RootState) => state.application);
+    const canViewProjects = Boolean(user_info?.is_sales_staff);
+    const canViewEnquiry = Boolean(user_info?.is_eq_user);
     const linkClasses = (active: boolean) =>
         [
             "w-full rounded-xl px-3 py-2 text-left text-sm font-medium transition-colors",
@@ -70,13 +75,15 @@ const StaffSidebar = () => {
                     <AlarmClockCheck size={18} /> Tasks
                 </motion.button></Tooltip>
             </Link>
-            <Link href="/staff/projects">
-                <Tooltip title="Projects" placement='right'><motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-                    aria-current={pathname.includes("/staff/projects") ? "page" : undefined}
-                    className={linkClasses(pathname.includes("/staff/projects"))}>
-                    <Captions size={18} /> Projects
-                </motion.button></Tooltip>
-            </Link>
+            {canViewProjects && (
+                <Link href="/staff/projects">
+                    <Tooltip title="Projects" placement='right'><motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                        aria-current={pathname.includes("/staff/projects") ? "page" : undefined}
+                        className={linkClasses(pathname.includes("/staff/projects"))}>
+                        <Captions size={18} /> Projects
+                    </motion.button></Tooltip>
+                </Link>
+            )}
             {userRole =="REGION_HEAD" && (
                 <Link href="/staff/region">
                 <Tooltip title="Region" placement='right'><motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
@@ -95,7 +102,7 @@ const StaffSidebar = () => {
                 </motion.button></Tooltip>
             </Link>
             )}
-            {
+            {canViewEnquiry && (
                 <Link href="/staff/enquiry">
                 <Tooltip title="Enquiry" placement='right'><motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                     aria-current={pathname.includes("/staff/enquiry") ? "page" : undefined}
@@ -103,7 +110,7 @@ const StaffSidebar = () => {
                     <ShieldQuestionIcon size={18} /> Enquiry
                 </motion.button></Tooltip>
             </Link>
-            }
+            )}
         </div>
     )
 }

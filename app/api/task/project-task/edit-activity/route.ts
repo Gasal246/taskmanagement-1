@@ -5,6 +5,7 @@ import Flow_Log from "@/models/Flow_Log.model";
 import Task_Activities from "@/models/task_activities.model";
 import Users from "@/models/users.model";
 import { NextRequest, NextResponse } from "next/server";
+import { notifyTaskActivityChange } from "@/app/api/helpers/task-activity-notifications";
 
 connectDB();
 
@@ -23,6 +24,7 @@ export async function PUT(req: NextRequest) {
 
         const session: any = await auth();
         if (!session) return new NextResponse("Un Authorized Access", { status: 401 });
+        const actor = await Users.findById(session?.user?.id).select("name");
 
         const body: Body = await req.json();
         if (!body.activity_id) return NextResponse.json({ message: "Please Provide Activity_id" }, { status: 400 });
@@ -60,6 +62,21 @@ export async function PUT(req: NextRequest) {
                         })
                         await newFLow.save();
                     }
+                }
+
+                const taskId = changeStatus?.task_id?.toString();
+                if (actor?._id && taskId) {
+                    await notifyTaskActivityChange({
+                        req,
+                        taskId,
+                        activityId: changeStatus?._id?.toString(),
+                        activityTitle: changeStatus?.activity || "",
+                        activityDescription: changeStatus?.description || "",
+                        activityAssignedTo: changeStatus?.assigned_to?.toString() || null,
+                        action: "completed",
+                        actorId: String(actor._id),
+                        actorName: actor?.name || "User",
+                    });
                 }
             }
 

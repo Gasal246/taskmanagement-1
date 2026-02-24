@@ -1,9 +1,10 @@
+import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import Business_Tasks from "@/models/business_tasks.model";
 import Task_Activities from "@/models/task_activities.model";
-import { message } from "antd";
-import { Activity } from "lucide-react";
+import Users from "@/models/users.model";
 import { NextRequest, NextResponse } from "next/server";
+import { notifyTaskActivityChange } from "@/app/api/helpers/task-activity-notifications";
 
 connectDB();
 
@@ -18,6 +19,11 @@ interface Body {
 
 export async function POST(req: NextRequest) {
     try {
+        const session: any = await auth();
+        if (!session) return new NextResponse("Un Authorized Access", { status: 401 });
+
+        const actor = await Users.findById(session?.user?.id).select("name");
+
         const body: Body = await req.json();
         if (!body.task_id) return NextResponse.json({ message: "Please provide task_id" }, { status: 400 });
 
@@ -47,6 +53,20 @@ export async function POST(req: NextRequest) {
         }, {new:true});
 
         if(updatedTask.status == "Completed") await Business_Tasks.findByIdAndUpdate(body.task_id, {$set:{status:"In Progress"}})
+
+        if (actor?._id) {
+            await notifyTaskActivityChange({
+                req,
+                taskId: body.task_id,
+                activityId: savedActivity?._id?.toString(),
+                activityTitle: body.activity,
+                activityDescription: body.description,
+                activityAssignedTo: assignedTo || null,
+                action: "added",
+                actorId: String(actor._id),
+                actorName: actor?.name || "User",
+            });
+        }
         
         return NextResponse.json({ message: "Activity Added Successfully" }, { status: 201 });
 
