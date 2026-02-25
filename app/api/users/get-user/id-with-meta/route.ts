@@ -95,16 +95,16 @@ export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
         const user_id = body?.user_id;
-        const roleLabel = body?.roleLabel || "";
+        // const roleLabel = body?.roleLabel || "";
 
         if (!user_id || !isValidObjectId(user_id)) {
             return NextResponse.json({ error: "Invalid user id" }, { status: 400 });
         }
 
-        const [user, eqUserExists, isSalesStaff] = await Promise.all([
+        const [user, eqUserExists] = await Promise.all([
             Users.findOne({ _id: user_id, status: 1 }, { password: 0, otp: 0 }).lean(),
             Eq_enquiry_users.exists({ user_id }),
-            checkSalesStaffByScope(user_id, roleLabel),
+            // checkSalesStaffByScope(user_id, roleLabel),
         ]);
 
         if (!user) {
@@ -114,7 +114,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({
             ...user,
             is_eq_user: Boolean(eqUserExists),
-            is_sales_staff: isSalesStaff,
+            // is_sales_staff: isSalesStaff,
         });
     } catch (error) {
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
