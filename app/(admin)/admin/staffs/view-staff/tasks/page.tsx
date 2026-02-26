@@ -2,8 +2,8 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarPlus, ListTodo } from "lucide-react";
 import { DatePicker } from "antd";
+import { ArrowLeft, ListTodo } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSelector } from "react-redux";
@@ -40,21 +40,11 @@ const getProgressClass = (value: number) => {
   return "bg-emerald-500";
 };
 
-const priorityStyles: Record<string, string> = {
-  high: "border-red-500/40 bg-red-500/10 text-red-200",
-  medium: "border-amber-500/40 bg-amber-500/10 text-amber-200",
-  normal: "border-sky-500/40 bg-sky-500/10 text-sky-200",
-};
-
-const getTaskSortTime = (task: any) => {
-  const dateValue = task?.updatedAt ?? task?.updated_at ?? task?.createdAt ?? task?.created_at;
-  const timestamp = dateValue ? new Date(dateValue).getTime() : 0;
-  return Number.isNaN(timestamp) ? 0 : timestamp;
-};
-
-const TasksPage = () => {
+const StaffTasksPage = () => {
   const router = useRouter();
   const { businessData } = useSelector((state: RootState) => state.user);
+  const { businessStaff } = useSelector((state: RootState) => state.application);
+
   const [activeTab, setActiveTab] = useState<TaskTab>("all");
   const [rangeValue, setRangeValue] = useState<any>(null);
   const [draftRange, setDraftRange] = useState<RangeState>({ start: "", end: "" });
@@ -62,14 +52,15 @@ const TasksPage = () => {
   const [filters, setFilters] = useState<Record<string, string | undefined>>({});
 
   useEffect(() => {
-    if (!businessData?._id) return;
+    if (!businessData?._id || !businessStaff?._id) return;
     setFilters({
       business_id: businessData._id,
+      user_id: businessStaff._id,
       type: activeTab,
       startDate: appliedRange.start || undefined,
       endDate: appliedRange.end || undefined,
     });
-  }, [businessData?._id, activeTab, appliedRange]);
+  }, [businessData?._id, businessStaff?._id, activeTab, appliedRange]);
 
   const { data: tasks, isLoading } = useGetAllTasks(filters);
 
@@ -91,40 +82,29 @@ const TasksPage = () => {
     setRangeValue(null);
   };
 
-  const taskList = [...(tasks?.data ?? [])].sort(
-    (a: any, b: any) => getTaskSortTime(b) - getTaskSortTime(a)
-  );
+  const taskList = tasks?.data ?? [];
 
   return (
     <div className="p-4 pb-20 space-y-3">
       <div className="rounded-xl border border-slate-800/70 bg-gradient-to-br from-slate-950/70 via-slate-900/50 to-slate-900/80 p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-xs uppercase tracking-widest text-slate-400">Business Tasks</p>
+            <p className="text-xs uppercase tracking-widest text-slate-400">Staff Task Assignments</p>
             <h1 className="text-lg font-semibold text-slate-100 flex items-center gap-2">
-              <ListTodo size={18} /> Task Overview
+              <ListTodo size={18} /> {businessStaff?.name || "Staff"} Tasks
             </h1>
             <p className="text-xs text-slate-400 mt-1">
-              Track individual assignments and project workstreams across the business.
+              Review individual and project-based tasks assigned to this staff member.
             </p>
           </div>
           <Button
-            className="flex items-center gap-2 bg-cyan-600/20 text-cyan-100 border border-cyan-700/50 hover:bg-cyan-500/20"
-            onClick={() => router.push("/admin/tasks/addtask")}
+            variant="outline"
+            className="flex items-center gap-2 border-slate-700/70 bg-slate-900/40 text-slate-100 hover:bg-slate-800/50"
+            onClick={() => router.push("/admin/staffs/view-staff")}
           >
-            Add Task <CalendarPlus size={16} />
+            <ArrowLeft size={16} /> Back to Staff
           </Button>
         </div>
-        {appliedRange.start && appliedRange.end && (
-          <div className="mt-3 text-xs text-slate-400 flex flex-wrap items-center gap-2">
-            <span className="rounded-md border border-slate-700/60 bg-slate-900/60 px-2 py-1">
-              From {appliedRange.start}
-            </span>
-            <span className="rounded-md border border-slate-700/60 bg-slate-900/60 px-2 py-1">
-              To {appliedRange.end}
-            </span>
-          </div>
-        )}
       </div>
 
       <div className="rounded-xl border border-slate-800/70 bg-gradient-to-br from-slate-950/60 to-slate-900/70 p-4">
@@ -191,14 +171,20 @@ const TasksPage = () => {
           <p className="text-xs text-slate-400">{taskList.length} tasks</p>
         </div>
 
-        {isLoading && (
+        {!businessStaff?._id && (
+          <p className="text-xs text-slate-500 italic">
+            Staff context is missing. Open this page from the staff profile to load assignments.
+          </p>
+        )}
+
+        {businessStaff?._id && isLoading && (
           <div className="flex items-center justify-center w-full h-[15vh]">
             <LoaderSpin size={20} title="Loading Tasks..." />
           </div>
         )}
 
-        {!isLoading && taskList.length === 0 && (
-          <p className="text-xs text-slate-500 italic">No tasks found.</p>
+        {businessStaff?._id && !isLoading && taskList.length === 0 && (
+          <p className="text-xs text-slate-500 italic">No tasks found for this staff.</p>
         )}
 
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -207,7 +193,7 @@ const TasksPage = () => {
               Number(task.completed_activity || 0),
               Number(task.activity_count || 0)
             );
-            const priority = typeof task?.priority === "string" ? task.priority.toLowerCase() : "";
+
             return (
               <div
                 key={task._id}
@@ -216,9 +202,7 @@ const TasksPage = () => {
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <h3 className="text-base font-semibold text-slate-100">
-                      {task.task_name}
-                    </h3>
+                    <h3 className="text-base font-semibold text-slate-100">{task.task_name}</h3>
                     <p className="text-xs text-slate-400 mt-1">
                       {task.task_description || "No description added."}
                     </p>
@@ -235,16 +219,6 @@ const TasksPage = () => {
                     {task.is_project_task && (
                       <span className="text-[10px] uppercase tracking-wide px-2 py-1 rounded-md border border-indigo-500/40 bg-indigo-500/10 text-indigo-200">
                         Project Based
-                      </span>
-                    )}
-                    {priority && (
-                      <span
-                        className={`text-[10px] uppercase tracking-wide px-2 py-1 rounded-md border ${
-                          priorityStyles[priority] ||
-                          "border-slate-600/40 bg-slate-700/30 text-slate-200"
-                        }`}
-                      >
-                        {priority} Priority
                       </span>
                     )}
                   </div>
@@ -279,4 +253,4 @@ const TasksPage = () => {
   );
 };
 
-export default TasksPage;
+export default StaffTasksPage;

@@ -40,6 +40,18 @@ const getProgressClass = (value: number) => {
   return "bg-emerald-500";
 };
 
+const priorityStyles: Record<string, string> = {
+  high: "border-red-500/40 bg-red-500/10 text-red-200",
+  medium: "border-amber-500/40 bg-amber-500/10 text-amber-200",
+  normal: "border-sky-500/40 bg-sky-500/10 text-sky-200",
+};
+
+const getTaskSortTime = (task: any) => {
+  const dateValue = task?.updatedAt ?? task?.updated_at ?? task?.createdAt ?? task?.created_at;
+  const timestamp = dateValue ? new Date(dateValue).getTime() : 0;
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+};
+
 const StaffTasks = () => {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TaskTab>("all");
@@ -93,7 +105,9 @@ const StaffTasks = () => {
     setRangeValue(null);
   };
 
-  const taskList = tasks?.data ?? [];
+  const taskList = [...(tasks?.data ?? [])].sort(
+    (a: any, b: any) => getTaskSortTime(b) - getTaskSortTime(a)
+  );
 
   return (
     <div className="p-4 pb-20 space-y-3">
@@ -209,6 +223,7 @@ const StaffTasks = () => {
               Number(task.completed_activity || 0),
               Number(task.activity_count || 0)
             );
+            const priority = typeof task?.priority === "string" ? task.priority.toLowerCase() : "";
             const endDateLabel = task?.end_date
               ? new Date(task.end_date).toLocaleDateString()
               : null;
@@ -243,6 +258,16 @@ const StaffTasks = () => {
                     {task.is_project_task && (
                       <span className="text-[10px] uppercase tracking-wide px-2 py-1 rounded-md border border-indigo-500/40 bg-indigo-500/10 text-indigo-200">
                         Project Based
+                      </span>
+                    )}
+                    {priority && (
+                      <span
+                        className={`text-[10px] uppercase tracking-wide px-2 py-1 rounded-md border ${
+                          priorityStyles[priority] ||
+                          "border-slate-600/40 bg-slate-700/30 text-slate-200"
+                        }`}
+                      >
+                        {priority} Priority
                       </span>
                     )}
                   </div>

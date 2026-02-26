@@ -4,7 +4,7 @@ import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbP
 import { useRouter } from 'next/navigation';
 import { useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '@/redux/store';
-import { DraftingCompass, EllipsisVertical, Eye, Files, LockKeyhole, MapPinned, Package, PencilRuler, SquareArrowUp, SquareArrowUpRight, Trash2, UserRound } from 'lucide-react';
+import { DraftingCompass, EllipsisVertical, Eye, Files, ListTodo, LockKeyhole, MapPinned, Package, PencilRuler, SquareArrowUp, SquareArrowUpRight, Trash2, UserRound } from 'lucide-react';
 import { Avatar, Popconfirm, Tooltip } from 'antd';
 import { formatDateTiny } from '@/lib/utils';
 import { motion } from 'framer-motion';
@@ -19,6 +19,7 @@ import { useForm } from "react-hook-form"
 import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, } from "@/components/ui/form";
 import { Input } from '@/components/ui/input';
+import { Skeleton } from "@/components/ui/skeleton";
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "name must be at least 2 characters." }),
@@ -30,6 +31,59 @@ const formSchema = z.object({
   dob: z.string().optional(),
   gender: z.string().optional(),
 })
+
+const StaffPageSkeleton = () => {
+  return (
+    <div className='p-5 overflow-y-scroll pb-20'>
+      <div className='mb-3'>
+        <Skeleton className="h-4 w-52 bg-slate-800" />
+      </div>
+
+      <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg mb-2 border border-slate-700/30">
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-[60px] w-[60px] rounded-full bg-slate-800" />
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-40 bg-slate-800" />
+            <Skeleton className="h-3 w-56 bg-slate-800" />
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg min-h-[15vh] pb-3 mb-2 border border-slate-700/50">
+        <div className="mb-3 flex items-center justify-between">
+          <Skeleton className="h-4 w-28 bg-slate-800" />
+          <Skeleton className="h-8 w-24 rounded-lg bg-slate-800" />
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 lg:w-1/2">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="space-y-2">
+              <Skeleton className="h-3 w-20 bg-slate-800" />
+              <Skeleton className="h-3.5 w-32 bg-slate-700" />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {Array.from({ length: 5 }).map((_, sectionIdx) => (
+        <div key={sectionIdx} className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg min-h-[18vh] mb-2 border border-slate-700/50">
+          <div className="mb-3 flex items-center justify-between">
+            <Skeleton className="h-4 w-36 bg-slate-800" />
+            <Skeleton className="h-8 w-24 rounded-lg bg-slate-800" />
+          </div>
+          <div className="flex flex-wrap">
+            {Array.from({ length: 4 }).map((_, cardIdx) => (
+              <div className="w-full lg:w-3/12 p-1" key={cardIdx}>
+                <div className="p-3 rounded-lg border border-slate-700/50">
+                  <Skeleton className="h-4 w-full bg-slate-800" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
 
 const StaffPage = () => {
   const router = useRouter();
@@ -99,12 +153,16 @@ const StaffPage = () => {
   }
 
   useEffect(() => {
-    handleGetCompleteProfile();
+    if (!businessStaff?._id) return;
+    handleGetCompleteProfile(businessStaff._id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [businessStaff])
+  }, [businessStaff?._id])
 
-  const handleGetCompleteProfile = async () => {
-    const response = await getUserProfile(businessStaff?._id || "");
+  const handleGetCompleteProfile = async (staffId?: string) => {
+    const targetStaffId = staffId || businessStaff?._id;
+    if (!targetStaffId) return;
+
+    const response = await getUserProfile(targetStaffId);
     if (response?.status == 200) {
       setUserData({
         ...response?.user,
@@ -121,6 +179,8 @@ const StaffPage = () => {
       toast.error("Failed to fetch profile.")
     }
   }
+
+  const isInitialLoading = loadingUserProfile && !userData;
 
   const handleNavigateToChangeDetails = () => {
     if (!userData) {
@@ -248,12 +308,16 @@ const StaffPage = () => {
     }
   };
 
+  if (isInitialLoading) {
+    return <StaffPageSkeleton />;
+  }
+
   return (
     <div className='p-5 overflow-y-scroll pb-20'>
       <Breadcrumb className='mb-3'>
         <BreadcrumbList>
           <BreadcrumbItem>
-            <BreadcrumbLink onClick={() => router.back()}>Manage Staffs</BreadcrumbLink>
+            <BreadcrumbLink onClick={() => router.push("/admin/staffs")}>Manage Staffs</BreadcrumbLink>
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
@@ -303,6 +367,28 @@ const StaffPage = () => {
               </div>
             </PopoverContent>
           </Popover>
+        </div>
+      </div>
+
+      <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg mb-2 border border-slate-700/50">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="text-xs font-semibold text-slate-200 flex items-center gap-1">
+              <ListTodo size={14} /> Staff Task Assignments
+            </h2>
+            <p className="text-xs text-slate-400 mt-1">
+              Review all individual and project-based tasks linked to this staff.
+            </p>
+          </div>
+          <motion.div
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className='p-2 px-4 rounded-lg border border-cyan-700/50 hover:border-cyan-500 bg-gradient-to-tr from-cyan-950/30 to-cyan-900/20 cursor-pointer text-xs font-medium flex gap-1 items-center text-cyan-100'
+            onClick={() => router.push("/admin/staffs/view-staff/tasks")}
+          >
+            <ListTodo size={12} />
+            Tasks Assigned
+          </motion.div>
         </div>
       </div>
 

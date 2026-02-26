@@ -40,6 +40,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -84,6 +85,12 @@ const getProgressClass = (value: number) => {
   return "bg-emerald-500";
 };
 
+const priorityStyles: Record<string, string> = {
+  high: "border-red-500/40 bg-red-500/10 text-red-200",
+  medium: "border-amber-500/40 bg-amber-500/10 text-amber-200",
+  normal: "border-sky-500/40 bg-sky-500/10 text-sky-200",
+};
+
 // Validation schema for activity form
 const activitySchema = z.object({
   activity_name: z.string().min(2, { message: "Activity name must be at least 2 characters." }),
@@ -95,6 +102,8 @@ const activitySchema = z.object({
 const taskSchema = z.object({
   task_name: z.string().min(2, { message: "Task name must be at least 2 characters." }),
   task_description: z.string().min(5, { message: "Description must be at least 5 characters." }).optional(),
+  priority: z.string().optional(),
+  comments: z.string().optional(),
   status: z.string(),
   assigned_team_id: z.string().optional(),
   assigned_user_id: z.string().optional(),
@@ -165,6 +174,8 @@ const TaskDetailPage = () => {
     defaultValues: {
       task_name: "",
       task_description: "",
+      priority: "",
+      comments: "",
       status: "To Do",
       assigned_team_id: "",
       assigned_user_id: "",
@@ -185,6 +196,8 @@ const TaskDetailPage = () => {
     if (!taskData) return;
     taskForm.setValue("task_name", taskData.task_name);
     taskForm.setValue("task_description", taskData.task_description || "");
+    taskForm.setValue("priority", taskData.priority || "");
+    taskForm.setValue("comments", taskData.comments || "");
     taskForm.setValue("status", taskData.status);
 
     if (!taskData.is_project_task && loadedStaffs) {
@@ -361,6 +374,8 @@ const TaskDetailPage = () => {
       task_id: params.taskid,
       task_name: values.task_name,
       task_description: values.task_description,
+      priority: values.priority || undefined,
+      comments: values.comments || undefined,
       status: values.status,
       is_project_task: taskData?.is_project_task,
       assigned_to: assignedTo,
@@ -475,6 +490,7 @@ const TaskDetailPage = () => {
     const email = staff?.user_id?.email || "";
     return `${name} ${email}`.toLowerCase().includes(staffSearchTerm);
   });
+  const priority = typeof taskData?.priority === "string" ? taskData.priority.toLowerCase() : "";
 
   return (
     <div className="p-5 overflow-y-scroll pb-20 min-h-screen space-y-4">
@@ -505,10 +521,28 @@ const TaskDetailPage = () => {
                   Project Based
                 </span>
               )}
+              {priority && (
+                <span
+                  className={`text-[10px] uppercase tracking-wide px-2 py-1 rounded-md border ${
+                    priorityStyles[priority] ||
+                    "border-slate-600/40 bg-slate-700/30 text-slate-200"
+                  }`}
+                >
+                  {priority} Priority
+                </span>
+              )}
             </div>
             <p className="text-xs text-slate-400 max-w-2xl">
               {taskData.task_description || "No description added."}
             </p>
+            {taskData?.comments && (
+              <div className="rounded-lg border border-slate-800/70 bg-slate-900/50 p-3 max-w-2xl">
+                <p className="text-[11px] uppercase tracking-wide text-slate-500">Comments</p>
+                <p className="text-xs text-slate-300 mt-1 whitespace-pre-wrap">
+                  {taskData.comments}
+                </p>
+              </div>
+            )}
           </div>
           <div className="flex flex-wrap gap-2">
             {taskData.is_project_task && (
@@ -987,6 +1021,49 @@ const TaskDetailPage = () => {
                     <FormLabel className="text-xs text-slate-300 font-semibold">Description</FormLabel>
                     <FormControl className="border-slate-600 focus:border-slate-400">
                       <Input placeholder="Task description" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={taskForm.control}
+                name="priority"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs text-slate-300 font-semibold">Priority</FormLabel>
+                    <Select
+                      onValueChange={(value) => field.onChange(value === "none" ? "" : value)}
+                      value={field.value || "none"}
+                    >
+                      <FormControl>
+                        <SelectTrigger className="border-slate-600 focus:border-slate-400">
+                          <SelectValue placeholder="No priority" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">No priority</SelectItem>
+                        <SelectItem value="high">High</SelectItem>
+                        <SelectItem value="medium">Medium</SelectItem>
+                        <SelectItem value="normal">Normal</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={taskForm.control}
+                name="comments"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs text-slate-300 font-semibold">Comments</FormLabel>
+                    <FormControl className="border-slate-600 focus:border-slate-400">
+                      <Textarea
+                        placeholder="Optional additional comments"
+                        {...field}
+                        className="min-h-[90px]"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

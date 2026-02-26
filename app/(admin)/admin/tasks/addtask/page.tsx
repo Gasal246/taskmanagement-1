@@ -13,11 +13,15 @@ import { RootState } from "@/redux/store";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useSelector } from "react-redux";
 import * as z from "zod";
 import { toast } from "sonner";
+import { format } from "date-fns";
+import type { DateRange } from "react-day-picker";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -33,7 +37,7 @@ import {
   useGetBusinessStaffsBySkill,
 } from "@/query/business/queries";
 import { TASK_STATUS } from "@/lib/constants";
-import { Check, Search, Sparkles } from "lucide-react";
+import { CalendarIcon, Check, Search, Sparkles } from "lucide-react";
 import LoaderSpin from "@/components/shared/LoaderSpin";
 import { Avatar } from "antd";
 
@@ -55,6 +59,8 @@ const AddTask = () => {
   const formSchema = z.object({
     task_name: z.string().min(1, "Task name is required"),
     task_description: z.string().optional(),
+    priority: z.string().optional(),
+    comments: z.string().optional(),
     start_date: z.string().min(1, "Start date is required"),
     end_date: z.string().min(1, "End date is required"),
     assigned_user_id: z.string().min(1, "Assigned user is required"),
@@ -67,6 +73,8 @@ const AddTask = () => {
     defaultValues: {
       task_name: "",
       task_description: "",
+      priority: "",
+      comments: "",
       start_date: "",
       end_date: "",
       assigned_user_id: "",
@@ -74,12 +82,33 @@ const AddTask = () => {
       business_id: businessData?._id,
     },
   });
+  const selectedStartDate = form.watch("start_date");
+  const selectedEndDate = form.watch("end_date");
+  const todayDate = new Date().toISOString().split("T")[0];
+  const today = new Date(`${todayDate}T00:00:00`);
+
+  const selectedDateRange: DateRange | undefined = selectedStartDate
+    ? {
+        from: new Date(`${selectedStartDate}T00:00:00`),
+        to: selectedEndDate ? new Date(`${selectedEndDate}T00:00:00`) : undefined,
+      }
+    : undefined;
 
   useEffect(() => {
     if (businessData?._id) {
       form.setValue("business_id", businessData._id);
     }
   }, [businessData?._id, form]);
+
+  useEffect(() => {
+    const endDate = form.getValues("end_date");
+    if (selectedStartDate && endDate && endDate < selectedStartDate) {
+      form.setValue("end_date", "");
+    }
+    if (!selectedStartDate && endDate) {
+      form.setValue("end_date", "");
+    }
+  }, [selectedStartDate, form]);
 
   useEffect(() => {
     if (!businessData?._id) return;
@@ -132,6 +161,8 @@ const AddTask = () => {
     const newTask = {
       task_name: data.task_name,
       task_description: data.task_description,
+      priority: data.priority || undefined,
+      comments: data.comments || undefined,
       start_date: data.start_date,
       end_date: data.end_date,
       status: data.status,
@@ -148,6 +179,8 @@ const AddTask = () => {
         form.reset({
           task_name: "",
           task_description: "",
+          priority: "",
+          comments: "",
           start_date: "",
           end_date: "",
           assigned_user_id: "",
@@ -167,6 +200,19 @@ const AddTask = () => {
       toast.error("An error occurred while adding the task");
       console.error("Error adding task:", error);
     }
+  };
+
+  const handleTaskDateRangeChange = (range: DateRange | undefined) => {
+    if (!range?.from) {
+      form.setValue("start_date", "", { shouldValidate: true });
+      form.setValue("end_date", "", { shouldValidate: true });
+      return;
+    }
+
+    form.setValue("start_date", format(range.from, "yyyy-MM-dd"), { shouldValidate: true });
+    form.setValue("end_date", range.to ? format(range.to, "yyyy-MM-dd") : "", {
+      shouldValidate: true,
+    });
   };
 
   const skillSearchTerm = skillSearch.trim().toLowerCase();
@@ -279,6 +325,26 @@ const AddTask = () => {
                     </FormItem>
                   )}
                 />
+
+                <FormField
+                  control={form.control}
+                  name="comments"
+                  render={({ field }) => (
+                    <FormItem className="md:col-span-2">
+                      <FormLabel className="text-xs text-slate-300 font-semibold">
+                        Comments
+                      </FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Optional notes, dependencies, or special instructions."
+                          {...field}
+                          className="min-h-[100px] bg-slate-950/40 text-slate-100 placeholder:text-slate-500 border-slate-800/80 focus:border-emerald-400 focus-visible:ring-0 focus-visible:ring-offset-0"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
             </div>
 
@@ -291,46 +357,63 @@ const AddTask = () => {
                   Set a timeline and status for this task.
                 </p>
               </div>
-              <div className="grid gap-4 md:grid-cols-3">
-                <FormField
-                  control={form.control}
-                  name="start_date"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs text-slate-300 font-semibold">
-                        Start Date *
-                      </FormLabel>
-                      <FormControl>
-                        <Input
-                          type="date"
-                          {...field}
-                          className="bg-slate-950/40 text-slate-100 border-slate-800/80 focus:border-emerald-400 focus-visible:ring-0 focus-visible:ring-offset-0"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="end_date"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs text-slate-300 font-semibold">
-                        End Date *
-                      </FormLabel>
-                      <FormControl>
-                        <Input
-                          type="date"
-                          {...field}
-                          className="bg-slate-950/40 text-slate-100 border-slate-800/80 focus:border-emerald-400 focus-visible:ring-0 focus-visible:ring-offset-0"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+              <div className="grid gap-4 md:grid-cols-4">
+                <div className="md:col-span-2 space-y-2">
+                  <FormLabel className="text-xs text-slate-300 font-semibold">
+                    Task Duration (Start & End) *
+                  </FormLabel>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full justify-between bg-slate-950/40 text-slate-100 border-slate-800/80 hover:bg-slate-900/60 hover:text-slate-100"
+                      >
+                        <span className="truncate text-left">
+                          {selectedDateRange?.from ? (
+                            selectedDateRange?.to ? (
+                              `${format(selectedDateRange.from, "PPP")} - ${format(
+                                selectedDateRange.to,
+                                "PPP"
+                              )}`
+                            ) : (
+                              `${format(selectedDateRange.from, "PPP")} - Select end date`
+                            )
+                          ) : (
+                            "Select start and end dates"
+                          )}
+                        </span>
+                        <CalendarIcon size={16} className="opacity-70" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      className="w-auto p-0 border-slate-800 bg-slate-950"
+                      align="start"
+                    >
+                      <Calendar
+                        mode="range"
+                        numberOfMonths={2}
+                        defaultMonth={selectedDateRange?.from || today}
+                        selected={selectedDateRange}
+                        onSelect={handleTaskDateRangeChange}
+                        disabled={(date) => date < today}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <div className="space-y-1">
+                    {form.formState.errors.start_date && (
+                      <p className="text-[0.8rem] font-medium text-destructive">
+                        {form.formState.errors.start_date.message}
+                      </p>
+                    )}
+                    {form.formState.errors.end_date && (
+                      <p className="text-[0.8rem] font-medium text-destructive">
+                        {form.formState.errors.end_date.message}
+                      </p>
+                    )}
+                  </div>
+                </div>
 
                 <FormField
                   control={form.control}
@@ -350,6 +433,30 @@ const AddTask = () => {
                               {status.label}
                             </option>
                           ))}
+                        </select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="priority"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs text-slate-300 font-semibold">
+                        Priority
+                      </FormLabel>
+                      <FormControl>
+                        <select
+                          {...field}
+                          className="w-full rounded-md border border-slate-800/80 bg-slate-950/40 text-slate-100 p-2 focus:border-emerald-400 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                        >
+                          <option value="">No priority</option>
+                          <option value="high">High</option>
+                          <option value="medium">Medium</option>
+                          <option value="normal">Normal</option>
                         </select>
                       </FormControl>
                       <FormMessage />

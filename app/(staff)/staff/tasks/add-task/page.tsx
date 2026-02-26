@@ -23,13 +23,17 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { toast } from "sonner";
 import Cookies from "js-cookie";
 import { Avatar } from "antd";
-import { CalendarPlus, Check, ChevronRight, Users } from "lucide-react";
+import { CalendarIcon, CalendarPlus, Check, ChevronRight, Users } from "lucide-react";
+import { format } from "date-fns";
+import type { DateRange } from "react-day-picker";
 import { TASK_STATUS } from "@/lib/constants";
 import {
   useAddBusinessTask,
@@ -78,6 +82,8 @@ const normalizeStaff = (staff: any) => {
 const formSchema = z.object({
   task_name: z.string().min(1, "Task name is required"),
   task_description: z.string().optional(),
+  priority: z.string().optional(),
+  comments: z.string().optional(),
   start_date: z.string().min(1, "Start date is required"),
   end_date: z.string().min(1, "End date is required"),
   assigned_user_id: z.string().min(1, "Assigned user is required"),
@@ -131,6 +137,8 @@ const AddTask = () => {
     defaultValues: {
       task_name: "",
       task_description: "",
+      priority: "",
+      comments: "",
       start_date: "",
       end_date: "",
       assigned_user_id: "",
@@ -138,6 +146,16 @@ const AddTask = () => {
       business_id: "",
     },
   });
+  const selectedStartDate = form.watch("start_date");
+  const selectedEndDate = form.watch("end_date");
+  const todayDate = new Date().toISOString().split("T")[0];
+  const today = new Date(`${todayDate}T00:00:00`);
+  const selectedDateRange: DateRange | undefined = selectedStartDate
+    ? {
+        from: new Date(`${selectedStartDate}T00:00:00`),
+        to: selectedEndDate ? new Date(`${selectedEndDate}T00:00:00`) : undefined,
+      }
+    : undefined;
 
   useEffect(() => {
     const roleCookie = Cookies.get("user_role");
@@ -158,6 +176,16 @@ const AddTask = () => {
       toast.error("Invalid cookies");
     }
   }, [form]);
+
+  useEffect(() => {
+    const endDate = form.getValues("end_date");
+    if (selectedStartDate && endDate && endDate < selectedStartDate) {
+      form.setValue("end_date", "");
+    }
+    if (!selectedStartDate && endDate) {
+      form.setValue("end_date", "");
+    }
+  }, [selectedStartDate, form]);
 
   const fetchDepartmentMeta = async (departmentId: string) => {
     const response = await fetch(`/api/department/get-meta?department_id=${departmentId}`);
@@ -388,6 +416,8 @@ const AddTask = () => {
     const newTask = {
       task_name: data.task_name,
       task_description: data.task_description,
+      priority: data.priority || undefined,
+      comments: data.comments || undefined,
       start_date: data.start_date,
       end_date: data.end_date,
       status: data.status,
@@ -411,6 +441,19 @@ const AddTask = () => {
     } catch (error) {
       toast.error("An error occurred while adding the task");
     }
+  };
+
+  const handleTaskDateRangeChange = (range: DateRange | undefined) => {
+    if (!range?.from) {
+      form.setValue("start_date", "", { shouldValidate: true });
+      form.setValue("end_date", "", { shouldValidate: true });
+      return;
+    }
+
+    form.setValue("start_date", format(range.from, "yyyy-MM-dd"), { shouldValidate: true });
+    form.setValue("end_date", range.to ? format(range.to, "yyyy-MM-dd") : "", {
+      shouldValidate: true,
+    });
   };
 
   const canContinueFromStep1 = assignScope === "my" || Boolean(selectedDepartmentId);
@@ -525,42 +568,80 @@ const AddTask = () => {
                     </FormItem>
                   )}
                 />
-                <div className="grid gap-3 md:grid-cols-3">
-                  <FormField
-                    control={form.control}
-                    name="start_date"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-xs text-slate-300 font-semibold">Start Date</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="date"
-                            {...field}
-                            className="bg-transparent border-slate-700 focus:border-slate-500 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="end_date"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-xs text-slate-300 font-semibold">End Date</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="date"
-                            {...field}
-                            className="bg-transparent border-slate-700 focus:border-slate-500 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                <FormField
+                  control={form.control}
+                  name="comments"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs text-slate-300 font-semibold">Comments</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Optional additional comments for this task."
+                          {...field}
+                          className="min-h-[90px] border-slate-700 focus:border-slate-500 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="grid gap-3 md:grid-cols-4">
+                  <div className="md:col-span-2 space-y-2">
+                    <FormLabel className="text-xs text-slate-300 font-semibold">
+                      Task Duration (Start & End)
+                    </FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full justify-between border-slate-700 bg-transparent text-slate-100 hover:bg-slate-900/60 hover:text-slate-100"
+                        >
+                          <span className="truncate text-left">
+                            {selectedDateRange?.from ? (
+                              selectedDateRange?.to ? (
+                                `${format(selectedDateRange.from, "PPP")} - ${format(
+                                  selectedDateRange.to,
+                                  "PPP"
+                                )}`
+                              ) : (
+                                `${format(selectedDateRange.from, "PPP")} - Select end date`
+                              )
+                            ) : (
+                              "Select start and end dates"
+                            )}
+                          </span>
+                          <CalendarIcon size={16} className="opacity-70" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent
+                        className="w-auto p-0 border-slate-800 bg-slate-950"
+                        align="start"
+                      >
+                        <Calendar
+                          mode="range"
+                          numberOfMonths={2}
+                          defaultMonth={selectedDateRange?.from || today}
+                          selected={selectedDateRange}
+                          onSelect={handleTaskDateRangeChange}
+                          disabled={(date) => date < today}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <div className="space-y-1">
+                      {form.formState.errors.start_date && (
+                        <p className="text-[0.8rem] font-medium text-destructive">
+                          {form.formState.errors.start_date.message}
+                        </p>
+                      )}
+                      {form.formState.errors.end_date && (
+                        <p className="text-[0.8rem] font-medium text-destructive">
+                          {form.formState.errors.end_date.message}
+                        </p>
+                      )}
+                    </div>
+                  </div>
 
                   <FormField
                     control={form.control}
@@ -579,6 +660,32 @@ const AddTask = () => {
                                   {status.label}
                                 </SelectItem>
                               ))}
+                            </SelectContent>
+                          </Select>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="priority"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs text-slate-300 font-semibold">Priority</FormLabel>
+                        <FormControl>
+                          <Select
+                            onValueChange={(value) => field.onChange(value === "none" ? "" : value)}
+                            value={field.value || "none"}
+                          >
+                            <SelectTrigger className="border-slate-700 focus:border-slate-500">
+                              <SelectValue placeholder="No priority" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">No priority</SelectItem>
+                              <SelectItem value="high">High</SelectItem>
+                              <SelectItem value="medium">Medium</SelectItem>
+                              <SelectItem value="normal">Normal</SelectItem>
                             </SelectContent>
                           </Select>
                         </FormControl>
