@@ -16,75 +16,75 @@ import { NextRequest, NextResponse } from "next/server";
 connectDB();
 
 interface Body {
-    enquiry_id: string;
+    enquiry_id?: string;
 
-    country: string;
-    region: string;
-    province: string;
-    city: string;
+    country?: string;
+    region?: string;
+    province?: string;
+    city?: string;
 
-    area_input_mode: string;
-    area: string;
-    area_name_request: string;
+    area_input_mode?: string;
+    area?: string;
+    area_name_request?: string;
 
-    camp_input_mode: string;
-    camp: string;
-    camp_name_request: string;
+    camp_input_mode?: string;
+    camp?: string;
+    camp_name_request?: string;
 
-    camp_type: string;
-    client_company: string;
-    landlord: string;
-    real_estate: string;
+    camp_type?: string;
+    client_company?: string;
+    landlord?: string;
+    real_estate?: string;
 
-    latitude: string;
-    longitude: string;
+    latitude?: string;
+    longitude?: string;
 
-    camp_capacity: string;
-    camp_occupancy: string;
+    camp_capacity?: string;
+    camp_occupancy?: string;
 
-    contacts: Array<{
-        name: string;
-        phone: string;
+    contacts?: Array<{
+        name?: string;
+        phone?: string;
         email?: string;
         designation?: string;
         is_decision_maker?: string;
         authority_level?: string;
     }>;
 
-    wifi_available: string;
-    expected_monthly_price: string;
-    other_wifi_details: string;
-    wifi_type: string;
-    contractor_name: string;
-    contract_start: string;
-    contract_expiry: string;
-    wifi_plan: string;
-    speed_mbps: string;
+    wifi_available?: string;
+    expected_monthly_price?: string;
+    other_wifi_details?: string;
+    wifi_type?: string;
+    contractor_name?: string;
+    contract_start?: string;
+    contract_expiry?: string;
+    wifi_plan?: string;
+    speed_mbps?: string;
     pain_points?: string;
     plain_points?: string;
 
-    provider_plan: string;
-    personal_wifi_start: string;
-    personal_wifi_expiry: string;
-    personal_wifi_price: string;
+    provider_plan?: string;
+    personal_wifi_start?: string;
+    personal_wifi_expiry?: string;
+    personal_wifi_price?: string;
 
-    head_office_address: string;
-    head_office_contact: string;
-    head_office_location: string;
-    head_office_details: string;
+    head_office_address?: string;
+    head_office_contact?: string;
+    head_office_location?: string;
+    head_office_details?: string;
 
-    lease_expiry_due: string;
-    rent_terms: string;
+    lease_expiry_due?: string;
+    rent_terms?: string;
 
-    competition_status: string;
-    competition_notes: string;
+    competition_status?: string;
+    competition_notes?: string;
 
-    priority: string;
+    priority?: string;
 
-    followup_status: string;
-    alert_date: string;
-    next_action: string;
-    next_action_due: string;
+    followup_status?: string;
+    alert_date?: string;
+    next_action?: string;
+    next_action_due?: string;
     comments?: string;
 
     enquiry_brought_by?: string[];
@@ -94,42 +94,72 @@ interface Body {
     enquiry_user_notes?: string;
 }
 
+const asString = (value: unknown): string => (typeof value === "string" ? value : "");
+const isBlank = (value: unknown): boolean => asString(value).trim() === "";
+const toIdOrNull = (value: unknown): string | null => {
+    const normalized = asString(value).trim();
+    return normalized || null;
+};
+const toTextOrNull = (value: unknown): string | null => {
+    const text = asString(value);
+    return text.trim() === "" ? null : text;
+};
+const toNumberOrNull = (value: unknown): number | null => {
+    if (isBlank(value)) return null;
+    const parsed = Number(asString(value));
+    return Number.isFinite(parsed) ? parsed : null;
+};
+
 export async function PUT(req: NextRequest) {
     try {
         const body: Body = await req.json();
+        const enquiryId = toIdOrNull(body.enquiry_id);
+        const areaInputMode = body.area_input_mode === "new" ? "new" : "existing";
+        let campInputMode = body.camp_input_mode === "new" ? "new" : "existing";
+
         const wifiAvailability = body.wifi_available === "Yes"
             ? true
             : body.wifi_available === "No"
                 ? false
                 : null;
+        const wifiType = asString(body.wifi_type);
+        const competitionStatus = body.competition_status === "Yes"
+            ? true
+            : body.competition_status === "No"
+                ? false
+                : null;
 
-        if (!body.enquiry_id) {
+        if (!enquiryId) {
             return NextResponse.json({ message: "Enquiry ID Missing", status: 400 }, { status: 400 });
         }
 
-        const enquiry = await Eq_enquiry.findById(body.enquiry_id);
+        const enquiry = await Eq_enquiry.findById(enquiryId);
         if (!enquiry) {
             return NextResponse.json({ message: "Enquiry not found", status: 404 }, { status: 404 });
         }
 
-        let areaId = body.area;
-        let campId = body.camp;
+        const countryId = toIdOrNull(body.country);
+        const regionId = toIdOrNull(body.region);
+        const provinceId = toIdOrNull(body.province);
+        const cityId = toIdOrNull(body.city);
+        let areaId = toIdOrNull(body.area);
+        let campId = toIdOrNull(body.camp);
 
-        if (body.area_input_mode === "new" && body.area_name_request) {
+        if (areaInputMode === "new" && !isBlank(body.area_name_request)) {
             const newArea = new Eq_area({
-                country_id: body.country,
-                region_id: body.region,
-                province_id: body.province,
-                city_id: body.city,
-                area_name: body.area_name_request,
+                country_id: countryId,
+                region_id: regionId,
+                province_id: provinceId,
+                city_id: cityId,
+                area_name: asString(body.area_name_request).trim(),
                 is_active: false
             });
             const savedArea = await newArea.save();
             areaId = savedArea._id;
-            body.camp_input_mode = "new";
+            campInputMode = "new";
         }
 
-        if (body.camp_input_mode === "existing" && campId) {
+        if (campInputMode === "existing" && campId) {
             const existingEnquiry = await Eq_enquiry.findOne({
                 camp_id: campId,
                 _id: { $ne: enquiry._id }
@@ -139,18 +169,17 @@ export async function PUT(req: NextRequest) {
             }
         }
 
-        if (body.camp_input_mode === "new" || body.area_input_mode === "new") {
-            let landlordId = "";
-            let realestateId = "";
-            let client_companyId = "";
-            let headOfficeId = "";
+        if (campInputMode === "new" || areaInputMode === "new") {
+            let landlordId: string | null = null;
+            let realestateId: string | null = null;
+            let clientCompanyId: string | null = null;
+            let headOfficeId: string | null = null;
 
-            if (body.landlord) {
-                const isLandlordExist = await Eq_camp_landlord.findOne({ landlord_name: body.landlord?.toLowerCase().trim() });
+            const landlordName = asString(body.landlord).toLowerCase().trim();
+            if (landlordName) {
+                const isLandlordExist = await Eq_camp_landlord.findOne({ landlord_name: landlordName });
                 if (!isLandlordExist) {
-                    const newLandlord = new Eq_camp_landlord({
-                        landlord_name: body.landlord?.toLowerCase().trim()
-                    });
+                    const newLandlord = new Eq_camp_landlord({ landlord_name: landlordName });
                     const savedLandlord = await newLandlord.save();
                     landlordId = savedLandlord._id;
                 } else {
@@ -158,12 +187,11 @@ export async function PUT(req: NextRequest) {
                 }
             }
 
-            if (body.real_estate) {
-                const isRealEstateExist = await Eq_camp_realestate.findOne({ company_name: body.real_estate.toLowerCase().trim() });
+            const realEstateName = asString(body.real_estate).toLowerCase().trim();
+            if (realEstateName) {
+                const isRealEstateExist = await Eq_camp_realestate.findOne({ company_name: realEstateName });
                 if (!isRealEstateExist) {
-                    const newRealEstate = new Eq_camp_realestate({
-                        company_name: body.real_estate.toLowerCase().trim()
-                    });
+                    const newRealEstate = new Eq_camp_realestate({ company_name: realEstateName });
                     const savedRealEstate = await newRealEstate.save();
                     realestateId = savedRealEstate._id;
                 } else {
@@ -171,25 +199,31 @@ export async function PUT(req: NextRequest) {
                 }
             }
 
-            if (body.client_company) {
-                const isClientCompanyExist = await Eq_camp_client_company.findOne({ client_company_name: body.client_company.toLowerCase().trim() });
+            const clientCompanyName = asString(body.client_company).toLowerCase().trim();
+            if (clientCompanyName) {
+                const isClientCompanyExist = await Eq_camp_client_company.findOne({ client_company_name: clientCompanyName });
                 if (!isClientCompanyExist) {
-                    const newClientCompany = new Eq_camp_client_company({
-                        client_company_name: body.client_company.toLowerCase().trim()
-                    });
+                    const newClientCompany = new Eq_camp_client_company({ client_company_name: clientCompanyName });
                     const savedClientCompany = await newClientCompany.save();
-                    client_companyId = savedClientCompany._id;
+                    clientCompanyId = savedClientCompany._id;
                 } else {
-                    client_companyId = isClientCompanyExist._id;
+                    clientCompanyId = isClientCompanyExist._id;
                 }
             }
 
-            if (body.head_office_contact || body.head_office_address || body.head_office_location || body.head_office_details) {
+            const hasHeadOfficePayload = [
+                body.head_office_contact,
+                body.head_office_address,
+                body.head_office_location,
+                body.head_office_details
+            ].some((value) => !isBlank(value));
+
+            if (hasHeadOfficePayload) {
                 const newHeadOffice = new Eq_camp_headoffice({
-                    phone: body.head_office_contact,
-                    geo_location: body.head_office_location,
-                    other_details: body.head_office_details,
-                    address: body.head_office_address
+                    phone: toTextOrNull(body.head_office_contact),
+                    geo_location: toTextOrNull(body.head_office_location),
+                    other_details: toTextOrNull(body.head_office_details),
+                    address: toTextOrNull(body.head_office_address)
                 });
                 const savedHeadOffice = await newHeadOffice.save();
                 headOfficeId = savedHeadOffice._id;
@@ -197,21 +231,21 @@ export async function PUT(req: NextRequest) {
 
             const newCamp = new Eq_camps({
                 area_id: areaId,
-                country_id: body.country,
-                region_id: body.region,
-                province_id: body.province,
-                city_id: body.city,
-                landlord_id: landlordId || null,
-                realestate_id: realestateId || null,
-                client_company_id: client_companyId || null,
-                headoffice_id: headOfficeId || null,
-                camp_type: body.camp_type,
-                camp_name: body.camp_name_request,
-                camp_capacity: body.camp_capacity,
-                camp_occupancy: body.camp_occupancy,
+                country_id: countryId,
+                region_id: regionId,
+                province_id: provinceId,
+                city_id: cityId,
+                landlord_id: landlordId,
+                realestate_id: realestateId,
+                client_company_id: clientCompanyId,
+                headoffice_id: headOfficeId,
+                camp_type: toTextOrNull(body.camp_type),
+                camp_name: toTextOrNull(body.camp_name_request),
+                camp_capacity: toTextOrNull(body.camp_capacity),
+                camp_occupancy: toNumberOrNull(body.camp_occupancy),
                 is_active: false,
-                latitude: body.latitude,
-                longitude: body.longitude,
+                latitude: toTextOrNull(body.latitude),
+                longitude: toTextOrNull(body.longitude),
             });
 
             const savedCamp = await newCamp.save();
@@ -222,124 +256,123 @@ export async function PUT(req: NextRequest) {
                 return NextResponse.json({ message: "Camp not found", status: 404 }, { status: 404 });
             }
 
-            const hasHeadOfficePayload = Boolean(
-                body.head_office_contact ||
-                body.head_office_address ||
-                body.head_office_location ||
+            const hasHeadOfficePayload = [
+                body.head_office_contact,
+                body.head_office_address,
+                body.head_office_location,
                 body.head_office_details
-            );
+            ].some((value) => !isBlank(value));
 
             if (hasHeadOfficePayload) {
                 if (campToEdit.headoffice_id) {
                     const headoffice = await Eq_camp_headoffice.findById(campToEdit.headoffice_id);
                     if (headoffice) {
-                        if (body.head_office_contact) headoffice.phone = body.head_office_contact;
-                        if (body.head_office_details) headoffice.other_details = body.head_office_details;
-                        if (body.head_office_location) headoffice.geo_location = body.head_office_location;
-                        if (body.head_office_address) headoffice.address = body.head_office_address;
+                        headoffice.phone = toTextOrNull(body.head_office_contact);
+                        headoffice.other_details = toTextOrNull(body.head_office_details);
+                        headoffice.geo_location = toTextOrNull(body.head_office_location);
+                        headoffice.address = toTextOrNull(body.head_office_address);
                         await headoffice.save();
                     }
                 } else {
                     const newHeadOffice = new Eq_camp_headoffice({
-                        phone: body.head_office_contact,
-                        geo_location: body.head_office_location,
-                        other_details: body.head_office_details,
-                        address: body.head_office_address
+                        phone: toTextOrNull(body.head_office_contact),
+                        geo_location: toTextOrNull(body.head_office_location),
+                        other_details: toTextOrNull(body.head_office_details),
+                        address: toTextOrNull(body.head_office_address)
                     });
-                    const saved_headoffice = await newHeadOffice.save();
-                    campToEdit.headoffice_id = saved_headoffice._id;
+                    const savedHeadoffice = await newHeadOffice.save();
+                    campToEdit.headoffice_id = savedHeadoffice._id;
                 }
             } else if (campToEdit.headoffice_id) {
                 await Eq_camp_headoffice.findByIdAndDelete(campToEdit.headoffice_id);
                 campToEdit.headoffice_id = null;
             }
 
-            if (body.landlord) {
+            const landlordName = asString(body.landlord).toLowerCase().trim();
+            if (landlordName) {
                 if (campToEdit.landlord_id) {
                     await Eq_camp_landlord.findByIdAndUpdate(campToEdit.landlord_id, {
-                        $set: { landlord_name: body.landlord.toLowerCase().trim() }
+                        $set: { landlord_name: landlordName }
                     });
                 } else {
-                    const newLandlord = new Eq_camp_landlord({
-                        landlord_name: body.landlord.toLowerCase().trim()
-                    });
+                    const newLandlord = new Eq_camp_landlord({ landlord_name: landlordName });
                     const savedLandlord = await newLandlord.save();
                     campToEdit.landlord_id = savedLandlord._id;
                 }
+            } else {
+                campToEdit.landlord_id = null;
             }
 
-            if (body.client_company) {
+            const clientCompanyName = asString(body.client_company).toLowerCase().trim();
+            if (clientCompanyName) {
                 if (campToEdit.client_company_id) {
                     await Eq_camp_client_company.findByIdAndUpdate(campToEdit.client_company_id, {
-                        $set: { client_company_name: body.client_company.toLowerCase().trim() }
+                        $set: { client_company_name: clientCompanyName }
                     });
                 } else {
-                    const newClientCompany = new Eq_camp_client_company({
-                        client_company_name: body.client_company.toLowerCase().trim()
-                    });
+                    const newClientCompany = new Eq_camp_client_company({ client_company_name: clientCompanyName });
                     const savedClientCompany = await newClientCompany.save();
                     campToEdit.client_company_id = savedClientCompany._id;
                 }
+            } else {
+                campToEdit.client_company_id = null;
             }
 
-            if (body.real_estate) {
+            const realEstateName = asString(body.real_estate).toLowerCase().trim();
+            if (realEstateName) {
                 if (campToEdit.realestate_id) {
                     await Eq_camp_realestate.findByIdAndUpdate(campToEdit.realestate_id, {
-                        $set: { company_name: body.real_estate.toLowerCase().trim() }
+                        $set: { company_name: realEstateName }
                     });
                 } else {
-                    const newRealEstate = new Eq_camp_realestate({
-                        company_name: body.real_estate.toLowerCase().trim()
-                    });
+                    const newRealEstate = new Eq_camp_realestate({ company_name: realEstateName });
                     const savedRealEstate = await newRealEstate.save();
                     campToEdit.realestate_id = savedRealEstate._id;
                 }
+            } else {
+                campToEdit.realestate_id = null;
             }
 
-            if (body.camp_name_request) campToEdit.camp_name = body.camp_name_request;
-            if (body.camp_capacity) campToEdit.camp_capacity = body.camp_capacity;
-            if (body.camp_type) campToEdit.camp_type = body.camp_type;
-            if (body.camp_occupancy !== undefined && body.camp_occupancy !== null && body.camp_occupancy !== "") {
-                campToEdit.camp_occupancy = Number(body.camp_occupancy);
-            }
-
-            campToEdit.country_id = body.country || campToEdit.country_id;
-            campToEdit.region_id = body.region || campToEdit.region_id;
-            campToEdit.province_id = body.province || campToEdit.province_id;
-            campToEdit.city_id = body.city || campToEdit.city_id;
-            campToEdit.area_id = areaId || campToEdit.area_id;
-
-            if (body.latitude) campToEdit.latitude = body.latitude;
-            if (body.longitude) campToEdit.longitude = body.longitude;
+            campToEdit.camp_name = toTextOrNull(body.camp_name_request);
+            campToEdit.camp_capacity = toTextOrNull(body.camp_capacity);
+            campToEdit.camp_type = toTextOrNull(body.camp_type);
+            campToEdit.camp_occupancy = toNumberOrNull(body.camp_occupancy);
+            campToEdit.country_id = countryId;
+            campToEdit.region_id = regionId;
+            campToEdit.province_id = provinceId;
+            campToEdit.city_id = cityId;
+            campToEdit.area_id = areaId;
+            campToEdit.latitude = toTextOrNull(body.latitude);
+            campToEdit.longitude = toTextOrNull(body.longitude);
 
             await campToEdit.save();
         }
 
-        enquiry.country_id = body.country;
-        enquiry.region_id = body.region;
-        enquiry.province_id = body.province;
-        enquiry.city_id = body.city;
+        enquiry.country_id = countryId;
+        enquiry.region_id = regionId;
+        enquiry.province_id = provinceId;
+        enquiry.city_id = cityId;
         enquiry.area_id = areaId;
         enquiry.camp_id = campId;
-        enquiry.status = body.followup_status;
-        enquiry.priority = body.priority;
-        enquiry.alert_date = body.alert_date || null;
-        enquiry.due_date = body.next_action_due || null;
+        enquiry.status = toTextOrNull(body.followup_status);
+        enquiry.priority = toTextOrNull(body.priority);
+        enquiry.alert_date = toTextOrNull(body.alert_date);
+        enquiry.due_date = toTextOrNull(body.next_action_due);
         enquiry.wifi_available = wifiAvailability;
-        enquiry.wifi_type = wifiAvailability === true ? body.wifi_type : null;
-        const expectedCost = body.expected_monthly_price === "" ? null : body.expected_monthly_price;
+        enquiry.wifi_type = wifiAvailability === true ? toTextOrNull(wifiType) : null;
+        const expectedCost = toTextOrNull(body.expected_monthly_price);
         enquiry.expected_wifi_cost = wifiAvailability === false ? expectedCost : null;
-        enquiry.lease_expiry_due = body.lease_expiry_due || null;
-        enquiry.competition_status = body.competition_status === "Yes";
-        enquiry.competition_notes = body.competition_notes || null;
-        enquiry.next_action = body.next_action;
-        enquiry.next_action_due = body.next_action_due || null;
-        enquiry.comments = body.comments || null;
-        enquiry.rent_terms = body.rent_terms;
-        enquiry.wifi_setup = wifiAvailability === true && body.wifi_type === "Other Sources" ? body.other_wifi_details : null;
-        enquiry.latitude = body.latitude;
-        enquiry.longitude = body.longitude;
-        enquiry.is_active = body.area_input_mode === "existing" && body.camp_input_mode === "existing";
+        enquiry.lease_expiry_due = toTextOrNull(body.lease_expiry_due);
+        enquiry.competition_status = competitionStatus;
+        enquiry.competition_notes = toTextOrNull(body.competition_notes);
+        enquiry.next_action = toTextOrNull(body.next_action);
+        enquiry.next_action_due = toTextOrNull(body.next_action_due);
+        enquiry.comments = toTextOrNull(body.comments);
+        enquiry.rent_terms = toTextOrNull(body.rent_terms);
+        enquiry.wifi_setup = wifiAvailability === true && wifiType === "Other Sources" ? toTextOrNull(body.other_wifi_details) : null;
+        enquiry.latitude = toTextOrNull(body.latitude);
+        enquiry.longitude = toTextOrNull(body.longitude);
+        enquiry.is_active = areaInputMode === "existing" && campInputMode === "existing" && Boolean(areaId && campId);
         if (Array.isArray(body.enquiry_brought_by)) {
             enquiry.enquiry_brought_by = body.enquiry_brought_by;
         }
@@ -353,7 +386,7 @@ export async function PUT(req: NextRequest) {
             enquiry.project_managed_by = body.project_managed_by;
         }
         if (body.enquiry_user_notes !== undefined) {
-            enquiry.enquiry_user_notes = body.enquiry_user_notes;
+            enquiry.enquiry_user_notes = toTextOrNull(body.enquiry_user_notes);
         }
 
         await enquiry.save();
@@ -364,11 +397,11 @@ export async function PUT(req: NextRequest) {
         await Eq_camp_contacts.deleteMany({ enquiry_id: enquiry._id });
         if (Array.isArray(body.contacts) && body.contacts.length > 0) {
             const newContacts = body.contacts.map((contact) => ({
-                contact_name: contact.name,
-                contact_phone: contact.phone,
-                contact_email: contact.email,
-                contact_authorization: contact.authority_level,
-                contact_designation: contact.designation,
+                contact_name: toTextOrNull(contact.name),
+                contact_phone: toTextOrNull(contact.phone),
+                contact_email: toTextOrNull(contact.email),
+                contact_authorization: toTextOrNull(contact.authority_level),
+                contact_designation: toTextOrNull(contact.designation),
                 is_decision_maker: contact.is_decision_maker === "Yes",
                 camp_id: campId,
                 enquiry_id: enquiry._id
@@ -380,17 +413,17 @@ export async function PUT(req: NextRequest) {
         await Eq_enquiry_wifi_personal.deleteMany({ enquiry_id: enquiry._id });
 
         if (wifiAvailability === true) {
-            switch (body.wifi_type) {
+            switch (wifiType) {
                 case "Existing Contractor": {
-                    const painPoints = body.pain_points || body.plain_points || null;
+                    const painPoints = toTextOrNull(body.pain_points) || toTextOrNull(body.plain_points);
                     const newExistingWifi = new Eq_enquiry_wifi_external({
                         camp_id: campId,
                         enquiry_id: enquiry._id,
-                        contractor_name: body.contractor_name,
-                        contract_start_date: body.contract_start || null,
-                        contract_end_date: body.contract_expiry || null,
-                        contract_speed: body.speed_mbps,
-                        contract_package: body.wifi_plan,
+                        contractor_name: toTextOrNull(body.contractor_name),
+                        contract_start_date: toTextOrNull(body.contract_start),
+                        contract_end_date: toTextOrNull(body.contract_expiry),
+                        contract_speed: toTextOrNull(body.speed_mbps),
+                        contract_package: toTextOrNull(body.wifi_plan),
                         plain_points: painPoints
                     });
 
@@ -402,10 +435,10 @@ export async function PUT(req: NextRequest) {
                     const newPersonalWifi = new Eq_enquiry_wifi_personal({
                         camp_id: campId,
                         enquiry_id: enquiry._id,
-                        personal_plan: body.provider_plan,
-                        personal_start_date: body.personal_wifi_start || null,
-                        personal_end_date: body.personal_wifi_expiry || null,
-                        personal_monthly_price: body.personal_wifi_price === "" ? null : body.personal_wifi_price
+                        personal_plan: toTextOrNull(body.provider_plan),
+                        personal_start_date: toTextOrNull(body.personal_wifi_start),
+                        personal_end_date: toTextOrNull(body.personal_wifi_expiry),
+                        personal_monthly_price: toTextOrNull(body.personal_wifi_price)
                     });
 
                     await newPersonalWifi.save();

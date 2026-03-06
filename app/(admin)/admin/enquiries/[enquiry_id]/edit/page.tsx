@@ -54,10 +54,10 @@ const MAX_DOC_SIZE = 5 * 1024 * 1024; // 5MB
 /* =========== SCHEMA =========== */
 const enquirySchema = z.object({
     enquiry_id: z.string(),
-    country: z.string().min(1, "Select country"),
-    region: z.string().min(1, "Select region"),
-    province: z.string().min(1, "Select province"),
-    city: z.string().min(1, "Select city"),
+    country: z.string().optional(),
+    region: z.string().optional(),
+    province: z.string().optional(),
+    city: z.string().optional(),
 
     area_input_mode: z.enum(["existing", "new"]).default("existing"),
     area: z.string().optional(),
@@ -67,7 +67,7 @@ const enquirySchema = z.object({
     camp: z.string().optional(),
     camp_name_request: z.string().optional(),
 
-    camp_type: z.string().min(1, "Select camp type"),
+    camp_type: z.string().optional(),
     client_company: z.string().optional(),
     landlord: z.string().optional(),
     real_estate: z.string().optional(),
@@ -81,8 +81,8 @@ const enquirySchema = z.object({
     enquiry_user_notes: z.string().optional(),
     coordinates: z.string().optional(),
 
-    camp_capacity: z.string().min(1, "Camp capacity is required"),
-    camp_occupancy: z.string().min(1, "Current occupancy is required"),
+    camp_capacity: z.string().optional(),
+    camp_occupancy: z.string().optional(),
 
     contacts: z.array(z.object({
         name: z.string().optional(),
@@ -132,38 +132,6 @@ const enquirySchema = z.object({
     images: z.any().optional(),
 
 }).superRefine((values, ctx) => {
-    if (values.area_input_mode === "existing" && !values.area) {
-        ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: ["area"],
-            message: "Select area",
-        });
-    }
-
-    if (values.area_input_mode === "new" && !values.area_name_request?.trim()) {
-        ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: ["area_name_request"],
-            message: "Area name is required",
-        });
-    }
-
-    if (values.area_input_mode === "existing" && values.camp_input_mode === "existing" && !values.camp) {
-        ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: ["camp"],
-            message: "Select camp",
-        });
-    }
-
-    if (!values.camp_name_request?.trim()) {
-        ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: ["camp_name_request"],
-            message: "Camp name is required",
-        });
-    }
-
     if (values.camp_capacity && values.camp_occupancy) {
         const limit = EQ_CAPACITY_LIMITS[values.camp_capacity];
         const occupancy = Number(values.camp_occupancy);
@@ -194,8 +162,10 @@ export default function EditEnquiry() {
     const [removingDoc, setRemovingDoc] = useState(false);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const priorityCapacityMap = Eq_CAPACITY_OPTIONS.map((capacity, index) => ({
-        priority: `${index + 1}/10`,
+        value: `${index + 1}`,
+        priority: `${index + 1}`,
         capacity,
+        capacityLabel: capacity,
     }));
 
     const { mutateAsync: GetCountries } = useGetEqCountries();
@@ -204,7 +174,7 @@ export default function EditEnquiry() {
     const { data: contactsData } = useGetEnquiryContacts(params.enquiry_id);
     const { data: eqUsers } = useGetEqUsers(businessData?._id, "users");
 
-    const form = useForm({
+    const form = useForm<any>({
         resolver: zodResolver(enquirySchema),
         defaultValues: {
             enquiry_id: params.enquiry_id,
@@ -265,6 +235,7 @@ export default function EditEnquiry() {
     });
 
     const selectedCampId = form.watch("camp");
+    const camp_id = selectedCampId;
     const baseCampId = (enquiry?.enquiry?.camp_id?._id ?? enquiry?.enquiry?.camp_id) || "";
     const activeCampId = selectedCampId || baseCampId;
     const { data: campData, isLoading: isCampDetailsLoading } = useGetEqCampsById(activeCampId);
@@ -285,15 +256,6 @@ export default function EditEnquiry() {
         lat: toNumberOrNull(coordinatesLat),
         lng: toNumberOrNull(coordinatesLng),
     };
-    const campCapacityMissing = isExistingCampMode
-        && !!activeCampId
-        && !!selectedCamp
-        && (selectedCamp?.camp_capacity === null || selectedCamp?.camp_capacity === undefined || selectedCamp?.camp_capacity === "");
-    const campOccupancyMissing = isExistingCampMode
-        && !!activeCampId
-        && !!selectedCamp
-        && (selectedCamp?.camp_occupancy === null || selectedCamp?.camp_occupancy === undefined || selectedCamp?.camp_occupancy === "");
-
     const { data: regions, isLoading: isRegionLoading } = useGetEqRegions(country_id);
     const { data: provinces, isLoading: isProvinceLoading } = useGetEqProvince(region_id);
     const { data: cities, isLoading: isCityLoading } = useGetEqCities(province_id);
@@ -312,6 +274,14 @@ export default function EditEnquiry() {
             })
             .filter(Boolean);
     }, [eqUsers?.users]);
+    const campCapacityMissing = isExistingCampMode
+        && !!camp_id
+        && !!selectedCamp
+        && (selectedCamp?.camp_capacity === null || selectedCamp?.camp_capacity === undefined || selectedCamp?.camp_capacity === "");
+    const campOccupancyMissing = isExistingCampMode
+        && !!camp_id
+        && !!selectedCamp
+        && (selectedCamp?.camp_occupancy === null || selectedCamp?.camp_occupancy === undefined || selectedCamp?.camp_occupancy === "");
 
 
     const { control, handleSubmit } = form;
@@ -367,6 +337,7 @@ export default function EditEnquiry() {
         if (!enquiry?.enquiry) return;
 
         const camp = campData?.camp;
+        const isApprovedEnquiry = Boolean(enquiry?.enquiry?.is_active);
         const initialLatitudeRaw = camp?.latitude ?? enquiry?.enquiry?.latitude ?? "";
         const initialLongitudeRaw = camp?.longitude ?? enquiry?.enquiry?.longitude ?? "";
         const initialLatitude = initialLatitudeRaw === "" ? "" : String(initialLatitudeRaw);
@@ -398,8 +369,8 @@ export default function EditEnquiry() {
             city: normalizeId(enquiry?.enquiry?.city_id),
             area_input_mode: "existing",
             area: normalizeId(enquiry?.enquiry?.area_id),
-            camp_input_mode: "existing",
-            camp: normalizeId(enquiry?.enquiry?.camp_id),
+            camp_input_mode: isApprovedEnquiry ? "existing" : "new",
+            camp: isApprovedEnquiry ? normalizeId(enquiry?.enquiry?.camp_id) : "",
             camp_name_request: camp?.camp_name || "",
             camp_type: camp?.camp_type || "",
             client_company: camp?.client_company_id?.client_company_name || "",
@@ -466,6 +437,7 @@ export default function EditEnquiry() {
         if (!isExistingCampMode) {
             return;
         }
+
         const capacityValue = selectedCamp?.camp_capacity;
         const occupancyValue = selectedCamp?.camp_occupancy;
 
@@ -595,7 +567,7 @@ export default function EditEnquiry() {
         }
     };
     const onInvalid = () => {
-        toast.error("Please check the required fields before updating.");
+        toast.error("Please check the form values before updating.");
     };
 
     if (isEnquiryLoading || isCampDetailsLoading) {
@@ -607,7 +579,7 @@ export default function EditEnquiry() {
     }
 
     return (
-        <div className="p-5 pb-10">
+        <div className="p-4 md:p-5 pb-10">
 
             <Breadcrumb>
                 <BreadcrumbList>
@@ -621,22 +593,26 @@ export default function EditEnquiry() {
                 </BreadcrumbList>
             </Breadcrumb>
 
-            <div className="bg-gradient-to-tr from-slate-900/60 to-slate-950/60 p-3 rounded-lg mt-2">
-                <h1 className="font-semibold text-sm text-slate-300 flex items-center gap-1">
-                    <Building2 size={16} /> Edit Enquiry
+            <div className="bg-gradient-to-r from-slate-950/80 via-slate-900/70 to-cyan-950/30 border border-slate-800/80 p-4 rounded-xl mt-2 shadow-[0_10px_30px_-20px_rgba(34,211,238,0.35)]">
+                <h1 className="font-semibold text-sm text-slate-200 flex items-center gap-2">
+                    <Building2 size={16} className="text-cyan-300" /> Edit Enquiry
                 </h1>
+                <p className="text-xs text-slate-400 mt-1">
+                    Update enquiry details with the same structured workflow and visuals as the add enquiry experience.
+                </p>
             </div>
 
-            <div className="mt-2 bg-gradient-to-tr from-slate-950/60 to-slate-900/60 p-4 rounded-lg pb-16">
+            <div className="mt-3 bg-gradient-to-br from-slate-950/80 via-slate-900/75 to-cyan-950/20 p-4 md:p-5 rounded-xl border border-slate-800/80 pb-16">
 
                 <Form {...form}>
-                    <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="space-y-8">
+                    <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="space-y-10">
 
                         {/* ------------------------------------ LOCATION ------------------------------------ */}
-                        <div className="flex flex-wrap gap-3">
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             {/* COUNTRY */}
                             <FormField control={form.control} name="country" render={({ field }) => (
-                                <FormItem>
+                                <FormItem className="w-full">
                                     <FormLabel className="text-xs text-slate-300 font-semibold">Country</FormLabel>
                                     <FormControl>
                                         <select
@@ -655,7 +631,7 @@ export default function EditEnquiry() {
 
                             {/* REGION */}
                             <FormField control={form.control} name="region" render={({ field }) => (
-                                <FormItem>
+                                <FormItem className="w-full">
                                     <FormLabel className="text-xs text-slate-300 font-semibold">Region / Territory</FormLabel>
                                     <FormControl>
                                         <select
@@ -674,7 +650,7 @@ export default function EditEnquiry() {
 
                             {/* CITY + PROVINCE */}
                             <FormField control={form.control} name="province" render={({ field }) => (
-                                <FormItem>
+                                <FormItem className="w-full">
                                     <FormLabel className="text-xs text-slate-300 font-semibold">Province</FormLabel>
                                     <FormControl>
                                         <select
@@ -691,7 +667,7 @@ export default function EditEnquiry() {
                                 </FormItem>
                             )} />
                             <FormField control={form.control} name="city" render={({ field }) => (
-                                <FormItem>
+                                <FormItem className="w-full">
                                     <FormLabel className="text-xs text-slate-300 font-semibold">City</FormLabel>
                                     <FormControl>
                                         <select
@@ -708,46 +684,60 @@ export default function EditEnquiry() {
                                 </FormItem>
                             )} />
 
-                            {/* AREA MODE */}
-                            <FormField control={form.control} name="area_input_mode" render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel className="text-xs text-slate-300 font-semibold">Area Selection</FormLabel>
-                                    <div className="flex gap-4 mt-1 text-sm">
-                                        <label><input type="radio" value="existing" checked={field.value === "existing"} onChange={() => form.setValue("area_input_mode", "existing")} /> Select Existing Area</label>
-                                        <label><input type="radio" value="new" checked={field.value === "new"} onChange={() => form.setValue("area_input_mode", "new")} /> Request New Area</label>
-                                    </div>
-                                </FormItem>
-                            )} />
+                            </div>
 
-                            {areaInputMode === "existing" && (
-                                <FormField control={form.control} name="area" render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel className="text-xs text-slate-300 font-semibold">Area</FormLabel>
-                                        <FormControl>
-                                            <select
-                                                value={field.value ?? ""}
-                                                onChange={field.onChange}
-                                                className={selectClassName}
-                                            >
-                                                <option value="">{city_id ? "Select Area" : "Select City first"}</option>
-                                                {areas?.areas?.map((a: any) => (
-                                                    <option key={a._id} value={a._id}>{a.area_name}</option>
-                                                ))}
-                                            </select>
-                                        </FormControl>
+                            <div className="w-full lg:w-[56%] rounded-2xl border border-slate-800/80 bg-gradient-to-br from-slate-900/55 via-slate-950/45 to-cyan-950/10 p-4 shadow-[0_12px_26px_-18px_rgba(15,23,42,0.9)]">
+                                <div className="mb-3">
+                                    <p className="text-xs font-semibold text-slate-200">Area Selection</p>
+                                    <p className="text-[11px] text-slate-400">Choose an existing area or request a new area for review.</p>
+                                </div>
+
+                                <FormField control={form.control} name="area_input_mode" render={({ field }) => (
+                                    <FormItem className="w-full">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                            <label className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 text-xs cursor-pointer transition ${field.value === "existing" ? "border-cyan-500/60 bg-cyan-950/20 text-slate-100 shadow-[inset_0_0_0_1px_rgba(34,211,238,0.16)]" : "border-slate-700/70 bg-slate-900/40 text-slate-300 hover:border-slate-600"}`}>
+                                                <input type="radio" value="existing" checked={field.value === "existing"} onChange={() => form.setValue("area_input_mode", "existing")} className="accent-cyan-400" />
+                                                <span>Select Existing</span>
+                                            </label>
+                                            <label className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 text-xs cursor-pointer transition ${field.value === "new" ? "border-cyan-500/60 bg-cyan-950/20 text-slate-100 shadow-[inset_0_0_0_1px_rgba(34,211,238,0.16)]" : "border-slate-700/70 bg-slate-900/40 text-slate-300 hover:border-slate-600"}`}>
+                                                <input type="radio" value="new" checked={field.value === "new"} onChange={() => form.setValue("area_input_mode", "new")} className="accent-cyan-400" />
+                                                <span>Request New</span>
+                                            </label>
+                                        </div>
                                     </FormItem>
                                 )} />
-                            )}
 
-                            {areaInputMode === "new" && (
-                                <FormField control={form.control} name="area_name_request" render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel className="text-xs text-slate-300">New Area Name</FormLabel>
-                                        <FormControl><Input placeholder="Enter area name to request" {...field} /></FormControl>
-                                    </FormItem>
-                                )} />
-                            )}
+                                <div className="mt-3">
+                                    {areaInputMode === "existing" && (
+                                        <FormField control={form.control} name="area" render={({ field }) => (
+                                            <FormItem className="w-full">
+                                                <FormLabel className="text-xs text-slate-300 font-semibold">Area</FormLabel>
+                                                <FormControl>
+                                                    <select
+                                                        value={field.value ?? ""}
+                                                        onChange={field.onChange}
+                                                        className={selectClassName}
+                                                    >
+                                                        <option value="">{city_id ? "Select Area" : "Select City first"}</option>
+                                                        {areas?.areas?.map((a: any) => (
+                                                            <option key={a._id} value={a._id}>{a.area_name}</option>
+                                                        ))}
+                                                    </select>
+                                                </FormControl>
+                                            </FormItem>
+                                        )} />
+                                    )}
 
+                                    {areaInputMode === "new" && (
+                                        <FormField control={form.control} name="area_name_request" render={({ field }) => (
+                                            <FormItem className="w-full">
+                                                <FormLabel className="text-xs text-slate-300 font-semibold">New Area Name</FormLabel>
+                                                <FormControl><Input placeholder="Enter area name to request" {...field} value={field.value ?? ""} className="bg-slate-950/40" /></FormControl>
+                                            </FormItem>
+                                        )} />
+                                    )}
+                                </div>
+                            </div>
                         </div>
 
 
@@ -757,28 +747,33 @@ export default function EditEnquiry() {
                                 control={form.control}
                                 name="camp_input_mode"
                                 render={({ field }) => (
-                                    <FormItem className="mt-2 w-full">
-                                        <FormLabel className="text-xs text-slate-300 font-semibold">Camp Selection</FormLabel>
+                                    <FormItem className="w-full lg:w-[56%] rounded-2xl border border-slate-800/80 bg-gradient-to-br from-slate-900/55 via-slate-950/45 to-cyan-950/10 p-4 shadow-[0_12px_26px_-18px_rgba(15,23,42,0.9)]">
+                                        <div className="mb-3">
+                                            <FormLabel className="text-xs text-slate-300 font-semibold">Camp Selection</FormLabel>
+                                            <p className="text-[11px] text-slate-400 mt-1">Choose an existing camp or request a new camp entry for the selected area.</p>
+                                        </div>
 
-                                        <div className="flex gap-4 mt-1 text-sm">
-                                            <label className="flex items-center gap-1 cursor-pointer">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                                            <label className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 text-xs cursor-pointer transition ${field.value === "existing" ? "border-cyan-500/60 bg-cyan-950/20 text-slate-100 shadow-[inset_0_0_0_1px_rgba(34,211,238,0.16)]" : "border-slate-700/70 bg-slate-900/40 text-slate-300 hover:border-slate-600"}`}>
                                                 <input
                                                     type="radio"
                                                     value="existing"
                                                     checked={field.value === "existing"}
                                                     onChange={() => form.setValue("camp_input_mode", "existing")}
+                                                    className="accent-cyan-400"
                                                 />
-                                                <span className="text-slate-300">Select Existing Camp</span>
+                                                <span>Select Existing Camp</span>
                                             </label>
 
-                                            <label className="flex items-center gap-1 cursor-pointer">
+                                            <label className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 text-xs cursor-pointer transition ${field.value === "new" ? "border-cyan-500/60 bg-cyan-950/20 text-slate-100 shadow-[inset_0_0_0_1px_rgba(34,211,238,0.16)]" : "border-slate-700/70 bg-slate-900/40 text-slate-300 hover:border-slate-600"}`}>
                                                 <input
                                                     type="radio"
                                                     value="new"
                                                     checked={field.value === "new"}
                                                     onChange={() => form.setValue("camp_input_mode", "new")}
+                                                    className="accent-cyan-400"
                                                 />
-                                                <span className="text-slate-300">Request New Camp</span>
+                                                <span>Request New Camp</span>
                                             </label>
                                         </div>
 
@@ -794,7 +789,7 @@ export default function EditEnquiry() {
                                 control={form.control}
                                 name="camp"
                                 render={({ field }) => (
-                                    <FormItem className="w-full mt-3">
+                                    <FormItem className="w-full lg:w-[56%] rounded-xl border border-slate-800/70 bg-slate-950/25 p-3">
                                         <FormLabel className="text-xs text-slate-300 font-semibold">Camp Name</FormLabel>
                                         <FormControl>
                                             <select
@@ -816,513 +811,551 @@ export default function EditEnquiry() {
                             />
                         )}
 
-                        {/* CAMP DETAILS */}
-                        <>
-                            <FormField
-                                control={form.control}
-                                name="camp_name_request"
-                                render={({ field }) => (
-                                    <FormItem className="mt-3 w-full">
-                                        <FormLabel className="text-xs text-slate-300 font-semibold">
-                                            {isNewCamp ? "Requested Camp Name" : "Camp Name"}
-                                        </FormLabel>
-                                        <FormControl>
-                                            <Input
-                                                placeholder={isNewCamp ? "Enter camp name to request review" : "Enter camp name"}
-                                                {...field}
-                                            />
-                                        </FormControl>
-                                        {isNewCamp && (
+                        {/* REQUEST NEW CAMP TEXT INPUT + LANDLORD/RE DETAILS/CLIENT */}
+                        {(campInputMode === "new" || areaInputMode == "new") && (
+                            <div className="rounded-2xl border border-slate-800/80 bg-gradient-to-br from-slate-900/45 via-slate-950/45 to-cyan-950/10 p-4 space-y-3">
+                                <div>
+                                    <p className="text-xs font-semibold text-slate-200">Camp Request Details</p>
+                                    <p className="text-[11px] text-slate-400">Capture new camp details with enough context for review and follow-up.</p>
+                                </div>
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                                <FormField
+                                    control={form.control}
+                                    name="camp_name_request"
+                                    render={({ field }) => (
+                                        <FormItem className="w-full lg:col-span-2">
+                                            <FormLabel className="text-xs text-slate-300 font-semibold">Requested Camp Name</FormLabel>
+                                            <FormControl>
+                                                <Input placeholder="Enter camp name to request review" {...field} value={field.value ?? ""} className="bg-slate-950/40" />
+                                            </FormControl>
                                             <p className="text-[10px] text-slate-400 mt-1">
                                                 This will be reviewed and added to the system if valid.
                                             </p>
-                                        )}
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
 
-                            {/* CAMP TYPE */}
-                            <FormField
-                                control={form.control}
-                                name="camp_type"
-                                render={({ field }) => (
-                                    <FormItem className="w-full lg:w-[48%]">
-                                        <FormLabel className="text-xs text-slate-300 font-semibold">Camp Type</FormLabel>
-                                        <FormControl>
-                                            <select
-                                                value={field.value ?? ""}
-                                                onChange={field.onChange}
-                                                className={selectClassName}
-                                            >
-                                                <option value="">Select Camp Type</option>
-                                                {EQ_CAMP_TYPES.map((c) => (
-                                                    <option key={c} value={c}>
-                                                        {c}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
+                                {/* CAMP TYPE */}
+                                <FormField
+                                    control={form.control}
+                                    name="camp_type"
+                                    render={({ field }) => (
+                                        <FormItem className="w-full">
+                                            <FormLabel className="text-xs text-slate-300 font-semibold">Camp Type</FormLabel>
+                                            <FormControl>
+                                                <select
+                                                    value={field.value ?? ""}
+                                                    onChange={field.onChange}
+                                                    className={selectClassName}
+                                                >
+                                                    <option value="">Select Camp Type</option>
+                                                    {EQ_CAMP_TYPES.map((c) => (
+                                                        <option key={c} value={c}>
+                                                            {c}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
 
-                            <FormField
-                                control={form.control}
-                                name="landlord"
-                                render={({ field }) => (
-                                    <FormItem className="w-full mt-2">
-                                        <FormLabel className="text-xs text-slate-300 font-semibold">Landlord / Owner</FormLabel>
-                                        <FormControl><Input placeholder="Landlord / Owner Name" {...field} /></FormControl>
-                                    </FormItem>
-                                )}
-                            />
+                                <FormField
+                                    control={form.control}
+                                    name="landlord"
+                                    render={({ field }) => (
+                                        <FormItem className="w-full">
+                                            <FormLabel className="text-xs text-slate-300 font-semibold">Landlord / Owner</FormLabel>
+                                            <FormControl><Input placeholder="Landlord / Owner Name" {...field} value={field.value ?? ""} className="bg-slate-950/40" /></FormControl>
+                                        </FormItem>
+                                    )}
+                                />
 
-                            <FormField
-                                control={form.control}
-                                name="real_estate"
-                                render={({ field }) => (
-                                    <FormItem className="w-full mt-2">
-                                        <FormLabel className="text-xs text-slate-300 font-semibold">Real Estate Company</FormLabel>
-                                        <FormControl><Input placeholder="Real Estate Company Name" {...field} /></FormControl>
-                                    </FormItem>
-                                )}
-                            />
+                                <FormField
+                                    control={form.control}
+                                    name="real_estate"
+                                    render={({ field }) => (
+                                        <FormItem className="w-full">
+                                            <FormLabel className="text-xs text-slate-300 font-semibold">Real Estate Company</FormLabel>
+                                            <FormControl><Input placeholder="Real Estate Company Name" {...field} value={field.value ?? ""} className="bg-slate-950/40" /></FormControl>
+                                        </FormItem>
+                                    )}
+                                />
 
-                            <FormField
-                                control={form.control}
-                                name="client_company"
-                                render={({ field }) => (
-                                    <FormItem className="w-full mt-2">
-                                        <FormLabel className="text-xs text-slate-300 font-semibold">Client / End-User Company</FormLabel>
-                                        <FormControl><Input placeholder="Client Company Name" {...field} /></FormControl>
-                                    </FormItem>
-                                )}
-                            />
-
+                                <FormField
+                                    control={form.control}
+                                    name="client_company"
+                                    render={({ field }) => (
+                                        <FormItem className="w-full lg:col-span-2">
+                                            <FormLabel className="text-xs text-slate-300 font-semibold">Client / End-User Company</FormLabel>
+                                            <FormControl><Input placeholder="Client Company Name" {...field} value={field.value ?? ""} className="bg-slate-950/40" /></FormControl>
+                                        </FormItem>
+                                    )}
+                                />
 
 
                                 {/* HEAD OFFICE */}
                                 {!showHeadOffice && (
-                                    <button type="button" className="text-cyan-400 text-xs underline" onClick={() => setShowHeadOffice(true)}>
+                                    <button type="button" className="inline-flex items-center rounded-lg border border-cyan-800/60 bg-cyan-950/20 px-3 py-2 text-cyan-200 text-xs hover:bg-cyan-950/30 transition" onClick={() => setShowHeadOffice(true)}>
                                         + Add Head Office Details
                                     </button>
                                 )}
 
                                 {showHeadOffice && (
-                                    <div className="border border-slate-700 p-3 rounded-lg space-y-3 bg-slate-900/50">
+                                    <div className="lg:col-span-2 border border-slate-700/80 p-4 rounded-xl space-y-3 bg-slate-900/50">
                                         <div className="flex justify-between items-center">
                                             <h1 className="text-xs font-semibold text-slate-300">Head Office</h1>
-                                            <button
-                                                type="button"
-                                                className="text-red-400 text-xs underline"
-                                                onClick={() => {
-                                                    setShowHeadOffice(false);
-                                                    form.setValue("head_office_address", "");
-                                                    form.setValue("head_office_contact", "");
-                                                    form.setValue("head_office_location", "");
-                                                    form.setValue("head_office_details", "");
-                                                }}
-                                            >
+                                            <button type="button" className="text-red-400 text-xs underline" onClick={() => setShowHeadOffice(false)}>
                                                 Remove
                                             </button>
                                         </div>
 
                                         <FormField control={form.control} name="head_office_address" render={({ field }) => (
-                                            <FormItem><FormLabel className="text-xs text-slate-300">Address</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                                            <FormItem><FormLabel className="text-xs text-slate-300">Address</FormLabel><FormControl><Input {...field} value={field.value ?? ""} /></FormControl></FormItem>
                                         )} />
 
                                         <FormField control={form.control} name="head_office_contact" render={({ field }) => (
-                                            <FormItem><FormLabel className="text-xs text-slate-300">Contact Number</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                                            <FormItem><FormLabel className="text-xs text-slate-300">Contact Number</FormLabel><FormControl><Input {...field} value={field.value ?? ""} /></FormControl></FormItem>
                                         )} />
 
                                         <FormField control={form.control} name="head_office_location" render={({ field }) => (
-                                            <FormItem><FormLabel className="text-xs text-slate-300">Location</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                                            <FormItem><FormLabel className="text-xs text-slate-300">Location</FormLabel><FormControl><Input {...field} value={field.value ?? ""} /></FormControl></FormItem>
                                         )} />
 
                                         <FormField control={form.control} name="head_office_details" render={({ field }) => (
-                                            <FormItem><FormLabel className="text-xs text-slate-300">Other Details</FormLabel><FormControl><Textarea {...field} /></FormControl></FormItem>
+                                            <FormItem><FormLabel className="text-xs text-slate-300">Other Details</FormLabel><FormControl><Textarea {...field} value={field.value ?? ""} /></FormControl></FormItem>
                                         )} />
 
                                     </div>
                                 )}
 
-                        </>
-
-                        {isExistingCampMode ? (
-                            <>
-                                {/* CAMP CAPACITY (READ-ONLY) */}
-                                <FormField
-                                    control={form.control}
-                                    name="camp_capacity"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel className="text-xs text-slate-300">Camp Capacity</FormLabel>
-                                            <FormControl>
-                                                <Input
-                                                    {...field}
-                                                    readOnly
-                                                    value={field.value || ""}
-                                                    placeholder="Select a camp to view capacity"
-                                                />
-                                            </FormControl>
-                                            {campCapacityMissing && (
-                                                <p className="text-xs text-red-400 mt-1">Please add the camp capacity</p>
-                                            )}
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-
-                                {/* OCCUPANCY (READ-ONLY) */}
-                                <FormField
-                                    control={form.control}
-                                    name="camp_occupancy"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel className="text-xs text-slate-300">Current Occupancy</FormLabel>
-                                            <FormControl>
-                                                <Input
-                                                    type="number"
-                                                    {...field}
-                                                    readOnly
-                                                    value={field.value || ""}
-                                                    placeholder="Select a camp to view occupancy"
-                                                />
-                                            </FormControl>
-                                            {campOccupancyMissing && (
-                                                <p className="text-xs text-red-400 mt-1">Please add the camp occupancy</p>
-                                            )}
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-                            </>
-                        ) : (
-                            <>
-                                {/* CAMP CAPACITY */}
-                                <FormField control={form.control} name="camp_capacity" render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel className="text-xs text-slate-300">Camp Capacity</FormLabel>
-                                        <FormControl>
-                                            <select
-                                                value={field.value ?? ""}
-                                                onChange={field.onChange}
-                                                className={selectClassName}
-                                            >
-                                                <option value="">Select Capacity</option>
-                                                {Eq_CAPACITY_OPTIONS.map((c) => (
-                                                    <option key={c} value={c}>{c}</option>
-                                                ))}
-                                            </select>
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )} />
-
-                                {/* OCCUPANCY */}
-                                <FormField control={form.control} name="camp_occupancy" render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel className="text-xs text-slate-300">Current Occupancy</FormLabel>
-                                        <Input type="number" {...field} value={field.value || ""} />
-                                        <FormMessage />
-                                    </FormItem>
-                                )} />
-                            </>
+                                </div>
+                            </div>
                         )}
 
-                        {/* CONTACTS */}
-                        <div className="text-xs text-slate-400 font-semibold flex items-center gap-1">
-                            <PhoneCall size={14} /> Contacts
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {/* CAMP CAPACITY */}
+                            <FormField control={form.control} name="camp_capacity" render={({ field }) => (
+                                <FormItem className="rounded-xl border border-slate-800/70 bg-slate-950/25 p-3">
+                                    <FormLabel className="text-xs text-slate-300">Camp Capacity</FormLabel>
+                                    <FormControl>
+                                        <select
+                                            value={field.value ?? ""}
+                                            onChange={(event) => {
+                                                const value = event.target.value;
+                                                field.onChange(value);
+                                                const matchedPriority = priorityCapacityMap.find((item) => item.capacity === value)?.priority;
+                                                if (matchedPriority) {
+                                                    form.setValue("priority", matchedPriority, { shouldDirty: true, shouldValidate: true });
+                                                }
+                                            }}
+                                            className={selectClassName}
+                                        >
+                                            <option value="">Select Capacity</option>
+                                            {priorityCapacityMap.map((item) => (
+                                                <option key={item.capacity} value={item.capacity}>
+                                                    {item.capacityLabel} (Priority {item.priority})
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </FormControl>
+                                    {campCapacityMissing && (
+                                        <p className="text-xs text-red-400 mt-1">Please add the camp capacity</p>
+                                    )}
+                                    <FormMessage />
+                                </FormItem>
+                            )} />
+
+                            {/* OCCUPANCY */}
+                            <FormField control={form.control} name="camp_occupancy" render={({ field }) => (
+                                <FormItem className="rounded-xl border border-slate-800/70 bg-slate-950/25 p-3">
+                                    <FormLabel className="text-xs text-slate-300">Current Occupancy</FormLabel>
+                                    <Input type="number" {...field} value={field.value || ""} placeholder="Enter in numbers" className="bg-slate-950/40" />
+                                    {campOccupancyMissing && (
+                                        <p className="text-xs text-red-400 mt-1">Please add the camp occupancy</p>
+                                    )}
+                                    <FormMessage />
+                                </FormItem>
+                            )} />
                         </div>
 
-                        {fields?.length === 0 && (
-                            <div className="border border-dashed border-slate-700 rounded-lg p-3 text-xs text-slate-400">
-                                No contacts added yet. You can continue editing and add contacts anytime.
-                            </div>
-                        )}
-                        {fields?.map((field, i) => (
-                            <div key={field.id} className="border border-slate-700 p-3 rounded-lg space-y-2">
-
-                                <div className="flex gap-3">
-                                    <Input {...form.register(`contacts.${i}.name`)} placeholder="Name" className="w-1/2" />
-                                    <Input {...form.register(`contacts.${i}.phone`)} placeholder="Phone" className="w-1/2" />
-                                </div>
-
-                                <Input {...form.register(`contacts.${i}.email`)} placeholder="Email (optional)" />
-                                <Input {...form.register(`contacts.${i}.designation`)} placeholder="Designation" />
-
-                                {/* Is Decision Maker? */}
+                        {/* CONTACTS */}
+                        <div className="rounded-xl border border-slate-800/80 bg-gradient-to-r from-slate-900/50 to-slate-950/40 p-3 space-y-3">
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                 <div>
-                                    <FormLabel className="text-xs text-slate-300 font-semibold">Is Decision Maker?</FormLabel>
-                                    <select
-                                        value={form.watch(`contacts.${i}.is_decision_maker`) ?? ""}
-                                        onChange={(event) => form.setValue(`contacts.${i}.is_decision_maker`, event.target.value)}
-                                        className={selectClassName}
-                                    >
-                                        <option value="">Select</option>
-                                        <option value="Yes">Yes</option>
-                                        <option value="No">No</option>
-                                    </select>
+                                    <div className="text-xs text-slate-300 font-semibold flex items-center gap-2">
+                                        <PhoneCall size={14} className="text-cyan-300" /> Contacts
+                                    </div>
+                                    <p className="mt-1 text-[11px] text-slate-400">Add one or more contacts connected to this enquiry.</p>
                                 </div>
-
-                                {/* Authority Level */}
-                                <div>
-                                    <FormLabel className="text-xs text-slate-300 font-semibold">Authority Level</FormLabel>
-                                    <select
-                                        value={form.watch(`contacts.${i}.authority_level`) ?? ""}
-                                        onChange={(event) => form.setValue(`contacts.${i}.authority_level`, event.target.value)}
-                                        className={selectClassName}
-                                    >
-                                        <option value="">Authority Level</option>
-                                        <option value="Operational">Operational</option>
-                                        <option value="Manager">Manager</option>
-                                        <option value="Director">Director</option>
-                                        <option value="C-Level">C-Level</option>
-                                    </select>
-                                </div>
-
                                 <button
                                     type="button"
-                                    onClick={() => remove(i)}
-                                    className="text-red-400 text-xs flex items-center gap-1"
+                                    onClick={() => append({ name: "", phone: "" })}
+                                    className="inline-flex items-center gap-2 rounded-lg border border-cyan-800/70 bg-cyan-950/20 px-3 py-2 text-xs font-medium text-cyan-200 hover:border-cyan-600/70 hover:bg-cyan-950/30 transition sm:self-start"
                                 >
-                                    <Trash2 size={14} /> Remove Contact
+                                    <Plus size={14} /> {fields.length === 0 ? "Add Contact" : "Add Another Contact"}
                                 </button>
                             </div>
-                        ))}
-                        <button type="button" onClick={() => append({ name: "", phone: "" })} className="text-cyan-400 text-xs flex items-center gap-1">
-                            <Plus size={14} /> Add Another Contact
-                        </button>
 
-                        {/* Location */}
-                        <LocationPicker
-                            onChange={(loc: any) => {
-                                form.setValue("latitude", String(loc.lat));
-                                form.setValue("longitude", String(loc.lng));
-                                form.setValue("coordinates", `${loc.lat}, ${loc.lng}`);
-                            }}
-                            value={coordsForDisplay}
-                        />
+                            {fields?.map((field, i) => (
+                                <div key={field.id} className="border border-slate-800/80 bg-slate-950/30 p-3 rounded-xl space-y-3">
+                                    <div className="flex flex-col sm:flex-row gap-3">
+                                        <Input {...form.register(`contacts.${i}.name`)} placeholder="Name" className="w-full sm:w-1/2" />
+                                        <Input {...form.register(`contacts.${i}.phone`)} placeholder="Phone" className="w-full sm:w-1/2" />
+                                    </div>
 
-                        <Input
-                            type="text"
-                            {...form.register("coordinates", {
-                                onChange: (event) => {
-                                    const { latitude, longitude } = parseCoordinates(event.target.value);
-                                    form.setValue("latitude", latitude);
-                                    form.setValue("longitude", longitude);
-                                },
-                            })}
-                            placeholder="Latitude,Longitude"
-                        />
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                                        <Input {...form.register(`contacts.${i}.email`)} placeholder="Email (optional)" />
+                                        <Input {...form.register(`contacts.${i}.designation`)} placeholder="Designation" />
+                                    </div>
+
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                                        <div>
+                                            <FormLabel className="text-xs text-slate-300 font-semibold">Is Decision Maker?</FormLabel>
+                                            <select
+                                                value={form.watch(`contacts.${i}.is_decision_maker`) ?? ""}
+                                                onChange={(event) => form.setValue(`contacts.${i}.is_decision_maker`, event.target.value)}
+                                                className={selectClassName}
+                                            >
+                                                <option value="">Select</option>
+                                                <option value="Yes">Yes</option>
+                                                <option value="No">No</option>
+                                            </select>
+                                        </div>
+
+                                        <div>
+                                            <FormLabel className="text-xs text-slate-300 font-semibold">Authority Level</FormLabel>
+                                            <select
+                                                value={form.watch(`contacts.${i}.authority_level`) ?? ""}
+                                                onChange={(event) => form.setValue(`contacts.${i}.authority_level`, event.target.value)}
+                                                className={selectClassName}
+                                            >
+                                                <option value="">Authority Level</option>
+                                                <option value="Operational">Operational</option>
+                                                <option value="Manager">Manager</option>
+                                                <option value="Director">Director</option>
+                                                <option value="C-Level">C-Level</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    {fields.length > 1 && (
+                                        <button type="button" onClick={() => remove(i)} className="text-red-400 text-xs flex items-center gap-1">
+                                            <Trash2 size={14} /> Remove Contact
+                                        </button>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="rounded-xl border border-slate-800/70 bg-slate-950/30 p-3">
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between mb-2">
+                                <div>
+                                    <p className="text-xs font-semibold text-slate-300">Coordinates (Optional)</p>
+                                    <p className="text-[11px] text-slate-400">Type manually or use the location picker for a precise map point.</p>
+                                </div>
+                                <LocationPicker
+                                    onChange={(loc: any) => {
+                                        form.setValue("latitude", loc.lat);
+                                        form.setValue("longitude", loc.lng);
+                                        form.setValue("coordinates", `${loc.lat}, ${loc.lng}`);
+                                    }}
+                                    value={coordsForDisplay}
+                                    showValues={false}
+                                    className="sm:self-start"
+                                    buttonClassName="h-8 px-3 text-xs"
+                                />
+                            </div>
+
+                            <Input
+                                type="text"
+                                {...form.register("coordinates", {
+                                    onChange: (event) => {
+                                        const { latitude, longitude } = parseCoordinates(event.target.value);
+                                        form.setValue("latitude", latitude);
+                                        form.setValue("longitude", longitude);
+                                    },
+                                })}
+                                placeholder="Latitude,Longitude"
+                                className="bg-slate-950/40"
+                            />
+
+                            {coordsForDisplay?.lat !== null && coordsForDisplay?.lng !== null && (
+                                <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-slate-400">
+                                    <div className="rounded-md border border-slate-800/80 bg-slate-950/40 px-2 py-1.5">
+                                        Latitude: <span className="text-slate-200">{coordsForDisplay.lat}</span>
+                                    </div>
+                                    <div className="rounded-md border border-slate-800/80 bg-slate-950/40 px-2 py-1.5">
+                                        Longitude: <span className="text-slate-200">{coordsForDisplay.lng}</span>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
 
                         {/* WIFI */}
-                        <div className="text-xs text-slate-400 font-semibold flex items-center gap-1"><Wifi size={14} /> Wi-Fi / Internet</div>
-
-                        <FormField control={form.control} name="wifi_available" render={({ field }) => (
-                            <FormItem>
-                                <FormLabel className="text-xs text-slate-300 font-semibold">Wi-Fi Available?</FormLabel>
-                                <FormControl>
-                                    <select
-                                        value={field.value ?? ""}
-                                        onChange={field.onChange}
-                                        className={selectClassName}
-                                    >
-                                        <option value="">Select Wi-Fi Availability</option>
-                                        <option value="Yes">Yes</option>
-                                        <option value="No">No</option>
-                                        <option value="not-specified">Not Specified</option>
-                                    </select>
-                                </FormControl>
-                            </FormItem>
-                        )} />
-
-                        {form.watch("wifi_available") === "No" && (
-                            <Input {...form.register("expected_monthly_price")} placeholder="Expected Monthly Price" />
-                        )}
-
-                        {form.watch("wifi_available") === "Yes" && (
-                            <>
-                                <FormField control={form.control} name="wifi_type" render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel className="text-xs text-slate-300 font-semibold">Wi-Fi Type</FormLabel>
+                        <div className="rounded-xl border border-slate-800/80 bg-gradient-to-r from-slate-900/50 to-slate-950/40 p-3">
+                            <div className="text-xs text-slate-300 font-semibold flex items-center gap-2"><Wifi size={14} className="text-cyan-300" /> Wi-Fi / Internet</div>
+                            <p className="mt-1 text-[11px] text-slate-400">Capture availability, source type, and connection details in one organized section.</p>
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mt-3">
+                                <FormField control={form.control} name="wifi_available" render={({ field }) => (
+                                    <FormItem className="rounded-xl border border-slate-800/70 bg-slate-950/25 p-3">
+                                        <FormLabel className="text-xs text-slate-300 font-semibold">Wi-Fi Available?</FormLabel>
                                         <FormControl>
                                             <select
                                                 value={field.value ?? ""}
                                                 onChange={field.onChange}
                                                 className={selectClassName}
                                             >
-                                                <option value="">Select Type</option>
-                                                <option value="Existing Contractor">Existing Contractor</option>
-                                                <option value="Personal WiFi">Personal WiFi</option>
-                                                <option value="Other Sources">Other Sources</option>
+                                                <option value="">Select Wi-Fi Availability</option>
+                                                <option value="Yes">Yes</option>
+                                                <option value="No">No</option>
+                                                <option value="not-specified">Not Specified</option>
                                             </select>
                                         </FormControl>
                                     </FormItem>
                                 )} />
 
-                                {/* Existing Contractor */}
-                                {form.watch("wifi_type") === "Existing Contractor" && (
-                                    <>
-                                        <Input {...form.register("contractor_name")} placeholder="Contractor Name *" />
-                                        <div className="flex flex-col gap-1">
-                                            <label className="text-xs text-slate-400 font-medium">
-                                                Contract Start Date
-                                            </label>
+                                <div className="rounded-xl border border-slate-800/70 bg-slate-950/25 p-3">
+                                    <label className="text-xs text-slate-300 font-semibold block mb-2">Expected Monthly Price</label>
+                                    <Input
+                                        {...form.register("expected_monthly_price")}
+                                        placeholder="Expected Monthly Price"
+                                        disabled={form.watch("wifi_available") !== "No"}
+                                        className={form.watch("wifi_available") !== "No" ? "bg-slate-900/40 opacity-70" : "bg-slate-950/40"}
+                                    />
+                                    {form.watch("wifi_available") !== "No" && (
+                                        <p className="mt-1 text-[11px] text-slate-500">Enable this when Wi-Fi Available is set to `No`.</p>
+                                    )}
+                                </div>
+                            </div>
 
-                                            <Input type="date" {...form.register("contract_start")} />
-                                        </div>
-                                        <div className="flex flex-col gap-1">
-                                            <label className="text-xs text-slate-400 font-medium">
-                                                Contract End Date
-                                            </label>
-                                            <Input type="date" {...form.register("contract_expiry")} />
-                                        </div>
-                                        <Input {...form.register("wifi_plan")} placeholder="Plan / Package" />
-                                        <Input type="number" {...form.register("speed_mbps")} placeholder="Speed (Mbps)" />
-                                        <Textarea {...form.register("pain_points")} placeholder="Client Pain Points" />
-                                    </>
-                                )}
+                            {form.watch("wifi_available") === "Yes" && (
+                                <div className="mt-3 rounded-xl border border-slate-800/70 bg-slate-950/20 p-3 space-y-3">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <p className="text-xs font-semibold text-slate-300">Connection Setup</p>
+                                        <p className="text-[11px] text-slate-400">Select the current internet source to reveal relevant fields.</p>
+                                    </div>
+                                    <FormField control={form.control} name="wifi_type" render={({ field }) => (
+                                        <FormItem className="rounded-lg border border-slate-800/70 bg-slate-950/25 p-3">
+                                            <FormLabel className="text-xs text-slate-300 font-semibold">Wi-Fi Type</FormLabel>
+                                            <FormControl>
+                                                <select
+                                                    value={field.value ?? ""}
+                                                    onChange={field.onChange}
+                                                    className={selectClassName}
+                                                >
+                                                    <option value="">Select Type</option>
+                                                    <option value="Existing Contractor">Existing Contractor</option>
+                                                    <option value="Personal WiFi">Personal WiFi</option>
+                                                    <option value="Other Sources">Other Sources</option>
+                                                </select>
+                                            </FormControl>
+                                        </FormItem>
+                                    )} />
 
-                                {/* Personal WiFi */}
-                                {form.watch("wifi_type") === "Personal WiFi" && (
-                                    <>
-                                        <Input {...form.register("provider_plan")} placeholder="Provider / Plan" />
-                                        <div className="flex flex-col gap-1">
-                                            <label className="text-xs text-slate-400 font-medium">
-                                                Start Date
-                                            </label>
-                                            <Input type="date" {...form.register("personal_wifi_start")} />
-                                        </div>
-
-                                        <div className="flex flex-col gap-1">
-                                            <label className="text-xs text-slate-400 font-medium">
-                                                End Date
-                                            </label>
-                                            <Input type="date" {...form.register("personal_wifi_expiry")} />
-                                        </div>
-                                        <Input type="number" {...form.register("personal_wifi_price")} placeholder="Monthly Price" />
-                                    </>
-                                )}
-
-                                {/* Other Sources */}
-                                {form.watch("wifi_type") === "Other Sources" && (
-                                    <Textarea {...form.register("other_wifi_details")} placeholder="Describe Internet Setup" />
-                                )}
-                            </>
-                        )}
-
-                        {/* Lease Expiry Date */}
-                        <FormField control={form.control} name="lease_expiry_due" render={({ field }) => (
-                            <FormItem><FormLabel className="text-xs text-slate-300">Lease Expiry Date</FormLabel>
-                                <Input type="date" {...field} />
-                            </FormItem>
-                        )} />
-
-                        {/* Rent Terms */}
-                        <Textarea {...form.register("rent_terms")} placeholder="Rent Terms" />
-
-                        {/* Competition Presence */}
-                        <FormField control={form.control} name="competition_status" render={({ field }) => (
-                            <FormItem>
-                                <FormLabel className="text-xs text-slate-300 font-semibold">Competition Presence</FormLabel>
-                                <FormControl>
-                                    <select
-                                        value={field.value ?? ""}
-                                        onChange={field.onChange}
-                                        className={selectClassName}
-                                    >
-                                        <option value="">Competition Status</option>
-                                        <option value="Yes">Yes</option>
-                                        <option value="No">No</option>
-                                    </select>
-                                </FormControl>
-                            </FormItem>
-                        )} />
-
-                        {/* Competiton Notes */}
-                        <Textarea {...form.register("competition_notes")} placeholder="Competition Notes" />
-
-                        {/* PRIORITY */}
-                        <FormField control={form.control} name="priority" render={({ field }) => (
-                            <FormItem>
-                                <Tooltip
-                                    placement="topLeft"
-                                    rootClassName="w-[360px]"
-                                    className="w-[360px]"
-                                    title={
-                                        <div className="w-[360px] rounded-lg border border-slate-700/70 bg-slate-900/95 p-3 shadow-lg">
-                                            <div className="grid grid-cols-2 gap-x-4 text-[11px] font-semibold uppercase tracking-wide text-slate-300">
-                                                <span>Priority</span>
-                                                <span>Capacity</span>
+                                    {form.watch("wifi_type") === "Existing Contractor" && (
+                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                                            <div className="rounded-lg border border-slate-800/70 bg-slate-950/25 p-3 lg:col-span-2">
+                                                <label className="text-xs text-slate-300 font-semibold block mb-2">Contractor Name</label>
+                                                <Input {...form.register("contractor_name")} placeholder="Contractor Name" className="bg-slate-950/40" />
                                             </div>
-                                            <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-slate-200">
-                                                {priorityCapacityMap.map((item) => (
-                                                    <React.Fragment key={item.priority}>
-                                                        <span className="tabular-nums">{item.priority}</span>
-                                                        <span className="whitespace-nowrap">{item.capacity}</span>
-                                                    </React.Fragment>
-                                                ))}
+                                            <div className="rounded-lg border border-slate-800/70 bg-slate-950/25 p-3">
+                                                <label className="text-xs text-slate-300 font-semibold block mb-2">Contract Start Date</label>
+                                                <Input type="date" {...form.register("contract_start")} className="bg-slate-950/40" />
+                                            </div>
+                                            <div className="rounded-lg border border-slate-800/70 bg-slate-950/25 p-3">
+                                                <label className="text-xs text-slate-300 font-semibold block mb-2">Contract End Date</label>
+                                                <Input type="date" {...form.register("contract_expiry")} className="bg-slate-950/40" />
+                                            </div>
+                                            <div className="rounded-lg border border-slate-800/70 bg-slate-950/25 p-3">
+                                                <label className="text-xs text-slate-300 font-semibold block mb-2">Plan / Package</label>
+                                                <Input {...form.register("wifi_plan")} placeholder="Plan / Package" className="bg-slate-950/40" />
+                                            </div>
+                                            <div className="rounded-lg border border-slate-800/70 bg-slate-950/25 p-3">
+                                                <label className="text-xs text-slate-300 font-semibold block mb-2">Speed (Mbps)</label>
+                                                <Input type="number" {...form.register("speed_mbps")} placeholder="Speed (Mbps)" className="bg-slate-950/40" />
+                                            </div>
+                                            <div className="rounded-lg border border-slate-800/70 bg-slate-950/25 p-3 lg:col-span-2">
+                                                <label className="text-xs text-slate-300 font-semibold block mb-2">Client Pain Points</label>
+                                                <Textarea {...form.register("pain_points")} placeholder="Client Pain Points" className="bg-slate-950/40" />
                                             </div>
                                         </div>
-                                    }
-                                >
-                                    <FormLabel className="text-xs text-slate-300 font-semibold flex gap-1 items-center">
-                                        <Info size={14} color="white" />
-                                        Priority (1 - Low, 10 - High)
-                                    </FormLabel>
-                                </Tooltip>
-                                <FormControl>
-                                    <select
-                                        value={field.value ?? ""}
-                                        onChange={field.onChange}
-                                        className={selectClassName}
+                                    )}
+
+                                    {form.watch("wifi_type") === "Personal WiFi" && (
+                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                                            <div className="rounded-lg border border-slate-800/70 bg-slate-950/25 p-3 lg:col-span-2">
+                                                <label className="text-xs text-slate-300 font-semibold block mb-2">Provider / Plan</label>
+                                                <Input {...form.register("provider_plan")} placeholder="Provider / Plan" className="bg-slate-950/40" />
+                                            </div>
+                                            <div className="rounded-lg border border-slate-800/70 bg-slate-950/25 p-3">
+                                                <label className="text-xs text-slate-300 font-semibold block mb-2">Start Date</label>
+                                                <Input type="date" {...form.register("personal_wifi_start")} className="bg-slate-950/40" />
+                                            </div>
+                                            <div className="rounded-lg border border-slate-800/70 bg-slate-950/25 p-3">
+                                                <label className="text-xs text-slate-300 font-semibold block mb-2">End Date</label>
+                                                <Input type="date" {...form.register("personal_wifi_expiry")} className="bg-slate-950/40" />
+                                            </div>
+                                            <div className="rounded-lg border border-slate-800/70 bg-slate-950/25 p-3">
+                                                <label className="text-xs text-slate-300 font-semibold block mb-2">Monthly Price</label>
+                                                <Input type="number" {...form.register("personal_wifi_price")} placeholder="Monthly Price" className="bg-slate-950/40" />
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {form.watch("wifi_type") === "Other Sources" && (
+                                        <div className="rounded-lg border border-slate-800/70 bg-slate-950/25 p-3">
+                                            <label className="text-xs text-slate-300 font-semibold block mb-2">Other Internet Source Details</label>
+                                            <Textarea {...form.register("other_wifi_details")} placeholder="Describe Internet Setup" className="bg-slate-950/40 min-h-[96px]" />
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="rounded-xl border border-slate-800/80 bg-gradient-to-r from-slate-900/45 to-slate-950/35 p-3">
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                                <FormField control={form.control} name="lease_expiry_due" render={({ field }) => (
+                                    <FormItem className="rounded-lg border border-slate-800/70 bg-slate-950/25 p-3">
+                                        <FormLabel className="text-xs text-slate-300 font-semibold">Lease Expiry Date</FormLabel>
+                                        <Input type="date" {...field} className="bg-slate-950/40" />
+                                    </FormItem>
+                                )} />
+                                <div className="rounded-lg border border-slate-800/70 bg-slate-950/25 p-3">
+                                    <label className="text-xs text-slate-300 font-semibold block mb-2">Rent Terms</label>
+                                    <Textarea {...form.register("rent_terms")} placeholder="Rent Terms" className="bg-slate-950/40 min-h-[86px]" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="rounded-xl border border-slate-800/80 bg-gradient-to-r from-slate-900/45 to-slate-950/35 p-3">
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                                <FormField control={form.control} name="competition_status" render={({ field }) => (
+                                    <FormItem className="rounded-lg border border-slate-800/70 bg-slate-950/25 p-3">
+                                        <FormLabel className="text-xs text-slate-300 font-semibold">Competition Presence</FormLabel>
+                                        <FormControl>
+                                            <select
+                                                value={field.value ?? ""}
+                                                onChange={field.onChange}
+                                                className={selectClassName}
+                                            >
+                                                <option value="">Competition Status</option>
+                                                <option value="Yes">Yes</option>
+                                                <option value="No">No</option>
+                                            </select>
+                                        </FormControl>
+                                    </FormItem>
+                                )} />
+                                <div className="rounded-lg border border-slate-800/70 bg-slate-950/25 p-3">
+                                    <label className="text-xs text-slate-300 font-semibold block mb-2">Competition Notes</label>
+                                    <Textarea {...form.register("competition_notes")} placeholder="Competition Notes" className="bg-slate-950/40 min-h-[86px]" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="rounded-xl border border-slate-800/80 bg-gradient-to-r from-slate-900/45 to-slate-950/35 p-3">
+                            <FormField control={form.control} name="priority" render={({ field }) => (
+                                <FormItem>
+                                    <Tooltip
+                                        placement="topLeft"
+                                        rootClassName="w-[360px]"
+                                        className="w-[360px]"
+                                        title={
+                                            <div className="w-[360px] rounded-lg border border-slate-700/70 bg-slate-900/95 p-3 shadow-lg">
+                                                <div className="grid grid-cols-2 gap-x-4 text-[11px] font-semibold uppercase tracking-wide text-slate-300">
+                                                    <span>Priority</span>
+                                                    <span>Capacity</span>
+                                                </div>
+                                                <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-slate-200">
+                                                    {priorityCapacityMap.map((item) => (
+                                                        <React.Fragment key={item.value}>
+                                                            <span className="tabular-nums">{item.priority}</span>
+                                                            <span className="whitespace-nowrap">{item.capacityLabel}</span>
+                                                        </React.Fragment>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        }
                                     >
-                                        <option value="">Priority</option>
-                                        {priorityLevels.map((p) => (
-                                            <option key={p} value={p}>{p}</option>
-                                        ))}
-                                    </select>
-                                </FormControl>
-                            </FormItem>
-                        )} />
+                                        <FormLabel className="text-xs text-slate-300 font-semibold flex gap-1 items-center">
+                                            <Info size={14} color="white" />
+                                            Priority (1 - Low, 10 - High)
+                                        </FormLabel>
+                                    </Tooltip>
+                                    <FormControl>
+                                        <select
+                                            value={field.value ?? ""}
+                                            onChange={field.onChange}
+                                            className={selectClassName}
+                                        >
+                                            <option value="">Priority</option>
+                                            {priorityCapacityMap.map((item) => (
+                                                <option key={item.value} value={item.value}>
+                                                    {item.value} - {item.capacityLabel}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </FormControl>
+                                </FormItem>
+                            )} />
+                        </div>
 
-                        {/* FOLLOW-UP */}
-                        <FormField control={form.control} name="followup_status" render={({ field }) => (
-                            <FormItem>
-                        <FormLabel className="text-xs text-slate-300 font-semibold">Enquiry Status</FormLabel>
-                        <FormControl>
-                            <select
-                                value={field.value ?? ""}
-                                onChange={field.onChange}
-                                className={selectClassName}
-                            >
-                                <option value="">Enquiry Status</option>
-                                {ENQUIRY_STATUS_OPTIONS.map((status) => (
-                                    <option key={status} value={status}>{status}</option>
-                                ))}
-                            </select>
-                        </FormControl>
-                    </FormItem>
-                )} />
+                        <div className="rounded-xl border border-slate-800/80 bg-gradient-to-r from-slate-900/45 to-slate-950/35 p-3">
+                            <FormField control={form.control} name="followup_status" render={({ field }) => (
+                                <FormItem className="rounded-lg border border-slate-800/70 bg-slate-950/25 p-3">
+                                    <FormLabel className="text-xs text-slate-300 font-semibold">Follow-up Status</FormLabel>
+                                    <FormControl>
+                                        <select
+                                            value={field.value ?? ""}
+                                            onChange={field.onChange}
+                                            className={selectClassName}
+                                        >
+                                            <option value="">Status</option>
+                                            {ENQUIRY_STATUS_OPTIONS.map((status) => (
+                                                <option key={status} value={status}>{status}</option>
+                                            ))}
+                                        </select>
+                                    </FormControl>
+                                </FormItem>
+                            )} />
+                        </div>
 
-                        {/* DATES + NOTES */}
-                        <FormField control={form.control} name="alert_date" render={({ field }) => (
-                            <FormItem><FormLabel className="text-xs text-slate-300">Alert Date</FormLabel><Input type="date" {...field} /></FormItem>
-                        )} />
-                        <Textarea {...form.register("next_action")} placeholder="Next Action" />
-                        <Textarea {...form.register("comments")} placeholder="Comments" />
-                        <FormField control={form.control} name="next_action_due" render={({ field }) => (
-                            <FormItem><FormLabel className="text-xs text-slate-300">Next Action Due Date</FormLabel>
-                                <Input type="date" {...field} />
-                            </FormItem>
-                        )} />
+                        <div className="rounded-xl border border-slate-800/80 bg-gradient-to-r from-slate-900/45 to-slate-950/35 p-3">
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                                <FormField control={form.control} name="alert_date" render={({ field }) => (
+                                    <FormItem className="rounded-lg border border-slate-800/70 bg-slate-950/25 p-3">
+                                        <FormLabel className="text-xs text-slate-300 font-semibold">Alert Date</FormLabel>
+                                        <Input type="date" {...field} className="bg-slate-950/40" />
+                                    </FormItem>
+                                )} />
+                                <FormField control={form.control} name="next_action_due" render={({ field }) => (
+                                    <FormItem className="rounded-lg border border-slate-800/70 bg-slate-950/25 p-3">
+                                        <FormLabel className="text-xs text-slate-300 font-semibold">Next Action Due Date</FormLabel>
+                                        <Input type="date" {...field} className="bg-slate-950/40" />
+                                    </FormItem>
+                                )} />
+                                <div className="lg:col-span-2 rounded-lg border border-slate-800/70 bg-slate-950/25 p-3">
+                                    <label className="text-xs text-slate-300 font-semibold block mb-2">Next Action</label>
+                                    <Textarea {...form.register("next_action")} placeholder="Next Action" className="bg-slate-950/40 min-h-[92px]" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="rounded-xl border border-slate-800/80 bg-gradient-to-r from-slate-900/45 to-slate-950/35 p-3">
+                            <div className="rounded-lg border border-slate-800/70 bg-slate-950/25 p-3">
+                                <label className="text-xs text-slate-300 font-semibold block mb-2">Comments</label>
+                                <Textarea {...form.register("comments")} placeholder="Comments" className="bg-slate-950/40 min-h-[110px]" />
+                            </div>
+                        </div>
 
                         {/* ENQUIRY USERS */}
-                        <div className="border border-slate-700 p-3 rounded-lg space-y-3 bg-slate-900/40">
-                            <div className="text-xs text-slate-400 font-semibold">Enquiry Users</div>
+                        <div className="rounded-xl border border-slate-800/80 bg-gradient-to-r from-slate-900/45 to-slate-950/35 p-3 space-y-3">
+                            <div>
+                                <div className="text-xs text-slate-300 font-semibold">Enquiry Users</div>
+                                <p className="mt-1 text-[11px] text-slate-400">Assign ownership and collaboration members for this enquiry lifecycle.</p>
+                            </div>
                             <FormField
                                 control={form.control}
                                 name="enquiry_brought_by"
@@ -1386,7 +1419,7 @@ export default function EditEnquiry() {
                                     <FormItem className="w-full">
                                         <FormLabel className="text-xs text-slate-300 font-semibold">Enquiry User Notes</FormLabel>
                                         <FormControl>
-                                            <Textarea placeholder="Comments..." {...field} />
+                                            <Textarea placeholder="Comments..." {...field} className="bg-slate-950/40" />
                                         </FormControl>
                                     </FormItem>
                                 )}
@@ -1405,7 +1438,7 @@ export default function EditEnquiry() {
                                             <Upload size={14} className="text-cyan-400" />
                                             <span className="truncate">{docFile ? docFile.name : 'Choose or drop a file (image/PDF, max 5MB)'}</span>
                                         </div>
-                                        {docFile && <span className="text-[11px] text-slate-400">{(docFile.size/1024/1024).toFixed(2)} MB</span>}
+                                        {docFile && <span className="text-[11px] text-slate-400">{(docFile.size / 1024 / 1024).toFixed(2)} MB</span>}
                                     </div>
                                     <input type="file" accept="image/*,application/pdf" className="hidden" onChange={handleEnquiryFileChange} />
                                 </label>
@@ -1453,7 +1486,7 @@ export default function EditEnquiry() {
                                                         </span>
                                                     </div>
                                                     <div className="flex items-center justify-between text-[11px] text-slate-400">
-                                                        {docFile && <span className="text-[10px] text-slate-500">{(docFile.size/1024/1024).toFixed(2)} MB</span>}
+                                                        {docFile && <span className="text-[10px] text-slate-500">{(docFile.size / 1024 / 1024).toFixed(2)} MB</span>}
                                                     </div>
                                                 </div>
                                             </div>
@@ -1525,15 +1558,20 @@ export default function EditEnquiry() {
                         </Dialog>
 
                         {/* SUBMIT */}
-                        <motion.button
-                            type="submit"
-                            disabled={isUpdating}
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                            className="bg-gradient-to-tr from-cyan-950/60 to-cyan-900/60 p-2 px-4 rounded-lg border border-cyan-700 hover:border-cyan-400 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                            {isUpdating ? "Updating..." : "Update Enquiry"}
-                        </motion.button>
+                        <div className="pt-2">
+                            <div className="rounded-xl border border-cyan-900/40 bg-slate-950/50 px-3 py-3 flex justify-end">
+                                <motion.button
+                                    type="submit"
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    disabled={isUpdating}
+                                    className="min-w-[170px] inline-flex items-center justify-center gap-2 bg-gradient-to-r from-cyan-700 to-cyan-600 px-4 py-2.5 rounded-lg border border-cyan-500/70 hover:from-cyan-600 hover:to-cyan-500 text-sm font-semibold text-white disabled:opacity-60 disabled:cursor-not-allowed shadow-[0_8px_20px_-10px_rgba(34,211,238,0.65)]"
+                                >
+                                    {isUpdating && <Loader2 className="h-4 w-4 animate-spin" />}
+                                    {isUpdating ? "Updating..." : "Update Enquiry"}
+                                </motion.button>
+                            </div>
+                        </div>
 
                     </form>
                 </Form>
