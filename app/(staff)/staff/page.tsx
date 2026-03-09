@@ -105,7 +105,7 @@ const StaffHome = () => {
   return (
     <div className='p-4'>
       <div className="flex justify-between p-3 bg-slate-950/50 rounded-lg mb-3 items-center flex-wrap">
-        <h1>Hello, {userData?.user_name?.name}!</h1>
+        <h1>Hi, {userData?.user_name?.name}!</h1>
         <div className="flex gap-2 flex-wrap">
           <div className='border border-slate-700 rounded-lg p-1 px-2'>
             <h1 className='text-xs font-medium flex items-center gap-1'><BellElectric size={14} /> Department</h1>

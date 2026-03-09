@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import AdminSidebar from '@/components/admin/AdminSidebar'
 import AdminTopbar from '@/components/admin/AdminTopbar'
+import AdminLayoutShell from "@/components/admin/AdminLayoutShell";
 import { Metadata } from 'next';
 import React from 'react'
 import { redirect } from 'next/navigation';
@@ -33,35 +34,7 @@ const AdminLayout = async ({ children }: {
     )
   }
   
-  return (
-    <div className="relative h-[100dvh] w-full overflow-hidden text-slate-100">
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -top-24 right-[-10%] h-72 w-72 rounded-full bg-cyan-500/10 blur-3xl" />
-        <div className="absolute bottom-0 left-[-15%] h-72 w-72 rounded-full bg-emerald-500/10 blur-3xl" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.08),_transparent_45%)]" />
-      </div>
-      <div className="relative z-10 grid h-[100dvh] min-h-0 grid-cols-1 md:grid-cols-[220px_1fr] lg:grid-cols-[260px_1fr]">
-        <aside className="border-b border-slate-800/60 bg-slate-950/70 backdrop-blur md:border-b-0 md:border-r">
-          <div className="px-4 pt-5 pb-3 text-[10px] uppercase tracking-[0.35em] text-slate-500">
-            Admin Workspace
-          </div>
-          <div className="overflow-y-auto px-2 pb-6 md:h-[calc(100dvh-3.25rem)]">
-            <AdminSidebar />
-          </div>
-        </aside>
-        <div className="flex h-[100dvh] min-h-0 flex-col overflow-hidden">
-          <div className="sticky top-0 z-20 border-b border-slate-800/60 bg-slate-950/70 backdrop-blur">
-            <AdminTopbar />
-          </div>
-          <main className="flex-1 min-h-0 overflow-y-auto px-4 pb-10 pt-4 md:px-6">
-            <div className="mx-auto w-full max-w-[1400px]">
-              {children}
-            </div>
-          </main>
-        </div>
-      </div>
-    </div>
-  )
+  return <AdminLayoutShell>{children}</AdminLayoutShell>
 }
 
 export default AdminLayout

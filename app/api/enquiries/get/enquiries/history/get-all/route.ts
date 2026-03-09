@@ -10,10 +10,20 @@ export async function GET(req:NextRequest){
         const enquiry_id = searchParams.get("enquiry_id");
         if(!enquiry_id) return NextResponse.json({message: "Please provide enquiry id", status: 400}, {status: 400});
 
-        const histories = await Eq_enquiry_histories.find({enquiry_id: enquiry_id}).sort({step_number: -1}).populate({
-            path: "assigned_to",
-            select: "name email"
-        }).lean();
+        const histories = await Eq_enquiry_histories.find({enquiry_id: enquiry_id}).sort({step_number: -1}).populate([
+            {
+                path: "assigned_to",
+                select: "name email"
+            },
+            {
+                path: "forwarded_by",
+                select: "name email avatar_url"
+            },
+            {
+                path: "changed_by",
+                select: "name email avatar_url"
+            }
+        ]).lean();
 
         return NextResponse.json({histories, status: 200}, {status: 200});
     }catch(err){

@@ -43,6 +43,7 @@ const StaffProjects = () => {
   const [canAdd, setCanAdd] = useState(false);
 
   const [tab, setTab] = useState('all');
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [filters, setFilters] = useState({
     type: '',
     client_id: '',
@@ -259,16 +260,30 @@ const StaffProjects = () => {
         </div>
 
         <Tabs value={tab} onValueChange={setTab} className="mt-3">
-          <TabsList className="grid w-full grid-cols-2 gap-2 bg-slate-900/70 md:grid-cols-4">
+          <TabsList className="grid h-auto w-full grid-cols-2 gap-2 bg-slate-900/70 md:h-12 md:grid-cols-4">
             {statusTabs.map((status) => (
-              <TabsTrigger key={status.value} value={status.value} className="text-xs">
+              <TabsTrigger
+                key={status.value}
+                value={status.value}
+                className="h-auto min-h-9 whitespace-normal px-2 py-1.5 text-center text-[11px] leading-tight md:h-9 md:min-h-0 md:whitespace-nowrap md:py-1 md:text-xs"
+              >
                 {status.label}
               </TabsTrigger>
             ))}
           </TabsList>
         </Tabs>
 
-        <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-3 md:hidden">
+          <Button
+            variant="outline"
+            className="w-full text-xs"
+            onClick={() => setMobileFiltersOpen((prev) => !prev)}
+          >
+            {mobileFiltersOpen ? "Hide Filters" : "Show Filters"}
+          </Button>
+        </div>
+
+        <div className={`mt-4 gap-3 md:grid md:grid-cols-2 lg:grid-cols-4 ${mobileFiltersOpen ? 'grid' : 'hidden'}`}>
           <div className="space-y-1">
             <p className="text-[11px] text-slate-400">Project Domain</p>
             <Select

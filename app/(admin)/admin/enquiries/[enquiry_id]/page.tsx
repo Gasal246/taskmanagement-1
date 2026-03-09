@@ -1,10 +1,10 @@
 "use client";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Mail, Phone, User, Pencil, Trash2, UserCircle2, MapPin, Wifi, Sparkles } from "lucide-react";
 import { Avatar } from "antd";
 import { useParams, useRouter } from "next/navigation";
-import { useGetEnquiryById, useGetEnquiryContacts, useGetEqCampsById, useRemoveEnquiry } from "@/query/enquirymanager/queries";
+import { useGetEnquiryById, useGetEnquiryComments, useGetEnquiryContacts, useGetEqCampsById, useRemoveEnquiry } from "@/query/enquirymanager/queries";
 import { formatDateTiny } from "@/lib/utils";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
@@ -17,12 +17,25 @@ export default function SingleEnquiryPage() {
   const params = useParams<{ enquiry_id: string }>();
   const { data: enquiry, isLoading } = useGetEnquiryById(params.enquiry_id);
   const { data: contactsData } = useGetEnquiryContacts(params.enquiry_id);
+  const { data: commentsData, isLoading: isCommentsLoading } = useGetEnquiryComments(params.enquiry_id);
   const baseCampId = enquiry?.enquiry?.camp_id?._id ?? enquiry?.enquiry?.camp_id;
   const { data: campData, isLoading: isCampLoading } = useGetEqCampsById(baseCampId || "");
   const { mutateAsync: RemoveEnquiry, isPending: isDeleting } = useRemoveEnquiry();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [commentsDialogOpen, setCommentsDialogOpen] = useState(false);
   const camp = campData?.camp || enquiry?.enquiry?.camp_id;
   const contacts = contactsData?.contacts ?? enquiry?.contacts ?? [];
+  const sortedComments = useMemo(() => {
+    const source = commentsData?.comments;
+    const list = Array.isArray(source) ? [...source] : [];
+    return list.sort((a: any, b: any) => {
+      const aTime = new Date(a?.createdAt || 0).getTime();
+      const bTime = new Date(b?.createdAt || 0).getTime();
+      return bTime - aTime;
+    });
+  }, [commentsData?.comments]);
+  const recentComments = sortedComments.slice(0, 3);
+  const hasMoreComments = sortedComments.length > 3;
   const latitude = camp?.latitude || enquiry?.enquiry?.latitude;
   const longitude = camp?.longitude || enquiry?.enquiry?.longitude;
 
@@ -72,6 +85,35 @@ export default function SingleEnquiryPage() {
       .filter(Boolean)
       .map((entry) => String(entry));
     return names.length > 0 ? names.join(", ") : "Not specified";
+  };
+
+  const formatCommentTime = (value: any) => {
+    if (!value) return "N/A";
+    return new Date(value).toLocaleString();
+  };
+
+  const renderCommentCard = (comment: any) => {
+    const commentId = String(comment?._id || "");
+    const createdAt = formatCommentTime(comment?.createdAt);
+    const updatedAt = formatCommentTime(comment?.updatedAt);
+    const wasEdited = Boolean(comment?.createdAt && comment?.updatedAt && new Date(comment.updatedAt).getTime() !== new Date(comment.createdAt).getTime());
+
+    return (
+      <div key={commentId} className="rounded-lg border border-slate-800 bg-slate-900/40 p-3 space-y-2">
+        <div className="flex items-center gap-3 min-w-0">
+          <Avatar size={36} src={`https://api.dicebear.com/7.x/personas/svg?seed=${encodeURIComponent(comment?.user_id?.email || comment?.user_id?.name || commentId)}`} />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-slate-200 truncate">{comment?.user_id?.name || "Unknown User"}</p>
+            <p className="text-xs text-slate-400 truncate">{comment?.user_id?.email || "No email"}</p>
+          </div>
+        </div>
+        <p className="text-sm text-slate-200 whitespace-pre-wrap">{comment?.comment || "-"}</p>
+        <div className="text-[11px] text-slate-500 flex flex-wrap gap-3">
+          <span>Created: {createdAt}</span>
+          {wasEdited && <span>Updated: {updatedAt}</span>}
+        </div>
+      </div>
+    );
   };
 
   const InfoRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
@@ -424,9 +466,46 @@ export default function SingleEnquiryPage() {
               <InfoRow label="Alert Date" value={renderDate(enquiry?.enquiry?.alert_date)} />
               <InfoRow label="Next Action" value={renderValue(enquiry?.enquiry?.next_action)} />
               <InfoRow label="Next Action Due" value={renderDate(enquiry?.enquiry?.next_action_due)} />
-              <InfoRow label="Comments" value={renderValue(enquiry?.enquiry?.comments)} />
             </div>
           </div>
+
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="font-semibold text-lg">Comments</h2>
+              {hasMoreComments && (
+                <Button variant="outline" size="sm" onClick={() => setCommentsDialogOpen(true)}>
+                  View more
+                </Button>
+              )}
+            </div>
+            <p className="text-xs text-slate-400">Showing latest comments first.</p>
+
+            {isCommentsLoading && (
+              <div className="rounded-lg border border-slate-800 bg-slate-900/40 p-3 text-xs text-slate-400">
+                Loading comments...
+              </div>
+            )}
+
+            {!isCommentsLoading && sortedComments.length === 0 && (
+              <div className="rounded-lg border border-dashed border-slate-800 bg-slate-900/40 p-3 text-xs text-slate-400">
+                No comments yet.
+              </div>
+            )}
+
+            {!isCommentsLoading && recentComments.map((comment: any) => renderCommentCard(comment))}
+          </div>
+
+          <Dialog open={commentsDialogOpen} onOpenChange={setCommentsDialogOpen}>
+            <DialogContent className="max-w-3xl">
+              <DialogHeader>
+                <DialogTitle>All Comments</DialogTitle>
+                <DialogDescription>Showing all enquiry comments, newest first.</DialogDescription>
+              </DialogHeader>
+              <div className="max-h-[70vh] overflow-y-auto space-y-2 pr-1">
+                {sortedComments.map((comment: any) => renderCommentCard(comment))}
+              </div>
+            </DialogContent>
+          </Dialog>
 
           <div className="grid gap-4 md:grid-cols-2">
             <div>

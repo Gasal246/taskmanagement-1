@@ -14,33 +14,12 @@ import MobileBottomBar from '@/components/staff/MobileBottomBar';
 //   }
 // }
 
-const AdminLayout = async ({ children }: {
+const StaffLayout = async ({ children }: {
   children: React.ReactNode
 }) => {
   const session = await auth()
   if (!session) {
     return redirect('/signin')
-  }
-
-  const layoutStyle = process.env.LAYOUT_STYLE ?? process.env.NEXT_PUBLIC_LAYOUT_STYLE ?? "modern";
-  const useClassicLayout = layoutStyle === "classic";
-
-  if (useClassicLayout) {
-    return (
-      <div className='w-full h-[100dvh] overflow-hidden flex relative'>
-        <div className="hidden lg:block w-2/12 h-full border-r border-slate-700">
-          <StaffSidebar variant="classic" />
-        </div>
-        <div className="w-full lg:w-10/12 h-full overflow-y-scroll overflow-x-hidden pb-20">
-          <StaffTopbar variant="classic" />
-          {children}
-        </div>
-        <div className="block lg:hidden w-full absolute bottom-0 p-0">
-          <MobileBottomBar variant="classic" />
-          {/* <div className="bg-black p-20 w-full"></div> */}
-        </div>
-      </div>
-    )
   }
 
   return (
@@ -60,7 +39,7 @@ const AdminLayout = async ({ children }: {
           <div className="sticky top-0 z-20 border-b border-slate-800/60 bg-slate-950/70 backdrop-blur">
             <StaffTopbar />
           </div>
-          <main className="flex-1 min-h-0 overflow-y-auto px-4 pb-24 pt-4 md:px-6">
+          <main className="flex-1 min-h-0 overflow-y-auto px-4 pb-28 pt-4 md:px-6 lg:pb-10">
             <div className="mx-auto w-full max-w-[1400px] ">
               {children}
             </div>
@@ -74,4 +53,4 @@ const AdminLayout = async ({ children }: {
   )
 }
 
-export default AdminLayout
+export default StaffLayout

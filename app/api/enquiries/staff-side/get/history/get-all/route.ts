@@ -16,10 +16,20 @@ export async function GET(req: NextRequest) {
 
         const histories = await Eq_enquiry_access.find({ enquiry_id: enquiry_id, user_id: session?.user?.id }).populate({
             path: "history_id",
-            populate: {
-                path: "assigned_to",
-                select: "name email"
-            }
+            populate: [
+                {
+                    path: "assigned_to",
+                    select: "name email"
+                },
+                {
+                    path: "forwarded_by",
+                    select: "name email avatar_url"
+                },
+                {
+                    path: "changed_by",
+                    select: "name email avatar_url"
+                }
+            ]
         }).lean();
 
         histories.sort((a: any, b: any) => {

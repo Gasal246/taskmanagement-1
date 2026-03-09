@@ -1,18 +1,39 @@
 "use client"
-import React, { useState } from 'react'
+import React from 'react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { DashboardIcon } from '@radix-ui/react-icons'
 import { Building2, CalendarCheck, EarthIcon, HandPlatter, PanelsTopLeft, ShieldQuestion, UsersIcon } from 'lucide-react'
 
-const AdminSidebar = () => {
+type AdminSidebarMode = "full" | "compact";
+
+type AdminSidebarProps = {
+    mode?: AdminSidebarMode;
+    onNavigate?: () => void;
+    variant?: "classic" | "modern";
+};
+
+const navItems = [
+    { href: "/admin", label: "Admin Dashboard", isActive: (path: string) => path === "/admin", icon: DashboardIcon },
+    { href: "/admin/staffs", label: "Manage Staffs", isActive: (path: string) => path.includes("/staffs"), icon: UsersIcon },
+    { href: "/admin/clients", label: "Manage Clients", isActive: (path: string) => path.includes("/clients"), icon: Building2 },
+    { href: "/admin/regions", label: "Manage Regions", isActive: (path: string) => path.includes("/regions"), icon: EarthIcon },
+    { href: "/admin/skills", label: "Manage Skills", isActive: (path: string) => path.includes("/skills"), icon: HandPlatter },
+    { href: "/admin/projects", label: "Manage Projects", isActive: (path: string) => path.includes("/projects"), icon: PanelsTopLeft },
+    { href: "/admin/tasks", label: "Manage Tasks", isActive: (path: string) => path.includes("/tasks"), icon: CalendarCheck },
+    { href: "/admin/enquiries", label: "Enquiry Manager", isActive: (path: string) => path.includes("/enquiries"), icon: ShieldQuestion },
+] as const;
+
+const AdminSidebar = ({ mode = "full", onNavigate }: AdminSidebarProps) => {
     const pathname = usePathname();
+    const isCompact = mode === "compact";
 
     const linkClasses = (active: boolean) =>
         [
-            "w-full rounded-xl px-3 py-2 text-left text-sm font-medium transition-colors",
-            "flex items-center gap-2",
+            "w-full rounded-xl py-2 text-sm font-medium transition-colors",
+            "flex items-center",
+            isCompact ? "justify-center px-2" : "gap-2 px-3",
             active
                 ? "border border-cyan-500/30 bg-cyan-500/10 text-cyan-100 shadow-[inset_0_0_0_1px_rgba(6,182,212,0.15)]"
                 : "text-slate-300 hover:bg-slate-800/60 hover:text-slate-100",
@@ -20,86 +41,28 @@ const AdminSidebar = () => {
 
     return (
         <div className="flex h-full flex-col gap-1 text-sm">
-            <Link href="/admin">
-                <motion.button
-                    whileHover={{ scale: 1.01 }}
-                    whileTap={{ scale: 0.98 }}
-                    aria-current={pathname === "/admin" ? "page" : undefined}
-                    className={linkClasses(pathname === "/admin")}
-                >
-                    <DashboardIcon /> Admin Dashboard
-                </motion.button>
-            </Link>
-            <Link href="/admin/staffs">
-                <motion.button
-                    whileHover={{ scale: 1.01 }}
-                    whileTap={{ scale: 0.98 }}
-                    aria-current={pathname.includes("/staffs") ? "page" : undefined}
-                    className={linkClasses(pathname.includes("/staffs"))}
-                >
-                    <UsersIcon size={18} /> Manage Staffs
-                </motion.button>
-            </Link>
-            <Link href="/admin/clients">
-                <motion.button
-                    whileHover={{ scale: 1.01 }}
-                    whileTap={{ scale: 0.98 }}
-                    aria-current={pathname.includes("/clients") ? "page" : undefined}
-                    className={linkClasses(pathname.includes("/clients"))}
-                >
-                    <Building2 size={18} /> Manage Clients
-                </motion.button>
-            </Link>
-            <Link href="/admin/regions">
-                <motion.button
-                    whileHover={{ scale: 1.01 }}
-                    whileTap={{ scale: 0.98 }}
-                    aria-current={pathname.includes("/regions") ? "page" : undefined}
-                    className={linkClasses(pathname.includes("/regions"))}
-                >
-                    <EarthIcon size={18} /> Manage Regions
-                </motion.button>
-            </Link>
-            <Link href="/admin/skills">
-                <motion.button
-                    whileHover={{ scale: 1.01 }}
-                    whileTap={{ scale: 0.98 }}
-                    aria-current={pathname.includes("/skills") ? "page" : undefined}
-                    className={linkClasses(pathname.includes("/skills"))}
-                >
-                    <HandPlatter size={18} /> Manage Skills
-                </motion.button>
-            </Link>
-            <Link href="/admin/projects">
-                <motion.button
-                    whileHover={{ scale: 1.01 }}
-                    whileTap={{ scale: 0.98 }}
-                    aria-current={pathname.includes("/projects") ? "page" : undefined}
-                    className={linkClasses(pathname.includes("/projects"))}
-                >
-                    <PanelsTopLeft size={18} /> Manage Projects
-                </motion.button>
-            </Link>
-            <Link href="/admin/tasks">
-                <motion.button
-                    whileHover={{ scale: 1.01 }}
-                    whileTap={{ scale: 0.98 }}
-                    aria-current={pathname.includes("/tasks") ? "page" : undefined}
-                    className={linkClasses(pathname.includes("/tasks"))}
-                >
-                    <CalendarCheck size={18} /> Manage Tasks
-                </motion.button>
-            </Link>
-            <Link href="/admin/enquiries">
-                <motion.button
-                    whileHover={{ scale: 1.01 }}
-                    whileTap={{ scale: 0.98 }}
-                    aria-current={pathname.includes("/enquiries") ? "page" : undefined}
-                    className={linkClasses(pathname.includes("/enquiries"))}
-                >
-                    <ShieldQuestion size={18} /> Enquiry Manager
-                </motion.button>
-            </Link>
+            {navItems.map((item) => {
+                const active = item.isActive(pathname);
+                const Icon = item.icon;
+                return (
+                    <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={onNavigate}
+                        title={isCompact ? item.label : undefined}
+                        aria-current={active ? "page" : undefined}
+                    >
+                        <motion.div
+                            whileHover={{ scale: 1.01 }}
+                            whileTap={{ scale: 0.98 }}
+                            className={linkClasses(active)}
+                        >
+                            <Icon size={18} />
+                            {!isCompact && <span>{item.label}</span>}
+                        </motion.div>
+                    </Link>
+                );
+            })}
         </div>
     )
 }

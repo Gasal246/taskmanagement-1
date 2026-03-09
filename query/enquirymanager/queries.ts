@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from "@tanstack/react-query"
-import { AcceptEnquiryEdits, ActivateDeactivateEqAgents, ActivateEqCamp, AddEqUser, AddNewCampContact, AddNewContactAgent, AddNewEnquiry, AddNewEqArea, AddNewEqCamp, AddNewEqCity, AddNewEqCountry, AddNewEqHeadOffice, AddNewEqProvince, AddNewEqRegion, AddNewStaffEqHeadOffice, AssignEqCamptoEnquiry, CloseEqnuiry, EnquiryToProject, ForwardEnquiryByStaff, ForwardHistory, GetAccessEnquiriesForStaffs, GetAgentEnquiries, GetAgentsByBusiness, GetAllEnquiryHistoryForStaffs, GetEnquiriesWithFilters, GetEnquiryById, GetEnquiryByIdForStaffs, GetEnquiryContacts, GetEnquiryHistories, GetEnquiryHistoryById, GetEqAgentByID, GetEqAreaById, GetEqAreaProfile, GetEqAreasByCity,
+import { AcceptEnquiryEdits, ActivateDeactivateEqAgents, ActivateEqCamp, AddEqUser, AddEnquiryComment, AddNewCampContact, AddNewContactAgent, AddNewEnquiry, AddNewEqArea, AddNewEqCamp, AddNewEqCity, AddNewEqCountry, AddNewEqHeadOffice, AddNewEqProvince, AddNewEqRegion, AddNewStaffEqHeadOffice, AssignEqCamptoEnquiry, CloseEqnuiry, DeleteEnquiryComment, EnquiryToProject, ForwardEnquiryByStaff, ForwardHistory, GetAccessEnquiriesForStaffs, GetAgentEnquiries, GetAgentsByBusiness, GetAllEnquiryHistoryForStaffs, GetEnquiriesWithFilters, GetEnquiryById, GetEnquiryByIdForStaffs, GetEnquiryComments, GetEnquiryContacts, GetEnquiryHistories, GetEnquiryHistoryById, GetEqAgentByID, GetEqAreaById, GetEqAreaProfile, GetEqAreasByCity,
      GetEqAreasFiltered,
      GetEqCampsByArea, 
      GetEqCampsByEnquiry, 
@@ -43,6 +43,7 @@ import { AcceptEnquiryEdits, ActivateDeactivateEqAgents, ActivateEqCamp, AddEqUs
      RemoveEqRegion,
      RemoveEqUsers,
      UpdateEnquiry,
+     UpdateEnquiryComment,
      UpdateEqArea,
      UpdateEqCamp,
      UpdateEqCampContact,
@@ -450,6 +451,36 @@ export const useGetEnquiryHistories = (enquiry_id: string) => {
         queryKey: ["histories", enquiry_id],
         queryFn: () => GetEnquiryHistories(enquiry_id),
         enabled: !!enquiry_id,
+    })
+}
+
+//Get Enquiry Comments
+export const useGetEnquiryComments = (enquiry_id: string) => {
+    return useQuery({
+        queryKey: ["enquiry-comments", enquiry_id],
+        queryFn: () => GetEnquiryComments(enquiry_id),
+        enabled: !!enquiry_id,
+    })
+}
+
+//Add Enquiry Comment
+export const useAddEnquiryComment = () => {
+    return useMutation({
+        mutationFn: (payload: any) => AddEnquiryComment(payload),
+    })
+}
+
+//Update Enquiry Comment
+export const useUpdateEnquiryComment = () => {
+    return useMutation({
+        mutationFn: (payload: any) => UpdateEnquiryComment(payload),
+    })
+}
+
+//Delete Enquiry Comment
+export const useDeleteEnquiryComment = () => {
+    return useMutation({
+        mutationFn: (comment_id: string) => DeleteEnquiryComment(comment_id),
     })
 }
 

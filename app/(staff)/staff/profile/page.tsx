@@ -386,7 +386,7 @@ const ProfilPage = () => {
         <>
           <div className="bg-gradient-to-tr from-slate-950/70 to-slate-900/60 border border-slate-800 rounded-2xl p-4 sm:p-6">
             <div className="flex flex-col lg:flex-row gap-4 items-start">
-              <div className="flex items-center gap-4">
+              <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:items-center sm:text-left">
                 <div
                   className={`
                     w-[100px] h-[100px]
@@ -405,7 +405,7 @@ const ProfilPage = () => {
                 <div className="space-y-1">
                   <h1 className='text-lg sm:text-xl md:text-2xl font-semibold text-slate-100'>{userData?.userData?.name}</h1>
                   <h1 className='text-sm sm:text-base font-medium text-slate-300'>{userData?.userData?.email}</h1>
-                  <div className="flex flex-wrap gap-2 pt-2">
+                  <div className="flex flex-wrap justify-center gap-2 pt-2 sm:justify-start">
                     <span className="text-[10px] uppercase tracking-wide bg-slate-950/60 border border-slate-800 px-2 py-1 rounded-full text-slate-300">
                       Role: {roleLabel}
                     </span>

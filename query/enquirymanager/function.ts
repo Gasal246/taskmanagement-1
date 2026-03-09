@@ -455,6 +455,50 @@ export async function GetEnquiryHistories(enquiry_id: string){
     }
 }
 
+//Get Enquiry Comments
+export async function GetEnquiryComments(enquiry_id: string){
+    try{
+        const res = await axios.get(`/api/enquiries/comments/get?enquiry_id=${enquiry_id}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+        return (err as any)?.response?.data;
+    }
+}
+
+//Add Enquiry Comment
+export async function AddEnquiryComment(payload: any){
+    try{
+        const res = await axios.post(`/api/enquiries/comments/add`, payload);
+        return res.data;
+    }catch(err){
+        console.log(err);
+        return (err as any)?.response?.data;
+    }
+}
+
+//Update Enquiry Comment
+export async function UpdateEnquiryComment(payload: any){
+    try{
+        const res = await axios.put(`/api/enquiries/comments/update`, payload);
+        return res.data;
+    }catch(err){
+        console.log(err);
+        return (err as any)?.response?.data;
+    }
+}
+
+//Delete Enquiry Comment
+export async function DeleteEnquiryComment(comment_id: string){
+    try{
+        const res = await axios.delete(`/api/enquiries/comments/delete?comment_id=${comment_id}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+        return (err as any)?.response?.data;
+    }
+}
+
 //Get Enquiry History by ID
 export async function GetEnquiryHistoryById(history_id: string) {
     try{

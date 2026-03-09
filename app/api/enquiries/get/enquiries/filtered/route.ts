@@ -51,8 +51,8 @@ export async function GET(req: NextRequest) {
       filter.competition_status = competition === "true";
     }
 
-    const priority = searchParams.get("priority");
-    if (priority) filter.priority = priority;
+    const selectedPriority = Number(searchParams.get("priority"));
+    const hasPriorityFilter = Number.isFinite(selectedPriority) && selectedPriority > 0;
 
     // --- Date Filters ---
     const from_date = searchParams.get("from_date");
@@ -91,10 +91,8 @@ export async function GET(req: NextRequest) {
       filter.camp_id = {$in: campIds};
     };
 
-    // Take count of total docs (cap at latest 200)
+    // Take latest docs (cap at latest 200)
     const maxRecords = 200;
-    const totalRecordsRaw = await Eq_enquiry.countDocuments(filter);
-    let totalRecords = Math.min(totalRecordsRaw, maxRecords);
 
     const latestIds = await Eq_enquiry.find(filter)
       .sort({ createdAt: -1 })
@@ -118,19 +116,11 @@ export async function GET(req: NextRequest) {
       ]);
       const allowedIds = new Set(latestActions.map((entry) => String(entry._id)));
       latestIdList = latestIdList.filter((entry) => allowedIds.has(String(entry)));
-      totalRecords = latestIdList.length;
     }
 
     if (latestIdList.length === 0) {
       return NextResponse.json(
         { status: 200, data: [], pagination: { page, limit, totalRecords: 0, totalPages: 0 } },
-        { status: 200 }
-      );
-    }
-
-    if (skip >= totalRecords) {
-      return NextResponse.json(
-        { status: 200, data: [], pagination: { page, limit, totalRecords, totalPages: Math.ceil(totalRecords / limit) } },
         { status: 200 }
       );
     }
@@ -142,8 +132,7 @@ export async function GET(req: NextRequest) {
         model: Eq_camps,
       })
       .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
+      .lean();
 
     // Apply occupancy filter AFTER populate
     if (occupancy) {
@@ -151,10 +140,35 @@ export async function GET(req: NextRequest) {
         return e.camp_id && e.camp_id.camp_occupancy >= Number(occupancy);
       });
     }
+
+    if (hasPriorityFilter) {
+      enquiries = enquiries
+        .filter((e: any) => {
+          const priorityNumber = Number(e?.priority);
+          return Number.isFinite(priorityNumber) && priorityNumber >= selectedPriority;
+        })
+        .sort((a: any, b: any) => {
+          const priorityA = Number(a?.priority);
+          const priorityB = Number(b?.priority);
+          if (priorityA !== priorityB) return priorityA - priorityB;
+          return new Date(b?.createdAt).getTime() - new Date(a?.createdAt).getTime();
+        });
+    }
+
+    const totalRecords = enquiries.length;
+
+    if (skip >= totalRecords) {
+      return NextResponse.json(
+        { status: 200, data: [], pagination: { page, limit, totalRecords, totalPages: Math.ceil(totalRecords / limit) } },
+        { status: 200 }
+      );
+    }
+
+    const paginatedEnquiries = enquiries.slice(skip, skip + limit);
     console.log("filter: ", filter);  
 
     return NextResponse.json(
-      { status: 200, data: enquiries, pagination: {page, limit, totalRecords, totalPages: Math.ceil(totalRecords / limit)}},
+      { status: 200, data: paginatedEnquiries, pagination: {page, limit, totalRecords, totalPages: Math.ceil(totalRecords / limit)}},
       { status: 200 }
     );
   } catch (err) {

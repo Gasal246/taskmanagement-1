@@ -33,6 +33,7 @@ const ENQUIRY_STATUS_OPTIONS = [
     "Survey Completed",
     "Proposal Submitted",
     "Waiting For Client Response",
+    "On Hold",
     "Project Awarded",
 ] as const;
 

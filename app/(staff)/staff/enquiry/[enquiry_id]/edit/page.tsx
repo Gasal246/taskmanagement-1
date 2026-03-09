@@ -9,38 +9,55 @@ import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
 import { motion } from "framer-motion";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useAddNewEnquiry, useGetEqAreas, useGetEqCampsByArea, useGetEqCities, useGetEqCountries, useGetEqProvince, useGetEqRegions, useGetEqUsers } from "@/query/enquirymanager/queries";
+import { useSession } from "next-auth/react";
+import {
+    useAddEnquiryComment,
+    useDeleteEnquiryComment,
+    useGetEnquiryByIdForStaffs,
+    useGetEnquiryComments,
+    useGetEnquiryContacts,
+    useGetEqAreas,
+    useGetEqCampsByArea,
+    useGetEqCampsById,
+    useGetEqCities,
+    useGetEqCountries,
+    useGetEqProvince,
+    useGetEqRegions,
+    useUpdateEnquiryComment,
+    useUpdateEnquiry
+} from "@/query/enquirymanager/queries";
 import { toast } from "sonner";
-import { EQ_CAMP_TYPES, EQ_CAPACITY_LIMITS } from "@/lib/constants";
-import { useRouter } from "next/navigation";
+import { EQ_CAMP_TYPES, EQ_CAPACITY_LIMITS, Eq_CAPACITY_OPTIONS } from "@/lib/constants";
+import { useParams, useRouter } from "next/navigation";
 import LocationPicker from "@/components/enquiries/LocationPicker";
-import EnquiryUserMultiSelect from "@/components/enquiries/EnquiryUserMultiSelect";
 import Image from "next/image";
 import { deleteObject, getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { storage } from "@/firebase/config";
 import { Button } from "@/components/ui/button";
-import { Tooltip } from "antd";
-import { useSelector } from "react-redux";
-import { RootState } from "@/redux/store";
+import { Avatar, Tooltip } from "antd";
+import { useQueryClient } from "@tanstack/react-query";
 
 const priorityLevels = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"];
 const ENQUIRY_STATUS_OPTIONS = [
-    "Pending",
-    "In Progress",
+    "Lead Received",
+    "Initial Meeting Over",
+    "Survey Completed",
+    "Proposal Submitted",
+    "Waiting For Client Response",
     "On Hold",
-    "Closed",
+    "Project Awarded",
 ] as const;
 
 const MAX_DOC_SIZE = 5 * 1024 * 1024; // 5MB
 
 /* =========== SCHEMA =========== */
 const enquirySchema = z.object({
-    country: z.string().min(1, "Select country"),
-    region: z.string().min(1, "Select region"),
+    enquiry_id: z.string(),
+    country: z.string().optional(),
+    region: z.string().optional(),
     province: z.string().optional(),
     city: z.string().optional(),
 
@@ -59,26 +76,26 @@ const enquirySchema = z.object({
 
     latitude: z.string(),
     longitude: z.string(),
-    coordinates: z.string().optional(),
     enquiry_brought_by: z.array(z.string()).optional(),
     meeting_initiated_by: z.array(z.string()).optional(),
     project_closed_by: z.array(z.string()).optional(),
     project_managed_by: z.array(z.string()).optional(),
     enquiry_user_notes: z.string().optional(),
+    coordinates: z.string().optional(),
 
     camp_capacity: z.string().optional(),
     camp_occupancy: z.string().optional(),
 
     contacts: z.array(z.object({
-        name: z.string().min(1, "Contact name required"),
-        phone: z.string().min(5, "Phone required"),
+        name: z.string().optional(),
+        phone: z.string().optional(),
         email: z.string().optional(),
         designation: z.string().optional(),
         is_decision_maker: z.string().optional(),
         authority_level: z.string().optional(),
     })).optional(),
 
-    wifi_available: z.enum(["Yes", "No", "not-specified"]),
+    wifi_available: z.string().optional(),
     expected_monthly_price: z.string().optional(),
     other_wifi_details: z.string().optional(),
     wifi_type: z.string().optional(),
@@ -108,7 +125,7 @@ const enquirySchema = z.object({
 
     priority: z.enum(priorityLevels as [string, ...string[]]).optional().or(z.literal("")),
 
-    followup_status: z.enum(ENQUIRY_STATUS_OPTIONS),
+    followup_status: z.string().optional(),
     alert_date: z.string().optional(),
     next_action: z.string().optional(),
     next_action_due: z.string().optional(),
@@ -132,9 +149,11 @@ const enquirySchema = z.object({
 });
 
 /* =========== COMPONENT =========== */
-export default function AddEnquiry() {
+export default function EditEnquiry() {
     const router = useRouter();
-    const { businessData } = useSelector((state: RootState) => state.user);
+    const params = useParams<{ enquiry_id: string }>();
+    const { data: session } = useSession();
+    const queryClient = useQueryClient();
     const [showHeadOffice, setShowHeadOffice] = useState(false);
     const [countries, setCountries] = useState([]);
     const [docFile, setDocFile] = useState<File | null>(null);
@@ -144,42 +163,90 @@ export default function AddEnquiry() {
     const [uploadedDoc, setUploadedDoc] = useState<{ url: string; name: string; type?: string; storagePath?: string } | null>(null);
     const [removingDoc, setRemovingDoc] = useState(false);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-    const priorityCapacityMap = [
-        { value: "1", priority: "1", capacity: "<500", capacityLabel: "<500" },
-        { value: "2", priority: "2", capacity: "500-1000", capacityLabel: "500-1,000" },
-        { value: "3", priority: "3", capacity: "1000-2000", capacityLabel: "1,000-2,000" },
-        { value: "4", priority: "4", capacity: "2000-3000", capacityLabel: "2,000-3,000" },
-        { value: "5", priority: "5", capacity: "3000-5000", capacityLabel: "3,000-5,000" },
-        { value: "6", priority: "6", capacity: "5000-10000", capacityLabel: "5,000-10,000" },
-        { value: "7", priority: "7", capacity: "10000-20000", capacityLabel: "10,000-20,000" },
-        { value: "8", priority: "8", capacity: "20000-35000", capacityLabel: "20,000-35,000" },
-        { value: "9", priority: "9", capacity: "35000-50000", capacityLabel: "35,000-50,000" },
-        { value: "10", priority: "10", capacity: "50000+", capacityLabel: "50,000+" },
-    ];
+    const priorityCapacityMap = Eq_CAPACITY_OPTIONS.map((capacity, index) => ({
+        value: `${index + 1}`,
+        priority: `${index + 1}`,
+        capacity,
+        capacityLabel: capacity,
+    }));
 
-    const { mutateAsync: GetCountries, isPending: isCountryLoading } = useGetEqCountries();
-    const { mutateAsync: AddNewEnquiry, isPending: isEqAdding } = useAddNewEnquiry();
-    const { data: eqUsers } = useGetEqUsers(businessData?._id, "users");
+    const { mutateAsync: GetCountries } = useGetEqCountries();
+    const { mutateAsync: UpdateEnquiry, isPending: isUpdating } = useUpdateEnquiry();
+    const { data: enquiry, isLoading: isEnquiryLoading } = useGetEnquiryByIdForStaffs(params.enquiry_id);
+    const { data: contactsData } = useGetEnquiryContacts(params.enquiry_id);
+    const { data: commentsData, isLoading: isCommentsLoading } = useGetEnquiryComments(params.enquiry_id);
+    const { mutateAsync: AddEnquiryComment, isPending: isAddingComment } = useAddEnquiryComment();
+    const { mutateAsync: UpdateEnquiryComment, isPending: isCommentUpdating } = useUpdateEnquiryComment();
+    const { mutateAsync: DeleteEnquiryComment, isPending: isCommentDeleting } = useDeleteEnquiryComment();
+    const [newComment, setNewComment] = useState("");
+    const [allCommentsDialogOpen, setAllCommentsDialogOpen] = useState(false);
+    const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+    const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
+    const currentUserId = String((session as any)?.user?.id || "");
+    const enquiryComments = commentsData?.comments || [];
+    const sortedComments = useMemo(() => {
+        const comments = Array.isArray(enquiryComments) ? [...enquiryComments] : [];
+        return comments.sort((a: any, b: any) => {
+            const aTime = new Date(a?.createdAt || 0).getTime();
+            const bTime = new Date(b?.createdAt || 0).getTime();
+            return bTime - aTime;
+        });
+    }, [enquiryComments]);
+    const recentComments = sortedComments.slice(0, 3);
+    const hasMoreComments = sortedComments.length > 3;
 
-    const form = useForm({
+    const form = useForm<any>({
         resolver: zodResolver(enquirySchema),
         defaultValues: {
+            enquiry_id: params.enquiry_id,
             country: "",
             region: "",
             province: "",
             city: "",
             area: "",
+            area_name_request: "",
             camp: "",
+            camp_name_request: "",
+            camp_type: "",
+            client_company: "",
+            landlord: "",
+            real_estate: "",
+            camp_capacity: "",
+            camp_occupancy: "",
             wifi_available: "No",
+            wifi_type: "",
+            contractor_name: "",
+            contract_start: "",
+            contract_expiry: "",
+            wifi_plan: "",
+            speed_mbps: "",
+            pain_points: "",
+            provider_plan: "",
+            personal_wifi_start: "",
+            personal_wifi_expiry: "",
+            personal_wifi_price: "",
             followup_status: ENQUIRY_STATUS_OPTIONS[0],
             area_input_mode: "existing",
             camp_input_mode: "existing",
             expected_monthly_price: "",
             other_wifi_details: "",
+            head_office_address: "",
+            head_office_contact: "",
+            head_office_location: "",
+            head_office_details: "",
+            lease_expiry_due: "",
+            rent_terms: "",
+            competition_status: "",
+            competition_notes: "",
+            priority: "",
+            alert_date: "",
+            next_action: "",
+            next_action_due: "",
+            comments: "",
             latitude: "",
             longitude: "",
             coordinates: "",
-            comments: "",
+            contacts: [],
             enquiry_brought_by: [],
             meeting_initiated_by: [],
             project_closed_by: [],
@@ -188,14 +255,21 @@ export default function AddEnquiry() {
         }
     });
 
+    const selectedCampId = form.watch("camp");
+    const camp_id = selectedCampId;
+    const baseCampId = (enquiry?.enquiry?.camp_id?._id ?? enquiry?.enquiry?.camp_id) || "";
+    const activeCampId = selectedCampId || baseCampId;
+    const { data: campData, isLoading: isCampDetailsLoading } = useGetEqCampsById(activeCampId);
+    const selectedCamp = campData?.camp;
+
     const country_id = form.watch("country");
     const region_id = form.watch("region");
     const province_id = form.watch("province");
     const city_id = form.watch("city");
     const area_id = form.watch("area");
-    const camp_id = form.watch("camp");
     const areaInputMode = form.watch("area_input_mode");
     const campInputMode = form.watch("camp_input_mode");
+    const isNewCamp = campInputMode === "new" || areaInputMode == "new";
     const isExistingCampMode = areaInputMode === "existing" && campInputMode === "existing";
     const coordinatesValue = form.watch("coordinates");
     const { latitude: coordinatesLat, longitude: coordinatesLng } = parseCoordinates(coordinatesValue || "");
@@ -203,26 +277,11 @@ export default function AddEnquiry() {
         lat: toNumberOrNull(coordinatesLat),
         lng: toNumberOrNull(coordinatesLng),
     };
-
     const { data: regions, isLoading: isRegionLoading } = useGetEqRegions(country_id);
     const { data: provinces, isLoading: isProvinceLoading } = useGetEqProvince(region_id);
     const { data: cities, isLoading: isCityLoading } = useGetEqCities(province_id);
     const { data: areas, isLoading: isAreaLoading } = useGetEqAreas(city_id);
-    const { data: camps, isLoading: isCampLoading } = useGetEqCampsByArea(area_id);
-    const selectedCamp = camps?.camps?.find((c: any) => c._id === camp_id);
-    const userOptions = useMemo(() => {
-        return (eqUsers?.users || [])
-            .map((userEntry: any) => {
-                const user = userEntry?.user_id || userEntry;
-                if (!user?._id) return null;
-                return {
-                    id: String(user._id),
-                    name: user?.name || "Unknown User",
-                    email: user?.email || "",
-                };
-            })
-            .filter(Boolean);
-    }, [eqUsers?.users]);
+    const { data: camps, isLoading: isCampListLoading } = useGetEqCampsByArea(area_id);
     const campCapacityMissing = isExistingCampMode
         && !!camp_id
         && !!selectedCamp
@@ -234,24 +293,145 @@ export default function AddEnquiry() {
 
 
     const { control, handleSubmit } = form;
-    const { fields, append, remove } = useFieldArray({ control, name: "contacts" });
+    const { fields, append, remove, replace } = useFieldArray({ control, name: "contacts" });
+    const selectClassName = "w-full rounded-md border border-slate-700 bg-slate-900 text-slate-200 p-2 focus:border-slate-500 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0";
+
+    const formatDate = (dateString?: string | null) => {
+        if (!dateString) return "";
+        return new Date(dateString).toISOString().split("T")[0];
+    };
+
+    const normalizeId = (value: any) => {
+        if (!value) return "";
+        return typeof value === "string" ? value : value?._id || "";
+    };
+
+    const normalizeDecimal = (value: any) => {
+        if (value === null || value === undefined) return "";
+        const resolved = value?.$numberDecimal ?? value;
+        return String(resolved);
+    };
+    const normalizeUserIds = (value: any) => {
+        if (!Array.isArray(value)) return [];
+        return value
+            .map((entry) => (typeof entry === "string" ? entry : entry?._id))
+            .filter(Boolean);
+    };
+    function toNumberOrNull(value: string) {
+        if (!value) return null;
+        const num = Number(value);
+        return Number.isFinite(num) ? num : null;
+    }
+    function parseCoordinates(value: string) {
+        const [lat, lng] = value.split(",").map((item) => item.trim());
+        return {
+            latitude: lat || "",
+            longitude: lng || "",
+        };
+    }
 
     const fetchCountries = async () => {
         const res = await GetCountries();
-        console.log("countries: ", res);
-
-        if (res.status == 200) {
+        if (res?.status == 200) {
             setCountries(res.countries);
         }
-    }
+    };
 
     useEffect(() => {
         fetchCountries();
     }, []);
 
     useEffect(() => {
-        console.log("regions: ", regions);
-    }, [regions]);
+        if (!enquiry?.enquiry) return;
+
+        const camp = campData?.camp;
+        const isApprovedEnquiry = Boolean(enquiry?.enquiry?.is_active);
+        const initialLatitudeRaw = camp?.latitude ?? enquiry?.enquiry?.latitude ?? "";
+        const initialLongitudeRaw = camp?.longitude ?? enquiry?.enquiry?.longitude ?? "";
+        const initialLatitude = initialLatitudeRaw === "" ? "" : String(initialLatitudeRaw);
+        const initialLongitude = initialLongitudeRaw === "" ? "" : String(initialLongitudeRaw);
+        const headOffice = camp?.headoffice_id;
+        const mappedContacts = (contactsData?.contacts || campData?.contacts || []).map((contact: any) => ({
+            name: contact?.contact_name || "",
+            phone: contact?.contact_phone || "",
+            email: contact?.contact_email || "",
+            designation: contact?.contact_designation || "",
+            is_decision_maker: contact?.is_decision_maker ? "Yes" : "No",
+            authority_level: contact?.contact_authorization || "",
+        }));
+
+        const hasHeadOffice = Boolean(
+            headOffice?.phone ||
+            headOffice?.address ||
+            headOffice?.geo_location ||
+            headOffice?.other_details
+        );
+
+        setShowHeadOffice(hasHeadOffice);
+
+        form.reset({
+            enquiry_id: params.enquiry_id,
+            country: normalizeId(enquiry?.enquiry?.country_id),
+            region: normalizeId(enquiry?.enquiry?.region_id),
+            province: normalizeId(enquiry?.enquiry?.province_id),
+            city: normalizeId(enquiry?.enquiry?.city_id),
+            area_input_mode: "existing",
+            area: normalizeId(enquiry?.enquiry?.area_id),
+            camp_input_mode: isApprovedEnquiry ? "existing" : "new",
+            camp: isApprovedEnquiry ? normalizeId(enquiry?.enquiry?.camp_id) : "",
+            camp_name_request: camp?.camp_name || "",
+            camp_type: camp?.camp_type || "",
+            client_company: camp?.client_company_id?.client_company_name || "",
+            landlord: camp?.landlord_id?.landlord_name || "",
+            real_estate: camp?.realestate_id?.company_name || "",
+            latitude: initialLatitude,
+            longitude: initialLongitude,
+            coordinates: (initialLatitude || initialLongitude) ? `${initialLatitude}, ${initialLongitude}` : "",
+            camp_capacity: camp?.camp_capacity || "",
+            camp_occupancy: camp?.camp_occupancy ? String(camp?.camp_occupancy) : "",
+            contacts: mappedContacts,
+            wifi_available:
+                enquiry?.enquiry?.wifi_available === true
+                    ? "Yes"
+                    : enquiry?.enquiry?.wifi_available === false
+                        ? "No"
+                        : "not-specified",
+            expected_monthly_price: normalizeDecimal(enquiry?.enquiry?.expected_wifi_cost),
+            other_wifi_details: enquiry?.enquiry?.wifi_setup || "",
+            wifi_type: enquiry?.enquiry?.wifi_type || "",
+            contractor_name: enquiry?.external_provider?.contractor_name || "",
+            contract_start: formatDate(enquiry?.external_provider?.contract_start_date) || "",
+            contract_expiry: formatDate(enquiry?.external_provider?.contract_end_date) || "",
+            wifi_plan: enquiry?.external_provider?.contract_package || "",
+            speed_mbps: enquiry?.external_provider?.contract_speed || "",
+            pain_points: enquiry?.external_provider?.plain_points || enquiry?.external_provider?.pain_points || "",
+            provider_plan: enquiry?.personal_provider?.personal_plan || "",
+            personal_wifi_start: formatDate(enquiry?.personal_provider?.personal_start_date) || "",
+            personal_wifi_expiry: formatDate(enquiry?.personal_provider?.personal_end_date) || "",
+            personal_wifi_price: normalizeDecimal(enquiry?.personal_provider?.personal_monthly_price),
+            head_office_address: headOffice?.address || "",
+            head_office_contact: headOffice?.phone || "",
+            head_office_location: headOffice?.geo_location || "",
+            head_office_details: headOffice?.other_details || "",
+            lease_expiry_due: formatDate(enquiry?.enquiry?.lease_expiry_due) || "",
+            rent_terms: enquiry?.enquiry?.rent_terms || "",
+            competition_status: enquiry?.enquiry?.competition_status ? "Yes" : "No",
+            competition_notes: enquiry?.enquiry?.competition_notes || "",
+            priority: enquiry?.enquiry?.priority ? String(enquiry?.enquiry?.priority) : undefined,
+            followup_status: enquiry?.enquiry?.status || ENQUIRY_STATUS_OPTIONS[0],
+            alert_date: formatDate(enquiry?.enquiry?.alert_date) || "",
+            next_action: enquiry?.enquiry?.next_action || "",
+            next_action_due: formatDate(enquiry?.enquiry?.next_action_due) || "",
+            comments: enquiry?.enquiry?.comments || "",
+            enquiry_brought_by: normalizeUserIds(enquiry?.enquiry?.enquiry_brought_by),
+            meeting_initiated_by: normalizeUserIds(enquiry?.enquiry?.meeting_initiated_by),
+            project_closed_by: normalizeUserIds(enquiry?.enquiry?.project_closed_by),
+            project_managed_by: normalizeUserIds(enquiry?.enquiry?.project_managed_by),
+            enquiry_user_notes: enquiry?.enquiry?.enquiry_user_notes || ""
+        });
+
+        replace(mappedContacts);
+    }, [enquiry, campData, contactsData]);
 
     useEffect(() => {
         if (isExistingCampMode) {
@@ -271,7 +451,7 @@ export default function AddEnquiry() {
 
         form.setValue("camp_capacity", capacityValue === null || capacityValue === undefined ? "" : String(capacityValue));
         form.setValue("camp_occupancy", occupancyValue === null || occupancyValue === undefined ? "" : String(occupancyValue));
-    }, [camp_id, isExistingCampMode, selectedCamp?.camp_capacity, selectedCamp?.camp_occupancy]);
+    }, [activeCampId, isExistingCampMode, selectedCamp?.camp_capacity, selectedCamp?.camp_occupancy]);
 
     const isPdf = (type: string) => type?.toLowerCase().includes('pdf');
     const isImage = (type: string) => type?.startsWith('image/');
@@ -288,18 +468,6 @@ export default function AddEnquiry() {
             .toLowerCase()
             .replace(/[^a-z0-9]+/g, '-')
             .replace(/(^-|-$)+/g, '') || `file-${Date.now()}`;
-    function toNumberOrNull(value: string) {
-        if (!value) return null;
-        const num = Number(value);
-        return Number.isFinite(num) ? num : null;
-    }
-    function parseCoordinates(value: string) {
-        const [lat, lng] = value.split(",").map((item) => item.trim());
-        return {
-            latitude: lat || "",
-            longitude: lng || "",
-        };
-    }
 
     const handleEnquiryFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -387,7 +555,7 @@ export default function AddEnquiry() {
                 return toast.error("Camp occupancy cannot exceed Camp Capacity");
             }
         }
-        const payload = { ...data };
+        const payload = { ...data, enquiry_id: params.enquiry_id };
         if (payload.coordinates) {
             const { latitude, longitude } = parseCoordinates(payload.coordinates);
             payload.latitude = latitude;
@@ -397,14 +565,184 @@ export default function AddEnquiry() {
         if (uploadedDoc?.url) {
             payload.images = [uploadedDoc.url];
         }
-        const res = await AddNewEnquiry(payload);
-        if (res?.status == 201) {
-            toast.success(res?.message || "Enquiry Added");
-            return router.replace(`/admin/enquiries/${res?.enquiry_id}`);
+        const res = await UpdateEnquiry(payload);
+        if (res?.status == 200) {
+            toast.success(res?.message || "Enquiry Updated");
+            queryClient.invalidateQueries({ queryKey: ["enquiry", params.enquiry_id] });
+            return router.replace(`/staff/enquiry/${params.enquiry_id}`);
         } else {
-            toast.error(res?.message || "Failed to create enquiry");
+            toast.error(res?.message || "Failed to update enquiry");
         }
     };
+    const onInvalid = () => {
+        toast.error("Please check the form values before updating.");
+    };
+
+    const isOwnComment = (comment: any) => {
+        return String(comment?.user_id?._id || comment?.user_id || "") === currentUserId;
+    };
+
+    const formatCommentTime = (value: any) => {
+        if (!value) return "N/A";
+        return new Date(value).toLocaleString();
+    };
+
+    const handleAddComment = async () => {
+        const comment = newComment.trim();
+        if (!comment) return;
+
+        const res = await AddEnquiryComment({ enquiry_id: params.enquiry_id, comment });
+        if (res?.status === 201) {
+            setNewComment("");
+            toast.success("Comment added");
+            queryClient.invalidateQueries({ queryKey: ["enquiry-comments", params.enquiry_id] });
+            return;
+        }
+        toast.error(res?.message || "Failed to add comment");
+    };
+
+    const handleSaveComment = async (commentId: string) => {
+        const comment = String(commentDrafts[commentId] || "").trim();
+        if (!comment) {
+            toast.error("Comment cannot be empty");
+            return;
+        }
+
+        const res = await UpdateEnquiryComment({ comment_id: commentId, comment });
+        if (res?.status === 200) {
+            toast.success("Comment updated");
+            setEditingCommentId(null);
+            queryClient.invalidateQueries({ queryKey: ["enquiry-comments", params.enquiry_id] });
+            return;
+        }
+        toast.error(res?.message || "Failed to update comment");
+    };
+
+    const handleDeleteComment = async (commentId: string) => {
+        const res = await DeleteEnquiryComment(commentId);
+        if (res?.status === 200) {
+            toast.success("Comment deleted");
+            if (editingCommentId === commentId) {
+                setEditingCommentId(null);
+            }
+            queryClient.invalidateQueries({ queryKey: ["enquiry-comments", params.enquiry_id] });
+            return;
+        }
+        toast.error(res?.message || "Failed to delete comment");
+    };
+
+    const renderCommentCard = (comment: any) => {
+        const commentId = String(comment?._id || "");
+        const canManage = isOwnComment(comment);
+        const isEditing = editingCommentId === commentId;
+        const createdAt = formatCommentTime(comment?.createdAt);
+        const updatedAt = formatCommentTime(comment?.updatedAt);
+        const wasEdited = Boolean(comment?.createdAt && comment?.updatedAt && new Date(comment.updatedAt).getTime() !== new Date(comment.createdAt).getTime());
+
+        return (
+            <div key={commentId} className="rounded-lg border border-slate-800/70 bg-slate-950/25 p-3 space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                        <Avatar size={36} src={`https://api.dicebear.com/7.x/personas/svg?seed=${encodeURIComponent(comment?.user_id?.email || comment?.user_id?.name || commentId)}`} />
+                        <div className="min-w-0">
+                            <p className="text-sm font-semibold text-slate-200 truncate">{comment?.user_id?.name || "Unknown User"}</p>
+                            <p className="text-xs text-slate-400 truncate">{comment?.user_id?.email || "No email"}</p>
+                        </div>
+                    </div>
+
+                    {canManage && (
+                        <div className="flex items-center gap-2">
+                            {isEditing ? (
+                                <>
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        onClick={() => handleSaveComment(commentId)}
+                                        disabled={isCommentUpdating}
+                                        className="h-7 px-2 text-xs bg-cyan-700 hover:bg-cyan-800"
+                                    >
+                                        Save
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => setEditingCommentId(null)}
+                                        className="h-7 px-2 text-xs"
+                                    >
+                                        Cancel
+                                    </Button>
+                                </>
+                            ) : (
+                                <>
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => {
+                                            setEditingCommentId(commentId);
+                                            setCommentDrafts((prev) => ({ ...prev, [commentId]: comment?.comment || "" }));
+                                        }}
+                                        className="h-7 px-2 text-xs"
+                                    >
+                                        Edit
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="destructive"
+                                        onClick={() => handleDeleteComment(commentId)}
+                                        disabled={isCommentDeleting}
+                                        className="h-7 px-2 text-xs"
+                                    >
+                                        Delete
+                                    </Button>
+                                </>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                {isEditing ? (
+                    <Textarea
+                        value={commentDrafts[commentId] ?? ""}
+                        onChange={(event) => setCommentDrafts((prev) => ({ ...prev, [commentId]: event.target.value }))}
+                        className="bg-slate-950/40 min-h-[90px]"
+                    />
+                ) : (
+                    <p className="text-sm text-slate-200 whitespace-pre-wrap">{comment?.comment || "-"}</p>
+                )}
+
+                <div className="text-[11px] text-slate-500 flex flex-wrap gap-3">
+                    <span>Created: {createdAt}</span>
+                    {wasEdited && <span>Updated: {updatedAt}</span>}
+                </div>
+            </div>
+        );
+    };
+
+    if (isEnquiryLoading || isCampDetailsLoading) {
+        return (
+            <div className="flex items-center justify-center h-40">
+                <div className="animate-spin rounded-full h-8 w-8 border-4 border-slate-700 border-t-cyan-400" />
+            </div>
+        );
+    }
+
+    if (enquiry?.status === 403 || enquiry?.canEdit === false) {
+        return (
+            <div className="p-5">
+                <div className="rounded-xl border border-red-900/60 bg-red-950/20 p-4 text-sm text-red-200">
+                    You are not allowed to edit this enquiry.
+                    <div className="mt-3">
+                        <Button variant="outline" onClick={() => router.replace(`/staff/enquiry/${params.enquiry_id}`)}>
+                            Back to Enquiry
+                        </Button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="p-4 md:p-5 pb-10">
@@ -412,28 +750,28 @@ export default function AddEnquiry() {
             <Breadcrumb>
                 <BreadcrumbList>
                     <BreadcrumbItem>
-                        <BreadcrumbLink href="/admin/enquiries">Enquiries</BreadcrumbLink>
+                        <BreadcrumbLink href="/staff/enquiry">Enquiries</BreadcrumbLink>
                     </BreadcrumbItem>
                     <BreadcrumbSeparator />
                     <BreadcrumbItem>
-                        <BreadcrumbPage>Add Enquiry</BreadcrumbPage>
+                        <BreadcrumbPage>Edit Enquiry</BreadcrumbPage>
                     </BreadcrumbItem>
                 </BreadcrumbList>
             </Breadcrumb>
 
             <div className="bg-gradient-to-r from-slate-950/80 via-slate-900/70 to-cyan-950/30 border border-slate-800/80 p-4 rounded-xl mt-2 shadow-[0_10px_30px_-20px_rgba(34,211,238,0.35)]">
                 <h1 className="font-semibold text-sm text-slate-200 flex items-center gap-2">
-                    <Building2 size={16} className="text-cyan-300" /> Add New Enquiry
+                    <Building2 size={16} className="text-cyan-300" /> Edit Enquiry
                 </h1>
                 <p className="text-xs text-slate-400 mt-1">
-                    Admin can capture complete enquiry details with polished routing, ownership, and follow-up tracking.
+                    Update enquiry details with the same structured workflow and visuals as the add enquiry experience.
                 </p>
             </div>
 
             <div className="mt-3 bg-gradient-to-br from-slate-950/80 via-slate-900/75 to-cyan-950/20 p-4 md:p-5 rounded-xl border border-slate-800/80 pb-16">
 
                 <Form {...form}>
-                    <form onSubmit={handleSubmit(onSubmit)} className="space-y-10">
+                    <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="space-y-10">
 
                         {/* ------------------------------------ LOCATION ------------------------------------ */}
                         <div className="space-y-4">
@@ -442,18 +780,18 @@ export default function AddEnquiry() {
                             <FormField control={form.control} name="country" render={({ field }) => (
                                 <FormItem className="w-full">
                                     <FormLabel className="text-xs text-slate-300 font-semibold">Country</FormLabel>
-                                    <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
-                                        <Select value={field.value} onValueChange={field.onChange}>
-                                            <SelectTrigger className={field.value ? "text-slate-200" : "text-slate-400"}>
-                                                <SelectValue placeholder="Select Country" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {countries?.map((country: any) => (
-                                                    <SelectItem key={country._id} value={country._id}>{country.country_name}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
+                                    <FormControl>
+                                        <select
+                                            value={field.value ?? ""}
+                                            onChange={field.onChange}
+                                            className={selectClassName}
+                                        >
+                                            <option value="">Select Country</option>
+                                            {countries?.map((country: any) => (
+                                                <option key={country._id} value={country._id}>{country.country_name}</option>
+                                            ))}
+                                        </select>
+                                    </FormControl>
                                 </FormItem>
                             )} />
 
@@ -461,16 +799,18 @@ export default function AddEnquiry() {
                             <FormField control={form.control} name="region" render={({ field }) => (
                                 <FormItem className="w-full">
                                     <FormLabel className="text-xs text-slate-300 font-semibold">Region / Territory</FormLabel>
-                                    <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
-                                        <Select value={field.value} onValueChange={field.onChange}>
-                                            <SelectTrigger className="text-slate-200"><SelectValue placeholder="Select Region" /></SelectTrigger>
-                                            <SelectContent>
-                                                {regions?.region?.map((rg: any) => (
-                                                    <SelectItem key={rg._id} value={rg._id}>{rg.region_name}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
+                                    <FormControl>
+                                        <select
+                                            value={field.value ?? ""}
+                                            onChange={field.onChange}
+                                            className={selectClassName}
+                                        >
+                                            <option value="">{country_id ? "Select Region" : "Select Country first"}</option>
+                                            {regions?.region?.map((rg: any) => (
+                                                <option key={rg._id} value={rg._id}>{rg.region_name}</option>
+                                            ))}
+                                        </select>
+                                    </FormControl>
                                 </FormItem>
                             )} />
 
@@ -478,31 +818,35 @@ export default function AddEnquiry() {
                             <FormField control={form.control} name="province" render={({ field }) => (
                                 <FormItem className="w-full">
                                     <FormLabel className="text-xs text-slate-300 font-semibold">Province</FormLabel>
-                                    <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
-                                        <Select value={field.value} onValueChange={field.onChange}>
-                                            <SelectTrigger className="text-slate-200"><SelectValue placeholder="Select Province" /></SelectTrigger>
-                                            <SelectContent>
-                                                {provinces?.provinces?.map((p: any) => (
-                                                    <SelectItem key={p._id} value={p._id}>{p.province_name}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
+                                    <FormControl>
+                                        <select
+                                            value={field.value ?? ""}
+                                            onChange={field.onChange}
+                                            className={selectClassName}
+                                        >
+                                            <option value="">{region_id ? "Select Province" : "Select Region first"}</option>
+                                            {provinces?.provinces?.map((p: any) => (
+                                                <option key={p._id} value={p._id}>{p.province_name}</option>
+                                            ))}
+                                        </select>
+                                    </FormControl>
                                 </FormItem>
                             )} />
                             <FormField control={form.control} name="city" render={({ field }) => (
                                 <FormItem className="w-full">
                                     <FormLabel className="text-xs text-slate-300 font-semibold">City</FormLabel>
-                                    <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
-                                        <Select value={field.value} onValueChange={field.onChange}>
-                                            <SelectTrigger className="text-slate-200"><SelectValue placeholder="Select City" /></SelectTrigger>
-                                            <SelectContent>
-                                                {cities?.cities?.map((c: any) => (
-                                                    <SelectItem key={c._id} value={c._id}>{c.city_name}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
+                                    <FormControl>
+                                        <select
+                                            value={field.value ?? ""}
+                                            onChange={field.onChange}
+                                            className={selectClassName}
+                                        >
+                                            <option value="">{province_id ? "Select City" : "Select Province first"}</option>
+                                            {cities?.cities?.map((c: any) => (
+                                                <option key={c._id} value={c._id}>{c.city_name}</option>
+                                            ))}
+                                        </select>
+                                    </FormControl>
                                 </FormItem>
                             )} />
 
@@ -534,16 +878,18 @@ export default function AddEnquiry() {
                                         <FormField control={form.control} name="area" render={({ field }) => (
                                             <FormItem className="w-full">
                                                 <FormLabel className="text-xs text-slate-300 font-semibold">Area</FormLabel>
-                                                <div className="bg-gradient-to-br from-slate-950/60 to-slate-900/50 rounded-lg">
-                                                    <Select value={field.value} onValueChange={field.onChange}>
-                                                        <SelectTrigger><SelectValue placeholder="Select Area" /></SelectTrigger>
-                                                        <SelectContent>
-                                                            {areas?.areas?.map((a: any) => (
-                                                                <SelectItem key={a._id} value={a._id}>{a.area_name}</SelectItem>
-                                                            ))}
-                                                        </SelectContent>
-                                                    </Select>
-                                                </div>
+                                                <FormControl>
+                                                    <select
+                                                        value={field.value ?? ""}
+                                                        onChange={field.onChange}
+                                                        className={selectClassName}
+                                                    >
+                                                        <option value="">{city_id ? "Select Area" : "Select City first"}</option>
+                                                        {areas?.areas?.map((a: any) => (
+                                                            <option key={a._id} value={a._id}>{a.area_name}</option>
+                                                        ))}
+                                                    </select>
+                                                </FormControl>
                                             </FormItem>
                                         )} />
                                     )}
@@ -611,20 +957,20 @@ export default function AddEnquiry() {
                                 render={({ field }) => (
                                     <FormItem className="w-full lg:w-[56%] rounded-xl border border-slate-800/70 bg-slate-950/25 p-3">
                                         <FormLabel className="text-xs text-slate-300 font-semibold">Camp Name</FormLabel>
-                                        <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
-                                            <Select value={field.value} onValueChange={field.onChange}>
-                                                <SelectTrigger className={field.value ? "text-slate-200" : "text-slate-400"}>
-                                                    <SelectValue placeholder="Select Camp Name" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {camps?.camps?.map((c: any) => (
-                                                        <SelectItem key={c._id} value={c._id}>
-                                                            {c.camp_name}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
+                                        <FormControl>
+                                            <select
+                                                value={field.value ?? ""}
+                                                onChange={field.onChange}
+                                                className={selectClassName}
+                                            >
+                                                <option value="">{area_id ? "Select Camp Name" : "Select Area first"}</option>
+                                                {camps?.camps?.map((c: any) => (
+                                                    <option key={c._id} value={c._id}>
+                                                        {c.camp_name}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </FormControl>
                                         <FormMessage />
                                     </FormItem>
                                 )}
@@ -663,20 +1009,20 @@ export default function AddEnquiry() {
                                     render={({ field }) => (
                                         <FormItem className="w-full">
                                             <FormLabel className="text-xs text-slate-300 font-semibold">Camp Type</FormLabel>
-                                            <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
-                                                <Select value={field.value} onValueChange={field.onChange}>
-                                                    <SelectTrigger className="text-slate-200">
-                                                        <SelectValue placeholder="Select Camp Type" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        {EQ_CAMP_TYPES.map((c) => (
-                                                            <SelectItem key={c} value={c}>
-                                                                {c}
-                                                            </SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
+                                            <FormControl>
+                                                <select
+                                                    value={field.value ?? ""}
+                                                    onChange={field.onChange}
+                                                    className={selectClassName}
+                                                >
+                                                    <option value="">Select Camp Type</option>
+                                                    {EQ_CAMP_TYPES.map((c) => (
+                                                        <option key={c} value={c}>
+                                                            {c}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </FormControl>
                                             <FormMessage />
                                         </FormItem>
                                     )}
@@ -760,27 +1106,27 @@ export default function AddEnquiry() {
                             <FormField control={form.control} name="camp_capacity" render={({ field }) => (
                                 <FormItem className="rounded-xl border border-slate-800/70 bg-slate-950/25 p-3">
                                     <FormLabel className="text-xs text-slate-300">Camp Capacity</FormLabel>
-                                    <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
-                                        <Select
-                                            value={field.value}
-                                            onValueChange={(value) => {
+                                    <FormControl>
+                                        <select
+                                            value={field.value ?? ""}
+                                            onChange={(event) => {
+                                                const value = event.target.value;
                                                 field.onChange(value);
                                                 const matchedPriority = priorityCapacityMap.find((item) => item.capacity === value)?.priority;
                                                 if (matchedPriority) {
                                                     form.setValue("priority", matchedPriority, { shouldDirty: true, shouldValidate: true });
                                                 }
                                             }}
+                                            className={selectClassName}
                                         >
-                                            <SelectTrigger><SelectValue placeholder="Select Capacity" /></SelectTrigger>
-                                            <SelectContent>
-                                                {priorityCapacityMap.map((item) => (
-                                                    <SelectItem key={item.capacity} value={item.capacity}>
-                                                        {item.capacityLabel} (Priority {item.priority})
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
+                                            <option value="">Select Capacity</option>
+                                            {priorityCapacityMap.map((item) => (
+                                                <option key={item.capacity} value={item.capacity}>
+                                                    {item.capacityLabel} (Priority {item.priority})
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </FormControl>
                                     {campCapacityMissing && (
                                         <p className="text-xs text-red-400 mt-1">Please add the camp capacity</p>
                                     )}
@@ -834,30 +1180,30 @@ export default function AddEnquiry() {
                                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                                         <div>
                                             <FormLabel className="text-xs text-slate-300 font-semibold">Is Decision Maker?</FormLabel>
-                                            <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
-                                                <Select value={form.watch(`contacts.${i}.is_decision_maker`)} onValueChange={(val) => form.setValue(`contacts.${i}.is_decision_maker`, val)}>
-                                                    <SelectTrigger className="text-slate-200"><SelectValue placeholder="Select" /></SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="Yes">Yes</SelectItem>
-                                                        <SelectItem value="No">No</SelectItem>
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
+                                            <select
+                                                value={form.watch(`contacts.${i}.is_decision_maker`) ?? ""}
+                                                onChange={(event) => form.setValue(`contacts.${i}.is_decision_maker`, event.target.value)}
+                                                className={selectClassName}
+                                            >
+                                                <option value="">Select</option>
+                                                <option value="Yes">Yes</option>
+                                                <option value="No">No</option>
+                                            </select>
                                         </div>
 
                                         <div>
                                             <FormLabel className="text-xs text-slate-300 font-semibold">Authority Level</FormLabel>
-                                            <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
-                                                <Select value={form.watch(`contacts.${i}.authority_level`)} onValueChange={(val) => form.setValue(`contacts.${i}.authority_level`, val)}>
-                                                    <SelectTrigger className="text-slate-200"><SelectValue placeholder="Authority Level" /></SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="Operational">Operational</SelectItem>
-                                                        <SelectItem value="Manager">Manager</SelectItem>
-                                                        <SelectItem value="Director">Director</SelectItem>
-                                                        <SelectItem value="C-Level">C-Level</SelectItem>
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
+                                            <select
+                                                value={form.watch(`contacts.${i}.authority_level`) ?? ""}
+                                                onChange={(event) => form.setValue(`contacts.${i}.authority_level`, event.target.value)}
+                                                className={selectClassName}
+                                            >
+                                                <option value="">Authority Level</option>
+                                                <option value="Operational">Operational</option>
+                                                <option value="Manager">Manager</option>
+                                                <option value="Director">Director</option>
+                                                <option value="C-Level">C-Level</option>
+                                            </select>
                                         </div>
                                     </div>
 
@@ -922,12 +1268,18 @@ export default function AddEnquiry() {
                                 <FormField control={form.control} name="wifi_available" render={({ field }) => (
                                     <FormItem className="rounded-xl border border-slate-800/70 bg-slate-950/25 p-3">
                                         <FormLabel className="text-xs text-slate-300 font-semibold">Wi-Fi Available?</FormLabel>
-                                        <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
-                                            <Select value={field.value} onValueChange={field.onChange}>
-                                                <SelectTrigger><SelectValue placeholder="Select Wi-Fi Availability" /></SelectTrigger>
-                                                <SelectContent><SelectItem value="Yes">Yes</SelectItem><SelectItem value="No">No</SelectItem><SelectItem value="not-specified">Not Specified</SelectItem></SelectContent>
-                                            </Select>
-                                        </div>
+                                        <FormControl>
+                                            <select
+                                                value={field.value ?? ""}
+                                                onChange={field.onChange}
+                                                className={selectClassName}
+                                            >
+                                                <option value="">Select Wi-Fi Availability</option>
+                                                <option value="Yes">Yes</option>
+                                                <option value="No">No</option>
+                                                <option value="not-specified">Not Specified</option>
+                                            </select>
+                                        </FormControl>
                                     </FormItem>
                                 )} />
 
@@ -954,16 +1306,18 @@ export default function AddEnquiry() {
                                     <FormField control={form.control} name="wifi_type" render={({ field }) => (
                                         <FormItem className="rounded-lg border border-slate-800/70 bg-slate-950/25 p-3">
                                             <FormLabel className="text-xs text-slate-300 font-semibold">Wi-Fi Type</FormLabel>
-                                            <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
-                                                <Select value={field.value} onValueChange={field.onChange}>
-                                                    <SelectTrigger><SelectValue placeholder="Select Type" /></SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="Existing Contractor">Existing Contractor</SelectItem>
-                                                        <SelectItem value="Personal WiFi">Personal WiFi</SelectItem>
-                                                        <SelectItem value="Other Sources">Other Sources</SelectItem>
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
+                                            <FormControl>
+                                                <select
+                                                    value={field.value ?? ""}
+                                                    onChange={field.onChange}
+                                                    className={selectClassName}
+                                                >
+                                                    <option value="">Select Type</option>
+                                                    <option value="Existing Contractor">Existing Contractor</option>
+                                                    <option value="Personal WiFi">Personal WiFi</option>
+                                                    <option value="Other Sources">Other Sources</option>
+                                                </select>
+                                            </FormControl>
                                         </FormItem>
                                     )} />
 
@@ -1047,12 +1401,17 @@ export default function AddEnquiry() {
                                 <FormField control={form.control} name="competition_status" render={({ field }) => (
                                     <FormItem className="rounded-lg border border-slate-800/70 bg-slate-950/25 p-3">
                                         <FormLabel className="text-xs text-slate-300 font-semibold">Competition Presence</FormLabel>
-                                        <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
-                                            <Select value={field.value} onValueChange={field.onChange}>
-                                                <SelectTrigger><SelectValue placeholder="Competition Status" /></SelectTrigger>
-                                                <SelectContent><SelectItem value="Yes">Yes</SelectItem><SelectItem value="No">No</SelectItem></SelectContent>
-                                            </Select>
-                                        </div>
+                                        <FormControl>
+                                            <select
+                                                value={field.value ?? ""}
+                                                onChange={field.onChange}
+                                                className={selectClassName}
+                                            >
+                                                <option value="">Competition Status</option>
+                                                <option value="Yes">Yes</option>
+                                                <option value="No">No</option>
+                                            </select>
+                                        </FormControl>
                                     </FormItem>
                                 )} />
                                 <div className="rounded-lg border border-slate-800/70 bg-slate-950/25 p-3">
@@ -1091,18 +1450,20 @@ export default function AddEnquiry() {
                                             Priority (1 - Low, 10 - High)
                                         </FormLabel>
                                     </Tooltip>
-                                    <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
-                                        <Select value={field.value} onValueChange={field.onChange}>
-                                            <SelectTrigger><SelectValue placeholder="Priority" /></SelectTrigger>
-                                            <SelectContent>
-                                                {priorityCapacityMap.map((item) => (
-                                                    <SelectItem key={item.value} value={item.value}>
-                                                        {item.value} - {item.capacityLabel}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
+                                    <FormControl>
+                                        <select
+                                            value={field.value ?? ""}
+                                            onChange={field.onChange}
+                                            className={selectClassName}
+                                        >
+                                            <option value="">Priority</option>
+                                            {priorityCapacityMap.map((item) => (
+                                                <option key={item.value} value={item.value}>
+                                                    {item.value} - {item.capacityLabel}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </FormControl>
                                 </FormItem>
                             )} />
                         </div>
@@ -1111,16 +1472,18 @@ export default function AddEnquiry() {
                             <FormField control={form.control} name="followup_status" render={({ field }) => (
                                 <FormItem className="rounded-lg border border-slate-800/70 bg-slate-950/25 p-3">
                                     <FormLabel className="text-xs text-slate-300 font-semibold">Follow-up Status</FormLabel>
-                                    <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
-                                        <Select value={field.value} onValueChange={field.onChange}>
-                                            <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
-                                            <SelectContent>
-                                                {ENQUIRY_STATUS_OPTIONS.map((status) => (
-                                                    <SelectItem key={status} value={status}>{status}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
+                                    <FormControl>
+                                        <select
+                                            value={field.value ?? ""}
+                                            onChange={field.onChange}
+                                            className={selectClassName}
+                                        >
+                                            <option value="">Status</option>
+                                            {ENQUIRY_STATUS_OPTIONS.map((status) => (
+                                                <option key={status} value={status}>{status}</option>
+                                            ))}
+                                        </select>
+                                    </FormControl>
                                 </FormItem>
                             )} />
                         </div>
@@ -1146,87 +1509,75 @@ export default function AddEnquiry() {
                             </div>
                         </div>
 
-                        <div className="rounded-xl border border-slate-800/80 bg-gradient-to-r from-slate-900/45 to-slate-950/35 p-3">
-                            <div className="rounded-lg border border-slate-800/70 bg-slate-950/25 p-3">
-                                <label className="text-xs text-slate-300 font-semibold block mb-2">Comments</label>
-                                <Textarea {...form.register("comments")} placeholder="Comments" className="bg-slate-950/40 min-h-[110px]" />
-                            </div>
-                        </div>
-
-                        {/* ENQUIRY USERS */}
                         <div className="rounded-xl border border-slate-800/80 bg-gradient-to-r from-slate-900/45 to-slate-950/35 p-3 space-y-3">
                             <div>
-                                <div className="text-xs text-slate-300 font-semibold">Enquiry Users</div>
-                                <p className="mt-1 text-[11px] text-slate-400">Assign ownership and collaboration members for this enquiry lifecycle.</p>
+                                <div className="text-xs text-slate-300 font-semibold">Comments</div>
+                                <p className="mt-1 text-[11px] text-slate-400">Add progress notes. Each comment keeps author and timestamps.</p>
                             </div>
-                            <FormField
-                                control={form.control}
-                                name="enquiry_brought_by"
-                                render={({ field }) => (
-                                    <FormItem className="w-full">
-                                        <EnquiryUserMultiSelect
-                                            label="Enquiry Brought By"
-                                            value={field.value || []}
-                                            options={userOptions}
-                                            onChange={field.onChange}
-                                        />
-                                    </FormItem>
+
+                            <div className="rounded-lg border border-slate-800/70 bg-slate-950/25 p-3">
+                                <label className="text-xs text-slate-300 font-semibold block mb-2">Add Comment</label>
+                                <Textarea
+                                    value={newComment}
+                                    onChange={(event) => setNewComment(event.target.value)}
+                                    placeholder="Write a comment..."
+                                    className="bg-slate-950/40 min-h-[96px]"
+                                />
+                                <div className="mt-2 flex justify-end">
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        onClick={handleAddComment}
+                                        disabled={!newComment.trim() || isAddingComment}
+                                        className="bg-cyan-700 hover:bg-cyan-800"
+                                    >
+                                        {isAddingComment ? "Adding..." : "Add Comment"}
+                                    </Button>
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                {isCommentsLoading && (
+                                    <div className="rounded-lg border border-slate-800/70 bg-slate-950/25 p-3 text-xs text-slate-400">
+                                        Loading comments...
+                                    </div>
                                 )}
-                            />
-                            <FormField
-                                control={form.control}
-                                name="meeting_initiated_by"
-                                render={({ field }) => (
-                                    <FormItem className="w-full">
-                                        <EnquiryUserMultiSelect
-                                            label="Meeting Initiated By"
-                                            value={field.value || []}
-                                            options={userOptions}
-                                            onChange={field.onChange}
-                                        />
-                                    </FormItem>
+
+                                {!isCommentsLoading && sortedComments.length === 0 && (
+                                    <div className="rounded-lg border border-dashed border-slate-800/70 bg-slate-950/25 p-3 text-xs text-slate-400">
+                                        No comments yet.
+                                    </div>
                                 )}
-                            />
-                            <FormField
-                                control={form.control}
-                                name="project_closed_by"
-                                render={({ field }) => (
-                                    <FormItem className="w-full">
-                                        <EnquiryUserMultiSelect
-                                            label="Project Closed By"
-                                            value={field.value || []}
-                                            options={userOptions}
-                                            onChange={field.onChange}
-                                        />
-                                    </FormItem>
-                                )}
-                            />
-                            <FormField
-                                control={form.control}
-                                name="project_managed_by"
-                                render={({ field }) => (
-                                    <FormItem className="w-full">
-                                        <EnquiryUserMultiSelect
-                                            label="Project Managed By"
-                                            value={field.value || []}
-                                            options={userOptions}
-                                            onChange={field.onChange}
-                                        />
-                                    </FormItem>
-                                )}
-                            />
-                            <FormField
-                                control={form.control}
-                                name="enquiry_user_notes"
-                                render={({ field }) => (
-                                    <FormItem className="w-full">
-                                        <FormLabel className="text-xs text-slate-300 font-semibold">Enquiry User Notes</FormLabel>
-                                        <FormControl>
-                                            <Textarea placeholder="Comments..." {...field} className="bg-slate-950/40" />
-                                        </FormControl>
-                                    </FormItem>
-                                )}
-                            />
+
+                                {!isCommentsLoading && recentComments.map((comment: any) => renderCommentCard(comment))}
+                            </div>
+
+                            {!isCommentsLoading && hasMoreComments && (
+                                <div className="flex justify-end">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setAllCommentsDialogOpen(true)}
+                                    >
+                                        View more
+                                    </Button>
+                                </div>
+                            )}
+
+                            <Dialog open={allCommentsDialogOpen} onOpenChange={setAllCommentsDialogOpen}>
+                                <DialogContent className="max-w-3xl">
+                                    <DialogHeader>
+                                        <DialogTitle>All Comments</DialogTitle>
+                                        <DialogDescription>
+                                            Showing all comments for this enquiry, newest first.
+                                        </DialogDescription>
+                                    </DialogHeader>
+                                    <div className="max-h-[70vh] overflow-y-auto space-y-2 pr-1">
+                                        {sortedComments.map((comment: any) => renderCommentCard(comment))}
+                                    </div>
+                                </DialogContent>
+                            </Dialog>
                         </div>
 
                         {/* IMAGES */}
@@ -1367,11 +1718,11 @@ export default function AddEnquiry() {
                                     type="submit"
                                     whileHover={{ scale: 1.02 }}
                                     whileTap={{ scale: 0.98 }}
-                                    disabled={isEqAdding}
+                                    disabled={isUpdating}
                                     className="min-w-[170px] inline-flex items-center justify-center gap-2 bg-gradient-to-r from-cyan-700 to-cyan-600 px-4 py-2.5 rounded-lg border border-cyan-500/70 hover:from-cyan-600 hover:to-cyan-500 text-sm font-semibold text-white disabled:opacity-60 disabled:cursor-not-allowed shadow-[0_8px_20px_-10px_rgba(34,211,238,0.65)]"
                                 >
-                                    {isEqAdding && <Loader2 className="h-4 w-4 animate-spin" />}
-                                    {isEqAdding ? "Saving..." : "Save Enquiry"}
+                                    {isUpdating && <Loader2 className="h-4 w-4 animate-spin" />}
+                                    {isUpdating ? "Updating..." : "Update Enquiry"}
                                 </motion.button>
                             </div>
                         </div>

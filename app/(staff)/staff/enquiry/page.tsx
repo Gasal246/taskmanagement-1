@@ -17,9 +17,39 @@ import { DatePicker, Space } from "antd";
 import { ChevronDown, ChevronUp, PanelsTopLeft, Search, SlidersHorizontal } from "lucide-react";
 import LoaderSpin from "@/components/shared/LoaderSpin";
 import { useGetAccessEnquiriesForStaffs, useGetEqAreas, useGetEqCampsByArea, useGetEqCities, useGetEqCountries, useGetEqProvince, useGetEqRegions } from "@/query/enquirymanager/queries";
-import { ENQUIRY_STATUS } from "@/lib/constants";
+import { Eq_CAPACITY_OPTIONS } from "@/lib/constants";
 
 const { RangePicker } = DatePicker;
+
+const NEXT_ACTION_OPTIONS = [
+  { _id: "all", name: "All" },
+  { _id: "Call", name: "Call" },
+  { _id: "Visit", name: "Visit" },
+];
+
+const STATUS_OPTIONS = [
+  { _id: "all", name: "All" },
+  { _id: "Lead Received", name: "Lead Received" },
+  { _id: "Initial Meeting Over", name: "Initial Meeting Over" },
+  { _id: "Survey Completed", name: "Survey Completed" },
+  { _id: "Proposal Submitted", name: "Proposal Submitted" },
+  { _id: "Waiting For Client Response", name: "Waiting For Client Response" },
+  { _id: "On Hold", name: "On Hold" },
+  { _id: "Project Awarded", name: "Project Awarded" },
+];
+
+const PRIORITY_OPTIONS = [
+  { _id: "1", name: "1 - <500" },
+  { _id: "2", name: "2 - 500-1,000" },
+  { _id: "3", name: "3 - 1,000-2,000" },
+  { _id: "4", name: "4 - 2,000-3,000" },
+  { _id: "5", name: "5 - 3,000-5,000" },
+  { _id: "6", name: "6 - 5,000-10,000" },
+  { _id: "7", name: "7 - 10,000-20,000" },
+  { _id: "8", name: "8 - 20,000-35,000" },
+  { _id: "9", name: "9 - 35,000-50,000" },
+  { _id: "10", name: "10 - 50,000+" },
+];
 
 /* -------------------------------------------------------
                       PAGE START
@@ -41,47 +71,56 @@ export default function EnquiriesPage() {
     city_id: "",
     area_id: "",
     camp_id: "",
-    status: "",
+    status: "all",
+    next_action: "all",
     occupancy: "",
+    capacity: "",
     wifi_available: "",
     competition: "",
     priority: "",
     from_date: "",
     due_date: "",
     lease_expiry: "",
-    enquiry_uuid: ""
+    enquiry_uuid: "",
+    search: "",
   });
+
+  const normalizedFilters = useMemo(() => ({
+    ...filters,
+    status: filters.status === "all" ? "" : filters.status,
+    next_action: filters.next_action === "all" ? "" : filters.next_action,
+  }), [filters]);
 
   // Cascading dropdown lists
   const [countries, setCountries] = useState([]);
 
   // Queries
   const { data: enquiries, isLoading } = useGetAccessEnquiriesForStaffs({
-    ...filters,
+    ...normalizedFilters,
     page: page.toString(),
     limit: limit.toString(),
   });
-  const {mutateAsync: GetCountries, isPending: isCompanyLoading} = useGetEqCountries();
-  const {data: regions, isLoading: isRegionLoading} = useGetEqRegions(filters?.country_id);
-  const {data: provinces, isLoading: isProvinceLoading} = useGetEqProvince(filters?.region_id);
-  const {data: cities, isLoading: isCityLoading} = useGetEqCities(filters?.province_id);
-  const {data: areas, isLoading: isAreaLoading} = useGetEqAreas(filters.city_id);
-  const {data: camps, isLoading: isCampLoading} = useGetEqCampsByArea(filters?.area_id);
+  const { mutateAsync: GetCountries, isPending: isCompanyLoading } = useGetEqCountries();
+  const { data: regions, isLoading: isRegionLoading } = useGetEqRegions(filters?.country_id);
+  const { data: provinces, isLoading: isProvinceLoading } = useGetEqProvince(filters?.region_id);
+  const { data: cities, isLoading: isCityLoading } = useGetEqCities(filters?.province_id);
+  const { data: areas, isLoading: isAreaLoading } = useGetEqAreas(filters.city_id);
+  const { data: camps, isLoading: isCampLoading } = useGetEqCampsByArea(filters?.area_id);
 
-  const fetchCountries = async() => {
+  const fetchCountries = async () => {
     const res = await GetCountries();
-    if(res?.status == 200){
+    if (res?.status == 200) {
       setCountries(res?.countries);
     }
   }
 
-  useEffect(()=> {
+  useEffect(() => {
     fetchCountries();
-  },[]);
+  }, []);
 
-  useEffect(()=>{
+  useEffect(() => {
     console.log("enq: ", enquiries);
-  },[enquiries]);
+  }, [enquiries]);
 
   useEffect(() => {
     setPage(1);
@@ -92,11 +131,11 @@ export default function EnquiriesPage() {
   ---------------------------------------------------------*/
 
   const updateFilter = (key, value) => {
-  setFilters(prev => ({
-    ...prev,
-    [key]: value === undefined ? "" : value,   // force string or ""
-  }));
-};
+    setFilters(prev => ({
+      ...prev,
+      [key]: value === undefined ? "" : value,   // force string or ""
+    }));
+  };
 
   /* -------------------------------------------------------
      CASCADING SELECT LOGIC
@@ -236,20 +275,20 @@ export default function EnquiriesPage() {
     <div className="p-4 pb-20">
 
       {/* HEADER */}
-            <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg mb-4 flex justify-between items-center">
-              <h1 className="font-semibold text-sm text-slate-300 flex items-center gap-1">
-                <PanelsTopLeft size={16} /> Enquiries
-              </h1>
-      
-              <div className="flex items-center gap-2">
-                <Button variant="ghost" className="text-xs" onClick={() => router.push("/staff/enquiry/add-enquiry")}>
-                  Add Enquiry
-                </Button>
-                <Button variant="ghost" className="text-xs" onClick={() => router.push("/staff/enquiry/head-quaters")}>
-                  Head Offices
-                </Button>
-                </div>
-                </div>
+      <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg mb-4 flex justify-between items-center">
+        <h1 className="font-semibold text-sm text-slate-300 flex items-center gap-1">
+          <PanelsTopLeft size={16} /> Enquiries
+        </h1>
+
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" className="text-xs" onClick={() => router.push("/staff/enquiry/add-enquiry")}>
+            Add Enquiry
+          </Button>
+          <Button variant="ghost" className="text-xs" onClick={() => router.push("/staff/enquiry/head-quaters")}>
+            Head Offices
+          </Button>
+        </div>
+      </div>
 
       {/* SEARCH + FILTER TOGGLE */}
       <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg mb-4">
@@ -288,141 +327,155 @@ export default function EnquiriesPage() {
               <p className="text-[11px] text-slate-500">Refine results with quick criteria</p>
             </div>
 
-        <div className="flex flex-wrap -m-1">
-          {/* COUNTRY */}
-          <FilterSelect
-            label="Country"
-            value={filters.country_id}
-            options={countries}
-            onChange={(v) => updateFilter("country_id", v)}
-            disabled={false}
-          />
-
-          {/* REGION */}
-          <FilterSelect
-            label="Region"
-            value={filters.region_id}
-            options={regions?.region}
-            onChange={(v) => updateFilter("region_id", v)}
-            disabled={!filters.country_id}
-          />
-
-          {/* PROVINCE */}
-          <FilterSelect
-            label="Province"
-            value={filters.province_id}
-            options={provinces?.provinces}
-            onChange={(v) => updateFilter("province_id", v)}
-            disabled={!filters.region_id}
-          />
-
-          {/* CITY */}
-          <FilterSelect
-            label="City"
-            value={filters.city_id}
-            options={cities?.cities}
-            onChange={(v) => updateFilter("city_id", v)}
-            disabled={!filters.province_id}
-          />
-
-          {/* AREA */}
-          <FilterSelect
-            label="Area"
-            value={filters.area_id}
-            options={areas?.areas}
-            onChange={(v) => updateFilter("area_id", v)}
-            disabled={!filters.city_id}
-          />
-
-          {/* CAMP */}
-          <FilterSelect
-            label="Camp"
-            value={filters.camp_id}
-            options={camps?.camps}
-            onChange={(v) => updateFilter("camp_id", v)}
-            disabled={!filters.area_id}
-          />
-
-          {/* STATUS */}
-          <FilterSelect
-            label="Status"
-            value={filters.status}
-            disabled={false}
-            options={ENQUIRY_STATUS}
-            onChange={(v) => updateFilter("status", v)}
-          />
-
-          {/* Occupancy */}
-          <div className="w-full lg:w-1/4 p-1">
-            <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg p-2">
-              <Label className="text-xs text-slate-400">Minimum Occupancy</Label>
-              <input
-                type="number"
-                value={filters.occupancy}
-                onChange={(e) => updateFilter("occupancy", e.target.value)}
-                placeholder="e.g. 600"
-                className="mt-1 w-full bg-transparent border rounded p-2 text-slate-200"
+            <div className="flex flex-wrap -m-1">
+              {/* COUNTRY */}
+              <FilterSelect
+                label="Country"
+                value={filters.country_id}
+                options={countries}
+                onChange={(v) => updateFilter("country_id", v)}
+                disabled={false}
               />
-            </div>
-          </div>
 
-          {/* WIFI */}
-          <FilterSelect
-            label="WiFi Available"
-            value={filters.wifi_available}
-            disabled={false}
-            options={[
-              { _id: "true", name: "Yes" },
-              { _id: "false", name: "No" },
-            ]}
-            onChange={(v) => updateFilter("wifi_available", v)}
-          />
+              {/* REGION */}
+              <FilterSelect
+                label="Region"
+                value={filters.region_id}
+                options={regions?.region}
+                onChange={(v) => updateFilter("region_id", v)}
+                disabled={!filters.country_id}
+              />
 
-          {/* Competition */}
-          <FilterSelect
-            label="Competition"
-            value={filters.competition}
-            disabled={false}
-            options={[
-              { _id: "true", name: "Active" },
-              { _id: "false", name: "None" },
-            ]}
-            onChange={(v) => updateFilter("competition", v)}
-          />
+              {/* PROVINCE */}
+              <FilterSelect
+                label="Province"
+                value={filters.province_id}
+                options={provinces?.provinces}
+                onChange={(v) => updateFilter("province_id", v)}
+                disabled={!filters.region_id}
+              />
 
-          {/* Priority */}
-          <div className="w-full lg:w-1/4 p-1">
-            <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg p-2">
-              <Label className="text-xs text-slate-400">Priority</Label>
-              <input
+              {/* CITY */}
+              <FilterSelect
+                label="City"
+                value={filters.city_id}
+                options={cities?.cities}
+                onChange={(v) => updateFilter("city_id", v)}
+                disabled={!filters.province_id}
+              />
+
+              {/* AREA */}
+              <FilterSelect
+                label="Area"
+                value={filters.area_id}
+                options={areas?.areas}
+                onChange={(v) => updateFilter("area_id", v)}
+                disabled={!filters.city_id}
+              />
+
+              {/* CAMP */}
+              <FilterSelect
+                label="Camp"
+                value={filters.camp_id}
+                options={camps?.camps}
+                onChange={(v) => updateFilter("camp_id", v)}
+                disabled={!filters.area_id}
+              />
+
+              {/* STATUS */}
+              <FilterSelect
+                label="Status"
+                value={filters.status}
+                disabled={false}
+                options={STATUS_OPTIONS}
+                onChange={(v) => updateFilter("status", v)}
+              />
+
+              {/* NEXT ACTION */}
+              <FilterSelect
+                label="Next Action"
+                value={filters.next_action}
+                disabled={false}
+                options={NEXT_ACTION_OPTIONS}
+                onChange={(v) => updateFilter("next_action", v)}
+              />
+
+              {/* Occupancy */}
+              <div className="w-full lg:w-1/4 mt-1">
+                <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg px-2 pb-2">
+                  <Label className="text-xs text-slate-400">Minimum Occupancy</Label>
+                  <input
+                    type="number"
+                    value={filters.occupancy}
+                    onChange={(e) => updateFilter("occupancy", e.target.value)}
+                    placeholder="Enter Occupancy"
+                    className="w-full bg-transparent border border-slate-800 rounded p-2 text-slate-200 text-sm mt-[3px]"
+                  />
+                </div>
+              </div>
+
+              {/* WIFI */}
+              <FilterSelect
+                label="WiFi Available"
+                value={filters.wifi_available}
+                disabled={false}
+                options={[
+                  { _id: "true", name: "Yes" },
+                  { _id: "false", name: "No" },
+                ]}
+                onChange={(v) => updateFilter("wifi_available", v)}
+              />
+
+              {/* Competition */}
+              <FilterSelect
+                label="Competition"
+                value={filters.competition}
+                disabled={false}
+                options={[
+                  { _id: "true", name: "Active" },
+                  { _id: "false", name: "None" },
+                ]}
+                onChange={(v) => updateFilter("competition", v)}
+              />
+
+              {/* Camp Capacity */}
+              <FilterCapacity
+                label="Camp Capacity"
+                value={filters.capacity}
+                disabled={false}
+                options={Eq_CAPACITY_OPTIONS}
+                onChange={(v) => updateFilter("capacity", v)}
+              />
+
+              {/* Priority */}
+              <FilterSelect
+                label="Priority"
                 value={filters.priority}
-                onChange={(e) => updateFilter("priority", e.target.value)}
-                placeholder="e.g. 1 - 10"
-                className="mt-1 w-full bg-transparent border rounded p-2 text-slate-200"
+                disabled={false}
+                options={PRIORITY_OPTIONS}
+                onChange={(v) => updateFilter("priority", v)}
               />
-            </div>
-          </div>
 
-          {/* Dates */}
-          <div className="w-full lg:w-1/3 p-1">
-            <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg p-2">
-              <Label className="text-xs text-slate-400">Within Period</Label>
-              <Space direction="vertical" size={12} style={{ width: "100%" }}>
-                <RangePicker onChange={handleRangeChange} style={{ width: "100%" }} />
-              </Space>
-            </div>
-          </div>
+              {/* Dates */}
+              <div className="w-full lg:w-1/3 p-1">
+                <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg p-2">
+                  <Label className="text-xs text-slate-400">Within Period</Label>
+                  <Space direction="vertical" size={12} style={{ width: "100%" }}>
+                    <RangePicker className="enquiry-dark-picker" onChange={handleRangeChange} style={{ width: "100%" }} />
+                  </Space>
+                </div>
+              </div>
 
-          {/* Lease Expiry */}
-          <div className="w-full lg:w-1/4 p-1">
-            <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg p-2">
-              <Label className="text-xs text-slate-400">Lease Expiry</Label>
-              <Space direction="vertical" size={12} style={{ width: "100%" }}>
-                <DatePicker onChange={handleLeaseChange} style={{ width: "100%" }} />
-              </Space>
+              {/* Lease Expiry */}
+              <div className="w-full lg:w-1/4 p-1">
+                <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg p-2">
+                  <Label className="text-xs text-slate-400">Lease Expiry</Label>
+                  <Space direction="vertical" size={12} style={{ width: "100%" }}>
+                    <DatePicker className="enquiry-dark-picker" onChange={handleLeaseChange} style={{ width: "100%" }} />
+                  </Space>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
           </>
         )}
       </div>
@@ -447,17 +500,15 @@ export default function EnquiriesPage() {
                 key={badge.key}
                 type="button"
                 onClick={() => setActiveListFilter(badge.key)}
-                className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs transition ${
-                  isActive
+                className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs transition ${isActive
                     ? "border-cyan-400/40 bg-gradient-to-r from-cyan-900/40 via-slate-900 to-emerald-900/30 text-white shadow-sm"
                     : "border-slate-700/80 bg-gradient-to-r from-slate-900/80 to-slate-950/80 text-slate-300 hover:border-slate-600"
-                }`}
+                  }`}
               >
                 <span className="font-medium">{badge.label}</span>
                 <span
-                  className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                    isActive ? "bg-white/15 text-white" : "bg-white/10 text-slate-100"
-                  }`}
+                  className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${isActive ? "bg-white/15 text-white" : "bg-white/10 text-slate-100"
+                    }`}
                 >
                   {badge.count}
                 </span>
@@ -478,34 +529,35 @@ export default function EnquiriesPage() {
               ? Math.max(totalRecords - ((currentPage - 1) * limit + index), 0)
               : Math.max(visibleEnquiries.length - index, 0);
             return (
-            <div
-              key={e._id}
-              className="relative p-3 border border-slate-700 rounded-lg hover:bg-slate-800/60 transition cursor-pointer"
-              onClick={() => router.replace(`/staff/enquiry/${e._id}`)}
-            >
-              {!e?.is_active && (
-                <div className="absolute top-3 right-3">
-                  <span className="inline-flex items-center rounded-full border border-amber-400/40 bg-amber-950/50 px-2.5 py-1 text-[11px] font-semibold text-amber-300 shadow-sm">
-                    Action Required
-                  </span>
+              <div
+                key={e._id}
+                className="relative p-3 border border-slate-700 rounded-lg hover:bg-slate-800/60 transition cursor-pointer"
+                onClick={() => router.replace(`/staff/enquiry/${e._id}`)}
+              >
+                {!e?.is_active && (
+                  <div className="absolute top-3 right-3">
+                    <span className="inline-flex items-center rounded-full border border-amber-400/40 bg-amber-950/50 px-2.5 py-1 text-[11px] font-semibold text-amber-300 shadow-sm">
+                      Action Required
+                    </span>
+                  </div>
+                )}
+                <div className="absolute top-3 left-3 text-xs font-bold text-slate-400 p-1">
+                  {String(enquiryNumber).padStart(2, "0")} )
                 </div>
-              )}
-              <div className="absolute top-3 left-3 text-xs font-bold text-slate-400 p-1">
-                {String(enquiryNumber).padStart(2, "0")} )
+                <h2 className="text-md font-medium text-slate-200 truncate ml-8">
+                  Camp: {e.camp_id?.camp_name ?? "N/A"}
+                </h2>
+                <div className="mt-1 text-xs text-slate-400 flex flex-wrap gap-2">
+                  <p className="bg-gradient-to-br from-slate-700 to-slate-900 px-2 py-1 rounded-sm font-bold">Status: <span className="text-white/80 font-normal">{e.status}</span></p>
+                  <p className="bg-gradient-to-br from-slate-700 to-slate-900 px-2 py-1 rounded-sm font-bold">Priority: <span className="text-white/80 font-normal">{e.forwarded_priority ?? e.priority}</span></p>
+                  <p className="bg-gradient-to-br from-slate-700 to-slate-900 px-2 py-1 rounded-sm font-bold">Occupancy: <span className="text-white/80 font-normal">{e.camp_id?.camp_occupancy ?? "N/A"}</span></p>
+                  <p className="bg-gradient-to-br from-slate-700 to-slate-900 px-2 py-1 rounded-sm font-bold">UUID: <span className="text-white/80 font-normal">{e.enquiry_uuid}</span></p>
+                  <p className="bg-gradient-to-br from-slate-700 to-slate-900 px-2 py-1 rounded-sm font-bold">WiFi: <span className="text-white/80 font-normal">{e.wifi_available ? "Yes" : "No"}</span></p>
+                  <p className="bg-gradient-to-br from-slate-700 to-slate-900 px-2 py-1 rounded-sm font-bold">Due Date: <span className="text-white/80 font-normal">{e.due_date?.slice(0, 10)}</span></p>
+                </div>
               </div>
-              <h2 className="text-md font-medium text-slate-200 truncate ml-8">
-                Camp: {e.camp_id?.camp_name ?? "N/A"}
-              </h2>
-              <div className="mt-1 text-xs text-slate-400 flex flex-wrap gap-2">
-                <p className="bg-gradient-to-br from-slate-700 to-slate-900 px-2 py-1 rounded-sm font-bold">Status: <span className="text-white/80 font-normal">{e.status}</span></p>
-                <p className="bg-gradient-to-br from-slate-700 to-slate-900 px-2 py-1 rounded-sm font-bold">Priority: <span className="text-white/80 font-normal">{e.forwarded_priority ?? e.priority}</span></p>
-                <p className="bg-gradient-to-br from-slate-700 to-slate-900 px-2 py-1 rounded-sm font-bold">Occupancy: <span className="text-white/80 font-normal">{e.camp_id?.camp_occupancy ?? "N/A"}</span></p>
-                <p className="bg-gradient-to-br from-slate-700 to-slate-900 px-2 py-1 rounded-sm font-bold">UUID: <span className="text-white/80 font-normal">{e.enquiry_uuid}</span></p>
-                <p className="bg-gradient-to-br from-slate-700 to-slate-900 px-2 py-1 rounded-sm font-bold">WiFi: <span className="text-white/80 font-normal">{e.wifi_available ? "Yes" : "No"}</span></p>
-                <p className="bg-gradient-to-br from-slate-700 to-slate-900 px-2 py-1 rounded-sm font-bold">Due Date: <span className="text-white/80 font-normal">{e.due_date?.slice(0, 10)}</span></p>
-              </div>
-            </div>
-          )})}
+            )
+          })}
         </div>
       </div>
       {pagination && pagination.totalPages > 1 && (
@@ -557,6 +609,33 @@ export default function EnquiriesPage() {
           </Pagination>
         </div>
       )}
+      <style jsx global>{`
+        .enquiry-dark-picker.ant-picker {
+          background: rgba(15, 23, 42, 0.78);
+          border: 1px solid rgba(71, 85, 105, 0.85);
+          color: #f8fafc;
+          box-shadow: none;
+        }
+        .enquiry-dark-picker .ant-picker-input > input {
+          color: #f8fafc;
+        }
+        .enquiry-dark-picker .ant-picker-input > input::placeholder {
+          color: #94a3b8;
+        }
+        .enquiry-dark-picker .ant-picker-separator,
+        .enquiry-dark-picker .ant-picker-suffix,
+        .enquiry-dark-picker .ant-picker-clear {
+          color: #e2e8f0;
+        }
+        .enquiry-dark-picker .ant-picker-clear {
+          background: transparent;
+        }
+        .enquiry-dark-picker.ant-picker-focused,
+        .enquiry-dark-picker.ant-picker:hover {
+          border-color: rgba(100, 116, 139, 1);
+          box-shadow: none;
+        }
+      `}</style>
     </div>
   );
 }
@@ -568,36 +647,66 @@ function FilterSelect({ label, value, options, onChange, disabled }) {
   return (
     <div className="w-full lg:w-1/4 p-1">
       <div
-        className={`bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg p-2 ${
-          disabled ? "opacity-40 cursor-not-allowed" : ""
-        }`}
+        className={`bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg p-2 ${disabled ? "opacity-40 cursor-not-allowed" : ""
+          }`}
       >
         <Label className="text-xs text-slate-400 mb-1 block">{label}</Label>
 
         <Select
-  value={value === "" ? undefined : value} 
-  onValueChange={(v) => onChange(v)} 
-  disabled={disabled}
->
-  <SelectTrigger className={`${value ? "text-slate-200" : "text-slate-400"}`}>
-    <SelectValue placeholder={`Select ${label}`} />
-  </SelectTrigger>
+          value={value === "" ? undefined : value}
+          onValueChange={(v) => onChange(v)}
+          disabled={disabled}
+        >
+          <SelectTrigger className={`${value ? "text-slate-200" : "text-slate-400"}`}>
+            <SelectValue placeholder={`Select ${label}`} />
+          </SelectTrigger>
 
-  <SelectContent>
-    {options?.map((o) => (
-      <SelectItem key={o._id} value={o._id}>
-        {o.country_name ||
-          o.region_name ||
-          o.province_name ||
-          o.city_name ||
-          o.area_name ||
-          o.camp_name ||
-          o.name}
-      </SelectItem>
-    ))}
-  </SelectContent>
-</Select>
+          <SelectContent>
+            {options?.map((o) => (
+              <SelectItem key={o._id} value={o._id}>
+                {o.country_name ||
+                  o.region_name ||
+                  o.province_name ||
+                  o.city_name ||
+                  o.area_name ||
+                  o.camp_name ||
+                  o.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
+      </div>
+    </div>
+  );
+}
+
+function FilterCapacity({ label, value, options, onChange, disabled }) {
+  return (
+    <div className="w-full lg:w-1/4 p-1">
+      <div
+        className={`bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg p-2 ${disabled ? "opacity-40 cursor-not-allowed" : ""
+          }`}
+      >
+        <Label className="text-xs text-slate-400 mb-1 block">{label}</Label>
+
+        <Select
+          value={value === "" ? undefined : value}
+          onValueChange={(v) => onChange(v)}
+          disabled={disabled}
+        >
+          <SelectTrigger className={`${value ? "text-slate-200" : "text-slate-400"}`}>
+            <SelectValue placeholder={`Select ${label}`} />
+          </SelectTrigger>
+
+          <SelectContent>
+            {options?.map((o, i) => (
+              <SelectItem key={i} value={o}>
+                {o}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
     </div>
   );

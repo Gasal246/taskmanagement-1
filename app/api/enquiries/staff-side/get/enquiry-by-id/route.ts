@@ -54,8 +54,15 @@ export async function GET(req:NextRequest){
                 ? [isAssigned.assigned_to]
                 : [];
         const canForward = assignedList.some((id: any) => String(id) === String(session?.user?.id));
+        const broughtByList = Array.isArray(enquiry?.enquiry_brought_by)
+            ? enquiry.enquiry_brought_by
+            : [];
+        const isCreatedByCurrentUser = String(enquiry?.createdBy?._id ?? enquiry?.createdBy ?? "") === String(session?.user?.id);
+        const canEdit = isCreatedByCurrentUser
+            || canForward
+            || broughtByList.some((id: any) => String(id) === String(session?.user?.id));
 
-        return NextResponse.json({enquiry, contacts, head_office, external_provider, personal_provider, canForward, status: 200}, {status: 200});
+        return NextResponse.json({enquiry, contacts, head_office, external_provider, personal_provider, canForward, canEdit, status: 200}, {status: 200});
 
     }catch(err){
         console.log("Error while getting Enquiry By ID: ", err);

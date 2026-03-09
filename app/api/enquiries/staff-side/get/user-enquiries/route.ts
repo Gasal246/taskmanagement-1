@@ -60,7 +60,6 @@ export async function GET(req: NextRequest) {
     }
 
     if (status) match.status = status;
-    if (priority) match.priority = priority;
     if (country_id) match.country_id = country_id;
     if (region_id) match.region_id = region_id;
     if (province_id) match.province_id = province_id;
@@ -82,7 +81,32 @@ export async function GET(req: NextRequest) {
        STEP 3: Fetch only the real enquiries (NO DUPLICATES)
     -----------------------------------------------------------------*/
 
-    const totalRecords = await Eq_enquiry.countDocuments(match);
+    let enquiries = await Eq_enquiry.find(match)
+      .populate("camp_id")
+      .lean();
+
+    const selectedPriority = Number(priority);
+    const hasPriorityFilter = Number.isFinite(selectedPriority) && selectedPriority > 0;
+
+    if (hasPriorityFilter) {
+      enquiries = enquiries
+        .filter((entry: any) => {
+          const priorityNumber = Number(entry?.priority);
+          return Number.isFinite(priorityNumber) && priorityNumber >= selectedPriority;
+        })
+        .sort((a: any, b: any) => {
+          const priorityA = Number(a?.priority);
+          const priorityB = Number(b?.priority);
+          if (priorityA !== priorityB) return priorityA - priorityB;
+          return new Date(b?.createdAt).getTime() - new Date(a?.createdAt).getTime();
+        });
+    } else {
+      enquiries.sort(
+        (a: any, b: any) => new Date(b?.createdAt).getTime() - new Date(a?.createdAt).getTime()
+      );
+    }
+
+    const totalRecords = enquiries.length;
     const totalPages = totalRecords > 0 ? Math.ceil(totalRecords / limit) : 0;
 
     if (skip >= totalRecords && totalRecords > 0) {
@@ -92,14 +116,9 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const enquiries = await Eq_enquiry.find(match)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .populate("camp_id")
-      .lean();
+    const paginatedEnquiries = enquiries.slice(skip, skip + limit);
 
-    const enquiryIds = enquiries.map((entry: any) => entry?._id).filter(Boolean);
+    const enquiryIds = paginatedEnquiries.map((entry: any) => entry?._id).filter(Boolean);
     let latestPriorityByEnquiry = new Map<string, number>();
 
     if (enquiryIds.length) {
@@ -119,7 +138,7 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const enrichedEnquiries = enquiries.map((entry: any) => ({
+    const enrichedEnquiries = paginatedEnquiries.map((entry: any) => ({
       ...entry,
       forwarded_priority: latestPriorityByEnquiry.get(String(entry?._id)) ?? null,
     }));

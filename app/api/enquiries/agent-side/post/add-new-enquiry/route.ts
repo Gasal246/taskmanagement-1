@@ -9,6 +9,7 @@ import Eq_camp_realestate from "@/models/eq_camp_realestate.model";
 import Eq_camps from "@/models/eq_camps.model";
 import Eq_Countries from "@/models/eq_countries.model";
 import Eq_enquiry from "@/models/eq_enquiries.model";
+import Eq_enquiry_comments from "@/models/eq_enquiry_comments.model";
 import Eq_enquiry_wifi_external from "@/models/eq_enquiry_wifi_external.model";
 import Eq_enquiry_wifi_personal from "@/models/eq_enquiry_wifi_personal.model";
 import Eq_region from "@/models/eq_region.model";
@@ -331,6 +332,15 @@ export async function POST(req:NextRequest){
         });
 
         const savedEnquiry = await newEnquiry.save();
+
+        const initialComment = String(body.comments || "").trim();
+        if (initialComment) {
+            await new Eq_enquiry_comments({
+                enquiry_id: savedEnquiry._id,
+                user_id: session?.user?.id,
+                comment: initialComment,
+            }).save();
+        }
 
         const newContacts: any[] = [];
         const contacts = Array.isArray(body.contacts) ? body.contacts : [];

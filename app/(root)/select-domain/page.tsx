@@ -1,154 +1,295 @@
-/* eslint-disable react-hooks/exhaustive-deps */
-"use client"
-import React from 'react';
-import { motion } from 'framer-motion';
-import LoaderSpin from '@/components/shared/LoaderSpin';
-import { useDispatch } from 'react-redux';
-import { AppDispatch } from '@/redux/store';
-import { useGetUserDomainByRole } from '@/query/user/queries';
-import { useSession } from 'next-auth/react';
-import Cookies from 'js-cookie';
-import { loadBusinessData } from '@/redux/slices/userdata';
-import { useRouter } from 'next/navigation';
-import { resolveSessionUserId } from '@/lib/utils';
+"use client";
+
+import * as React from "react";
+import Cookies from "js-cookie";
+import { motion } from "framer-motion";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { useDispatch } from "react-redux";
+
+import LoaderSpin from "@/components/shared/LoaderSpin";
+import RestartLoginButton from "@/components/shared/RestartLoginButton";
+import { Button } from "@/components/ui/button";
+import { resolveSessionUserId } from "@/lib/utils";
+import { useGetUserDomainByRole } from "@/query/user/queries";
+import { loadBusinessData } from "@/redux/slices/userdata";
+import { AppDispatch } from "@/redux/store";
+
+type RoleCookie = {
+  role_name?: string;
+  [key: string]: unknown;
+};
+
+type DomainOption = {
+  value: string;
+  name?: string;
+  region_name?: string;
+  area_name?: string;
+  location_name?: string;
+  dept_name?: string;
+  business_id?: string;
+  [key: string]: unknown;
+};
+
+type BusinessOption = {
+  _id?: string;
+  [key: string]: unknown;
+};
 
 const SelectDomainPage = () => {
-    const { data: session, status } = useSession();
-    const dispatch = useDispatch<AppDispatch>();
-    const router = useRouter();
-    const [selectedDomain, setSelectedDomain] = React.useState<string>('');
-    const [domains, setDomains] = React.useState<any[]>([]);
-    const [businessData, setBusinessData] = React.useState<any[]>([]);
-    const [loading, setLoading] = React.useState<boolean>(false);
+  const { data: session, status } = useSession();
+  const dispatch = useDispatch<AppDispatch>();
+  const router = useRouter();
 
-    const { mutateAsync: fetchDomains, isPending: domainsLoading } = useGetUserDomainByRole();
+  const [selectedDomain, setSelectedDomain] = React.useState("");
+  const [domains, setDomains] = React.useState<DomainOption[]>([]);
+  const [businessData, setBusinessData] = React.useState<BusinessOption[]>([]);
+  const [isFetchingDomains, setIsFetchingDomains] = React.useState(false);
+  const [isContinuing, setIsContinuing] = React.useState(false);
+  const [errorMessage, setErrorMessage] = React.useState("");
 
-    const handleFetchDomains = async () => {
-        const roleCookie = Cookies.get('user_role');
-        if (!roleCookie) {
-            router.replace('/select-roles');
-            return;
-        }
-        let userRole: any = null;
-        try {
-            userRole = JSON.parse(roleCookie);
-        } catch (error) {
-            Cookies.remove('user_role');
-            router.replace('/select-roles');
-            return;
-        }
+  const { mutateAsync: fetchDomains, isPending: domainsLoading } = useGetUserDomainByRole();
 
-        const roleName = userRole?.role_name;
-        if (!roleName) {
-            router.replace('/select-roles');
-            return;
-        }
+  const getRoleFromCookie = React.useCallback((): RoleCookie | null => {
+    const roleCookie = Cookies.get("user_role");
+    if (!roleCookie) return null;
 
-        const userId = resolveSessionUserId(session);
-        if (!userId) {
-            router.replace('/signin');
-            return;
-        }
-        const data = await fetchDomains({userid: userId, role: roleName});
-        console.log("businessData: ", data);
-        setDomains(data?.returnData || []);
-        if(roleName == 'BUSINESS_ADMIN') {
-            setBusinessData(data?.businesses?.map((business: any) => business?.business_id));
-            setDomains(data?.businesses?.map((business: any) => ({ name: business?.business_id?.business_name, value: business?.business_id?._id })));
-        } else if (data?.returnData?.length) {
-            setBusinessData(data?.returnData?.map((domain: any) => ({
-                _id: domain?.business_id,
-            })));
-        }
+    try {
+      const parsed = JSON.parse(roleCookie);
+      if (!parsed || typeof parsed !== "object") return null;
+      return parsed as RoleCookie;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const getDomainLabel = React.useCallback((domain: DomainOption): string => {
+    return (
+      domain?.region_name ||
+      domain?.area_name ||
+      domain?.location_name ||
+      domain?.dept_name ||
+      domain?.name ||
+      "Unknown domain"
+    );
+  }, []);
+
+  const handleFetchDomains = React.useCallback(async () => {
+    setIsFetchingDomains(true);
+    setErrorMessage("");
+
+    try {
+      const roleFromCookie = getRoleFromCookie();
+      const roleName = roleFromCookie?.role_name;
+
+      if (!roleName) {
+        Cookies.remove("user_role");
+        router.replace("/select-roles");
+        return;
+      }
+
+      const userId = resolveSessionUserId(session);
+      if (!userId) {
+        router.replace("/signin");
+        return;
+      }
+
+      const data: any = await fetchDomains({ userid: userId, role: roleName });
+
+      if (roleName === "BUSINESS_ADMIN") {
+        const businesses = Array.isArray(data?.businesses) ? data.businesses : [];
+
+        const nextBusinessData: BusinessOption[] = businesses
+          .map((business: any) => business?.business_id)
+          .filter(Boolean);
+
+        const nextDomains: DomainOption[] = businesses
+          .map((business: any) => {
+            const businessId = business?.business_id?._id;
+            if (!businessId) return null;
+
+            return {
+              value: String(businessId),
+              name: business?.business_id?.business_name,
+            };
+          })
+          .filter(Boolean) as DomainOption[];
+
+        setBusinessData(nextBusinessData);
+        setDomains(nextDomains);
+        setSelectedDomain((prev) =>
+          prev && nextDomains.some((domain) => domain.value === prev) ? prev : ""
+        );
+
+        return;
+      }
+
+      const returnData = Array.isArray(data?.returnData) ? data.returnData : [];
+
+      const nextDomains: DomainOption[] = returnData
+        .map((domain: any) => {
+          const value = domain?.value ?? domain?.business_id;
+          if (!value) return null;
+
+          return {
+            ...domain,
+            value: String(value),
+          };
+        })
+        .filter(Boolean) as DomainOption[];
+
+      const nextBusinessData: BusinessOption[] = returnData
+        .map((domain: any) => ({ _id: String(domain?.business_id || "") }))
+        .filter((business: BusinessOption) => Boolean(business?._id));
+
+      setBusinessData(nextBusinessData);
+      setDomains(nextDomains);
+      setSelectedDomain((prev) =>
+        prev && nextDomains.some((domain) => domain.value === prev) ? prev : ""
+      );
+    } catch {
+      setDomains([]);
+      setBusinessData([]);
+      setSelectedDomain("");
+      setErrorMessage("We could not load your domains right now. Please try again.");
+    } finally {
+      setIsFetchingDomains(false);
+    }
+  }, [fetchDomains, getRoleFromCookie, router, session]);
+
+  React.useEffect(() => {
+    if (status === "loading") return;
+
+    const userId = resolveSessionUserId(session);
+    if (!userId) {
+      router.replace("/signin");
+      return;
     }
 
-    React.useEffect(() => {
-        if (status === "loading") return;
-        const userId = resolveSessionUserId(session);
-        if (!userId) {
-            router.replace('/signin');
-            return;
-        }
-        handleFetchDomains();
-    }, [session, status]);
+    void handleFetchDomains();
+  }, [handleFetchDomains, router, session, status]);
 
+  const handleContinueWithDomain = async () => {
+    if (!selectedDomain) return;
 
-    const handleContinueWithDomain = async () => {
-        setLoading(true);
-        const roleCookie = Cookies.get('user_role');
-        if (!roleCookie) {
-            setLoading(false);
-            router.replace('/select-roles');
-            return;
-        }
+    setIsContinuing(true);
 
-        let userRole: any = null;
-        try {
-            userRole = JSON.parse(roleCookie);
-        } catch (error) {
-            setLoading(false);
-            Cookies.remove('user_role');
-            router.replace('/select-roles');
-            return;
-        }
+    try {
+      const roleFromCookie = getRoleFromCookie();
+      const roleName = roleFromCookie?.role_name;
 
-        const roleName = userRole?.role_name;
-        const selected = domains?.find((domain: any) => domain?.value == selectedDomain);
-        if (!selected) {
-            setLoading(false);
-            return;
-        }
+      if (!roleName) {
+        Cookies.remove("user_role");
+        router.replace("/select-roles");
+        return;
+      }
 
-        await Cookies.set('user_domain', JSON.stringify(selected));
+      const selected = domains.find((domain) => domain?.value === selectedDomain);
+      if (!selected) return;
 
-        const selectedBusiness = businessData?.find((business: any) => business?._id == selectedDomain) || {
-            _id: selected?.business_id,
+      Cookies.set("user_domain", JSON.stringify(selected), { sameSite: "lax" });
+
+      const selectedBusiness =
+        businessData.find((business) => business?._id === selectedDomain) || {
+          _id: String(selected?.business_id || selected?.value || ""),
         };
-        dispatch(loadBusinessData(selectedBusiness));
+      dispatch(loadBusinessData(selectedBusiness));
 
-        if(roleName == 'BUSINESS_ADMIN') {
-            setLoading(false);
-            router.push('/admin');
-            return;
-        }
-        setLoading(false);
-        router.push('/staff');
+      if (roleName === "BUSINESS_ADMIN") {
+        router.push("/admin");
+        return;
+      }
+
+      router.push("/staff");
+    } finally {
+      setIsContinuing(false);
     }
-    
+  };
+
+  const showLoadingState = isFetchingDomains || domainsLoading;
 
   return (
-    <div className='h-screen w-full p-4 flex items-center justify-center flex-col'>
-        <div className='w-full lg:w-1/2 bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-4 rounded-lg'>
-            <h1 className='text-2xl font-medium'>Enter to your role</h1>
-            <p className='text-sm text-slate-400'>select your organization domain to work with</p>
+    <div className="min-h-screen w-full px-4 py-6 sm:p-6 flex items-center justify-center">
+      <div className="w-full max-w-3xl space-y-3">
+        <div className="rounded-xl border border-slate-800 bg-gradient-to-tr from-slate-950/70 to-slate-900/60 p-5">
+          <h1 className="text-2xl font-semibold">Choose your domain</h1>
+          <p className="mt-1 text-sm text-slate-300">
+            Select where you want to work today. We will open the right dashboard for you.
+          </p>
         </div>
-        <div className="flex flex-col w-full lg:w-1/2 bg-gradient-to-tr max-h-[60dvh] overflow-y-scroll from-slate-950/50 to-slate-900/50 rounded-lg p-4 mt-2 space-y-2 items-center justify-center">
-        { domains?.length > 0 && domains?.map((domain: any) => (
-            <motion.div 
-                key={domain?.value}
-                whileHover={{ scale: 1.02 }} 
-                whileTap={{ scale: 0.98 }}
-                onClick={() => setSelectedDomain(domain?.value)}
-                className={`bg-gradient-to-tr ${selectedDomain == domain?.value ? 'from-cyan-950/50 to-cyan-900/50' : 'from-slate-950/50 to-slate-900/50'} hover:border-cyan-700 border border-transparent select-none cursor-pointer p-4 rounded-lg w-full`}>
-                <h1 className='text-md font-semibold'>{domain?.region_name || domain?.area_name || domain?.location_name || domain?.dept_name || domain?.name}</h1>
-                {selectedDomain == domain?.value && <p className='text-xs text-slate-400'>selected</p>}
-            </motion.div>
-        ))}
-        </div>
-        {selectedDomain && (
-            <div>
-                <motion.div 
-                    whileHover={{ scale: 1.02 }} 
-                    whileTap={{ scale: 0.98 }}
-                    onClick={handleContinueWithDomain}
-                    className='mt-2 bg-gradient-to-tr hover:bg-gradient-to-b from-slate-950 hover:from-cyan-950/50 hover:to-slate-950 to-cyan-950/50 select-none cursor-pointer p-4 rounded-lg w-full'
-                >
-                    {loading ? <LoaderSpin size={20} /> : <h1 className='text-sm font-medium text-center w-[200px]'>Continue</h1>}
-                </motion.div>
-            </div>
-        )}
-    </div>
-  )
-}
 
-export default SelectDomainPage
+        <div className="rounded-xl border border-slate-800 bg-gradient-to-tr from-slate-950/60 to-slate-900/50 p-3 sm:p-4 max-h-[58dvh] overflow-y-auto space-y-2">
+          {showLoadingState && (
+            <div className="min-h-[160px] flex items-center justify-center gap-3 text-slate-300">
+              <LoaderSpin size={28} />
+              <span className="text-sm">Loading your domains...</span>
+            </div>
+          )}
+
+          {!showLoadingState && errorMessage && (
+            <div className="rounded-lg border border-amber-800/70 bg-amber-950/30 px-4 py-3 text-sm text-amber-200">
+              {errorMessage}
+            </div>
+          )}
+
+          {!showLoadingState && !errorMessage && domains.length === 0 && (
+            <div className="rounded-lg border border-slate-700 bg-slate-900/40 px-4 py-6 text-sm text-slate-300">
+              No domains are available for this role right now.
+            </div>
+          )}
+
+          {!showLoadingState &&
+            !errorMessage &&
+            domains.map((domain) => {
+              const isSelected = selectedDomain === domain?.value;
+
+              return (
+                <motion.button
+                  key={domain?.value}
+                  type="button"
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.99 }}
+                  onClick={() => setSelectedDomain(domain?.value)}
+                  className={`w-full rounded-lg border p-4 text-left transition-colors ${
+                    isSelected
+                      ? "border-cyan-700/80 bg-cyan-950/30"
+                      : "border-slate-700/70 bg-slate-900/45 hover:border-slate-600"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <h2 className="text-base font-semibold">{getDomainLabel(domain)}</h2>
+                    <span
+                      className={`rounded-full px-2.5 py-1 text-xs ${
+                        isSelected
+                          ? "bg-cyan-900/80 text-cyan-100"
+                          : "bg-slate-800 text-slate-300"
+                      }`}
+                    >
+                      {isSelected ? "Selected" : "Select"}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-slate-400">
+                    Continue with this domain to open the most relevant workspace.
+                  </p>
+                </motion.button>
+              );
+            })}
+        </div>
+
+        <div className="flex justify-end">
+          <Button
+            onClick={handleContinueWithDomain}
+            disabled={!selectedDomain || showLoadingState || isContinuing}
+            className="min-w-[220px]"
+          >
+            {isContinuing ? "Continuing..." : "Continue"}
+          </Button>
+        </div>
+      </div>
+
+      <RestartLoginButton />
+    </div>
+  );
+};
+
+export default SelectDomainPage;

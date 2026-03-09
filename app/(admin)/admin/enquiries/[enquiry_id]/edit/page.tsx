@@ -12,8 +12,12 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { motion } from "framer-motion";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useSession } from "next-auth/react";
 import {
+    useAddEnquiryComment,
+    useDeleteEnquiryComment,
     useGetEnquiryById,
+    useGetEnquiryComments,
     useGetEnquiryContacts,
     useGetEqAreas,
     useGetEqCampsByArea,
@@ -23,6 +27,7 @@ import {
     useGetEqProvince,
     useGetEqRegions,
     useGetEqUsers,
+    useUpdateEnquiryComment,
     useUpdateEnquiry
 } from "@/query/enquirymanager/queries";
 import { toast } from "sonner";
@@ -34,7 +39,7 @@ import Image from "next/image";
 import { deleteObject, getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { storage } from "@/firebase/config";
 import { Button } from "@/components/ui/button";
-import { Tooltip } from "antd";
+import { Avatar, Tooltip } from "antd";
 import { useSelector } from "react-redux";
 import { RootState } from "@/redux/store";
 import { useQueryClient } from "@tanstack/react-query";
@@ -46,6 +51,7 @@ const ENQUIRY_STATUS_OPTIONS = [
     "Survey Completed",
     "Proposal Submitted",
     "Waiting For Client Response",
+    "On Hold",
     "Project Awarded",
 ] as const;
 
@@ -150,6 +156,7 @@ const enquirySchema = z.object({
 export default function EditEnquiry() {
     const router = useRouter();
     const params = useParams<{ enquiry_id: string }>();
+    const { data: session } = useSession();
     const { businessData } = useSelector((state: RootState) => state.user);
     const queryClient = useQueryClient();
     const [showHeadOffice, setShowHeadOffice] = useState(false);
@@ -173,6 +180,26 @@ export default function EditEnquiry() {
     const { data: enquiry, isLoading: isEnquiryLoading } = useGetEnquiryById(params.enquiry_id);
     const { data: contactsData } = useGetEnquiryContacts(params.enquiry_id);
     const { data: eqUsers } = useGetEqUsers(businessData?._id, "users");
+    const { data: commentsData, isLoading: isCommentsLoading } = useGetEnquiryComments(params.enquiry_id);
+    const { mutateAsync: AddEnquiryComment, isPending: isAddingComment } = useAddEnquiryComment();
+    const { mutateAsync: UpdateEnquiryComment, isPending: isCommentUpdating } = useUpdateEnquiryComment();
+    const { mutateAsync: DeleteEnquiryComment, isPending: isCommentDeleting } = useDeleteEnquiryComment();
+    const [newComment, setNewComment] = useState("");
+    const [allCommentsDialogOpen, setAllCommentsDialogOpen] = useState(false);
+    const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+    const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
+    const currentUserId = String((session as any)?.user?.id || "");
+    const enquiryComments = commentsData?.comments || [];
+    const sortedComments = useMemo(() => {
+        const comments = Array.isArray(enquiryComments) ? [...enquiryComments] : [];
+        return comments.sort((a: any, b: any) => {
+            const aTime = new Date(a?.createdAt || 0).getTime();
+            const bTime = new Date(b?.createdAt || 0).getTime();
+            return bTime - aTime;
+        });
+    }, [enquiryComments]);
+    const recentComments = sortedComments.slice(0, 3);
+    const hasMoreComments = sortedComments.length > 3;
 
     const form = useForm<any>({
         resolver: zodResolver(enquirySchema),
@@ -568,6 +595,149 @@ export default function EditEnquiry() {
     };
     const onInvalid = () => {
         toast.error("Please check the form values before updating.");
+    };
+
+    const isOwnComment = (comment: any) => {
+        return String(comment?.user_id?._id || comment?.user_id || "") === currentUserId;
+    };
+
+    const formatCommentTime = (value: any) => {
+        if (!value) return "N/A";
+        return new Date(value).toLocaleString();
+    };
+
+    const handleAddComment = async () => {
+        const comment = newComment.trim();
+        if (!comment) return;
+
+        const res = await AddEnquiryComment({ enquiry_id: params.enquiry_id, comment });
+        if (res?.status === 201) {
+            setNewComment("");
+            toast.success("Comment added");
+            queryClient.invalidateQueries({ queryKey: ["enquiry-comments", params.enquiry_id] });
+            return;
+        }
+        toast.error(res?.message || "Failed to add comment");
+    };
+
+    const handleSaveComment = async (commentId: string) => {
+        const comment = String(commentDrafts[commentId] || "").trim();
+        if (!comment) {
+            toast.error("Comment cannot be empty");
+            return;
+        }
+
+        const res = await UpdateEnquiryComment({ comment_id: commentId, comment });
+        if (res?.status === 200) {
+            toast.success("Comment updated");
+            setEditingCommentId(null);
+            queryClient.invalidateQueries({ queryKey: ["enquiry-comments", params.enquiry_id] });
+            return;
+        }
+        toast.error(res?.message || "Failed to update comment");
+    };
+
+    const handleDeleteComment = async (commentId: string) => {
+        const res = await DeleteEnquiryComment(commentId);
+        if (res?.status === 200) {
+            toast.success("Comment deleted");
+            if (editingCommentId === commentId) {
+                setEditingCommentId(null);
+            }
+            queryClient.invalidateQueries({ queryKey: ["enquiry-comments", params.enquiry_id] });
+            return;
+        }
+        toast.error(res?.message || "Failed to delete comment");
+    };
+
+    const renderCommentCard = (comment: any) => {
+        const commentId = String(comment?._id || "");
+        const canManage = isOwnComment(comment);
+        const isEditing = editingCommentId === commentId;
+        const createdAt = formatCommentTime(comment?.createdAt);
+        const updatedAt = formatCommentTime(comment?.updatedAt);
+        const wasEdited = Boolean(comment?.createdAt && comment?.updatedAt && new Date(comment.updatedAt).getTime() !== new Date(comment.createdAt).getTime());
+
+        return (
+            <div key={commentId} className="rounded-lg border border-slate-800/70 bg-slate-950/25 p-3 space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                        <Avatar size={36} src={`https://api.dicebear.com/7.x/personas/svg?seed=${encodeURIComponent(comment?.user_id?.email || comment?.user_id?.name || commentId)}`} />
+                        <div className="min-w-0">
+                            <p className="text-sm font-semibold text-slate-200 truncate">{comment?.user_id?.name || "Unknown User"}</p>
+                            <p className="text-xs text-slate-400 truncate">{comment?.user_id?.email || "No email"}</p>
+                        </div>
+                    </div>
+
+                    {canManage && (
+                        <div className="flex items-center gap-2">
+                            {isEditing ? (
+                                <>
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        onClick={() => handleSaveComment(commentId)}
+                                        disabled={isCommentUpdating}
+                                        className="h-7 px-2 text-xs bg-cyan-700 hover:bg-cyan-800"
+                                    >
+                                        Save
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => setEditingCommentId(null)}
+                                        className="h-7 px-2 text-xs"
+                                    >
+                                        Cancel
+                                    </Button>
+                                </>
+                            ) : (
+                                <>
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => {
+                                            setEditingCommentId(commentId);
+                                            setCommentDrafts((prev) => ({ ...prev, [commentId]: comment?.comment || "" }));
+                                        }}
+                                        className="h-7 px-2 text-xs"
+                                    >
+                                        Edit
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="destructive"
+                                        onClick={() => handleDeleteComment(commentId)}
+                                        disabled={isCommentDeleting}
+                                        className="h-7 px-2 text-xs"
+                                    >
+                                        Delete
+                                    </Button>
+                                </>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                {isEditing ? (
+                    <Textarea
+                        value={commentDrafts[commentId] ?? ""}
+                        onChange={(event) => setCommentDrafts((prev) => ({ ...prev, [commentId]: event.target.value }))}
+                        className="bg-slate-950/40 min-h-[90px]"
+                    />
+                ) : (
+                    <p className="text-sm text-slate-200 whitespace-pre-wrap">{comment?.comment || "-"}</p>
+                )}
+
+                <div className="text-[11px] text-slate-500 flex flex-wrap gap-3">
+                    <span>Created: {createdAt}</span>
+                    {wasEdited && <span>Updated: {updatedAt}</span>}
+                </div>
+            </div>
+        );
     };
 
     if (isEnquiryLoading || isCampDetailsLoading) {
@@ -1343,13 +1513,6 @@ export default function EditEnquiry() {
                             </div>
                         </div>
 
-                        <div className="rounded-xl border border-slate-800/80 bg-gradient-to-r from-slate-900/45 to-slate-950/35 p-3">
-                            <div className="rounded-lg border border-slate-800/70 bg-slate-950/25 p-3">
-                                <label className="text-xs text-slate-300 font-semibold block mb-2">Comments</label>
-                                <Textarea {...form.register("comments")} placeholder="Comments" className="bg-slate-950/40 min-h-[110px]" />
-                            </div>
-                        </div>
-
                         {/* ENQUIRY USERS */}
                         <div className="rounded-xl border border-slate-800/80 bg-gradient-to-r from-slate-900/45 to-slate-950/35 p-3 space-y-3">
                             <div>
@@ -1424,6 +1587,77 @@ export default function EditEnquiry() {
                                     </FormItem>
                                 )}
                             />
+                        </div>
+
+                        <div className="rounded-xl border border-slate-800/80 bg-gradient-to-r from-slate-900/45 to-slate-950/35 p-3 space-y-3">
+                            <div>
+                                <div className="text-xs text-slate-300 font-semibold">Comments</div>
+                                <p className="mt-1 text-[11px] text-slate-400">Add progress notes. Each comment keeps author and timestamps.</p>
+                            </div>
+
+                            <div className="rounded-lg border border-slate-800/70 bg-slate-950/25 p-3">
+                                <label className="text-xs text-slate-300 font-semibold block mb-2">Add Comment</label>
+                                <Textarea
+                                    value={newComment}
+                                    onChange={(event) => setNewComment(event.target.value)}
+                                    placeholder="Write a comment..."
+                                    className="bg-slate-950/40 min-h-[96px]"
+                                />
+                                <div className="mt-2 flex justify-end">
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        onClick={handleAddComment}
+                                        disabled={!newComment.trim() || isAddingComment}
+                                        className="bg-cyan-700 hover:bg-cyan-800"
+                                    >
+                                        {isAddingComment ? "Adding..." : "Add Comment"}
+                                    </Button>
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                {isCommentsLoading && (
+                                    <div className="rounded-lg border border-slate-800/70 bg-slate-950/25 p-3 text-xs text-slate-400">
+                                        Loading comments...
+                                    </div>
+                                )}
+
+                                {!isCommentsLoading && sortedComments.length === 0 && (
+                                    <div className="rounded-lg border border-dashed border-slate-800/70 bg-slate-950/25 p-3 text-xs text-slate-400">
+                                        No comments yet.
+                                    </div>
+                                )}
+
+                                {!isCommentsLoading && recentComments.map((comment: any) => renderCommentCard(comment))}
+                            </div>
+
+                            {!isCommentsLoading && hasMoreComments && (
+                                <div className="flex justify-end">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setAllCommentsDialogOpen(true)}
+                                    >
+                                        View more
+                                    </Button>
+                                </div>
+                            )}
+
+                            <Dialog open={allCommentsDialogOpen} onOpenChange={setAllCommentsDialogOpen}>
+                                <DialogContent className="max-w-3xl">
+                                    <DialogHeader>
+                                        <DialogTitle>All Comments</DialogTitle>
+                                        <DialogDescription>
+                                            Showing all comments for this enquiry, newest first.
+                                        </DialogDescription>
+                                    </DialogHeader>
+                                    <div className="max-h-[70vh] overflow-y-auto space-y-2 pr-1">
+                                        {sortedComments.map((comment: any) => renderCommentCard(comment))}
+                                    </div>
+                                </DialogContent>
+                            </Dialog>
                         </div>
 
                         {/* IMAGES */}

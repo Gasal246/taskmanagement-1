@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DatePicker, Space } from "antd";
-import { Download, PanelsTopLeft, SlidersHorizontal } from "lucide-react";
+import { ChevronDown, ChevronUp, Download, PanelsTopLeft, Search, SlidersHorizontal } from "lucide-react";
 import LoaderSpin from "@/components/shared/LoaderSpin";
 import { toast } from "sonner";
 import { GetEnquiriesWithFilters } from "@/query/enquirymanager/function";
@@ -33,7 +33,21 @@ const STATUS_OPTIONS = [
   { _id: "Survey Completed", name: "Survey Completed" },
   { _id: "Proposal Submitted", name: "Proposal Submitted" },
   { _id: "Waiting For Client Response", name: "Waiting For Client Response" },
+  { _id: "On Hold", name: "On Hold" },
   { _id: "Project Awarded", name: "Project Awarded" },
+];
+
+const PRIORITY_OPTIONS = [
+  { _id: "1", name: "1 - <500" },
+  { _id: "2", name: "2 - 500-1,000" },
+  { _id: "3", name: "3 - 1,000-2,000" },
+  { _id: "4", name: "4 - 2,000-3,000" },
+  { _id: "5", name: "5 - 3,000-5,000" },
+  { _id: "6", name: "6 - 5,000-10,000" },
+  { _id: "7", name: "7 - 10,000-20,000" },
+  { _id: "8", name: "8 - 20,000-35,000" },
+  { _id: "9", name: "9 - 35,000-50,000" },
+  { _id: "10", name: "10 - 50,000+" },
 ];
 
 const EXPORT_HEADERS = [
@@ -139,7 +153,6 @@ export default function EnquiriesPage() {
 
   const hasActiveFilters = useMemo(() => {
     return Object.entries(filters).some(([key, value]) => {
-      if (key === "search") return false;
       if ((key === "status" || key === "next_action") && value === "all") return false;
       return value !== "" && value !== null && value !== undefined;
     });
@@ -479,17 +492,27 @@ export default function EnquiriesPage() {
 
       {/* FILTERS */}
       <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg mb-4">
-        <div className="flex items-center justify-between px-2 mb-2 cursor-pointer" onClick={() => setShowFilters((prev) => !prev)}>
-          <h2 className="font-semibold text-xs text-slate-400">Enquiry Filters</h2>
-          <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="relative w-full md:max-w-md">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search enquiries..."
+              value={filters.search}
+              onChange={(e) => updateFilter("search", e.target.value)}
+              className="w-full rounded-lg border border-slate-700/70 bg-slate-950/40 py-2 pl-9 pr-3 text-sm text-slate-200 placeholder:text-slate-500 focus:border-slate-500 focus:outline-none"
+            />
+          </div>
+
+          <div className="flex w-full flex-wrap items-center justify-end gap-2 md:w-auto">
             <Dialog open={exportOpen} onOpenChange={setExportOpen}>
               <DialogTrigger asChild>
                 <Button
-                  variant="ghost"
-                  className="text-xs"
-                  onClick={(event) => event.stopPropagation()}
+                  type="button"
+                  variant="outline"
+                  className="w-full md:w-auto border-slate-700 bg-slate-900/40 text-slate-200 hover:bg-slate-800/60"
                 >
-                  <Download size={14} className="mr-1" />
+                  <Download size={14} className="mr-2" />
                   Export
                 </Button>
               </DialogTrigger>
@@ -571,12 +594,18 @@ export default function EnquiriesPage() {
               </DialogContent>
             </Dialog>
             <Button
-              variant="ghost"
-              className="text-xs"
-              onClick={() => {}}
+              type="button"
+              variant="outline"
+              className="w-full md:w-auto border-slate-700 bg-slate-900/40 text-slate-200 hover:bg-slate-800/60"
+              onClick={() => setShowFilters((prev) => !prev)}
             >
-              <SlidersHorizontal size={14} className="mr-1" />
-              {showFilters ? "Hide Filters" : "Open Filters"}
+              <SlidersHorizontal size={16} className="mr-2" />
+              {showFilters ? "Hide Filters" : "Show Filters"}
+              {showFilters ? (
+                <ChevronUp size={16} className="ml-2" />
+              ) : (
+                <ChevronDown size={16} className="ml-2" />
+              )}
             </Button>
             {showFilters && (
               <Button
@@ -592,6 +621,10 @@ export default function EnquiriesPage() {
 
         {showFilters && (
           <>
+            <div className="mt-4 mb-2 flex items-center justify-between px-2">
+              <h2 className="font-semibold text-xs text-slate-300">Filters</h2>
+              <p className="text-[11px] text-slate-500">Refine results with quick criteria</p>
+            </div>
             <div className="flex flex-wrap -m-1">
             {/* COUNTRY */}
             <FilterSelect
@@ -666,15 +699,15 @@ export default function EnquiriesPage() {
             />
 
             {/* Occupancy */}
-            <div className="w-full lg:w-1/4 p-1">
-              <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg p-2">
+            <div className="w-full lg:w-1/4 mt-1">
+              <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg px-2 pb-2">
                 <Label className="text-xs text-slate-400">Minimum Occupancy</Label>
                 <input
                   type="number"
                   value={filters.occupancy}
                   onChange={(e) => updateFilter("occupancy", e.target.value)}
-                  placeholder="e.g. 600"
-                  className="mt-1 w-full bg-transparent border rounded p-2 text-slate-200"
+                  placeholder="Enter Occupancy"
+                  className="w-full bg-transparent border border-slate-800 rounded p-2 text-slate-200 text-sm mt-[3px]"
                 />
               </div>
             </div>
@@ -713,43 +746,20 @@ export default function EnquiriesPage() {
               />
 
             {/* Priority */}
-            <div className="w-full lg:w-1/4 p-1">
-              <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg p-2">
-                <Label className="text-xs text-slate-400">Priority</Label>
-                <input
-                  value={filters.priority}
-                  onChange={(e) => updateFilter("priority", e.target.value)}
-                  placeholder="e.g. 1 - 10"
-                  className="mt-1 w-full bg-transparent border rounded p-2 text-slate-200"
-                />
-              </div>
-            </div>
-
-            {/* SEARCH BY ENQUIRY UUID */}
-            <div className="w-full lg:w-1/4 p-1">
-              <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg p-2">
-                <Label className="text-xs text-slate-400">Enquiry UUID</Label>
-                <input
-                  type="text"
-                  placeholder="Search by Enquiry UUID..."
-                  value={filters.enquiry_uuid}
-                  onChange={(e) =>
-                    setFilters((prev) => ({
-                      ...prev,
-                      enquiry_uuid: e.target.value,
-                    }))
-                  }
-                  className="mt-1 w-full bg-transparent border rounded p-2 text-slate-200"
-                />
-              </div>
-            </div>
+            <FilterSelect
+              label="Priority"
+              value={filters.priority}
+              disabled={false}
+              options={PRIORITY_OPTIONS}
+              onChange={(v:any) => updateFilter("priority", v)}
+            />
 
             {/* Dates */}
             <div className="w-full lg:w-1/3 p-1">
               <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg p-2">
                 <Label className="text-xs text-slate-400">Within Period</Label>
                 <Space direction="vertical" size={12} style={{ width: "100%" }}>
-                  <RangePicker value={rangeValue} onChange={handleRangeChange} style={{ width: "100%" }} />
+                  <RangePicker className="enquiry-dark-picker" value={rangeValue} onChange={handleRangeChange} style={{ width: "100%" }} />
                 </Space>
               </div>
             </div>
@@ -759,7 +769,7 @@ export default function EnquiriesPage() {
               <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg p-2">
                 <Label className="text-xs text-slate-400">Lease Expiry</Label>
                 <Space direction="vertical" size={12} style={{ width: "100%" }}>
-                  <DatePicker value={leaseValue} onChange={handleLeaseChange} style={{ width: "100%" }} />
+                  <DatePicker className="enquiry-dark-picker" value={leaseValue} onChange={handleLeaseChange} style={{ width: "100%" }} />
                 </Space>
               </div>
             </div>
@@ -783,18 +793,9 @@ export default function EnquiriesPage() {
 
       {/* ENQUIRY LIST */}
       <div className="bg-slate-900/50 p-4 rounded-xl shadow-sm min-h-[13vh]">
-        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-          <h1 className="font-semibold text-sm text-slate-300 flex items-center gap-2">
-            <PanelsTopLeft size={16} /> Enquiry List
-          </h1>
-          <input
-            type="search"
-            placeholder="Search enquiries..."
-            value={filters.search}
-            onChange={(e) => updateFilter("search", e.target.value)}
-            className="w-full md:w-[260px] bg-transparent border border-slate-700 rounded px-3 py-1.5 text-xs text-slate-200"
-          />
-        </div>
+        <h1 className="font-semibold text-sm text-slate-300 flex items-center gap-2 mb-3">
+          <PanelsTopLeft size={16} /> Enquiry List
+        </h1>
 
         {isLoading && (
           <div className="flex justify-center items-center h-24">
@@ -919,6 +920,33 @@ export default function EnquiriesPage() {
           </Pagination>
         </div>
       )}
+      <style jsx global>{`
+        .enquiry-dark-picker.ant-picker {
+          background: rgba(15, 23, 42, 0.78);
+          border: 1px solid rgba(71, 85, 105, 0.85);
+          color: #f8fafc;
+          box-shadow: none;
+        }
+        .enquiry-dark-picker .ant-picker-input > input {
+          color: #f8fafc;
+        }
+        .enquiry-dark-picker .ant-picker-input > input::placeholder {
+          color: #94a3b8;
+        }
+        .enquiry-dark-picker .ant-picker-separator,
+        .enquiry-dark-picker .ant-picker-suffix,
+        .enquiry-dark-picker .ant-picker-clear {
+          color: #e2e8f0;
+        }
+        .enquiry-dark-picker .ant-picker-clear {
+          background: transparent;
+        }
+        .enquiry-dark-picker.ant-picker-focused,
+        .enquiry-dark-picker.ant-picker:hover {
+          border-color: rgba(100, 116, 139, 1);
+          box-shadow: none;
+        }
+      `}</style>
     </div>
   );
 }
