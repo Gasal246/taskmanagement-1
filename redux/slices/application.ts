@@ -13,6 +13,7 @@ interface ApplicationState {
     locationData: any;
     filteredStaffs: any[] | null;
     staffFilterValues: any;
+    enquiriesListPage: number;
 };
 
 const initialState: ApplicationState = {
@@ -28,6 +29,7 @@ const initialState: ApplicationState = {
     locationData: null,
     filteredStaffs: null,
     staffFilterValues: null,
+    enquiriesListPage: 1,
 };
 
 const applicationSlice = createSlice({
@@ -69,6 +71,9 @@ const applicationSlice = createSlice({
         },
         loadStaffFilterValues: (state, action: PayloadAction<any>) => {
             state.staffFilterValues = action.payload
+        },
+        loadEnquiriesListPage: (state, action: PayloadAction<number>) => {
+            state.enquiriesListPage = Math.max(1, Number(action.payload) || 1)
         }
     }
 });
@@ -85,6 +90,7 @@ export const {
     loadAreaData,
     loadLocationData,
     loadFilteredStaffs,
-    loadStaffFilterValues
+    loadStaffFilterValues,
+    loadEnquiriesListPage
 } = applicationSlice.actions
 export default applicationSlice.reducer

@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { BadgeCheck, Eye, Filter, Hourglass, PencilRuler, Plus, Search, Users, Users2 } from 'lucide-react';
+import { Eye, Plus, Search, Users, Users2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Avatar, Tooltip } from 'antd';
 import { useRouter } from 'next/navigation';
@@ -20,15 +20,8 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 
-
-const multiFormatDateString = (date: any) => {
-  if (!date) return "Not Yet!"
-  return new Date(date).toLocaleDateString()
-}
-
 const AgentsPage = () => {
   const router = useRouter();
-  const [allStaffs, setAllStaffs] = useState<any[]>([]);
   const [searchVal, setSearchVal] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -95,9 +88,9 @@ const AgentsPage = () => {
     <div className='p-4 pb-10'>
             {/* Breadcrumb */}
             <Breadcrumb>
-                <BreadcrumbList>
+                <BreadcrumbList className='text-sm flex items-center gap-1'>
                     <BreadcrumbItem>
-                        <BreadcrumbLink onClick={() => router.back()}>Enquiries</BreadcrumbLink>
+                        <BreadcrumbLink onClick={() => router.back()} className='pl-2'>Dashboard</BreadcrumbLink>
                     </BreadcrumbItem>
                     <BreadcrumbSeparator />
                     <BreadcrumbItem>
@@ -132,46 +125,62 @@ const AgentsPage = () => {
             </motion.div>
           </div>
 
-          {(agents?.agents?.length === 0) && (
+          {isLoading && (
+            <div className='w-full h-full flex items-center justify-center min-h-[14vh] rounded-xl border border-slate-800/80 bg-slate-950/40'>
+              <p className='text-slate-300 text-sm'>Loading agents...</p>
+            </div>
+          )}
+
+          {!isLoading && (agents?.agents?.length === 0) && (
             <div className='w-full h-full flex items-center justify-center min-h-[10vh]'>
               <p className='text-slate-300 text-sm'>No agents found</p>
             </div>
           )}
 
-          { agentList.length > 0 && (
-            <table className="w-full bg-gradient-to-tr from-slate-950/40 to-slate-900/40 p-4 px-3 rounded-lg">
-              <thead>
-                <tr>
-                  <th className='py-2 w-[40%] border border-slate-800'><div className="flex justify-center gap-1 text-sm text-slate-300"><Users size={16} /> Users</div></th>
-                  <th className='py-2 w-[30%] border border-slate-800'><div className="flex justify-center gap-1 text-sm text-slate-300"><PencilRuler size={14} /> Actions</div></th>
-                </tr>
-              </thead>
-              <tbody>
-                {pagedAgents.map((agent: any) => (
-                  <tr key={agent._id}>
-                    <td>
-                      <div className="flex items-center gap-2 px-3 border rounded border-slate-800 p-1 min-h-[50px]">
-                        <Avatar size={40} src={agent?.avatar_url} />
-                        <div>
-                          <h1 className="font-semibold text-sm text-slate-300">{agent?.name}</h1>
-                          <p className="text-xs text-slate-400">{agent?.email}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td>
-                      <motion.div 
-                        whileHover={{ scale: 1.02 }} 
-                        whileTap={{ scale: 0.98 }}
-                        className='flex justify-center px-4 py-1 rounded-lg border border-slate-800 hover:border-slate-500 cursor-pointer text-xs font-semibold'
-                        onClick={() => handleViewStaff(agent?._id)}
-                      >
-                        <Eye size={14} /> Details
-                      </motion.div>
-                    </td>
+          {!isLoading && agentList.length > 0 && (
+            <div className="overflow-x-auto rounded-xl border border-slate-800/80 bg-gradient-to-b from-slate-900/70 via-slate-900/55 to-slate-950/70">
+              <table className="min-w-full">
+                <thead className="bg-slate-900/90">
+                  <tr>
+                    <th className='px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-300'>
+                      <div className="flex items-center gap-1.5"><Users size={14} /> Agent</div>
+                    </th>
+                    <th className='px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-300'>Email</th>
+                    <th className='px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-300'>Action</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {pagedAgents.map((agent: any) => (
+                    <tr key={agent._id} className="group border-t border-slate-800/80 hover:bg-gradient-to-r hover:from-cyan-950/20 hover:to-emerald-950/20">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <Avatar size={40} src={agent?.avatar_url} />
+                          <div>
+                            <h1 className="font-semibold text-sm text-slate-200">{agent?.name}</h1>
+                            <p className="text-[11px] text-slate-400">Enquiry Agent</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <p className="text-sm text-slate-300">{agent?.email}</p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex justify-end">
+                          <motion.button
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            className='inline-flex items-center gap-1 rounded-s-lg rounded-e-full border border-slate-700 bg-slate-900/80 px-4 py-1.5 text-xs font-semibold text-slate-100 transition-all hover:border-cyan-500/70 hover:text-cyan-100 hover:shadow-[0_0_0_1px_rgba(6,182,212,0.3),0_8px_20px_-12px_rgba(6,182,212,0.8)]'
+                            onClick={() => handleViewStaff(agent?._id)}
+                          >
+                            <Eye size={14} /> Details
+                          </motion.button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
           {totalPages > 1 && (
             <div className="flex flex-col gap-2 mt-4 text-xs text-slate-400">

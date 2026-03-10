@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useMemo, useState, useEffect } from "react";
-import { Users, Eye } from "lucide-react";
+import { ArrowRight, Plus, Users } from "lucide-react";
 import { Avatar } from "antd";
-import { motion } from "framer-motion";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { useGetEqUsers } from "@/query/enquirymanager/queries";
 import { useSelector } from "react-redux";
 import { RootState } from "@/redux/store";
@@ -73,97 +73,100 @@ export default function UsersPage() {
   }, [userList.length]);
 
   return (
-    <div className="p-5 pb-10">
-            {/* Breadcrumb */}
-            <Breadcrumb>
-                <BreadcrumbList>
-                    <BreadcrumbItem>
-                        <BreadcrumbLink onClick={() => router.back()}>Enquiries</BreadcrumbLink>
-                    </BreadcrumbItem>
-                    <BreadcrumbSeparator />
-                    <BreadcrumbItem>
-                        <BreadcrumbPage>Manage Users</BreadcrumbPage>
-                    </BreadcrumbItem>
-                </BreadcrumbList>
-            </Breadcrumb>
-      {/* HEADER */}
-      <div className="flex justify-between items-center bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 m-1 rounded-lg">
-        <h1 className="font-semibold text-md flex items-center gap-1 text-slate-300">
-          <Users size={16} /> Users
-        </h1>
+    <div className="p-4 pb-10">
+      <Breadcrumb>
+        <BreadcrumbList className="text-sm flex items-center gap-1">
+          <BreadcrumbItem>
+            <BreadcrumbLink onClick={() => router.back()} className="pl-2">Dashboard</BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbPage>Manage Users</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
 
-        <Link href="/admin/enquiries/users/add-user">
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            className="p-2 px-4 rounded-lg border border-slate-700 hover:border-slate-500 
-            bg-gradient-to-tr from-slate-900 to-slate-800 cursor-pointer text-sm font-semibold"
-          >
-            Add User
-          </motion.button>
-        </Link>
-      </div>
+      <div className="w-full p-1 space-y-4">
+        <div className="flex flex-col gap-3 rounded-xl border border-slate-800/80 bg-gradient-to-r from-cyan-950/35 via-slate-900/75 to-emerald-950/30 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-1">
+            <h1 className="text-lg font-semibold text-slate-100 flex items-center gap-2">
+              <Users size={18} className="text-cyan-300" /> Enquiry Users
+            </h1>
+            <p className="text-xs text-slate-400">
+              Manage users assigned to enquiry workflows with clear visibility.
+            </p>
+          </div>
+          <Link href="/admin/enquiries/users/add-user">
+            <Button className="w-full sm:w-auto bg-cyan-700 hover:bg-cyan-600 text-white rounded-e-full rounded-s-lg">
+              <Plus size={14} className="mr-1" /> Add User
+            </Button>
+          </Link>
+        </div>
 
-      <div className="w-full p-1">
-        <div className="bg-gradient-to-tr from-slate-950/60 to-slate-900/60 p-3 rounded-lg min-h-[40vh]">
-          <h1 className="font-semibold text-sm text-slate-300 flex items-center gap-1 mb-3">
-            <Users size={16} /> User List
-          </h1>
+        <div className="rounded-xl border border-slate-800/80 bg-gradient-to-b from-slate-900/70 to-slate-950/70 p-3">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold text-slate-200">User List</h2>
+            <p className="text-xs text-slate-400">Total: {userList.length}</p>
+          </div>
 
-          {userList.length === 0 && (
-            <div className="w-full h-full flex items-center justify-center min-h-[10vh]">
+          {isLoading && (
+            <div className="w-full h-full flex items-center justify-center min-h-[14vh] rounded-xl border border-slate-800/80 bg-slate-950/40">
+              <p className="text-slate-300 text-sm">Loading users...</p>
+            </div>
+          )}
+
+          {!isLoading && userList.length === 0 && (
+            <div className="w-full h-full flex items-center justify-center min-h-[10vh] rounded-xl border border-slate-800/80 bg-slate-950/40">
               <p className="text-slate-300 text-sm">No users found</p>
             </div>
           )}
 
-          {userList.length > 0 && (
-            <table className="w-full bg-gradient-to-tr from-slate-950/40 to-slate-900/40 p-4 px-3 rounded-lg">
-              <thead>
-                <tr>
-                  <th className="py-2 w-[50%] border border-slate-800">
-                    <div className="flex justify-center gap-1 text-sm text-slate-300">
-                      Users
-                    </div>
-                  </th>
-                  <th className="py-2 w-[30%] border border-slate-800">
-                    <div className="flex justify-center gap-1 text-sm text-slate-300">
-                      Actions
-                    </div>
-                  </th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {pagedUsers.map((user:any) => (
-                  <tr key={user?._id}>
-                    <td>
-                      <div className="flex items-center gap-2 px-3 border rounded border-slate-800 p-1 min-h-[50px]">
-                        <Avatar size={40} src="https://api.dicebear.com/7.x/personas/svg" />
-                        <div>
-                          <h1 className="font-semibold text-sm text-slate-300">
-                            {user?.user_id?.name}
-                          </h1>
-                          <p className="text-xs text-slate-400">{user?.user_id?.email}</p>
-                        </div>
-                      </div>
-                    </td>
-
-                    <td>
-                      <motion.div
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        className="flex justify-center px-4 py-1 rounded-lg border border-slate-800 hover:border-slate-500 
-                        cursor-pointer text-xs font-semibold text-slate-300"
-                        onClick={() => router.replace(`/admin/enquiries/users/${user?.user_id?._id}`)}
-                      >
-                        <Eye size={14} /> Details
-                      </motion.div>
-                    </td>
+          {!isLoading && userList.length > 0 && (
+            <div className="overflow-x-auto rounded-xl border border-slate-800/80 bg-gradient-to-b from-slate-900/80 via-slate-900/60 to-slate-950/80">
+              <table className="min-w-full text-sm text-slate-300">
+                <thead className="bg-slate-900/90">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-300">#</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-300">User</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-300">Email</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-300">Action</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {pagedUsers.map((user: any, index: number) => (
+                    <tr
+                      key={user?._id}
+                      className="group border-t border-slate-800/80 transition-colors hover:bg-gradient-to-r hover:from-cyan-950/20 hover:to-emerald-950/20"
+                    >
+                      <td className="px-4 py-3 text-xs text-slate-400">{(page - 1) * limit + index + 1}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <Avatar size={40} src="https://api.dicebear.com/7.x/personas/svg" />
+                          <div>
+                            <h1 className="font-medium text-slate-100">{user?.user_id?.name}</h1>
+                            <p className="text-[11px] text-slate-400">Enquiry User</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-slate-300">{user?.user_id?.email}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex justify-end">
+                          <Button
+                            variant="outline"
+                            className="h-8 rounded-s-lg rounded-e-full border-slate-700 bg-slate-900/80 px-3 text-xs text-slate-100 transition-all hover:border-cyan-500/70 hover:text-cyan-100 hover:shadow-[0_0_0_1px_rgba(6,182,212,0.3),0_8px_20px_-12px_rgba(6,182,212,0.8)]"
+                            onClick={() => router.replace(`/admin/enquiries/users/${user?.user_id?._id}`)}
+                          >
+                            View <ArrowRight size={13} className="ml-1" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
+
           {totalPages > 1 && (
             <div className="flex flex-col gap-2 mt-4 text-xs text-slate-400">
               <p>

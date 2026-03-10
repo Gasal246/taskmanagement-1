@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ArrowRight, Earth, Plus, Search } from "lucide-react";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { useGetEqCountriesFiltered } from "@/query/enquirymanager/queries";
 import {
@@ -25,6 +26,8 @@ export default function CountriesListPage() {
 
     const { data: countries, isLoading } = useGetEqCountriesFiltered({ search, page, limit });
     const pagination = countries?.pagination;
+    const countryList = countries?.countries ?? [];
+    const totalRecords = pagination?.totalRecords ?? 0;
 
     const pageItems = useMemo(() => {
         const totalPages = pagination?.totalPages ?? 1;
@@ -62,11 +65,11 @@ export default function CountriesListPage() {
     }, [search]);
 
     return (
-        <div className="p-5 pb-10">
+        <div className="p-4 pb-10">
             <Breadcrumb>
-                <BreadcrumbList>
+                <BreadcrumbList className="text-sm flex items-center gap-1">
                     <BreadcrumbItem>
-                        <BreadcrumbLink onClick={() => router.back()}>Enquiries</BreadcrumbLink>
+                        <BreadcrumbLink onClick={() => router.back()} className="pl-2">Dashboard</BreadcrumbLink>
                     </BreadcrumbItem>
                     <BreadcrumbSeparator />
                     <BreadcrumbItem>
@@ -75,51 +78,89 @@ export default function CountriesListPage() {
                 </BreadcrumbList>
             </Breadcrumb>
 
-            <div className="p-6 max-w-4xl mx-auto space-y-6">
-                <div className="flex items-center justify-between">
-                    <h1 className="text-lg font-semibold text-slate-200">Countries</h1>
+            <div className="w-full p-1 space-y-4">
+                <div className="flex flex-col gap-3 rounded-xl border border-slate-800/80 bg-gradient-to-r from-cyan-950/35 via-slate-900/75 to-emerald-950/30 p-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="space-y-1">
+                        <h1 className="text-lg font-semibold text-slate-100 flex items-center gap-2">
+                            <Earth size={18} className="text-cyan-300" /> Countries Management
+                        </h1>
+                        <p className="text-xs text-slate-400">
+                            Maintain country records used across enquiries and location mapping.
+                        </p>
+                    </div>
                     <Link href="/admin/enquiries/countries/add-country">
-                        <Button className="bg-cyan-700 hover:bg-cyan-600">Add New Country</Button>
+                        <Button className="w-full sm:w-auto bg-cyan-700 hover:bg-cyan-600 text-white rounded-e-full rounded-s-lg">
+                            <Plus size={14} className="mr-1" /> Add New Country
+                        </Button>
                     </Link>
                 </div>
 
-                <div>
-                    <Input
-                        type="search"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        placeholder="Search countries..."
-                        className="bg-slate-900/50 text-slate-200 border-slate-700 placeholder:text-slate-500"
-                    />
-                </div>
+                <div className="rounded-xl border border-slate-800/80 bg-gradient-to-b from-slate-900/70 to-slate-950/70 p-3">
+                    <div className="mb-3 flex items-center justify-between gap-2">
+                        <h2 className="text-sm font-semibold text-slate-200">Countries</h2>
+                        <p className="text-xs text-slate-400">Total: {totalRecords}</p>
+                    </div>
 
-                <div className="overflow-x-auto rounded-lg border border-slate-700 bg-slate-900/40">
-                    <table className="w-full text-sm text-slate-300">
-                        <thead className="bg-slate-800/50 text-slate-200">
-                            <tr>
-                                <th className="p-3 text-left">Country Name</th>
-                                <th className="p-3 text-left">Last Updated</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {isLoading ? (
-                                <tr><td colSpan={2} className="p-4 text-center text-slate-400">Loading...</td></tr>
-                            ) : countries?.countries?.length === 0 ? (
-                                <tr><td colSpan={2} className="p-4 text-center text-slate-400">No countries found.</td></tr>
-                            ) : (
-                                countries?.countries?.map((country: any) => (
-                                    <tr
-                                        key={country._id}
-                                        onClick={() => router.push(`/admin/enquiries/countries/${country._id}`)}
-                                        className="border-b border-slate-700/50 hover:bg-slate-800/40"
-                                    >
-                                        <td className="p-3">{country.country_name}</td>
-                                        <td className="p-3">{country.updatedAt ? new Date(country.updatedAt).toLocaleDateString() : "-"}</td>
+                    <div className="relative mb-3">
+                        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <Input
+                            type="search"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            placeholder="Search countries..."
+                            className="pl-9 bg-slate-900/50 text-slate-200 border-slate-700 placeholder:text-slate-500"
+                        />
+                    </div>
+
+                    <div className="overflow-x-auto rounded-xl border border-slate-800/80 bg-gradient-to-b from-slate-900/80 via-slate-900/60 to-slate-950/80">
+                        <table className="min-w-full text-sm text-slate-300">
+                            <thead className="bg-slate-900/90">
+                                <tr>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-300">#</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-300">Country Name</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-300">Last Updated</th>
+                                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-300">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {isLoading ? (
+                                    <tr>
+                                        <td colSpan={4} className="p-6 text-center text-slate-400">Loading countries...</td>
                                     </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
+                                ) : countryList.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={4} className="p-6 text-center text-slate-400">No countries found.</td>
+                                    </tr>
+                                ) : (
+                                    countryList.map((country: any, index: number) => (
+                                        <tr
+                                            key={country._id}
+                                            className="group border-t border-slate-800/80 transition-colors hover:bg-gradient-to-r hover:from-cyan-950/20 hover:to-emerald-950/20"
+                                        >
+                                            <td className="px-4 py-3 text-xs text-slate-400">
+                                                {((pagination?.page ?? page) - 1) * limit + index + 1}
+                                            </td>
+                                            <td className="px-4 py-3 font-medium text-slate-100">{country.country_name}</td>
+                                            <td className="px-4 py-3 text-slate-300">
+                                                {country.updatedAt ? new Date(country.updatedAt).toLocaleDateString() : "-"}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <div className="flex justify-end">
+                                                    <Button
+                                                        variant="outline"
+                                                        className="h-8 rounded-s-lg rounded-e-full border-slate-700 bg-slate-900/80 px-3 text-xs text-slate-100 transition-all hover:border-cyan-500/70 hover:text-cyan-100 hover:shadow-[0_0_0_1px_rgba(6,182,212,0.3),0_8px_20px_-12px_rgba(6,182,212,0.8)]"
+                                                        onClick={() => router.push(`/admin/enquiries/countries/${country._id}`)}
+                                                    >
+                                                        View <ArrowRight size={13} className="ml-1" />
+                                                    </Button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
 
                 {pagination && pagination.totalPages > 1 && (
