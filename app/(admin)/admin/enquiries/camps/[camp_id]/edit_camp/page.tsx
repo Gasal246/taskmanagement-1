@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
     useGetEqCountries,
     useGetEqRegions,
@@ -14,7 +15,7 @@ import {
     useUpdateEqCamp,
     useGetEqHeadOfficesFiltered
 } from "@/query/enquirymanager/queries";
-import { EQ_CAMP_TYPES, EQ_CAPACITY_LIMITS, Eq_CAPACITY_OPTIONS } from "@/lib/constants";
+import { EQ_CAMP_TYPES, EQ_CAMP_VISITED_STATUS_OPTIONS, EQ_CAPACITY_LIMITS, Eq_CAPACITY_OPTIONS } from "@/lib/constants";
 import { toast } from "sonner";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { useParams, useRouter } from "next/navigation";
@@ -61,6 +62,7 @@ export default function EditCampPage() {
 
     useEffect(() => {
         fetchCountries();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {
@@ -149,8 +151,11 @@ export default function EditCampPage() {
         reset({
             camp_name: camp?.camp_name || "",
             camp_type: camp?.camp_type || "",
+            visited_status: camp?.visited_status || "To Visit",
             camp_capacity: camp?.camp_capacity ? String(camp?.camp_capacity) : "",
             camp_occupancy: camp?.camp_occupancy ?? "",
+            latitude: camp?.latitude || "",
+            longitude: camp?.longitude || "",
             landlord: camp?.landlord_id?.landlord_name || "",
             real_estate: camp?.realestate_id?.company_name || "",
             client_company: camp?.client_company_id?.client_company_name || "",
@@ -169,7 +174,10 @@ export default function EditCampPage() {
             camp_id: params.camp_id,
             camp_name: data.camp_name,
             camp_type: data.camp_type,
+            visited_status: data.visited_status,
             camp_capacity: data.camp_capacity,
+            latitude: data.latitude ?? "",
+            longitude: data.longitude ?? "",
             country_id,
             region_id,
             province_id,
@@ -252,6 +260,26 @@ export default function EditCampPage() {
 
                     <Controller
                         control={control}
+                        name="visited_status"
+                        defaultValue="To Visit"
+                        render={({ field }) => (
+                            <Select value={field.value ?? "To Visit"} onValueChange={field.onChange}>
+                                <SelectTrigger className="bg-slate-900/50 text-slate-200">
+                                    <SelectValue placeholder="Visited Status" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {EQ_CAMP_VISITED_STATUS_OPTIONS.map((status) => (
+                                        <SelectItem key={status} value={status}>
+                                            {status}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        )}
+                    />
+
+                    <Controller
+                        control={control}
                         name="camp_capacity"
                         defaultValue=""
                         render={({ field }) => (
@@ -271,6 +299,8 @@ export default function EditCampPage() {
                     />
 
                     <Input type="number" placeholder="Current Occupancy" {...register("camp_occupancy")} />
+                    <Input placeholder="Latitude" {...register("latitude")} />
+                    <Input placeholder="Longitude" {...register("longitude")} />
 
                     <select
                         value={country_id}

@@ -177,6 +177,7 @@ export default function CampDetailsPage() {
 
                 <Detail label="Latitude" value={camps?.camp?.latitude} />
                 <Detail label="Longitude" value={camps?.camp?.longitude} />
+                <Detail label="Visited Status" value={camps?.camp?.visited_status || "Just Added"} />
 
                 <Detail label="Capacity" value={camps?.camp?.camp_capacity} />
                 <Detail label="Current Occupancy" value={camps?.camp?.camp_occupancy} />

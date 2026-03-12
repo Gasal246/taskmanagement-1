@@ -17,6 +17,7 @@ export interface IEq_camps extends Document{
     camp_occupancy: Number,
     is_active: Boolean,
     is_eq_added: Boolean,
+    visited_status: String,
     latitude: String,
     longitude: String,
     createdAt: Date,
@@ -39,6 +40,7 @@ const Eq_campsSchema: Schema = new Schema({
     camp_occupancy: {type: Number},
     is_active: {type: Boolean, default: false},
     is_eq_added: {type: Boolean},
+    visited_status: {type: String, enum: ["Visited", "To Visit", "Cancelled"], default: "To Visit"},
     latitude: {type: String},
     longitude: {type: String},
 }, {timestamps: true});

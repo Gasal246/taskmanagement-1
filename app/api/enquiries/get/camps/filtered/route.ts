@@ -17,6 +17,7 @@ export async function GET(req:NextRequest){
         const province_id = searchParams.get("province_id");
         const city_id = searchParams.get("city_id");
         const area_id = searchParams.get("area_id");
+        const visited_status = searchParams.get("visited_status");
         const search = searchParams.get("search")?.trim() || "";
         const pageParam = Number(searchParams.get("page"));
         const limitParam = Number(searchParams.get("limit"));
@@ -28,6 +29,7 @@ export async function GET(req:NextRequest){
         const skip = (page - 1) * limit;
 
         const query:any = {};
+        const andConditions: any[] = [];
 
         query.is_active = true;
 
@@ -36,6 +38,17 @@ export async function GET(req:NextRequest){
         if(province_id) query.province_id = province_id;
         if(city_id) query.city_id = city_id;
         if(area_id) query.area_id = area_id;
+        if (visited_status === "just_added") {
+            andConditions.push({
+                $or: [
+                    { visited_status: { $exists: false } },
+                    { visited_status: null },
+                    { visited_status: "" },
+                ],
+            });
+        } else if (visited_status && visited_status !== "all") {
+            query.visited_status = visited_status;
+        }
 
         if (search) {
             const regex = new RegExp(search, "i");
@@ -79,7 +92,11 @@ export async function GET(req:NextRequest){
                 });
             }
 
-            query.$or = orConditions;
+            andConditions.push({ $or: orConditions });
+        }
+
+        if (andConditions.length > 0) {
+            query.$and = andConditions;
         }
 
         const totalRecords = await Eq_camps.countDocuments(query);

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
 import { useGetEqCountries, useGetEqRegions, useGetEqCities, useGetEqAreas, useGetEqProvince, useAddNewEqCamp, useGetEqHeadOfficesFiltered } from "@/query/enquirymanager/queries";
-import { EQ_CAMP_TYPES, EQ_CAPACITY_LIMITS, Eq_CAPACITY_OPTIONS } from "@/lib/constants";
+import { EQ_CAMP_TYPES, EQ_CAMP_VISITED_STATUS_OPTIONS, EQ_CAPACITY_LIMITS, Eq_CAPACITY_OPTIONS } from "@/lib/constants";
 import { toast } from "sonner";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { useRouter } from "next/navigation";
@@ -49,6 +49,7 @@ export default function AddCampPage() {
 
     useEffect(() => {
         fetchCountries();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {
@@ -57,7 +58,13 @@ export default function AddCampPage() {
         }
     }, [headOfficeOpen, head_office_id]);
 
-    const { register, handleSubmit, reset, control } = useForm();
+    const { register, handleSubmit, reset, control } = useForm({
+        defaultValues: {
+            visited_status: "To Visit",
+            latitude: "",
+            longitude: "",
+        }
+    });
 
     const onSubmit = async (data: any) => {
         const limit = EQ_CAPACITY_LIMITS[data.camp_capacity];
@@ -156,6 +163,25 @@ export default function AddCampPage() {
                         )}
                     />
 
+                    <Controller
+                        control={control}
+                        name="visited_status"
+                        render={({ field }) => (
+                            <Select value={field.value} onValueChange={field.onChange}>
+                                <SelectTrigger className="bg-slate-900/50 text-slate-200">
+                                    <SelectValue placeholder="Visited Status" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {EQ_CAMP_VISITED_STATUS_OPTIONS.map((status) => (
+                                        <SelectItem key={status} value={status}>
+                                            {status}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        )}
+                    />
+
                     {/* Capacity */}
                     <Controller
                         control={control}
@@ -177,6 +203,8 @@ export default function AddCampPage() {
                     />
 
                     <Input type="number" placeholder="Current Occupancy" {...register("camp_occupancy")} />
+                    <Input placeholder="Latitude" {...register("latitude")} />
+                    <Input placeholder="Longitude" {...register("longitude")} />
 
 
 

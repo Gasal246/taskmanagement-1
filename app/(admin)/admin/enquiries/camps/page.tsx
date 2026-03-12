@@ -19,6 +19,14 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 
+const CAMP_VISITED_STATUS_FILTER_OPTIONS = [
+  { value: "all", label: "All Statuses" },
+  { value: "Visited", label: "Visited" },
+  { value: "To Visit", label: "To Visit" },
+  { value: "Cancelled", label: "Cancelled" },
+  { value: "just_added", label: "Just Added" },
+] as const;
+
 export default function CampsListPage() {
   const router = useRouter();
   const [countries, setCountries] = useState([]);
@@ -27,6 +35,7 @@ export default function CampsListPage() {
   const [province_id, setProvince] = React.useState("");
   const [city_id, setCity] = React.useState("");
   const [area_id, setArea] = useState("");
+  const [visited_status, setVisitedStatus] = useState("all");
   const [search, setSearch] = React.useState("");
   const [page, setPage] = React.useState(1);
   const limit = 15;
@@ -37,7 +46,17 @@ export default function CampsListPage() {
   const { data: cities } = useGetEqCities(province_id);
   const { data: areas } = useGetEqAreas(city_id);
 
-  const { data: camps, isLoading } = useGetEqCampsFiltered({ country_id, region_id, province_id, city_id, area_id, search, page, limit });
+  const { data: camps, isLoading } = useGetEqCampsFiltered({
+    country_id,
+    region_id,
+    province_id,
+    city_id,
+    area_id,
+    visited_status: visited_status === "all" ? "" : visited_status,
+    search,
+    page,
+    limit
+  });
   const pagination = camps?.pagination;
   const campList = camps?.camps ?? [];
   const totalRecords = pagination?.totalRecords ?? 0;
@@ -85,7 +104,7 @@ export default function CampsListPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [country_id, region_id, province_id, city_id, area_id, search]);
+  }, [country_id, region_id, province_id, city_id, area_id, visited_status, search]);
 
   return (
     <div className="p-4 pb-10">
@@ -172,6 +191,16 @@ export default function CampsListPage() {
                 {areas?.areas?.map((a: any) => <SelectItem key={a._id} value={a._id}>{a.area_name}</SelectItem>)}
               </SelectContent>
             </Select>
+            <Select value={visited_status} onValueChange={setVisitedStatus}>
+              <SelectTrigger className="bg-slate-900/50 text-slate-200 border-slate-700"><SelectValue placeholder="Visited Status" /></SelectTrigger>
+              <SelectContent>
+                {CAMP_VISITED_STATUS_FILTER_OPTIONS.map((status) => (
+                  <SelectItem key={status.value} value={status.value}>
+                    {status.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="overflow-x-auto rounded-xl border border-slate-800/80 bg-gradient-to-b from-slate-900/80 via-slate-900/60 to-slate-950/80">
@@ -185,14 +214,15 @@ export default function CampsListPage() {
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-300">City</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-300">Area</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-300">Camp</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-300">Visited Status</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-300">Action</th>
                 </tr>
               </thead>
               <tbody>
                 {isLoading ? (
-                  <tr><td colSpan={8} className="p-6 text-center text-slate-400">Loading camps...</td></tr>
+                  <tr><td colSpan={9} className="p-6 text-center text-slate-400">Loading camps...</td></tr>
                 ) : campList.length === 0 ? (
-                  <tr><td colSpan={8} className="p-6 text-center text-slate-400">No camps found.</td></tr>
+                  <tr><td colSpan={9} className="p-6 text-center text-slate-400">No camps found.</td></tr>
                 ) : (
                   campList.map((camp: any, index: number) => (
                     <tr key={camp._id} className="group border-t border-slate-800/80 transition-colors hover:bg-gradient-to-r hover:from-cyan-950/20 hover:to-emerald-950/20">
@@ -203,6 +233,21 @@ export default function CampsListPage() {
                       <td className="px-4 py-3 text-slate-300">{camp.city_id?.city_name}</td>
                       <td className="px-4 py-3 text-slate-300">{camp.area_id?.area_name}</td>
                       <td className="px-4 py-3 font-medium text-slate-100">{camp.camp_name}</td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
+                            camp.visited_status === "Visited"
+                              ? "bg-green-900/60 text-green-100"
+                              : camp.visited_status === "Cancelled"
+                                ? "bg-blue-900/60 text-blue-100"
+                                : camp.visited_status === "To Visit"
+                                  ? "bg-amber-700/50 text-amber-100"
+                                  : "bg-red-900/60 text-red-100"
+                          }`}
+                        >
+                          {camp.visited_status || "Just Added"}
+                        </span>
+                      </td>
                       <td className="px-4 py-3">
                         <div className="flex justify-end">
                           <Button

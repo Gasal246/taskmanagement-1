@@ -4,6 +4,7 @@ import { AcceptEnquiryEdits, ActivateDeactivateEqAgents, ActivateEqCamp, AddEqUs
      GetEqCampsByArea, 
      GetEqCampsByEnquiry, 
      GetEqCampsById, 
+     GetEqCampsForMap,
      GetEqCampsFiltered, 
      GetStaffEqCampsFiltered,
      GetEqCitiesByProvince, 
@@ -356,6 +357,15 @@ export const useGetEqCampsFiltered = (queryParams: Record<string, string | numbe
     return useQuery({
         queryKey: ["camps", queryParams],
         queryFn: () => GetEqCampsFiltered(queryParams),
+    })
+}
+
+//Get Camps for map
+export const useGetEqCampsForMap = (queryParams: Record<string, string | number | undefined>, enabled = true) => {
+    return useQuery({
+        queryKey: ["camps-map", queryParams],
+        queryFn: () => GetEqCampsForMap(queryParams),
+        enabled,
     })
 }
 

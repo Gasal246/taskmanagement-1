@@ -13,6 +13,7 @@ interface IBody {
     camp_occupancy?: number | string,
     camp_type?: string,
     camp_id: string,
+    visited_status?: string,
     latitude?: string,
     longitude?: string,
     country_id?: string,
@@ -86,6 +87,7 @@ export async function PUT(req: NextRequest){
         if(body.camp_name !== undefined) campToEdit.camp_name = body.camp_name;
         if(body.camp_capacity !== undefined) campToEdit.camp_capacity = body.camp_capacity;
         if(body.camp_type !== undefined) campToEdit.camp_type = body.camp_type;
+        if(body.visited_status !== undefined) campToEdit.visited_status = body.visited_status;
         if(body.camp_occupancy !== undefined) {
             campToEdit.camp_occupancy = Number(body.camp_occupancy);
         }
@@ -95,8 +97,8 @@ export async function PUT(req: NextRequest){
         if(body.city_id) campToEdit.city_id = body.city_id as any;
         if(body.area_id) campToEdit.area_id = body.area_id as any;
         if(body.headoffice_id !== undefined) campToEdit.headoffice_id = body.headoffice_id || null;
-        if(body.latitude) campToEdit.latitude = body.latitude;
-        if(body.longitude) campToEdit.longitude = body.longitude;
+        if(body.latitude !== undefined) campToEdit.latitude = body.latitude;
+        if(body.longitude !== undefined) campToEdit.longitude = body.longitude;
 
         await campToEdit.save();
 

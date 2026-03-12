@@ -26,6 +26,7 @@ export async function PUT(req: NextRequest){
             camp_occupancy: body.camp_occupancy,
             camp_type: body.camp_type,
             is_active: true,
+            visited_status: "Visited",
             country_id: enquiry?.country_id,
             region_id: enquiry?.region_id,
             province_id: enquiry?.province_id,

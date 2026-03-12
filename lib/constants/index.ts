@@ -50,6 +50,8 @@ export const TASK_STATUS = [
 
 export const EQ_CAMP_TYPES = ["Labour Camp", "Staff Accommodation", "Hotel Apartment", "Other"];
 
+export const EQ_CAMP_VISITED_STATUS_OPTIONS = ["Visited", "To Visit", "Cancelled"] as const;
+
 export const Eq_CAPACITY_OPTIONS = ["<500", "500-1000", "1000-2000", "2000-3000", "3000-5000", "5000-10000", "10000-20000", "20000-35000", "35000-50000", "50000+"];
 
 export const EQ_CAPACITY_LIMITS: Record<string, number> = {

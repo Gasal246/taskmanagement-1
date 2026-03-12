@@ -40,6 +40,13 @@ type DashboardCard = {
   isLoading: boolean;
 };
 
+type ToolCard = {
+  title: string;
+  description: string;
+  href: string;
+  icon: LucideIcon;
+};
+
 const formatCount = (value: number) => new Intl.NumberFormat("en-US").format(value);
 
 export default function EnquiriesDashboardPage() {
@@ -136,13 +143,20 @@ export default function EnquiriesDashboardPage() {
       count: usersData?.users?.length ?? 0,
       isLoading: !!businessId && isUsersLoading,
     },
+  ];
+
+  const tools: ToolCard[] = [
+    {
+      title: "Camp Map",
+      description: "Review camp coverage visually across regions and provinces.",
+      href: "/admin/enquiries/map",
+      icon: MapPinned,
+    },
     {
       title: "Add Enquiry",
+      description: "Create a new enquiry and continue expanding the camp network.",
       href: "/admin/enquiries/add-enquiry",
-      buttonLabel: "Add",
       icon: Plus,
-      count: totalEnquiries,
-      isLoading: isEnquiriesLoading,
     },
   ];
 
@@ -193,6 +207,41 @@ export default function EnquiriesDashboardPage() {
               </div>
             );
           })}
+        </div>
+
+        <div className="mt-6 border-t border-slate-800/80 pt-5">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold text-slate-200">Tools</h3>
+            <p className="text-xs text-slate-400">Focused actions for mapping and enquiry intake</p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            {tools.map((tool) => {
+              const Icon = tool.icon;
+              return (
+                <button
+                  key={tool.title}
+                  type="button"
+                  onClick={() => router.push(tool.href)}
+                  className="group flex items-center justify-between rounded-2xl border border-slate-800 bg-gradient-to-r from-slate-900/80 via-slate-900/65 to-slate-950/85 p-4 text-left transition-all duration-200 hover:border-cyan-500/60 hover:bg-slate-900/90 hover:shadow-[0_0_0_1px_rgba(6,182,212,0.2),0_16px_36px_-24px_rgba(6,182,212,0.85)]"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="rounded-2xl border border-slate-700/90 bg-slate-900/80 p-3 text-slate-200 transition-colors group-hover:border-cyan-500/50 group-hover:text-cyan-100">
+                      <Icon size={18} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-slate-100">{tool.title}</p>
+                      <p className="mt-1 text-xs text-slate-400">{tool.description}</p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-full border border-slate-700/80 bg-slate-900/70 p-2 text-slate-300 transition-colors group-hover:border-cyan-500/60 group-hover:text-cyan-100">
+                    <ChevronRight size={15} />
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </section>
     </div>

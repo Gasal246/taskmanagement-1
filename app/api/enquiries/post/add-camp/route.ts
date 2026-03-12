@@ -13,8 +13,11 @@ interface Body {
     landlord: string,
     real_estate: string,
     client_company: string,
+    visited_status?: string,
     camp_capacity: string,
     camp_occupancy: number,
+    latitude?: string,
+    longitude?: string,
     country_id: string,
     region_id: string,
     province_id: string,
@@ -83,6 +86,9 @@ export async function POST(req:NextRequest){
             camp_name: body.camp_name,
             camp_capacity: body.camp_capacity,
             camp_occupancy: body.camp_occupancy,
+            visited_status: body.visited_status || "To Visit",
+            latitude: body.latitude?.trim() || "",
+            longitude: body.longitude?.trim() || "",
             is_active: true
         });
 

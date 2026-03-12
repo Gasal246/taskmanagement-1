@@ -245,7 +245,7 @@ export default function SingleEnquiryPage() {
             </div>
           </div>
 
-          <div className="space-y-3">
+          {/* <div className="space-y-3">
             <h2 className="font-semibold text-lg">Enquiry Users</h2>
             <div className="grid gap-2 md:grid-cols-2">
               <InfoRow label="Enquiry Brought By" value={renderUserList(enquiry?.enquiry?.enquiry_brought_by)} />
@@ -254,7 +254,7 @@ export default function SingleEnquiryPage() {
               <InfoRow label="Project Managed By" value={renderUserList(enquiry?.enquiry?.project_managed_by)} />
               <InfoRow label="Enquiry User Notes" value={renderValue(enquiry?.enquiry?.enquiry_user_notes)} />
             </div>
-          </div>
+          </div> */}
 
           <div className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">

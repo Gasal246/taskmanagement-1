@@ -304,6 +304,28 @@ export async function GetEqCampsFiltered(queryParams:any){
     }
 }
 
+//Get Camps for map
+export async function GetEqCampsForMap(queryParams:any){
+    try{
+        const safeParams: Record<string, string> = {};
+
+        for (const key in queryParams) {
+            const rawValue = queryParams[key];
+            const value = typeof rawValue === "string" ? rawValue.trim() : rawValue;
+            if (value !== "" && value !== null && value !== undefined) {
+                safeParams[key] = String(value);
+            }
+        }
+
+        const queryString = new URLSearchParams(safeParams).toString();
+        const res = await axios.get(`/api/enquiries/get/camps/map?${queryString}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+        return { camps: [], summary: { total: 0, visited: 0, toVisit: 0, cancelled: 0, justAdded: 0 }, status: 500 };
+    }
+}
+
 //Get Camps filtered (Staff - created by current user)
 export async function GetStaffEqCampsFiltered(queryParams:any){
     try{

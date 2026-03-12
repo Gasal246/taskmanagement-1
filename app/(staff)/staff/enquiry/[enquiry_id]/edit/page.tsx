@@ -1288,8 +1288,6 @@ export default function EditEnquiry() {
                                     <Input
                                         {...form.register("expected_monthly_price")}
                                         placeholder="Expected Monthly Price"
-                                        disabled={form.watch("wifi_available") !== "No"}
-                                        className={form.watch("wifi_available") !== "No" ? "bg-slate-900/40 opacity-70" : "bg-slate-950/40"}
                                     />
                                     {form.watch("wifi_available") !== "No" && (
                                         <p className="mt-1 text-[11px] text-slate-500">Enable this when Wi-Fi Available is set to `No`.</p>
