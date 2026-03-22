@@ -2,6 +2,7 @@ import mongoose, { ObjectId, Schema } from "mongoose";
 
 export interface IEq_camp_headoffice extends Document{
     _id: ObjectId,
+    business_id?: ObjectId,
     created_by?: ObjectId,
     createdBy?: ObjectId,
     phone: String,
@@ -13,6 +14,7 @@ export interface IEq_camp_headoffice extends Document{
 }
 
 const Eq_camp_headofficeSchema:Schema = new Schema({
+    business_id: { type: Schema.Types.ObjectId, ref: "business" },
     created_by: { type: Schema.Types.ObjectId, ref: "users" },
     createdBy: { type: Schema.Types.ObjectId, ref: "users" },
     phone: {type:String},

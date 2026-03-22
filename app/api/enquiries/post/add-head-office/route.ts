@@ -1,4 +1,7 @@
+import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
+import Admin_assign_business from "@/models/admin_assign_business.model";
+import Business_staffs from "@/models/business_staffs.model";
 import Eq_camp_headoffice from "@/models/eq_camp_headoffice.model";
 import Eq_camps from "@/models/eq_camps.model";
 import { NextRequest, NextResponse } from "next/server";
@@ -15,6 +18,7 @@ interface Body {
 
 export async function POST(req: NextRequest) {
   try {
+    const session: any = await auth();
     const body: Body = await req.json();
 
     const phone = body.phone?.trim() || "";
@@ -31,7 +35,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const businessAssignment =
+      (session?.user?.id
+        ? await Business_staffs.findOne({ user_id: session.user.id, status: 1 }).select("business_id").lean()
+        : null) ||
+      (session?.user?.id
+        ? await Admin_assign_business.findOne({ user_id: session.user.id, status: 1 }).select("business_id").lean()
+        : null);
+
     const newHeadOffice = new Eq_camp_headoffice({
+      business_id: businessAssignment?.business_id || null,
       phone,
       geo_location,
       other_details,

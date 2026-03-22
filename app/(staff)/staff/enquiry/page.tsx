@@ -208,9 +208,10 @@ export default function EnquiriesPage() {
   };
 
   const visibleEnquiries = pageEnquiries.filter((e) => {
-    if (activeListFilter === "createdByYou") return isCreatedByCurrentUser(e);
-    if (activeListFilter === "assignedForwarded") return !isCreatedByCurrentUser(e);
-    if (activeListFilter === "notApprovedYet") return !e?.is_active;
+    if (activeListFilter === "createdByYou" && !isCreatedByCurrentUser(e)) return false;
+    if (activeListFilter === "assignedForwarded" && isCreatedByCurrentUser(e)) return false;
+    if (activeListFilter === "notApprovedYet" && e?.is_active) return false;
+
     return true;
   });
 
@@ -297,9 +298,9 @@ export default function EnquiriesPage() {
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Search enquiries by UUID..."
-              value={filters.enquiry_uuid}
-              onChange={(e) => updateFilter("enquiry_uuid", e.target.value)}
+              placeholder="Search UUID or camp name, or use status: ..., priority: ..., occupancy: ..., wifi: ..."
+              value={filters.search}
+              onChange={(e) => updateFilter("search", e.target.value)}
               className="w-full rounded-lg border border-slate-700/70 bg-slate-950/40 py-2 pl-9 pr-3 text-sm text-slate-200 placeholder:text-slate-500 focus:border-slate-500 focus:outline-none"
             />
           </div>

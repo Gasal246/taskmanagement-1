@@ -1,4 +1,6 @@
 import { auth } from "@/auth";
+import Admin_assign_business from "@/models/admin_assign_business.model";
+import Business_staffs from "@/models/business_staffs.model";
 import connectDB from "@/lib/mongo";
 import Eq_area from "@/models/eq_area.model";
 import Eq_camp_client_company from "@/models/eq_camp_client_company.model";
@@ -106,6 +108,14 @@ export async function POST(req:NextRequest){
         if(!session) return NextResponse.json({message: "Unauthorized Access", status: 401}, {status: 401});
 
         const body:Body = await req.json();
+        const businessAssignment =
+            (session?.user?.id
+                ? await Business_staffs.findOne({ user_id: session.user.id, status: 1 }).select("business_id").lean()
+                : null) ||
+            (session?.user?.id
+                ? await Admin_assign_business.findOne({ user_id: session.user.id, status: 1 }).select("business_id").lean()
+                : null);
+        const businessId = businessAssignment?.business_id || null;
         const wifiAvailability = body.wifi_available === "Yes"
             ? true
             : body.wifi_available === "No"
@@ -263,6 +273,7 @@ export async function POST(req:NextRequest){
 
             if (!headOfficeId && hasHeadOfficeDetails) {
                 const newHeadOffice = new Eq_camp_headoffice({
+                    business_id: businessId,
                     created_by: session?.user?.id,
                     createdBy: session?.user?.id,
                     phone: headOfficePhone,

@@ -1,5 +1,7 @@
 import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
+import Admin_assign_business from "@/models/admin_assign_business.model";
+import Business_staffs from "@/models/business_staffs.model";
 import Eq_camp_headoffice from "@/models/eq_camp_headoffice.model";
 import mongoose from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
@@ -25,9 +27,29 @@ export async function GET(req: NextRequest) {
     const limit = Number.isFinite(limitParam) && limitParam > 0 ? Math.min(limitParam, 15) : 15;
     const skip = (page - 1) * limit;
 
-    const userObjectId = new mongoose.Types.ObjectId(session.user.id);
+    const businessAssignment =
+      await Business_staffs.findOne({ user_id: session.user.id, status: 1 }).select("business_id").lean() ||
+      await Admin_assign_business.findOne({ user_id: session.user.id, status: 1 }).select("business_id").lean();
+    const businessId = businessAssignment?.business_id;
+
+    if (!businessId) {
+      return NextResponse.json(
+        {
+          head_offices: [],
+          status: 200,
+          pagination: {
+            page,
+            limit,
+            totalRecords: 0,
+            totalPages: 0,
+          },
+        },
+        { status: 200 }
+      );
+    }
+
     const query: any = {
-      $or: [{ created_by: userObjectId }, { createdBy: userObjectId }],
+      business_id: businessId,
     };
 
     if (search) {
