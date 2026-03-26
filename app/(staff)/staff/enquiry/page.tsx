@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
+import Cookies from "js-cookie";
 import {
   Select,
   SelectContent,
@@ -17,6 +18,7 @@ import { DatePicker, Space } from "antd";
 import { ChevronDown, ChevronUp, PanelsTopLeft, Search, SlidersHorizontal } from "lucide-react";
 import LoaderSpin from "@/components/shared/LoaderSpin";
 import { useGetAccessEnquiriesForStaffs, useGetEqAreas, useGetEqCampsByArea, useGetEqCities, useGetEqCountries, useGetEqProvince, useGetEqRegions } from "@/query/enquirymanager/queries";
+import EnquiryUserFilterField from "@/components/enquiries/EnquiryUserFilterField";
 import { Eq_CAPACITY_OPTIONS } from "@/lib/constants";
 
 const { RangePicker } = DatePicker;
@@ -61,6 +63,9 @@ export default function EnquiriesPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [activeListFilter, setActiveListFilter] = useState("all");
   const [page, setPage] = useState(1);
+  const [businessId, setBusinessId] = useState("");
+  const [enquiryBroughtByName, setEnquiryBroughtByName] = useState("");
+  const [createdByName, setCreatedByName] = useState("");
   const limit = 10;
 
   // Filters (linked to API keys)
@@ -83,6 +88,8 @@ export default function EnquiriesPage() {
     lease_expiry: "",
     enquiry_uuid: "",
     search: "",
+    enquiry_brought_by: "",
+    created_by: "",
   });
 
   const normalizedFilters = useMemo(() => ({
@@ -116,6 +123,18 @@ export default function EnquiriesPage() {
 
   useEffect(() => {
     fetchCountries();
+  }, []);
+
+  useEffect(() => {
+    const domainCookie = Cookies.get("user_domain");
+    if (!domainCookie) return;
+
+    try {
+      const parsed = JSON.parse(domainCookie);
+      setBusinessId(parsed?.business_id || "");
+    } catch {
+      setBusinessId("");
+    }
   }, []);
 
   useEffect(() => {
@@ -381,6 +400,36 @@ export default function EnquiriesPage() {
                 options={camps?.camps}
                 onChange={(v) => updateFilter("camp_id", v)}
                 disabled={!filters.area_id}
+              />
+
+              <EnquiryUserFilterField
+                label="Enquiry Brought By"
+                businessId={businessId}
+                selectedUserId={filters.enquiry_brought_by}
+                selectedUserName={enquiryBroughtByName}
+                onSelect={(user) => {
+                  updateFilter("enquiry_brought_by", user.id);
+                  setEnquiryBroughtByName(user.name);
+                }}
+                onClear={() => {
+                  updateFilter("enquiry_brought_by", "");
+                  setEnquiryBroughtByName("");
+                }}
+              />
+
+              <EnquiryUserFilterField
+                label="Enquiry Created By"
+                businessId={businessId}
+                selectedUserId={filters.created_by}
+                selectedUserName={createdByName}
+                onSelect={(user) => {
+                  updateFilter("created_by", user.id);
+                  setCreatedByName(user.name);
+                }}
+                onClear={() => {
+                  updateFilter("created_by", "");
+                  setCreatedByName("");
+                }}
               />
 
               {/* STATUS */}

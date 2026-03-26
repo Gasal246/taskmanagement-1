@@ -19,6 +19,8 @@ export async function GET(req: NextRequest) {
     const city_id = searchParams.get("city_id");
     const area_id = searchParams.get("area_id");
     const camp_id = searchParams.get("camp_id");
+    const enquiry_brought_by = searchParams.get("enquiry_brought_by");
+    const created_by = searchParams.get("created_by");
     const enquiry_uuid = searchParams.get("enquiry_uuid");
     const camp_capacity = searchParams.get("capacity");
     const search = searchParams.get("search");
@@ -33,6 +35,8 @@ export async function GET(req: NextRequest) {
     if (city_id) filter.city_id = city_id;
     if (area_id) filter.area_id = area_id;
     if (camp_id) filter.camp_id = camp_id;
+    if (enquiry_brought_by) filter.enquiry_brought_by = enquiry_brought_by;
+    if (created_by) filter.createdBy = created_by;
 
     // --- Status / Boolean filters ---
     const status = searchParams.get("status");

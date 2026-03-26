@@ -121,6 +121,8 @@ export async function GET(req: NextRequest) {
     const city_id = searchParams.get("city_id");
     const area_id = searchParams.get("area_id");
     const camp_id = searchParams.get("camp_id");
+    const enquiry_brought_by = searchParams.get("enquiry_brought_by");
+    const created_by = searchParams.get("created_by");
     const from_date = searchParams.get("from_date");
     const to_date = searchParams.get("to_date");
     const wifi_available = searchParams.get("wifi_available");
@@ -165,6 +167,8 @@ export async function GET(req: NextRequest) {
     if (city_id) match.city_id = city_id;
     if (area_id) match.area_id = area_id;
     if (camp_id) match.camp_id = camp_id;
+    if (enquiry_brought_by) match.enquiry_brought_by = enquiry_brought_by;
+    if (created_by) match.createdBy = created_by;
     if (wifi_available) match.wifi_available = wifi_available == "true";
     if (competition_status) match.competition_status = competition_status == "true";
     if (enquiry_uuid) match.enquiry_uuid = { $regex: enquiry_uuid, $options: "i" };

@@ -717,6 +717,7 @@ export async function GetEqLatestActionForStaff(enquiry_id: string){
         return res.data;
     }catch(err){
         console.log(err);
+        return (err as any)?.response?.data ?? { status: 500, message: "Failed to fetch latest action" };
     }
 }
 

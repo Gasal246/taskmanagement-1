@@ -1,9 +1,8 @@
 "use client";
 import React, { useMemo, useState } from "react";
-import { motion } from "framer-motion";
-import { Mail, Phone, User, UserCircle2, MapPin, Wifi, Pencil } from "lucide-react";
+import { Mail, Phone, User, UserCircle2, MapPin, Wifi, Pencil, History, Send } from "lucide-react";
 import { Avatar } from "antd";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useGetEnquiryByIdForStaffs, useGetEnquiryComments, useGetEnquiryContacts, useGetEqCampsById } from "@/query/enquirymanager/queries";
 import { formatDateTiny } from "@/lib/utils";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
@@ -15,8 +14,6 @@ import { toast } from "sonner";
 export default function SingleEnquiryPage() {
   const router = useRouter();
   const params = useParams<{ enquiry_id: string }>();
-  const params2 = useSearchParams();
-  const from = params2.get("from");
   const { data: enquiry, isLoading } = useGetEnquiryByIdForStaffs(params.enquiry_id);
   const { data: contactsData } = useGetEnquiryContacts(params.enquiry_id);
   const { data: commentsData, isLoading: isCommentsLoading } = useGetEnquiryComments(params.enquiry_id);
@@ -189,7 +186,7 @@ export default function SingleEnquiryPage() {
                   <Pencil size={14} /> Edit Enquiry
                 </Button>
               )}
-              {enquiry?.canForward && (
+              {enquiry?.hasAssignedAction && (
                 <Button
                   onClick={() => router.replace(`/staff/enquiry/${params.enquiry_id}/view-assigned`)}
                   className="flex items-center gap-1"
@@ -454,18 +451,24 @@ export default function SingleEnquiryPage() {
             <InfoRow label="Last Updated" value={renderDate(enquiry?.enquiry?.updatedAt)} />
           </div>
 
-          <div className="flex items-center gap-3">
-            <motion.div
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.97 }}
-              className="text-xs flex items-center gap-1 cursor-pointer 
-                bg-gradient-to-br from-slate-950/60 to-slate-900/60 
-                p-2.5 px-4 rounded-md border border-slate-700 
-                hover:border-cyan-600 transition"
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              variant="outline"
+              className="gap-2"
               onClick={() => router.replace(`/staff/enquiry/${params.enquiry_id}/history`)}
             >
+              <History size={16} />
               View History
-            </motion.div>
+            </Button>
+            {enquiry?.canForward && (
+              <Button
+                className="gap-2"
+                onClick={() => router.replace(`/staff/enquiry/${params.enquiry_id}/forward-enquiry`)}
+              >
+                <Send size={16} />
+                Forward Enquiry
+              </Button>
+            )}
           </div>
         </div>
       </div>

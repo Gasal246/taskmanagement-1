@@ -38,6 +38,8 @@ export async function POST(req: NextRequest) {
         city_id,
         area_id,
         camp_id,
+        enquiry_brought_by,
+        created_by,
         status,
         next_action,
         wifi_available,
@@ -57,6 +59,8 @@ export async function POST(req: NextRequest) {
       if (city_id) filter.city_id = city_id;
       if (area_id) filter.area_id = area_id;
       if (camp_id) filter.camp_id = camp_id;
+      if (enquiry_brought_by) filter.enquiry_brought_by = enquiry_brought_by;
+      if (created_by) filter.createdBy = created_by;
       if (status && status !== "all") filter.status = status;
       actionFilter = next_action && next_action !== "all" ? next_action : "";
       if (priority) filter.priority = priority;

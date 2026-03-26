@@ -13,6 +13,7 @@ import { DatePicker, Space } from "antd";
 import { ChevronDown, ChevronLeft, ChevronUp, Download, LayoutDashboardIcon, PanelsTopLeft, Plus, Search, SlidersHorizontal } from "lucide-react";
 import LoaderSpin from "@/components/shared/LoaderSpin";
 import { toast } from "sonner";
+import EnquiryUserFilterField from "@/components/enquiries/EnquiryUserFilterField";
 import { GetEnquiriesWithFilters } from "@/query/enquirymanager/function";
 import { useExportEnquiries, useGetEnquiriesWithFilters, useGetEqAreas, useGetEqCampsByArea, useGetEqCities, useGetEqCountries, useGetEqProvince, useGetEqRegions } from "@/query/enquirymanager/queries";
 import { Eq_CAPACITY_OPTIONS } from "@/lib/constants";
@@ -93,6 +94,7 @@ export default function EnquiriesPage() {
   const router = useRouter();
   const dispatch = useDispatch();
   const savedPage = useSelector((state: RootState) => state.application.enquiriesListPage);
+  const { businessData } = useSelector((state: RootState) => state.user);
 
   // Filters (linked to API keys)
   const initialFilters = useMemo(() => ({
@@ -114,8 +116,12 @@ export default function EnquiriesPage() {
     lease_expiry: "",
     enquiry_uuid: "",
     search: "",
+    enquiry_brought_by: "",
+    created_by: "",
   }), []);
   const [filters, setFilters] = useState(initialFilters);
+  const [enquiryBroughtByName, setEnquiryBroughtByName] = useState("");
+  const [createdByName, setCreatedByName] = useState("");
 
   // Cascading dropdown lists
   const [countries, setCountries] = useState([]);
@@ -274,6 +280,8 @@ export default function EnquiriesPage() {
 
   const handleClearFilters = () => {
     setFilters(initialFilters);
+    setEnquiryBroughtByName("");
+    setCreatedByName("");
     setRangeValue(null);
     setLeaseValue(null);
     setPage(1);
@@ -679,6 +687,36 @@ export default function EnquiriesPage() {
                 options={camps?.camps}
                 onChange={(v: any) => updateFilter("camp_id", v)}
                 disabled={!filters.area_id}
+              />
+
+              <EnquiryUserFilterField
+                label="Enquiry Brought By"
+                businessId={businessData?._id || ""}
+                selectedUserId={filters.enquiry_brought_by}
+                selectedUserName={enquiryBroughtByName}
+                onSelect={(user) => {
+                  updateFilter("enquiry_brought_by", user.id);
+                  setEnquiryBroughtByName(user.name);
+                }}
+                onClear={() => {
+                  updateFilter("enquiry_brought_by", "");
+                  setEnquiryBroughtByName("");
+                }}
+              />
+
+              <EnquiryUserFilterField
+                label="Enquiry Created By"
+                businessId={businessData?._id || ""}
+                selectedUserId={filters.created_by}
+                selectedUserName={createdByName}
+                onSelect={(user) => {
+                  updateFilter("created_by", user.id);
+                  setCreatedByName(user.name);
+                }}
+                onClear={() => {
+                  updateFilter("created_by", "");
+                  setCreatedByName("");
+                }}
               />
 
               {/* STATUS */}
