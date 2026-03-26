@@ -61,19 +61,26 @@ export default function EnquiryUserFilterField({
 
   return (
     <div className="w-full lg:w-1/4 p-1">
-      <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg p-2">
+      <div className={`bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg p-2 ${selectedUserId ? "ring-1 ring-cyan-500/40" : ""}`}>
         <div className="mb-1 flex items-center justify-between gap-2">
           <Label className="text-xs text-slate-400 block">{label}</Label>
-          {selectedUserId && (
-            <Button
-              type="button"
-              variant="ghost"
-              className="h-auto px-1 py-0 text-[11px] text-slate-400 hover:text-slate-100"
-              onClick={onClear}
-            >
-              Clear
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {selectedUserId && (
+              <span className="inline-flex items-center rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2 py-1">
+                <span className="size-1.5 rounded-full bg-cyan-300" />
+              </span>
+            )}
+            {selectedUserId && (
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-auto px-1 py-0 text-[11px] text-slate-400 hover:text-slate-100"
+                onClick={onClear}
+              >
+                Clear
+              </Button>
+            )}
+          </div>
         </div>
 
         <Button

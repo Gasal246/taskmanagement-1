@@ -10,7 +10,6 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 
-
 export default function SingleEnquiryPage() {
   const router = useRouter();
   const params = useParams<{ enquiry_id: string }>();

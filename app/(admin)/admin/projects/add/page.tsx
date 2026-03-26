@@ -6,12 +6,13 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { DEPARTMENT_TYPES } from '@/lib/constants';
 import { useAddNewProject, useGetAreasandDeptsForRegion, useGetBusinessClients, useGetBusinessRegions } from '@/query/business/queries';
+import { useGetEnquiryById, useGetEnquiryContacts, useGetEqCampsById } from '@/query/enquirymanager/queries';
 import { RootState } from '@/redux/store';
 import { zodResolver } from '@hookform/resolvers/zod';
 import Cookies from 'js-cookie';
 import { CalendarCheck, CheckCircle2, MapPinned, Sparkles } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import React, { useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useSelector } from 'react-redux';
 import { toast } from 'sonner';
@@ -30,18 +31,175 @@ const formSchema = z.object({
   area_id: z.string().nullable().optional()
 });
 
+const formatSummaryValue = (value: any, fallback = "Not specified") => {
+  if (value === null || value === undefined || value === "") return fallback;
+  const resolved = value?.$numberDecimal ?? value;
+  return String(resolved);
+};
+
+const formatSummaryDate = (value?: string | Date | null, fallback = "Not set") => {
+  if (!value) return fallback;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return fallback;
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+};
+
+const formatSummaryUsers = (users: any) => {
+  if (!users) return "Not specified";
+  const list = Array.isArray(users) ? users : [users];
+  const names = list
+    .map((user) => user?.name || user?.email || user)
+    .filter(Boolean)
+    .map((entry) => String(entry));
+  return names.length ? names.join(", ") : "Not specified";
+};
+
+const formatSummaryContacts = (contacts: any[]) => {
+  if (!Array.isArray(contacts) || contacts.length === 0) return "Not specified";
+
+  return contacts
+    .map((contact) => {
+      const pieces = [
+        contact?.contact_name,
+        contact?.contact_designation,
+        contact?.contact_phone,
+        contact?.contact_email,
+      ].filter(Boolean);
+      return pieces.join(" | ");
+    })
+    .filter(Boolean)
+    .join("\n");
+};
+
+const getTodayInputValue = () => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const buildProjectDescriptionFromEnquiry = ({
+  enquiryPayload,
+  camp,
+  contacts,
+}: {
+  enquiryPayload: any;
+  camp: any;
+  contacts: any[];
+}) => {
+  const enquiry = enquiryPayload?.enquiry;
+  if (!enquiry) return "";
+
+  const wifiAvailability =
+    enquiry?.wifi_available === true
+      ? "Available"
+      : enquiry?.wifi_available === false
+        ? "No WiFi"
+        : "Not specified";
+
+  const wifiDetails =
+    enquiry?.wifi_available === true && enquiry?.wifi_type === "Existing Contractor"
+      ? [
+          `Contractor: ${formatSummaryValue(enquiryPayload?.external_provider?.contractor_name)}`,
+          `Plan / Package: ${formatSummaryValue(enquiryPayload?.external_provider?.contract_package)}`,
+          `Speed: ${formatSummaryValue(enquiryPayload?.external_provider?.contract_speed)}`,
+          `Contract Start: ${formatSummaryDate(enquiryPayload?.external_provider?.contract_start_date)}`,
+          `Contract End: ${formatSummaryDate(enquiryPayload?.external_provider?.contract_end_date)}`,
+          `Pain Points: ${formatSummaryValue(enquiryPayload?.external_provider?.plain_points || enquiryPayload?.external_provider?.pain_points)}`,
+        ]
+      : enquiry?.wifi_available === true && enquiry?.wifi_type === "Personal WiFi"
+        ? [
+            `Personal Plan: ${formatSummaryValue(enquiryPayload?.personal_provider?.personal_plan)}`,
+            `Start Date: ${formatSummaryDate(enquiryPayload?.personal_provider?.personal_start_date)}`,
+            `End Date: ${formatSummaryDate(enquiryPayload?.personal_provider?.personal_end_date)}`,
+            `Monthly Price: ${formatSummaryValue(enquiryPayload?.personal_provider?.personal_monthly_price)}`,
+          ]
+        : enquiry?.wifi_type === "Other Sources"
+          ? [`Setup Details: ${formatSummaryValue(enquiry?.wifi_setup)}`]
+          : enquiry?.wifi_available === false
+            ? [`Expected Monthly Price: ${formatSummaryValue(enquiry?.expected_wifi_cost)}`]
+            : [];
+
+  return [
+    `Converted from enquiry ${formatSummaryValue(enquiry?.enquiry_uuid, "N/A")}`,
+    "",
+    "Camp Overview",
+    `Camp: ${formatSummaryValue(camp?.camp_name || enquiry?.camp_id?.camp_name)}`,
+    `Camp Type: ${formatSummaryValue(camp?.camp_type)}`,
+    `Camp Capacity: ${formatSummaryValue(camp?.camp_capacity)}`,
+    `Camp Occupancy: ${formatSummaryValue(camp?.camp_occupancy)}`,
+    "",
+    "Location",
+    `Country: ${formatSummaryValue(enquiry?.country_id?.country_name)}`,
+    `Region: ${formatSummaryValue(enquiry?.region_id?.region_name)}`,
+    `Province: ${formatSummaryValue(enquiry?.province_id?.province_name)}`,
+    `City: ${formatSummaryValue(enquiry?.city_id?.city_name)}`,
+    `Area: ${formatSummaryValue(enquiry?.area_id?.area_name)}`,
+    `Latitude: ${formatSummaryValue(camp?.latitude || enquiry?.latitude)}`,
+    `Longitude: ${formatSummaryValue(camp?.longitude || enquiry?.longitude)}`,
+    "",
+    "Stakeholders",
+    `Landlord: ${formatSummaryValue(camp?.landlord_id?.landlord_name)}`,
+    `Real Estate: ${formatSummaryValue(camp?.realestate_id?.company_name)}`,
+    `Client Company: ${formatSummaryValue(camp?.client_company_id?.client_company_name)}`,
+    "",
+    "Enquiry Users",
+    `Enquiry Brought By: ${formatSummaryUsers(enquiry?.enquiry_brought_by)}`,
+    `Meeting Initiated By: ${formatSummaryUsers(enquiry?.meeting_initiated_by)}`,
+    `Project Closed By: ${formatSummaryUsers(enquiry?.project_closed_by)}`,
+    `Project Managed By: ${formatSummaryUsers(enquiry?.project_managed_by)}`,
+    `Enquiry User Notes: ${formatSummaryValue(enquiry?.enquiry_user_notes)}`,
+    "",
+    "Contacts",
+    formatSummaryContacts(contacts),
+    "",
+    "Head Office",
+    `Phone: ${formatSummaryValue(enquiryPayload?.head_office?.phone)}`,
+    `Address: ${formatSummaryValue(enquiryPayload?.head_office?.address)}`,
+    `Other Details: ${formatSummaryValue(enquiryPayload?.head_office?.other_details)}`,
+    "",
+    "WiFi / Internet",
+    `Status: ${wifiAvailability}`,
+    `Type: ${formatSummaryValue(enquiry?.wifi_type)}`,
+    ...wifiDetails,
+    "",
+    "Lease & Follow-up",
+    `Lease Expiry: ${formatSummaryDate(enquiry?.lease_expiry_due)}`,
+    `Rent Terms: ${formatSummaryValue(enquiry?.rent_terms)}`,
+    `Competition Presence: ${enquiry?.competition_status === true ? "Yes" : enquiry?.competition_status === false ? "No" : "Not specified"}`,
+    `Competition Notes: ${formatSummaryValue(enquiry?.competition_notes)}`,
+    `Status: ${formatSummaryValue(enquiry?.status, "Lead Received")}`,
+    `Priority: ${enquiry?.priority ? `${enquiry.priority}/10` : "Not set"}`,
+    `Next Action: ${formatSummaryValue(enquiry?.next_action)}`,
+    `Next Action Due: ${formatSummaryDate(enquiry?.next_action_due)}`,
+    `Alert Date: ${formatSummaryDate(enquiry?.alert_date)}`,
+  ].join("\n");
+};
+
 const AddNewProject = () => {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { businessData } = useSelector((state: RootState) => state.user);
   const [businessClients, setBusinessClients] = useState<any[]>([]);
   const [businessRegions, setBusinessRegions] = useState<any[]>([]);
   const [regionAreas, setRegionAreas] = useState<any[]>([]);
   const [role_id, setRole_id] = useState("");
+  const prefillAppliedRef = useRef<string>("");
+  const enquiryId = searchParams.get("enquiry_id") || "";
 
   const { mutateAsync: getBusinessClients, isPending: loadingBusinessClients } = useGetBusinessClients();
   const { mutateAsync: addNewProject, isPending: addingNewProject } = useAddNewProject();
   const { mutateAsync: getRegions, isPending: isRegionLoading } = useGetBusinessRegions();
   const { mutateAsync: getAreasForRegion, isPending: loadingAreas } = useGetAreasandDeptsForRegion();
+  const { data: enquiryPrefill, isLoading: isEnquiryPrefillLoading } = useGetEnquiryById(enquiryId);
+  const baseCampId = enquiryPrefill?.enquiry?.camp_id?._id ?? enquiryPrefill?.enquiry?.camp_id;
+  const { data: enquiryCampPrefill, isLoading: isCampPrefillLoading } = useGetEqCampsById(baseCampId || "");
+  const { data: enquiryContactsPrefill, isLoading: isContactsPrefillLoading } = useGetEnquiryContacts(enquiryId);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -67,6 +225,47 @@ const AddNewProject = () => {
       form.setValue("business_id", businessData._id);
     }
   }, [businessData?._id, form]);
+
+  useEffect(() => {
+    if (!enquiryId) return;
+    if (prefillAppliedRef.current === enquiryId) return;
+    if (isEnquiryPrefillLoading || isContactsPrefillLoading) return;
+    if (baseCampId && isCampPrefillLoading) return;
+    if (!enquiryPrefill?.enquiry) return;
+
+    const camp = enquiryCampPrefill?.camp || enquiryPrefill?.enquiry?.camp_id;
+    const contacts = enquiryContactsPrefill?.contacts ?? enquiryPrefill?.contacts ?? [];
+
+    form.reset({
+      project_name: camp?.camp_name || enquiryPrefill?.enquiry?.camp_id?.camp_name || "",
+      project_description: buildProjectDescriptionFromEnquiry({
+        enquiryPayload: enquiryPrefill,
+        camp,
+        contacts,
+      }),
+      start_date: getTodayInputValue(),
+      end_date: "",
+      type: "sales",
+      client_id: "",
+      business_id: businessData?._id ?? form.getValues("business_id") ?? "",
+      priority: "normal",
+      region_id: "",
+      area_id: "",
+    });
+
+    prefillAppliedRef.current = enquiryId;
+  }, [
+    enquiryId,
+    enquiryPrefill,
+    enquiryCampPrefill,
+    enquiryContactsPrefill,
+    isEnquiryPrefillLoading,
+    isCampPrefillLoading,
+    isContactsPrefillLoading,
+    baseCampId,
+    businessData?._id,
+    form,
+  ]);
 
   const fetchRoleId = () => {
     const cookieData = Cookies.get("user_role");
@@ -134,7 +333,8 @@ const AddNewProject = () => {
       ...data,
       client_id: data?.client_id == "" ? null : data?.client_id,
       area_id: data?.area_id == "" ? null : data?.area_id,
-      role_id
+      role_id,
+      enquiry_id: enquiryId || undefined,
     };
     try {
       const response = await addNewProject(payload);
@@ -196,7 +396,11 @@ const AddNewProject = () => {
           <div>
             <p className="text-xs uppercase tracking-[0.3em] text-cyan-400/70">Create Project</p>
             <h1 className="mt-1 text-lg font-semibold text-slate-100">Create a fresh project.</h1>
-            <p className="mt-1 text-xs text-slate-400">Capture the essentials now, refine teams and tasks later.</p>
+            <p className="mt-1 text-xs text-slate-400">
+              {enquiryId && enquiryPrefill?.enquiry?.enquiry_uuid
+                ? `Prefilled from enquiry ${enquiryPrefill.enquiry.enquiry_uuid}.`
+                : "Capture the essentials now, refine teams and tasks later."}
+            </p>
           </div>
           <div className="flex items-center gap-2 text-[11px] text-slate-300">
             <span className="rounded-full border border-slate-700 px-3 py-1">Step 1 of 3</span>

@@ -14,6 +14,8 @@ interface ApplicationState {
     filteredStaffs: any[] | null;
     staffFilterValues: any;
     enquiriesListPage: number;
+    adminEnquiriesListState: any;
+    staffEnquiriesListState: any;
 };
 
 const initialState: ApplicationState = {
@@ -30,6 +32,8 @@ const initialState: ApplicationState = {
     filteredStaffs: null,
     staffFilterValues: null,
     enquiriesListPage: 1,
+    adminEnquiriesListState: null,
+    staffEnquiriesListState: null,
 };
 
 const applicationSlice = createSlice({
@@ -74,6 +78,12 @@ const applicationSlice = createSlice({
         },
         loadEnquiriesListPage: (state, action: PayloadAction<number>) => {
             state.enquiriesListPage = Math.max(1, Number(action.payload) || 1)
+        },
+        loadAdminEnquiriesListState: (state, action: PayloadAction<any>) => {
+            state.adminEnquiriesListState = action.payload
+        },
+        loadStaffEnquiriesListState: (state, action: PayloadAction<any>) => {
+            state.staffEnquiriesListState = action.payload
         }
     }
 });
@@ -91,6 +101,8 @@ export const {
     loadLocationData,
     loadFilteredStaffs,
     loadStaffFilterValues,
-    loadEnquiriesListPage
+    loadEnquiriesListPage,
+    loadAdminEnquiriesListState,
+    loadStaffEnquiriesListState
 } = applicationSlice.actions
 export default applicationSlice.reducer

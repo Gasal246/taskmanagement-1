@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
+import dayjs from "dayjs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -20,7 +21,7 @@ import { Eq_CAPACITY_OPTIONS } from "@/lib/constants";
 import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 import { useDispatch, useSelector } from "react-redux";
 import { RootState } from "@/redux/store";
-import { loadEnquiriesListPage } from "@/redux/slices/application";
+import { loadAdminEnquiriesListState, loadEnquiriesListPage } from "@/redux/slices/application";
 
 const { RangePicker } = DatePicker;
 
@@ -94,6 +95,7 @@ export default function EnquiriesPage() {
   const router = useRouter();
   const dispatch = useDispatch();
   const savedPage = useSelector((state: RootState) => state.application.enquiriesListPage);
+  const savedListState = useSelector((state: RootState) => state.application.adminEnquiriesListState);
   const { businessData } = useSelector((state: RootState) => state.user);
 
   // Filters (linked to API keys)
@@ -119,22 +121,40 @@ export default function EnquiriesPage() {
     enquiry_brought_by: "",
     created_by: "",
   }), []);
-  const [filters, setFilters] = useState(initialFilters);
-  const [enquiryBroughtByName, setEnquiryBroughtByName] = useState("");
-  const [createdByName, setCreatedByName] = useState("");
+  const restoredFilters = useMemo(
+    () => ({ ...initialFilters, ...(savedListState?.filters ?? {}) }),
+    [initialFilters, savedListState?.filters]
+  );
+  const [filters, setFilters] = useState(restoredFilters);
+  const [enquiryBroughtByName, setEnquiryBroughtByName] = useState(savedListState?.enquiryBroughtByName ?? "");
+  const [createdByName, setCreatedByName] = useState(savedListState?.createdByName ?? "");
 
   // Cascading dropdown lists
   const [countries, setCountries] = useState([]);
-  const [page, setPage] = useState(savedPage || 1);
-  const [showFilters, setShowFilters] = useState(false);
-  const [activeListFilter, setActiveListFilter] = useState<"all" | "waitingApproval">("all");
-  const [rangeValue, setRangeValue] = useState<any>(null);
-  const [leaseValue, setLeaseValue] = useState<any>(null);
+  const [page, setPage] = useState(savedListState?.page || savedPage || 1);
+  const [showFilters, setShowFilters] = useState(Boolean(savedListState?.showFilters));
+  const [activeListFilter, setActiveListFilter] = useState<"all" | "waitingApproval">(savedListState?.activeListFilter === "waitingApproval" ? "waitingApproval" : "all");
+  const [rangeValue, setRangeValue] = useState<any>(
+    restoredFilters.from_date || restoredFilters.due_date
+      ? [
+          restoredFilters.from_date ? dayjs(restoredFilters.from_date) : null,
+          restoredFilters.due_date ? dayjs(restoredFilters.due_date) : null,
+        ]
+      : null
+  );
+  const [leaseValue, setLeaseValue] = useState<any>(
+    restoredFilters.lease_expiry ? dayjs(restoredFilters.lease_expiry) : null
+  );
   const [exportOpen, setExportOpen] = useState(false);
   const [exportSearch, setExportSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [exportScope, setExportScope] = useState<"selected" | "filtered" | null>(null);
   const limit = 10;
+  const countryInitialized = useRef(false);
+  const regionInitialized = useRef(false);
+  const provinceInitialized = useRef(false);
+  const cityInitialized = useRef(false);
+  const areaInitialized = useRef(false);
 
   const normalizedFilters = useMemo(() => ({
     ...filters,
@@ -192,6 +212,17 @@ export default function EnquiriesPage() {
   }, [dispatch, page]);
 
   useEffect(() => {
+    dispatch(loadAdminEnquiriesListState({
+      filters,
+      page,
+      showFilters,
+      activeListFilter,
+      enquiryBroughtByName,
+      createdByName,
+    }));
+  }, [dispatch, filters, page, showFilters, activeListFilter, enquiryBroughtByName, createdByName]);
+
+  useEffect(() => {
     if (!exportOpen) {
       setExportSearch("");
       setSelectedIds([]);
@@ -228,6 +259,10 @@ export default function EnquiriesPage() {
 
   // When country changes
   useEffect(() => {
+    if (!countryInitialized.current) {
+      countryInitialized.current = true;
+      return;
+    }
     // reset children
     updateFilter("region_id", "");
     updateFilter("province_id", "");
@@ -238,6 +273,10 @@ export default function EnquiriesPage() {
 
   // When region changes
   useEffect(() => {
+    if (!regionInitialized.current) {
+      regionInitialized.current = true;
+      return;
+    }
 
     updateFilter("province_id", "");
     updateFilter("city_id", "");
@@ -247,6 +286,10 @@ export default function EnquiriesPage() {
 
   // When province changes
   useEffect(() => {
+    if (!provinceInitialized.current) {
+      provinceInitialized.current = true;
+      return;
+    }
     updateFilter("city_id", "");
     updateFilter("area_id", "");
     updateFilter("camp_id", "");
@@ -254,12 +297,20 @@ export default function EnquiriesPage() {
 
   // When city changes
   useEffect(() => {
+    if (!cityInitialized.current) {
+      cityInitialized.current = true;
+      return;
+    }
     updateFilter("area_id", "");
     updateFilter("camp_id", "");
   }, [filters.city_id]);
 
   // When area changes
   useEffect(() => {
+    if (!areaInitialized.current) {
+      areaInitialized.current = true;
+      return;
+    }
     updateFilter("camp_id", "");
   }, [filters.area_id]);
 
@@ -739,8 +790,15 @@ export default function EnquiriesPage() {
 
               {/* Occupancy */}
               <div className="w-full lg:w-1/4 mt-1">
-                <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg px-2 pb-2">
-                  <Label className="text-xs text-slate-400">Minimum Occupancy</Label>
+                <div className={`bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg px-2 pb-2 ${filters.occupancy ? "ring-1 ring-cyan-500/40" : ""}`}>
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <Label className="text-xs text-slate-400">Minimum Occupancy</Label>
+                    {filters.occupancy && (
+                      <span className="inline-flex items-center rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2 py-1">
+                        <span className="size-1.5 rounded-full bg-cyan-300" />
+                      </span>
+                    )}
+                  </div>
                   <input
                     type="number"
                     value={filters.occupancy}
@@ -795,8 +853,15 @@ export default function EnquiriesPage() {
 
               {/* Dates */}
               <div className="w-full lg:w-1/3 p-1">
-                <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg p-2">
-                  <Label className="text-xs text-slate-400">Within Period</Label>
+                <div className={`bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg p-2 ${(filters.from_date || filters.due_date) ? "ring-1 ring-cyan-500/40" : ""}`}>
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <Label className="text-xs text-slate-400">Within Period</Label>
+                    {(filters.from_date || filters.due_date) && (
+                      <span className="inline-flex items-center rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2 py-1">
+                        <span className="size-1.5 rounded-full bg-cyan-300" />
+                      </span>
+                    )}
+                  </div>
                   <Space direction="vertical" size={12} style={{ width: "100%" }}>
                     <RangePicker className="enquiry-dark-picker" value={rangeValue} onChange={handleRangeChange} style={{ width: "100%" }} />
                   </Space>
@@ -805,8 +870,15 @@ export default function EnquiriesPage() {
 
               {/* Lease Expiry */}
               <div className="w-full lg:w-1/4 p-1">
-                <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg p-2">
-                  <Label className="text-xs text-slate-400">Lease Expiry</Label>
+                <div className={`bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg p-2 ${filters.lease_expiry ? "ring-1 ring-cyan-500/40" : ""}`}>
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <Label className="text-xs text-slate-400">Lease Expiry</Label>
+                    {filters.lease_expiry && (
+                      <span className="inline-flex items-center rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2 py-1">
+                        <span className="size-1.5 rounded-full bg-cyan-300" />
+                      </span>
+                    )}
+                  </div>
                   <Space direction="vertical" size={12} style={{ width: "100%" }}>
                     <DatePicker className="enquiry-dark-picker" value={leaseValue} onChange={handleLeaseChange} style={{ width: "100%" }} />
                   </Space>
@@ -832,9 +904,17 @@ export default function EnquiriesPage() {
 
       {/* ENQUIRY LIST */}
       <div className="bg-slate-900/50 p-4 rounded-xl shadow-sm min-h-[13vh]">
-        <h1 className="font-semibold text-sm text-slate-300 flex items-center gap-2 mb-3">
-          <PanelsTopLeft size={16} /> Enquiry List
-        </h1>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h1 className="font-semibold text-sm text-slate-300 flex items-center gap-2">
+            <PanelsTopLeft size={16} /> Enquiry List
+          </h1>
+          {hasActiveFilters && (
+            <span className="inline-flex items-center gap-2 rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2.5 py-1 text-[11px] font-medium text-cyan-100">
+              <span className="size-2 rounded-full bg-cyan-300" />
+              Filter On
+            </span>
+          )}
+        </div>
 
         {isLoading && (
           <div className="flex justify-center items-center h-24">
@@ -992,13 +1072,22 @@ export default function EnquiriesPage() {
      REUSABLE FILTER SELECT COMPONENT
 ---------------------------------------------------------*/
 function FilterSelect({ label, value, options, onChange, disabled }: any) {
+  const isActive = value !== "" && value !== undefined && value !== null && value !== "all";
   return (
     <div className="w-full lg:w-1/4 p-1">
       <div
         className={`bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg p-2 ${disabled ? "opacity-40 cursor-not-allowed" : ""
+          } ${isActive ? "ring-1 ring-cyan-500/40" : ""
           }`}
       >
-        <Label className="text-xs text-slate-400 mb-1 block">{label}</Label>
+        <div className="mb-1 flex items-center justify-between gap-2">
+          <Label className="text-xs text-slate-400 block">{label}</Label>
+          {isActive && (
+            <span className="inline-flex items-center rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2 py-1">
+              <span className="size-1.5 rounded-full bg-cyan-300" />
+            </span>
+          )}
+        </div>
 
         <Select
           value={value === "" ? undefined : value}
@@ -1030,13 +1119,22 @@ function FilterSelect({ label, value, options, onChange, disabled }: any) {
 }
 
 function FilterCapacity({ label, value, options, onChange, disabled }: any) {
+  const isActive = value !== "" && value !== undefined && value !== null;
   return (
     <div className="w-full lg:w-1/4 p-1">
       <div
         className={`bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg p-2 ${disabled ? "opacity-40 cursor-not-allowed" : ""
+          } ${isActive ? "ring-1 ring-cyan-500/40" : ""
           }`}
       >
-        <Label className="text-xs text-slate-400 mb-1 block">{label}</Label>
+        <div className="mb-1 flex items-center justify-between gap-2">
+          <Label className="text-xs text-slate-400 block">{label}</Label>
+          {isActive && (
+            <span className="inline-flex items-center rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2 py-1">
+              <span className="size-1.5 rounded-full bg-cyan-300" />
+            </span>
+          )}
+        </div>
 
         <Select
           value={value === "" ? undefined : value}

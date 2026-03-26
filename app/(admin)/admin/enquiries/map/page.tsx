@@ -10,10 +10,11 @@ import { useGetEqCountries, useGetEqRegions, useGetEqProvince, useGetEqCampsForM
 import { EarthIcon, LandPlot, MapPinned, RotateCcw } from "lucide-react";
 
 const STATUS_META = [
-  { key: "Visited", label: "Visited", color: "bg-green-700", countKey: "visited" },
-  { key: "To Visit", label: "To Visit", color: "bg-amber-500", countKey: "toVisit" },
-  { key: "Cancelled", label: "Cancelled", color: "bg-blue-600", countKey: "cancelled" },
   { key: "Just Added", label: "Just Added", color: "bg-red-700", countKey: "justAdded" },
+  { key: "To Visit", label: "To Visit", color: "bg-orange-500", countKey: "toVisit" },
+  { key: "Visited", label: "Visited", color: "bg-yellow-400", countKey: "visited" },
+  { key: "Awarded", label: "Awarded", color: "bg-green-600", countKey: "awarded" },
+  { key: "On Hold / Cancelled", label: "On Hold / Cancelled", color: "bg-black", countKey: "cancelled" },
 ] as const;
 
 export default function EnquiriesMapPage() {
@@ -55,6 +56,7 @@ export default function EnquiriesMapPage() {
     total: 0,
     visited: 0,
     toVisit: 0,
+    awarded: 0,
     cancelled: 0,
     justAdded: 0,
   };

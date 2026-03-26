@@ -10,8 +10,16 @@ import "@/models/eq_area.model";
 connectDB();
 
 const normalizeVisitedStatus = (value?: string | null) => {
-    if (value === "Visited" || value === "To Visit" || value === "Cancelled") {
+    if (value === "Visited" || value === "To Visit") {
         return value;
+    }
+
+    if (value === "Awarded" || value === "Project Awarded") {
+        return "Awarded";
+    }
+
+    if (value === "On Hold" || value === "On hold" || value === "Cancelled") {
+        return "On Hold / Cancelled";
     }
 
     return "Just Added";
@@ -78,7 +86,7 @@ export async function GET(req: NextRequest) {
             .filter(Boolean);
 
         const summary = mappedCamps.reduce(
-            (acc: { total: number; visited: number; toVisit: number; cancelled: number; justAdded: number }, camp: any) => {
+            (acc: { total: number; visited: number; toVisit: number; awarded: number; cancelled: number; justAdded: number }, camp: any) => {
                 acc.total += 1;
 
                 switch (camp.visited_status) {
@@ -88,7 +96,10 @@ export async function GET(req: NextRequest) {
                     case "To Visit":
                         acc.toVisit += 1;
                         break;
-                    case "Cancelled":
+                    case "Awarded":
+                        acc.awarded += 1;
+                        break;
+                    case "On Hold / Cancelled":
                         acc.cancelled += 1;
                         break;
                     default:
@@ -98,7 +109,7 @@ export async function GET(req: NextRequest) {
 
                 return acc;
             },
-            { total: 0, visited: 0, toVisit: 0, cancelled: 0, justAdded: 0 }
+            { total: 0, visited: 0, toVisit: 0, awarded: 0, cancelled: 0, justAdded: 0 }
         );
 
         return NextResponse.json(

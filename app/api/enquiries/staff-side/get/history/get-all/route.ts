@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import Eq_enquiry_access from "@/models/eq_enquiry_access.model";
 import Eq_enquiry_histories from "@/models/eq_enquiry_histories";
+import { hydrateChangedFieldNames } from "@/lib/enquiry-history-resolver";
 import { NextRequest, NextResponse } from "next/server";
 
 connectDB();
@@ -35,6 +36,8 @@ export async function GET(req: NextRequest) {
         histories.sort((a: any, b: any) => {
             return b.history_id.step_number - a.history_id.step_number;
         });
+
+        await hydrateChangedFieldNames(histories, (entry) => entry?.history_id);
 
         return NextResponse.json({ histories, status: 200 }, { status: 200 });
     } catch (err) {

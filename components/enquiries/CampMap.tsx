@@ -34,21 +34,25 @@ const DEFAULT_CENTER = { lat: 24.7136, lng: 46.6753 };
 const DEFAULT_ZOOM = 5;
 
 const STATUS_META: Record<string, { color: string; softColor: string }> = {
-  Visited: {
-    color: "#15803d",
-    softColor: "rgba(21, 128, 61, 0.16)",
+  "Just Added": {
+    color: "#b91c1c",
+    softColor: "rgba(185, 28, 28, 0.14)",
   },
   "To Visit": {
     color: "#d97706",
     softColor: "rgba(217, 119, 6, 0.16)",
   },
-  Cancelled: {
-    color: "#2563eb",
-    softColor: "rgba(37, 99, 235, 0.16)",
+  Visited: {
+    color: "#facc15",
+    softColor: "rgba(250, 204, 21, 0.18)",
   },
-  "Just Added": {
-    color: "#b91c1c",
-    softColor: "rgba(185, 28, 28, 0.14)",
+  Awarded: {
+    color: "#16a34a",
+    softColor: "rgba(22, 163, 74, 0.16)",
+  },
+  "On Hold / Cancelled": {
+    color: "#000000",
+    softColor: "rgba(15, 23, 42, 0.22)",
   },
 };
 
@@ -155,16 +159,81 @@ const createInfoWindowContent = (camp: CampMapItem) => {
     wrapper.appendChild(row);
   });
 
+  const actions = document.createElement("div");
+  actions.style.display = "flex";
+  actions.style.gap = "12px";
+  actions.style.marginTop = "12px";
+  actions.style.alignItems = "center";
+  actions.style.flexWrap = "wrap";
+
   const link = document.createElement("a");
   link.href = `/admin/enquiries/camps/${camp._id}`;
   link.textContent = "Open camp";
-  link.style.display = "inline-block";
-  link.style.marginTop = "8px";
+  link.style.display = "inline-flex";
+  link.style.alignItems = "center";
+  link.style.justifyContent = "center";
+  link.style.minHeight = "34px";
+  link.style.padding = "0 12px";
+  link.style.borderRadius = "999px";
+  link.style.background = "#e6fffb";
+  link.style.border = "1px solid #99f6e4";
   link.style.fontSize = "12px";
   link.style.fontWeight = "700";
   link.style.color = "#0f766e";
   link.style.textDecoration = "none";
-  wrapper.appendChild(link);
+  actions.appendChild(link);
+
+  const direction = document.createElement("button");
+  direction.type = "button";
+  direction.textContent = "Direction";
+  direction.style.display = "inline-flex";
+  direction.style.alignItems = "center";
+  direction.style.justifyContent = "center";
+  direction.style.minHeight = "38px";
+  direction.style.padding = "0 16px";
+  direction.style.borderRadius = "999px";
+  direction.style.fontSize = "13px";
+  direction.style.fontWeight = "700";
+  direction.style.color = "#ffffff";
+  direction.style.background = "#2563eb";
+  direction.style.border = "1px solid #1d4ed8";
+  direction.style.boxShadow = "0 8px 18px rgba(37, 99, 235, 0.22)";
+  direction.style.cursor = "pointer";
+  direction.addEventListener("click", () => {
+    const destination = `${camp.latitude},${camp.longitude}`;
+
+    const openDirections = (origin?: string) => {
+      const url = new URL("https://www.google.com/maps/dir/");
+      url.searchParams.set("api", "1");
+      url.searchParams.set("destination", destination);
+      url.searchParams.set("travelmode", "driving");
+      if (origin) {
+        url.searchParams.set("origin", origin);
+      }
+      window.open(url.toString(), "_blank", "noopener,noreferrer");
+    };
+
+    if (!navigator.geolocation) {
+      openDirections();
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        openDirections(`${position.coords.latitude},${position.coords.longitude}`);
+      },
+      () => {
+        openDirections();
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+      }
+    );
+  });
+  actions.appendChild(direction);
+
+  wrapper.appendChild(actions);
 
   return wrapper;
 };

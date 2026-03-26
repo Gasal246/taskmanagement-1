@@ -14,6 +14,7 @@ import Region_dep_staffs from "@/models/region_dep_staffs.model";
 import Area_dep_staffs from "@/models/area_dep_staffs.model";
 import Location_dep_staffs from "@/models/location_dep_staffs.model";
 import Business_regions from "@/models/business_regions.model";
+import Eq_enquiry from "@/models/eq_enquiries.model";
 
 connectDB();
 
@@ -32,8 +33,20 @@ interface Body {
     region_id:string | null,
     area_id: string | null,
     role_id: string,
-    dept_id: string | null
+    dept_id: string | null,
+    enquiry_id?: string | null
 }
+
+const updateLinkedEnquiryIfNeeded = async (enquiry_id?: string | null) => {
+    if(!enquiry_id) return;
+
+    await Eq_enquiry.findByIdAndUpdate(enquiry_id, {
+        $set: {
+            status: "Project Awarded",
+            is_converted: true
+        }
+    });
+};
 
 export async function POST(req: NextRequest){
     try{
@@ -265,6 +278,8 @@ export async function POST(req: NextRequest){
                     return new NextResponse("You are not authorized to create projects", { status: 403 });
             }
         }
+        await updateLinkedEnquiryIfNeeded(body?.enquiry_id);
+
         return NextResponse.json({ message: "Project created successfully", status:201}, { status: 201 });
     } catch(err: any){
         console.log("Error while adding a new project: ", err);

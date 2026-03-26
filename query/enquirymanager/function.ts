@@ -322,7 +322,7 @@ export async function GetEqCampsForMap(queryParams:any){
         return res.data;
     }catch(err){
         console.log(err);
-        return { camps: [], summary: { total: 0, visited: 0, toVisit: 0, cancelled: 0, justAdded: 0 }, status: 500 };
+        return { camps: [], summary: { total: 0, visited: 0, toVisit: 0, awarded: 0, cancelled: 0, justAdded: 0 }, status: 500 };
     }
 }
 

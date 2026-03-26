@@ -1,7 +1,6 @@
 import connectDB from "@/lib/mongo";
 import Eq_camps from "@/models/eq_camps.model";
 import Eq_enquiry from "@/models/eq_enquiries.model";
-import Eq_enquiry_histories from "@/models/eq_enquiry_histories";
 import { NextRequest, NextResponse } from "next/server";
 
 connectDB();
@@ -24,6 +23,7 @@ export async function GET(req: NextRequest) {
     const enquiry_uuid = searchParams.get("enquiry_uuid");
     const camp_capacity = searchParams.get("capacity");
     const search = searchParams.get("search");
+    const occupancy = searchParams.get("occupancy");
     const page = Number(searchParams.get("page")) || 1;
     const limit = Number(searchParams.get("limit")) || 10;
 
@@ -69,110 +69,112 @@ export async function GET(req: NextRequest) {
 
     if (enquiry_uuid) filter.enquiry_uuid = { $regex: enquiry_uuid, $options: "i" };
 
-    if (search) {
-      const searchRegex = new RegExp(search, "i");
-      const campsForSearch = await Eq_camps.find({ camp_name: searchRegex }).select("_id").lean();
-      const campIdsForSearch = campsForSearch.map((camp) => camp._id);
-      filter.$or = [
-        { enquiry_uuid: { $regex: searchRegex } },
-        ...(campIdsForSearch.length ? [{ camp_id: { $in: campIdsForSearch } }] : []),
-      ];
+    const pipeline: any[] = [
+      { $match: filter },
+      {
+        $lookup: {
+          from: Eq_camps.collection.name,
+          localField: "camp_id",
+          foreignField: "_id",
+          as: "campDetails",
+        },
+      },
+      {
+        $unwind: {
+          path: "$campDetails",
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+    ];
+
+    if (camp_capacity) {
+      pipeline.push({ $match: { "campDetails.camp_capacity": camp_capacity } });
     }
 
-    // --- NEW: Occupancy Filter (From Camps Schema) ---
-    const occupancy = searchParams.get("occupancy");
-
-
-
-    let campIds : any[] = [];
-
-    if(camp_capacity){
-      const camps = await Eq_camps.find({camp_capacity: camp_capacity}).select("_id").lean();
-      campIds = camps.map((c)=> c._id);
-      if(campIds.length == 0){
-        return NextResponse.json({ status: 200, data: [], pagination: {page, limit, totalRecords: 0, totalPages:0}}, {status: 200})
-      }
-      filter.camp_id = {$in: campIds};
-    };
-
-    // Take latest docs (cap at latest 200)
-    const maxRecords = 200;
-
-    const latestIds = await Eq_enquiry.find(filter)
-      .sort({ createdAt: -1 })
-      .limit(maxRecords)
-      .select("_id")
-      .lean();
-    let latestIdList = latestIds.map((entry) => entry._id);
-    if (latestIdList.length === 0) {
-      return NextResponse.json(
-        { status: 200, data: [], pagination: { page, limit, totalRecords: 0, totalPages: 0 } },
-        { status: 200 }
-      );
-    }
-
-    if (actionFilter) {
-      const latestActions = await Eq_enquiry_histories.aggregate([
-        { $match: { enquiry_id: { $in: latestIdList } } },
-        { $sort: { createdAt: -1 } },
-        { $group: { _id: "$enquiry_id", action: { $first: "$action" } } },
-        { $match: { action: actionFilter } },
-      ]);
-      const allowedIds = new Set(latestActions.map((entry) => String(entry._id)));
-      latestIdList = latestIdList.filter((entry) => allowedIds.has(String(entry)));
-    }
-
-    if (latestIdList.length === 0) {
-      return NextResponse.json(
-        { status: 200, data: [], pagination: { page, limit, totalRecords: 0, totalPages: 0 } },
-        { status: 200 }
-      );
-    }
-
-    // First fetch enquiries + populate camp
-    let enquiries = await Eq_enquiry.find({ _id: { $in: latestIdList } })
-      .populate({
-        path: "camp_id",
-        model: Eq_camps,
-      })
-      .sort({ createdAt: -1 })
-      .lean();
-
-    // Apply occupancy filter AFTER populate
     if (occupancy) {
-      enquiries = enquiries.filter(e => {
-        return e.camp_id && e.camp_id.camp_occupancy >= Number(occupancy);
+      pipeline.push({ $match: { "campDetails.camp_occupancy": { $gte: Number(occupancy) } } });
+    }
+
+    if (search) {
+      pipeline.push({
+        $match: {
+          $or: [
+            { enquiry_uuid: { $regex: search, $options: "i" } },
+            { "campDetails.camp_name": { $regex: search, $options: "i" } },
+          ],
+        },
       });
     }
 
-    if (hasPriorityFilter) {
-      enquiries = enquiries
-        .filter((e: any) => {
-          const priorityNumber = Number(e?.priority);
-          return Number.isFinite(priorityNumber) && priorityNumber >= selectedPriority;
-        })
-        .sort((a: any, b: any) => {
-          const priorityA = Number(a?.priority);
-          const priorityB = Number(b?.priority);
-          if (priorityA !== priorityB) return priorityA - priorityB;
-          return new Date(b?.createdAt).getTime() - new Date(a?.createdAt).getTime();
-        });
-    }
-
-    const totalRecords = enquiries.length;
-
-    if (skip >= totalRecords) {
-      return NextResponse.json(
-        { status: 200, data: [], pagination: { page, limit, totalRecords, totalPages: Math.ceil(totalRecords / limit) } },
-        { status: 200 }
+    if (actionFilter) {
+      pipeline.push(
+        {
+          $lookup: {
+            from: "eq_enquiry_histories",
+            let: { enquiryId: "$_id" },
+            pipeline: [
+              { $match: { $expr: { $eq: ["$enquiry_id", "$$enquiryId"] } } },
+              { $sort: { createdAt: -1 } },
+              { $limit: 1 },
+              { $project: { action: 1 } },
+            ],
+            as: "latestHistory",
+          },
+        },
+        {
+          $unwind: {
+            path: "$latestHistory",
+            preserveNullAndEmptyArrays: false,
+          },
+        },
+        { $match: { "latestHistory.action": actionFilter } }
       );
     }
 
-    const paginatedEnquiries = enquiries.slice(skip, skip + limit);
-    console.log("filter: ", filter);  
+    if (hasPriorityFilter) {
+      pipeline.push(
+        {
+          $addFields: {
+            priorityNumber: {
+              $convert: {
+                input: "$priority",
+                to: "int",
+                onError: null,
+                onNull: null,
+              },
+            },
+          },
+        },
+        { $match: { priorityNumber: { $gte: selectedPriority } } }
+      );
+    }
+
+    pipeline.push(
+      { $addFields: { camp_id: "$campDetails" } },
+      { $project: { campDetails: 0, latestHistory: 0 } }
+    );
+
+    pipeline.push(
+      hasPriorityFilter
+        ? { $sort: { priorityNumber: 1, createdAt: -1 } }
+        : { $sort: { createdAt: -1 } }
+    );
+
+    pipeline.push({
+      $facet: {
+        metadata: [{ $count: "totalRecords" }],
+        data: [{ $skip: skip }, { $limit: limit }],
+      },
+    });
+
+    const result = await Eq_enquiry.aggregate(pipeline);
+    const metadata = result?.[0]?.metadata?.[0];
+    const totalRecords = metadata?.totalRecords ?? 0;
+    const totalPages = totalRecords > 0 ? Math.ceil(totalRecords / limit) : 0;
+    const data = result?.[0]?.data ?? [];
 
     return NextResponse.json(
-      { status: 200, data: paginatedEnquiries, pagination: {page, limit, totalRecords, totalPages: Math.ceil(totalRecords / limit)}},
+      { status: 200, data, pagination: { page, limit, totalRecords, totalPages } },
       { status: 200 }
     );
   } catch (err) {

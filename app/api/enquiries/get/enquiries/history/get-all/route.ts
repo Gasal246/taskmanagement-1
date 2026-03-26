@@ -1,5 +1,6 @@
 import connectDB from "@/lib/mongo";
 import Eq_enquiry_histories from "@/models/eq_enquiry_histories";
+import { hydrateChangedFieldNames } from "@/lib/enquiry-history-resolver";
 import { NextRequest, NextResponse } from "next/server";
 
 connectDB();
@@ -24,6 +25,8 @@ export async function GET(req:NextRequest){
                 select: "name email avatar_url"
             }
         ]).lean();
+
+        await hydrateChangedFieldNames(histories, (entry) => entry);
 
         return NextResponse.json({histories, status: 200}, {status: 200});
     }catch(err){
