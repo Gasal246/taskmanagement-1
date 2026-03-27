@@ -101,9 +101,9 @@ export default function EnquiriesPage() {
   const [rangeValue, setRangeValue] = useState<any>(
     restoredFilters.from_date || restoredFilters.due_date
       ? [
-          restoredFilters.from_date ? dayjs(restoredFilters.from_date) : null,
-          restoredFilters.due_date ? dayjs(restoredFilters.due_date) : null,
-        ]
+        restoredFilters.from_date ? dayjs(restoredFilters.from_date) : null,
+        restoredFilters.due_date ? dayjs(restoredFilters.due_date) : null,
+      ]
       : null
   );
   const [leaseValue, setLeaseValue] = useState<any>(
@@ -646,8 +646,8 @@ export default function EnquiriesPage() {
                 type="button"
                 onClick={() => setActiveListFilter(badge.key)}
                 className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs transition ${isActive
-                    ? "border-cyan-400/40 bg-gradient-to-r from-cyan-900/40 via-slate-900 to-emerald-900/30 text-white shadow-sm"
-                    : "border-slate-700/80 bg-gradient-to-r from-slate-900/80 to-slate-950/80 text-slate-300 hover:border-slate-600"
+                  ? "border-cyan-400/40 bg-gradient-to-r from-cyan-900/40 via-slate-900 to-emerald-900/30 text-white shadow-sm"
+                  : "border-slate-700/80 bg-gradient-to-r from-slate-900/80 to-slate-950/80 text-slate-300 hover:border-slate-600"
                   }`}
               >
                 <span className="font-medium">{badge.label}</span>
@@ -689,7 +689,7 @@ export default function EnquiriesPage() {
                 <div className="absolute top-3 left-3 text-xs font-bold text-slate-400 p-1">
                   {String(enquiryNumber).padStart(2, "0")} )
                 </div>
-                <h2 className="text-md font-medium text-slate-200 truncate ml-8">
+                <h2 className="text-md font-medium text-slate-200 truncate ml-8 uppercase">
                   Camp: {e.camp_id?.camp_name ?? "N/A"}
                 </h2>
                 <div className="mt-1 text-xs text-slate-400 flex flex-wrap gap-2">

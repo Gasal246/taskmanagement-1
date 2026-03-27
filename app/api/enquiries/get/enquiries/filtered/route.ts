@@ -2,6 +2,7 @@ import connectDB from "@/lib/mongo";
 import Eq_camps from "@/models/eq_camps.model";
 import Eq_enquiry from "@/models/eq_enquiries.model";
 import { NextRequest, NextResponse } from "next/server";
+import mongoose from "mongoose";
 
 connectDB();
 
@@ -29,14 +30,14 @@ export async function GET(req: NextRequest) {
 
     const skip = (page - 1) * limit;
 
-    if (country_id) filter.country_id = country_id;
-    if (region_id) filter.region_id = region_id;
-    if (province_id) filter.province_id = province_id;
-    if (city_id) filter.city_id = city_id;
-    if (area_id) filter.area_id = area_id;
-    if (camp_id) filter.camp_id = camp_id;
-    if (enquiry_brought_by) filter.enquiry_brought_by = enquiry_brought_by;
-    if (created_by) filter.createdBy = created_by;
+    if (country_id && mongoose.Types.ObjectId.isValid(country_id)) filter.country_id = new mongoose.Types.ObjectId(country_id);
+    if (region_id && mongoose.Types.ObjectId.isValid(region_id)) filter.region_id = new mongoose.Types.ObjectId(region_id);
+    if (province_id && mongoose.Types.ObjectId.isValid(province_id)) filter.province_id = new mongoose.Types.ObjectId(province_id);
+    if (city_id && mongoose.Types.ObjectId.isValid(city_id)) filter.city_id = new mongoose.Types.ObjectId(city_id);
+    if (area_id && mongoose.Types.ObjectId.isValid(area_id)) filter.area_id = new mongoose.Types.ObjectId(area_id);
+    if (camp_id && mongoose.Types.ObjectId.isValid(camp_id)) filter.camp_id = new mongoose.Types.ObjectId(camp_id);
+    if (enquiry_brought_by && mongoose.Types.ObjectId.isValid(enquiry_brought_by)) filter.enquiry_brought_by = new mongoose.Types.ObjectId(enquiry_brought_by);
+    if (created_by && mongoose.Types.ObjectId.isValid(created_by)) filter.createdBy = new mongoose.Types.ObjectId(created_by);
 
     // --- Status / Boolean filters ---
     const status = searchParams.get("status");
