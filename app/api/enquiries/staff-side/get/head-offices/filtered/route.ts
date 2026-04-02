@@ -27,9 +27,13 @@ export async function GET(req: NextRequest) {
     const limit = Number.isFinite(limitParam) && limitParam > 0 ? Math.min(limitParam, 15) : 15;
     const skip = (page - 1) * limit;
 
-    const businessAssignment =
-      await Business_staffs.findOne({ user_id: session.user.id, status: 1 }).select("business_id").lean() ||
-      await Admin_assign_business.findOne({ user_id: session.user.id, status: 1 }).select("business_id").lean();
+    const businessAssignment: { business_id?: string | null } | null =
+      (await Business_staffs.findOne({ user_id: session.user.id, status: 1 })
+        .select("business_id")
+        .lean<{ business_id?: string | null }>()) ||
+      (await Admin_assign_business.findOne({ user_id: session.user.id, status: 1 })
+        .select("business_id")
+        .lean<{ business_id?: string | null }>());
     const businessId = businessAssignment?.business_id;
 
     if (!businessId) {

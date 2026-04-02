@@ -29,7 +29,7 @@ function normalizeData(
 }
 
 function isTokenInvalid(error: any): boolean {
-  const code = error?.code || error?.errorInfo?.code || "";
+  const code = error?.code || "";
   return (
     code === "messaging/registration-token-not-registered" ||
     code === "messaging/invalid-registration-token"

@@ -47,22 +47,24 @@ export async function GET(req: NextRequest) {
         const limit = Math.min(50, Math.max(1, Number(limitRaw) || 10));
         const skip = (page - 1) * limit;
 
-        let roleId = role_id_param;
+        let roleId: string | null = role_id_param;
         if (!roleId) {
             const roleCookie = req.cookies.get("user_role")?.value;
             if (roleCookie) {
                 try {
                     roleId = JSON.parse(roleCookie)?._id;
                 } catch {
-                    roleId = undefined;
+                    roleId = null;
                 }
             }
         }
 
         let roleName: string | undefined;
         if (roleId) {
-            const role = await Roles.findById(roleId).select("role_name").lean();
-            roleName = role?.role_name as string | undefined;
+            const role: { role_name?: string } | null = await Roles.findById(roleId)
+                .select("role_name")
+                .lean<{ role_name?: string }>();
+            roleName = role?.role_name;
         }
 
         if (!roleName) {

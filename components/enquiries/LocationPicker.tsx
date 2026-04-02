@@ -44,7 +44,7 @@ export default function LocationPicker({
         Get Current Location
       </Button>
 
-      {showValues && value?.lat !== null && value?.lng !== null && (
+      {showValues && value && value.lat !== null && value.lng !== null && (
         <div className="text-sm text-slate-300">
           <p>Latitude: {value.lat}</p>
           <p>Longitude: {value.lng}</p>

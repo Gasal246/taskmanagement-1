@@ -29,12 +29,16 @@ export async function POST(req: NextRequest) {
     const geo_location = body.geo_location?.trim() || "";
     const other_details = body.other_details?.trim() || "";
     const address = body.address?.trim() || "";
-    const businessAssignment =
+    const businessAssignment: { business_id?: string | null } | null =
       (session?.user?.id
-        ? await Business_staffs.findOne({ user_id: session.user.id, status: 1 }).select("business_id").lean()
+        ? await Business_staffs.findOne({ user_id: session.user.id, status: 1 })
+            .select("business_id")
+            .lean<{ business_id?: string | null }>()
         : null) ||
       (session?.user?.id
-        ? await Admin_assign_business.findOne({ user_id: session.user.id, status: 1 }).select("business_id").lean()
+        ? await Admin_assign_business.findOne({ user_id: session.user.id, status: 1 })
+            .select("business_id")
+            .lean<{ business_id?: string | null }>()
         : null);
 
     const hasDetails = Boolean(phone || geo_location || other_details || address);

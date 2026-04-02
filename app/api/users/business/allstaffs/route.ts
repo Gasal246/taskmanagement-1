@@ -31,7 +31,7 @@ export async function GET (req: NextRequest) {
             }
             return result;
         };
-        const toUserIdSet = (docs: Array<{ user_id?: any }>) => {
+        const toUserIdSet = (docs: Array<any>) => {
             return new Set(
                 docs
                     .map((doc) => doc?.user_id?.toString())

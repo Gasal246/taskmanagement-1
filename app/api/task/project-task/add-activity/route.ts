@@ -27,9 +27,17 @@ export async function POST(req: NextRequest) {
         const body: Body = await req.json();
         if (!body.task_id) return NextResponse.json({ message: "Please provide task_id" }, { status: 400 });
 
-        const task = await Business_Tasks.findById(body.task_id)
+        const task: {
+            assigned_to?: string | null,
+            is_project_task?: boolean,
+            project_id?: string | null,
+        } | null = await Business_Tasks.findById(body.task_id)
             .select("assigned_to is_project_task project_id")
-            .lean();
+            .lean<{
+                assigned_to?: string | null,
+                is_project_task?: boolean,
+                project_id?: string | null,
+            }>();
         if (!task) {
             return NextResponse.json({ message: "Task not found" }, { status: 404 });
         }

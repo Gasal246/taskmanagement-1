@@ -35,12 +35,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const businessAssignment =
+    const businessAssignment: { business_id?: string | null } | null =
       (session?.user?.id
-        ? await Business_staffs.findOne({ user_id: session.user.id, status: 1 }).select("business_id").lean()
+        ? await Business_staffs.findOne({ user_id: session.user.id, status: 1 })
+            .select("business_id")
+            .lean<{ business_id?: string | null }>()
         : null) ||
       (session?.user?.id
-        ? await Admin_assign_business.findOne({ user_id: session.user.id, status: 1 }).select("business_id").lean()
+        ? await Admin_assign_business.findOne({ user_id: session.user.id, status: 1 })
+            .select("business_id")
+            .lean<{ business_id?: string | null }>()
         : null);
 
     const newHeadOffice = new Eq_camp_headoffice({

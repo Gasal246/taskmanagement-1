@@ -106,7 +106,7 @@ export const useRemoveEqCountry = () => {
 export const useGetEqRegions = (country_id?: string) => {
     return useQuery({
         queryKey: ["regions", country_id],
-        queryFn: () => GetEqRegionsByCountry(country_id),
+        queryFn: () => GetEqRegionsByCountry(country_id!),
         enabled: !!country_id,
     })
 }
@@ -153,7 +153,7 @@ export const useRemoveEqRegion = () => {
 export const useGetEqProvince = (region_id?: string) => {
     return useQuery({
         queryKey: ["provinces", region_id],
-        queryFn: () => GetEqProvincesByRegion(region_id),
+        queryFn: () => GetEqProvincesByRegion(region_id!),
         enabled: !!region_id
     })
 }
@@ -200,7 +200,7 @@ export const useRemoveEqProvince = () => {
 export const useGetEqCities = (province_id?: string) => {
     return useQuery({
         queryKey: ["cities", province_id],
-        queryFn: () => GetEqCitiesByProvince(province_id),
+        queryFn: () => GetEqCitiesByProvince(province_id!),
         enabled: !!province_id
     })
 }
@@ -323,7 +323,7 @@ export const useRemoveEqCity = () => {
 export const useGetEqAreas = (city_id?: string) => {
     return useQuery({
         queryKey: ["areas", city_id],
-        queryFn: () => GetEqAreasByCity(city_id),
+        queryFn: () => GetEqAreasByCity(city_id!),
         enabled: !!city_id
     })
 }
@@ -332,7 +332,7 @@ export const useGetEqAreas = (city_id?: string) => {
 export const useGetEqCampsByArea = (area_id?: string) => {
     return useQuery({
         queryKey: ["camps", area_id],
-        queryFn: () => GetEqCampsByArea(area_id),
+        queryFn: () => GetEqCampsByArea(area_id!),
         enabled: !!area_id
     })
 }

@@ -387,7 +387,7 @@ const NotificationPane = ({ trigger }: { trigger: React.ReactNode }) => {
               </SheetDescription>
             </div>
             {unreadCount > 0 && (
-              <Button variant="secondary" size="sm" onClick={markAllRead}>
+              <Button variant="secondary" size="sm" onClick={() => void markAllRead()}>
                 Mark all read
               </Button>
             )}

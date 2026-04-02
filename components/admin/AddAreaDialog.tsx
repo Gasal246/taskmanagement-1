@@ -3,12 +3,12 @@ import React, { useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, } from "@/components/ui/dialog"
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
-import { useAddNewArea } from '@/query/client/adminQueries'
+import { useAddRegionArea } from '@/query/business/queries'
 import { toast } from 'sonner'
 
 const AddAreaDialog = ({ trigger, regionId }: { trigger: React.ReactNode, regionId: string }) => {
     const [input, setInput] = useState('');
-    const { mutateAsync: addNewArea, isPending: addingNewArea } = useAddNewArea();
+    const { mutateAsync: addNewArea, isPending: addingNewArea } = useAddRegionArea();
     const handleSubmit = async () => {
         const response = await addNewArea({ name: input, regionId: regionId });
         if(response?.existing){

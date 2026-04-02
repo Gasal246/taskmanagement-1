@@ -155,7 +155,7 @@ export async function POST(req:NextRequest){
                     });
                     const invalidTokens = response.responses
                         .map((res, index) => {
-                            const code = res.error?.code || res.error?.errorInfo?.code || "";
+                            const code = res.error?.code || "";
                             if (
                                 code === "messaging/registration-token-not-registered" ||
                                 code === "messaging/invalid-registration-token"

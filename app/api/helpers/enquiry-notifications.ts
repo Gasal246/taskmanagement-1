@@ -56,9 +56,9 @@ export async function notifyEnquiryForward({
   const recipients = Array.from(new Set(recipientIds.filter(Boolean)));
   if (recipients.length === 0) return;
 
-  const enquiry = await Eq_enquiry.findById(enquiryId)
+  const enquiry: { enquiry_uuid?: string } | null = await Eq_enquiry.findById(enquiryId)
     .select("enquiry_uuid")
-    .lean();
+    .lean<{ enquiry_uuid?: string }>();
   const enquiryUuid = enquiry?.enquiry_uuid || "";
 
   const { role, domain, byLine } = resolveRoleDomain(req);
@@ -133,7 +133,7 @@ export async function notifyEnquiryForward({
     });
     const invalidTokens = response.responses
       .map((res, index) => {
-        const code = res.error?.code || res.error?.errorInfo?.code || "";
+        const code = res.error?.code || "";
         if (
           code === "messaging/registration-token-not-registered" ||
           code === "messaging/invalid-registration-token"

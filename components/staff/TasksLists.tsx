@@ -24,7 +24,7 @@ const TasksLists = ({ currentUser, tasktype }: { currentUser: any, tasktype: Tas
 
     return (
         <div className="flex flex-wrap">
-            {allTasks?.length <= 0 && <h1 className='text-xs text-slate-500'>no {tasktype} tasks.</h1>}
+            {(allTasks?.length ?? 0) <= 0 && <h1 className='text-xs text-slate-500'>no {tasktype} tasks.</h1>}
             {loadingTasks && <>
                 <div className="w-full lg:w-4/12 p-1"><Skeleton className='w-full h-[180px] rounded-lg' /> </div>
                 <div className="w-full lg:w-4/12 p-1"><Skeleton className='w-full h-[180px] rounded-lg' /> </div>

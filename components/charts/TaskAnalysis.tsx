@@ -34,6 +34,9 @@ const chartConfig = {
 
 const TaskAnalysis = ({ currentUser }: { currentUser: any }) => {
       const { data: chartData, isLoading: loading} = useGetTaskAnalyticsPi(currentUser?._id)
+      const totalTasks = Array.isArray(chartData)
+        ? chartData.reduce((sum, item: any) => sum + (typeof item?.count === "number" ? item.count : 0), 0)
+        : 0;
       return (
         <Card className="flex flex-col border-0 rounded-lg bg-slate-950/70">
           <CardHeader className="items-start pb-0">
@@ -65,7 +68,7 @@ const TaskAnalysis = ({ currentUser }: { currentUser: any }) => {
                               x={viewBox.cx}
                               y={viewBox.cy}
                               className="fill-foreground text-3xl font-bold"
-                            >{chartData[4]}</tspan>
+                            >{totalTasks}</tspan>
                             <tspan x={viewBox.cx} y={(viewBox.cy || 0) + 24} className="fill-muted-foreground"> Tasks </tspan>
                           </text>
                         )

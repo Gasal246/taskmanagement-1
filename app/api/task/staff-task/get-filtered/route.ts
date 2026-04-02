@@ -42,9 +42,9 @@ export async function GET(req: NextRequest) {
     // 📅 Date Filter
     if (hasValidStart || hasValidEnd) {
       query.start_date = {};
-      if (hasValidStart)
+      if (hasValidStart && startDate)
         query.start_date.$gte = new Date(startDate);
-      if (hasValidEnd)
+      if (hasValidEnd && endDate)
         query.start_date.$lte = new Date(endDate);
     }
 

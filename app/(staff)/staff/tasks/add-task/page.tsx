@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Breadcrumb,
@@ -187,13 +187,13 @@ const AddTask = () => {
     }
   }, [selectedStartDate, form]);
 
-  const fetchDepartmentMeta = async (departmentId: string) => {
+  const fetchDepartmentMeta = useCallback(async (departmentId: string) => {
     const response = await fetch(`/api/department/get-meta?department_id=${departmentId}`);
     const data = await response.json();
     return data?.data;
-  };
+  }, []);
 
-  const loadMyStaffs = async () => {
+  const loadMyStaffs = useCallback(async () => {
     if (!roleId || !roleName || !domainData) return;
     const domainId = resolveDomainId(roleName, domainData);
     if (!domainId) return;
@@ -203,9 +203,9 @@ const AddTask = () => {
     } else {
       setStaffOptions([]);
     }
-  };
+  }, [GetStaffs, domainData, roleId, roleName]);
 
-  const loadDepartmentTree = async () => {
+  const loadDepartmentTree = useCallback(async () => {
     if (!roleName || !domainData) return;
     setLoadingDepartments(true);
 
@@ -300,7 +300,14 @@ const AddTask = () => {
 
     setDepartmentTree(null);
     setLoadingDepartments(false);
-  };
+  }, [
+    domainData,
+    fetchDepartmentMeta,
+    getAreasAndDeptsForRegion,
+    getDeptsForLocation,
+    getLocationsAndDeptsForArea,
+    roleName,
+  ]);
 
   useEffect(() => {
     if (!roleName || !domainData || !roleId) return;
@@ -317,7 +324,7 @@ const AddTask = () => {
     } else {
       loadDepartmentTree();
     }
-  }, [assignScope, roleName, roleId, domainData]);
+  }, [assignScope, domainData, form, loadDepartmentTree, loadMyStaffs, roleId, roleName]);
 
   useEffect(() => {
     if (step !== 2 || !businessId) return;

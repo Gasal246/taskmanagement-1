@@ -74,9 +74,21 @@ export async function notifyTaskActivityChange({
   actorId: string;
   actorName: string;
 }) {
-  const task = await Business_Tasks.findById(taskId)
+  const task: {
+    task_name?: string;
+    is_project_task?: boolean;
+    assigned_to?: string | null;
+    assigned_teams?: string | null;
+    creator?: string | null;
+  } | null = await Business_Tasks.findById(taskId)
     .select("task_name is_project_task assigned_to assigned_teams creator")
-    .lean();
+    .lean<{
+      task_name?: string;
+      is_project_task?: boolean;
+      assigned_to?: string | null;
+      assigned_teams?: string | null;
+      creator?: string | null;
+    }>();
   if (!task) return;
 
   const recipients = new Set<string>();
@@ -97,9 +109,9 @@ export async function notifyTaskActivityChange({
   });
 
   if (task.is_project_task && task.assigned_teams) {
-    const team = await Project_Teams.findById(task.assigned_teams)
+    const team: { team_head?: string | null } | null = await Project_Teams.findById(task.assigned_teams)
       .select("team_head")
-      .lean();
+      .lean<{ team_head?: string | null }>();
     if (team?.team_head) recipients.add(String(team.team_head));
 
     const teamMembers = await Project_Team_Members.find({
@@ -184,7 +196,7 @@ export async function notifyTaskActivityChange({
     });
     const invalidTokens = response.responses
       .map((res, index) => {
-        const code = res.error?.code || res.error?.errorInfo?.code || "";
+        const code = res.error?.code || "";
         if (
           code === "messaging/registration-token-not-registered" ||
           code === "messaging/invalid-registration-token"

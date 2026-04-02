@@ -7,9 +7,10 @@ const UserActivityTracker = () => {
   const { data: session, status } = useSession();
   const lastUserId = useRef<string | null>(null);
   const logoutSent = useRef(false);
+  const isSuper = Boolean((session?.user as any)?.is_super);
 
   const sendActivity = useCallback((action: "login" | "logout", useBeacon = false) => {
-    if (!session?.user?.id || session?.user?.is_super) return;
+    if (!session?.user?.id || isSuper) return;
 
     const payload = JSON.stringify({ action });
 
@@ -26,20 +27,20 @@ const UserActivityTracker = () => {
       keepalive: true,
       credentials: "include",
     }).catch(() => {});
-  }, [session?.user?.id, session?.user?.is_super]);
+  }, [isSuper, session?.user?.id]);
 
   useEffect(() => {
-    if (status !== "authenticated" || !session?.user?.id || session?.user?.is_super) return;
+    if (status !== "authenticated" || !session?.user?.id || isSuper) return;
 
     if (lastUserId.current !== session.user.id) {
       lastUserId.current = session.user.id;
       logoutSent.current = false;
       sendActivity("login");
     }
-  }, [sendActivity, status, session?.user?.id, session?.user?.is_super]);
+  }, [isSuper, sendActivity, status, session?.user?.id]);
 
   useEffect(() => {
-    if (status !== "authenticated" || !session?.user?.id || session?.user?.is_super) return;
+    if (status !== "authenticated" || !session?.user?.id || isSuper) return;
 
     const handleLogout = () => {
       if (logoutSent.current) return;
@@ -54,7 +55,7 @@ const UserActivityTracker = () => {
       window.removeEventListener("beforeunload", handleLogout);
       window.removeEventListener("pagehide", handleLogout);
     };
-  }, [sendActivity, status, session?.user?.id, session?.user?.is_super]);
+  }, [isSuper, sendActivity, status, session?.user?.id]);
 
   useEffect(() => {
     if (status === "unauthenticated" && lastUserId.current && !logoutSent.current) {
