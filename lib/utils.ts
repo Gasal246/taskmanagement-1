@@ -44,7 +44,7 @@ export function formatDateShortly(dateTimeString: string) {
   return date.toLocaleDateString('en-US', options);
 }
 
-export function formatDateTiny(dateTimeString: string) {
+export function formatDateTiny(dateTimeString: string | Date | null | undefined) {
   if (!dateTimeString) return ""; // handle case where dateTimeString is undefined or null
 
   const date = new Date(dateTimeString);

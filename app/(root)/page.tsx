@@ -14,7 +14,7 @@ import { useGetUserByUserId } from "@/query/user/queries";
 import { resolveSessionUserId } from "@/lib/utils";
 
 export default function Home() {
-  const { data: session, status } = useSession();
+  const { data: session, status }:any = useSession();
   const dispatch = useDispatch<AppDispatch>();
   const { mutateAsync: getUserById } = useGetUserByUserId();
   const router = useRouter();
