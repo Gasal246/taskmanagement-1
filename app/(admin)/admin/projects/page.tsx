@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { CalendarPlus, CheckCircle2, Clock3, Filter, PanelsTopLeft } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import { RootState } from '@/redux/store';
-import { useSession } from 'next-auth/react';
 import { useGetAreasandDeptsForRegion, useGetBusinessClients, useGetBusinessRegions, useGetProjects } from '@/query/business/queries';
 import { DEPARTMENT_TYPES } from '@/lib/constants';
 import LoaderSpin from '@/components/shared/LoaderSpin';
@@ -35,13 +34,11 @@ const limit = 8;
 
 const ProjectsPage = () => {
   const router = useRouter();
-  const { data: session }: any = useSession();
   const { businessData } = useSelector((state: RootState) => state.user);
 
   const [businessClients, setBusinessClients] = useState<any[]>([]);
   const [businessRegions, setBusinessRegions] = useState<any[]>([]);
   const [regionAreas, setRegionAreas] = useState<any[]>([]);
-  const [canAdd, setCanAdd] = useState(false);
 
   const [tab, setTab] = useState('all');
   const [filters, setFilters] = useState({
@@ -57,12 +54,6 @@ const ProjectsPage = () => {
   const { mutateAsync: getRegions } = useGetBusinessRegions();
   const { mutateAsync: getBusinessClients } = useGetBusinessClients();
   const { mutateAsync: getAreasForRegion, isPending: loadingAreas } = useGetAreasandDeptsForRegion();
-
-  useEffect(() => {
-    if (businessData) {
-      setCanAdd(businessData?.admins?.some((x: any) => x.user_id == session?.user?.id));
-    }
-  }, [businessData, session?.user?.id]);
 
   useEffect(() => {
     if (!businessData?._id) return;
@@ -222,11 +213,9 @@ const ProjectsPage = () => {
           </h1>
           <p className='text-xs text-slate-400'>Track approvals, timelines, and ownership across your business projects.</p>
         </div>
-        {canAdd && (
-          <Button className='flex items-center gap-2' onClick={() => router.push('/admin/projects/add')}>
-            Add Project <CalendarPlus size={16} />
-          </Button>
-        )}
+        <Button className='flex items-center gap-2' onClick={() => router.push('/admin/projects/add')}>
+          Add Project <CalendarPlus size={16} />
+        </Button>
       </div>
 
       <div className="rounded-xl border border-slate-800 bg-gradient-to-tr from-slate-950/60 to-slate-900/60 p-4">

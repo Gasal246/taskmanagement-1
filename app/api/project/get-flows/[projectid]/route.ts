@@ -4,9 +4,10 @@ import { NextRequest, NextResponse } from "next/server";
 
 connectDB();
 
-export async function GET(req:NextRequest, {params}:{params: {projectid:string}}){
+export async function GET(req:NextRequest, context: { params: Promise<{projectid:string}> }){
     try{
-        const flows = await Flow_Log.find({project_id:params.projectid}).sort({createdAt: -1});
+        const { projectid } = await context.params;
+        const flows = await Flow_Log.find({project_id:projectid}).sort({createdAt: -1});
         return NextResponse.json({data:flows, status: 200}, {status:200});
     }catch(err){
         console.log("error while fetching flow: ", err);

@@ -9,26 +9,27 @@ import { NextRequest, NextResponse } from "next/server";
 
 connectDB();
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, context: { params: Promise<{ id: string }> }) {
     try {
+        const { id } = await context.params;
         const session = await auth();
         if(!session){
             return new NextResponse("Unauthorized", { status: 401 });
         }
-        const business = await Business.findById(params.id);
+        const business = await Business.findById(id);
         if(!business){
             return new NextResponse("Business Not Found", { status: 404 });
         }
 
         // find business plan
         await Superadmin_plans.find({}).limit(1) //refreshing super admin plans collection for registering
-        const businessPlan = await Business_assined_plans.findOne({ business_id: params.id })
+        const businessPlan = await Business_assined_plans.findOne({ business_id: id })
             .populate({
                 path: "plan_id",
             });
 
         // find business admins
-        const businessAdminsRaw = await Admin_assign_business.find({ business_id: params.id })
+        const businessAdminsRaw = await Admin_assign_business.find({ business_id: id })
             .populate({
                 path: "user_id",
                 select: { name: 1, email: 1, phone: 1, avatar_url: 1, _id: 1 },
@@ -46,7 +47,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
         });
 
         // find business docs
-        const businessDocs = await Business_docs.find({ business_id: params.id });
+        const businessDocs = await Business_docs.find({ business_id: id });
 
         const businessInfo = {
             ...(business.toObject?.() ?? business),

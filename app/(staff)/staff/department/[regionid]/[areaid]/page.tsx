@@ -5,7 +5,8 @@ import React from 'react'
 import { DataTable } from './data-table'
 import { columns } from './columns'
 
-const StaffDepartmentRegionArea = ({ params }: { params: { regionid: string, areaid: string } }) => {
+const StaffDepartmentRegionArea = ({ params }: { params: Promise<{ regionid: string, areaid: string }> }) => {
+    const { regionid } = React.use(params);
     return (
         <div className='p-4'>
             <Breadcrumb>
@@ -15,7 +16,7 @@ const StaffDepartmentRegionArea = ({ params }: { params: { regionid: string, are
                     </BreadcrumbItem>
                     <BreadcrumbSeparator />
                     <BreadcrumbItem>
-                        <BreadcrumbLink href="/staff/department/regionid">Region Name</BreadcrumbLink>
+                        <BreadcrumbLink href={`/staff/department/${regionid}`}>Region Name</BreadcrumbLink>
                     </BreadcrumbItem>
                     <BreadcrumbSeparator />
                     <BreadcrumbItem>

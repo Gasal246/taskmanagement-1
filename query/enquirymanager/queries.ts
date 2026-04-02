@@ -103,7 +103,7 @@ export const useRemoveEqCountry = () => {
 }
 
 //Get regions
-export const useGetEqRegions = (country_id: string) => {
+export const useGetEqRegions = (country_id?: string) => {
     return useQuery({
         queryKey: ["regions", country_id],
         queryFn: () => GetEqRegionsByCountry(country_id),
@@ -150,7 +150,7 @@ export const useRemoveEqRegion = () => {
 }
 
 //Get Provinces
-export const useGetEqProvince = (region_id: string) => {
+export const useGetEqProvince = (region_id?: string) => {
     return useQuery({
         queryKey: ["provinces", region_id],
         queryFn: () => GetEqProvincesByRegion(region_id),
@@ -197,7 +197,7 @@ export const useRemoveEqProvince = () => {
 }
 
 //Get Cities
-export const useGetEqCities = (province_id:string) => {
+export const useGetEqCities = (province_id?: string) => {
     return useQuery({
         queryKey: ["cities", province_id],
         queryFn: () => GetEqCitiesByProvince(province_id),
@@ -320,7 +320,7 @@ export const useRemoveEqCity = () => {
 }
 
 //Get Areas
-export const useGetEqAreas = (city_id: string) => {
+export const useGetEqAreas = (city_id?: string) => {
     return useQuery({
         queryKey: ["areas", city_id],
         queryFn: () => GetEqAreasByCity(city_id),
@@ -329,7 +329,7 @@ export const useGetEqAreas = (city_id: string) => {
 }
 
 //Get Camps
-export const useGetEqCampsByArea = (area_id: string) => {
+export const useGetEqCampsByArea = (area_id?: string) => {
     return useQuery({
         queryKey: ["camps", area_id],
         queryFn: () => GetEqCampsByArea(area_id),

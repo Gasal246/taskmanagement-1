@@ -161,9 +161,10 @@ export default function AddEnquiry() {
     const { mutateAsync: AddNewEnquiry, isPending: isEqAdding } = useAddNewEnquiry();
     const { data: eqUsers } = useGetEqUsers(businessData?._id, "users");
 
-    const form = useForm({
+    const form = useForm<z.infer<typeof enquirySchema>>({
         resolver: zodResolver(enquirySchema),
         defaultValues: {
+            contacts: [{ name: "", phone: "", email: "", designation: "", is_decision_maker: "No", authority_level: "Operational" }],
             country: "",
             region: "",
             province: "",
@@ -234,7 +235,7 @@ export default function AddEnquiry() {
 
 
     const { control, handleSubmit } = form;
-    const { fields, append, remove } = useFieldArray({ control, name: "contacts" });
+    const { fields, append, remove } = useFieldArray<z.infer<typeof enquirySchema>, "contacts">({ control, name: "contacts" });
 
     const fetchCountries = async () => {
         const res = await GetCountries();

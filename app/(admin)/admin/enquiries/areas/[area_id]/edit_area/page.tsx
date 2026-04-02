@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
@@ -68,15 +68,16 @@ export default function EditAreaPage() {
         ? { id: normalizeId(areaProfile.city_id), label: areaProfile.city_id?.city_name }
         : null;
 
+    const fetchCountries = useCallback(async () => {
+        const res = await GetCountries();
+        if (res?.status == 200) {
+            setCountries(res?.countries);
+        }
+    }, [GetCountries]);
+
     useEffect(() => {
-        const fetchCountries = async () => {
-            const res = await GetCountries();
-            if (res?.status == 200) {
-                setCountries(res?.countries);
-            }
-        };
         fetchCountries();
-    }, []);
+    }, [fetchCountries]);
 
     useEffect(() => {
         if (!areaProfile) return;
@@ -87,7 +88,7 @@ export default function EditAreaPage() {
             city: normalizeId(areaProfile.city_id),
             area_name: areaProfile.area_name || "",
         });
-    }, [areaProfile]);
+    }, [areaProfile, form]);
 
     const onSubmit = async (values: any) => {
         const payload = {

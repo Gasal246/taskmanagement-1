@@ -34,7 +34,7 @@ const ProjectDepartments = () => {
     ]);
   }, [businessDepartmentsData]);
 
-  const addedDepartments = project_depts?.data || [];
+  const addedDepartments = useMemo(() => project_depts?.data || [], [project_depts?.data]);
   const activeDepartment = addedDepartments.find((dept: any) => dept?.is_active);
 
   const filteredAvailableDepartments = useMemo(() => {

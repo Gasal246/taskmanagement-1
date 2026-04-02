@@ -82,7 +82,8 @@ export async function GET (req: NextRequest) {
             staffQuery.user_id = { $in: Array.from(filterUserIds) };
         }
         const allStaffs = await Business_staffs.find(staffQuery)
-            .populate(populateOptions);
+            .populate(populateOptions)
+            .sort({ updatedAt: -1 });
         const filteredStaffs = search ? allStaffs.filter((staff: any) => staff?.user_id) : allStaffs;
         return NextResponse.json(filteredStaffs);
     } catch (error) {

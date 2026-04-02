@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { useParams, useRouter } from 'next/navigation';
 import { Activity, Clock3, Workflow } from 'lucide-react';
@@ -23,14 +23,14 @@ const ProjectFlowView = () => {
   const { mutateAsync: GetFlowsByProject, isPending } = useGetFlowsByProject();
   const [flows, setFlows] = useState<any[]>([]);
 
-  const fetchFlows = async () => {
+  const fetchFlows = useCallback(async () => {
     const res = await GetFlowsByProject(params.projectid);
     setFlows(res?.data ?? []);
-  };
+  }, [GetFlowsByProject, params.projectid]);
 
   useEffect(() => {
     fetchFlows();
-  }, []);
+  }, [fetchFlows]);
 
   const lastUpdated = flows?.[0]?.createdAt;
   const totalLogs = flows.length;

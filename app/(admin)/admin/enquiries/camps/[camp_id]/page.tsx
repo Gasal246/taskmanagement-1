@@ -3,7 +3,7 @@
 import { ArrowLeft, Home, Building2, Pencil, Trash } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { useAddNewCampContact, useGetEqCampsById, useRemoveEqCamp, useUpdateEqCampContact } from "@/query/enquirymanager/queries";
 import { Button } from "@/components/ui/button";
 import {
@@ -519,14 +519,14 @@ function Detail({
     color,
 }: {
     label: string;
-    value: string | number | null;
+    value: ReactNode;
     color?: string;
 }) {
     return (
         <div className="flex justify-between border-b border-slate-800 pb-2">
             <span className="text-slate-400 text-sm">{label}</span>
             <span className={`text-sm font-medium ${color ?? "text-slate-200"}`}>
-                {value || "N/A"}
+                {value ?? "N/A"}
             </span>
         </div>
     );

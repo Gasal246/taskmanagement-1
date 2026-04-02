@@ -6,8 +6,9 @@ import Business_assined_plans from "@/models/business_assigned_plan.model";
 
 connectDB();
 
-export async function POST (req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST (req: NextRequest, context: { params: Promise<{ id: string }> }) {
     try {
+        const { id } = await context.params;
         const session: any = await auth();
         if (!session) {
             return new NextResponse("Authorisation Error", { status: 401 })
@@ -15,11 +16,11 @@ export async function POST (req: NextRequest, { params }: { params: { id: string
 
         let deletedPlan = null;
         
-        const assignedBusinesses = await Business_assined_plans.find({ plan_id: params?.id }).countDocuments();
+        const assignedBusinesses = await Business_assined_plans.find({ plan_id: id }).countDocuments();
         if (assignedBusinesses && assignedBusinesses > 0) {
-            deletedPlan = await Superadmin_plans.findByIdAndUpdate(params?.id, { status: 0 }, { new: true });
+            deletedPlan = await Superadmin_plans.findByIdAndUpdate(id, { status: 0 }, { new: true });
         } else {
-            deletedPlan = await Superadmin_plans.findByIdAndDelete(params?.id);
+            deletedPlan = await Superadmin_plans.findByIdAndDelete(id);
         }
 
         return NextResponse.json(deletedPlan);

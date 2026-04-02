@@ -28,7 +28,7 @@ export default function EditCountryPage() {
         form.reset({
             country_name: countryData.country.country_name || "",
         });
-    }, [countryData?.country]);
+    }, [countryData?.country, form]);
 
     const onSubmit = async (values: any) => {
         const payload = {

@@ -6,7 +6,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useGetEqCountries, useGetEqRegions, useAddNewEqProvince } from "@/query/enquirymanager/queries";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { useRouter } from "next/navigation";
@@ -29,20 +29,20 @@ export default function AddProvincePage() {
     const { data: regions } = useGetEqRegions(country_id);
     const { mutateAsync: AddProvince, isPending: isAdding } = useAddNewEqProvince();
 
-    const fetchCountries = async () => {
+    const fetchCountries = useCallback(async () => {
         const res = await getCountries();
         if (res?.status == 200) {
             setCountries(res?.countries);
         }
-    };
+    }, [getCountries]);
 
     useEffect(() => {
         fetchCountries();
-    }, []);
+    }, [fetchCountries]);
 
     useEffect(() => {
         form.setValue("region", "");
-    }, [country_id]);
+    }, [country_id, form]);
 
     const onSubmit = async (values: any) => {
         const res = await AddProvince(values);

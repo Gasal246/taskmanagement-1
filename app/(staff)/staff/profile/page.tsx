@@ -1,6 +1,7 @@
 "use client"
 import ProfilPageSkeleton from '@/components/skeletons/ProfilPageSkeleton'
 import { Edit2, Key, EyeOff, Eye } from 'lucide-react'
+import NextImage from 'next/image'
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import {
@@ -148,7 +149,7 @@ const ProfilPage = () => {
     defaultValues: { oldPassword: "", newPassword: "" }
   })
 
-  const fetchUserProfile = async () => {
+  const fetchUserProfile = useCallback(async () => {
     const domainCookie = Cookies.get("user_domain");
     const roleCookie = Cookies.get("user_role");
 
@@ -209,11 +210,11 @@ const ProfilPage = () => {
       toast.error(res?.message);
     }
 
-  }
+  }, [GetProfile]);
 
   useEffect(() => {
     fetchUserProfile();
-  }, []);
+  }, [fetchUserProfile]);
 
   useEffect(() => {
     return () => {
@@ -223,10 +224,10 @@ const ProfilPage = () => {
     };
   }, [avatarSrc]);
 
-  const refetchUser = async () => {
+  const refetchUser = useCallback(async () => {
     const res = await GetProfile({ role_id: creds.role_id, org_id: creds.org_id });
     if (res?.status == 200) setUserData(res);
-  }
+  }, [GetProfile, creds.org_id, creds.role_id]);
 
   // Open Modals
   const openEditName = () => {
@@ -396,9 +397,11 @@ const ProfilPage = () => {
                     rounded-full overflow-hidden border-4 border-slate-800 shadow-lg
                   `}
                 >
-                  <img
+                  <NextImage
                     src={avatarUrl}
                     alt="Profile"
+                    width={160}
+                    height={160}
                     className="w-full h-full object-cover"
                   />
                 </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { Form, FormField, FormItem, FormLabel, FormControl } from "@/components/ui/form";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
@@ -55,15 +55,16 @@ export default function EditCityPage() {
         ? { id: normalizeId(cityProfile.province_id), label: cityProfile.province_id?.province_name }
         : null;
 
+    const fetchCountries = useCallback(async () => {
+        const res = await GetCountries();
+        if (res?.status == 200) {
+            setCountries(res?.countries);
+        }
+    }, [GetCountries]);
+
     useEffect(() => {
-        const fetchCountries = async () => {
-            const res = await GetCountries();
-            if (res?.status == 200) {
-                setCountries(res?.countries);
-            }
-        };
         fetchCountries();
-    }, []);
+    }, [fetchCountries]);
 
     useEffect(() => {
         if (!cityProfile) return;
@@ -73,7 +74,7 @@ export default function EditCityPage() {
             province: normalizeId(cityProfile.province_id),
             city_name: cityProfile.city_name || "",
         });
-    }, [cityProfile]);
+    }, [cityProfile, form]);
 
     const onSubmit = async (values: any) => {
         const payload = {

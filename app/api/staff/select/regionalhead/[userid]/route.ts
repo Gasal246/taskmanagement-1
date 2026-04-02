@@ -7,9 +7,9 @@ import { NextRequest, NextResponse } from "next/server";
 
 connectDB();
 
-export async function GET(req: NextRequest, { params }:{ params: { userid: string } }) {
+export async function GET(req: NextRequest, context: { params: Promise<{ userid: string }> }) {
     try {
-        const { userid } = params;
+        const { userid } = await context.params;
 
         // Get the business ids the user administers or belongs to.
         const adminAssignments = await Admin_assign_business.find({ user_id: userid, status: 1 }, { business_id: 1 });

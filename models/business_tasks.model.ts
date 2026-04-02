@@ -35,6 +35,13 @@ const Business_TasksSchema:Schema = new Schema({
     status: {type: String, enum: ["To Do", "Completed", "In Progress", "Cancelled"]}
 }, {timestamps: true});
 
+Business_TasksSchema.index({ business_id: 1, updatedAt: -1 });
+Business_TasksSchema.index({ business_id: 1, is_project_task: 1, updatedAt: -1 });
+Business_TasksSchema.index({ business_id: 1, assigned_to: 1, updatedAt: -1 });
+Business_TasksSchema.index({ business_id: 1, assigned_teams: 1, updatedAt: -1 });
+Business_TasksSchema.index({ business_id: 1, creator: 1, updatedAt: -1 });
+Business_TasksSchema.index({ business_id: 1, start_date: 1, updatedAt: -1 });
+
 const Business_Tasks = mongoose.models?.business_tasks || mongoose.model<IBusiness_Tasks>('business_tasks', Business_TasksSchema);
 
 export default Business_Tasks;

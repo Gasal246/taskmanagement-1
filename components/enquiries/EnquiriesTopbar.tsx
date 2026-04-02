@@ -1,32 +1,19 @@
 "use client"
 import { Avatar } from 'antd';
-import { signOut, useSession } from 'next-auth/react'
+import { signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation';
-import React, { useEffect, useState } from 'react'
+import React from 'react'
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { motion } from 'framer-motion';
 import { CircleUser } from 'lucide-react';
 import { ExitIcon } from '@radix-ui/react-icons';
-import { useGetUserByUserId } from '@/query/user/queries';
 import Cookies from "js-cookie";
+import { useSelector } from 'react-redux';
+import type { RootState } from '@/redux/store';
 
 const StaffTopbar = () => {
   const router = useRouter();
-  const { data: session, status }: any = useSession();
-  const [userData, setUserData] = useState<any>({});
-
-  const { mutateAsync: GetuserData } = useGetUserByUserId();
-
-  useEffect(() => {
-    if (status === "authenticated" && session?.user?.id) {
-      fetchUserData(session.user.id);
-    }
-  }, [status, session]);
-
-  const fetchUserData = async (user_id: string) => {
-    const res = await GetuserData(user_id);
-    setUserData(res);
-  }
+  const userData = useSelector((state: RootState) => state.application.user_info);
 
   const logOut = async () => {
     Object.keys(Cookies.get()).forEach(cookieName => Cookies.remove(cookieName));

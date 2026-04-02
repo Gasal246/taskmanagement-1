@@ -7,10 +7,8 @@ import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '@/redux/store';
-import { getBusinessByIdFunc } from '@/query/business/functions';
 import Cookies from 'js-cookie';
 import { toast } from 'sonner';
-import { loadBusinessData } from '@/redux/slices/userdata';
 
 const quickActions = [
   {
@@ -117,27 +115,7 @@ const adminModules = [
 
 const AdminDashboard = () => {
   const router = useRouter();
-  const dispatch = useDispatch<AppDispatch>();
   const { businessData } = useSelector((state: RootState) => state.user);
-
-  useEffect(() => {
-    if (!businessData) {
-      fetchBusinessData()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [businessData]);
-
-  const fetchBusinessData = async () => {
-    const cookieValue = Cookies.get("user_domain");
-    const bid = cookieValue ? JSON.parse(cookieValue)?.value : null;
-    if (!bid) {
-      return toast("Domain Not Found")
-    }
-    const res = await getBusinessByIdFunc(bid)
-    if (res?.data) {
-      dispatch(loadBusinessData(res?.data?.info))
-    }
-  }
 
   const businessLocation = [businessData?.business_city, businessData?.business_country].filter(Boolean).join(', ');
 

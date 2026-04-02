@@ -25,6 +25,15 @@ type DirectoryOption = {
   email: string;
 };
 
+type ViewUserEntry = {
+  _id?: string;
+  user_id?: {
+    _id?: string;
+    name?: string;
+    email?: string;
+  };
+};
+
 export default function EscalatePage() {
   const router = useRouter();
   const params = useParams<{ enquiry_id: string }>();
@@ -66,14 +75,17 @@ export default function EscalatePage() {
     fetchBusinessId();
   }, []);
 
-  const availableViewUsers = viewUsersData?.users ?? [];
+  const availableViewUsers = useMemo<ViewUserEntry[]>(
+    () => viewUsersData?.users ?? [],
+    [viewUsersData?.users]
+  );
 
   const filteredUsers = useMemo(() => {
     if (!availableViewUsers.length) return [];
 
     if (!search.trim()) return availableViewUsers;
 
-    return availableViewUsers.filter((u: any) => {
+    return availableViewUsers.filter((u) => {
       const name = String(u?.user_id?.name || "").toLowerCase();
       const email = String(u?.user_id?.email || "").toLowerCase();
       const term = search.toLowerCase();
@@ -113,10 +125,10 @@ export default function EscalatePage() {
     [assignedTo, assigneeOptions]
   );
 
-  const selectedViewUsers = useMemo(
+  const selectedViewUsers = useMemo<DirectoryOption[]>(
     () =>
       availableViewUsers
-        .filter((entry: any) => selectedUsers.includes(String(entry?.user_id?._id)))
+        .filter((entry) => selectedUsers.includes(String(entry?.user_id?._id)))
         .map((entry: any) => ({
           id: String(entry?.user_id?._id),
           name: entry?.user_id?.name || "Unknown User",
@@ -317,7 +329,7 @@ export default function EscalatePage() {
 
               <div className="mt-4 flex flex-wrap gap-2">
                 {selectedViewUsers.length > 0 ? (
-                  selectedViewUsers.map((user) => (
+                  selectedViewUsers.map((user: DirectoryOption) => (
                     <span
                       key={user.id}
                       className="inline-flex items-center gap-2 rounded-full border border-cyan-500/30 bg-cyan-500/10 px-3 py-1 text-xs text-cyan-100"
@@ -366,7 +378,7 @@ export default function EscalatePage() {
                   <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Select Owner</p>
                   <Select
                     value={assignedTo === "" ? undefined : assignedTo}
-                    onValueChange={(value) => setAssignedTo(value)}
+                    onValueChange={(value: string) => setAssignedTo(value)}
                   >
                     <SelectTrigger className="border-slate-700 bg-slate-900/70 text-slate-100">
                       <SelectValue placeholder={user_type === "users" ? "Select a user" : "Select an agent"} />

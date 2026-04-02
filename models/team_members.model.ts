@@ -14,6 +14,8 @@ const TeamMembersSchema: Schema = new Schema({
     user_id: {type: Schema.Types.ObjectId, ref: "users", required: true}
 }, { timestamps: true });
 
+TeamMembersSchema.index({ user_id: 1, team_id: 1 });
+
 const Team_Members = mongoose.models?.Team_Members || mongoose.model<ITeam_Members>('Team_Members', TeamMembersSchema);
 
 export default Team_Members;

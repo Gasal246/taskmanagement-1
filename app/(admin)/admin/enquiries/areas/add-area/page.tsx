@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
 import { useGetEqCountries, useGetEqRegions, useGetEqCities, useGetEqProvince, useAddNewEqArea } from "@/query/enquirymanager/queries";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { useRouter } from "next/navigation";
@@ -15,6 +15,8 @@ import { useRouter } from "next/navigation";
 export default function AddAreaPage() {
     const router = useRouter();
   const [countries, setCountries] = useState([]);
+  const { mutateAsync: getCountries } = useGetEqCountries();
+  const {mutateAsync: AddArea, isPending: isAddingArea} = useAddNewEqArea();
   const form = useForm({
     defaultValues: {
       country: "",
@@ -25,23 +27,20 @@ export default function AddAreaPage() {
     }
   });
 
-  const fetchCountries = async() => {
+  const fetchCountries = useCallback(async() => {
     const res = await getCountries();
     if(res.status == 200){
       setCountries(res?.countries);
     }
-  }
+  }, [getCountries]);
 
   useEffect(()=> {
     fetchCountries();
-  },[]);
+  },[fetchCountries]);
 
   const country_id = form.watch("country");
   const region_id = form.watch("region");
   const province_id = form.watch("province");
-
-  const { mutateAsync: getCountries } = useGetEqCountries();
-  const {mutateAsync: AddArea, isPending: isAddingArea} = useAddNewEqArea();
   const { data: regions } = useGetEqRegions(country_id);
   const { data: provinces } = useGetEqProvince(region_id);
   const { data: cities } = useGetEqCities(province_id);

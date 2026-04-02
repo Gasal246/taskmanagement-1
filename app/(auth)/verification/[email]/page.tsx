@@ -21,8 +21,9 @@ const FormSchema = z.object({
     }),
 })
 
-const EmailVerificationPage = ({ params }: { params: { email: string } }) => {
-    const email = decodeURIComponent(params?.email) || '';
+const EmailVerificationPage = ({ params }: { params: Promise<{ email: string }> }) => {
+    const { email: encodedEmail } = React.use(params);
+    const email = decodeURIComponent(encodedEmail) || '';
     const { mutateAsync: findUserByEmail } = useGetUserByEmail();
     const { mutateAsync: sendEmailOtp, isPending: sendingEmail, status: emailSendStatus } = useSendEmailVerification();
     const { mutateAsync: verifyOtp, isPending: verifyingOTP, status: verificationStatus } = useVerifyUserOtp();

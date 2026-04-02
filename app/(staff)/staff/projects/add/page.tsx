@@ -318,6 +318,7 @@ const AddNewProject = () => {
                           <FormControl>
                             <select
                               {...field}
+                              value={field.value ?? ""}
                               className="w-full rounded-md border border-slate-700 bg-slate-950/50 text-slate-200 p-2 text-sm focus:border-cyan-500 focus:outline-none focus-visible:ring-0"
                             >
                               <option value="">Select region</option>
@@ -341,6 +342,7 @@ const AddNewProject = () => {
                           <FormControl>
                             <select
                               {...field}
+                              value={field.value ?? ""}
                               className="w-full rounded-md border border-slate-700 bg-slate-950/50 text-slate-200 p-2 text-sm focus:border-cyan-500 focus:outline-none focus-visible:ring-0"
                               disabled={!selectedRegionId || loadingAreas}
                             >

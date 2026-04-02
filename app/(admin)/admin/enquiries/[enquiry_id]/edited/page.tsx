@@ -105,7 +105,7 @@ const Page = () => {
                 next_action_due: formatDate(enquiry?.edited_enquiry?.next_action_date) ?? ""
             })
         }
-    }, [enquiry])
+    }, [enquiry, form, params.enquiry_id])
 
     const formatDate = (dateString?: string | null) => {
         if (!dateString) return "";

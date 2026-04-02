@@ -1,7 +1,7 @@
 "use client"
 // import { useFindUserById, useGetAllNotifications } from '@/query/client/userQueries';
 import { Avatar, Badge, Popconfirm, Tooltip } from 'antd';
-import { signOut, useSession } from 'next-auth/react'
+import { signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation';
 import React, { useEffect, useState } from 'react'
 import { Popover, PopoverContent, PopoverTrigger, } from "@/components/ui/popover";
@@ -9,7 +9,6 @@ import { motion } from 'framer-motion';
 import { Bell, CircleUser } from 'lucide-react';
 import { ExitIcon } from '@radix-ui/react-icons';
 import NotificationPane from '../shared/NotificationPane';
-import { useGetUserByUserIdWithMeta } from '@/query/user/queries';
 import Cookies from "js-cookie";
 import Image from 'next/image';
 import GoogleTranslate from '../shared/GoogleTranslate';
@@ -19,27 +18,18 @@ import { loadUserInfo } from '@/redux/slices/application';
 
 const StaffTopbar = () => {
     const router = useRouter();
-    const { data: session, status }: any = useSession();
     const dispatch = useDispatch();
-    const [userData, setUserData] = useState<any>({});
     const [roleLabel, setRoleLabel] = useState("");
     const [domainLabel, setDomainLabel] = useState("");
+    const userData = useSelector((state: RootState) => state.application.user_info);
 
     const formattedRoleLabel = roleLabel ? roleLabel.split('_').join(" ") : "";
     const formattedDomainLabel = domainLabel ? domainLabel.split('_').join(" ") : "";
-    const roleText = roleLabel ? `Role: ${formattedRoleLabel}` : "";
-    const domainText = domainLabel ? `Domain: ${formattedDomainLabel}` : "";
-    const roleDomainText = [roleText, domainText].filter(Boolean).join(" | ");
+    const roleText = roleLabel ? `${formattedRoleLabel}` : "";
+    const domainText = domainLabel ? `${formattedDomainLabel}` : "";
+    const roleDomainText = [roleText, domainText].filter(Boolean).join(" ▸ ");
 
-    const { mutateAsync: GetuserData, isPending: userLoading } = useGetUserByUserIdWithMeta();
     const unreadCount = useSelector((state: RootState) => state.notifications.unreadCount);
-
-    useEffect(() => {
-        if (status === "authenticated" && session?.user?.id) {
-            fetchUserData(session?.user?.id);
-        }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [status, session, roleLabel]);
 
     useEffect(() => {
         const roleCookie = Cookies.get("user_role");
@@ -75,19 +65,12 @@ const StaffTopbar = () => {
         }
     }, []);
 
-    const fetchUserData = async (user_id: string) => {
-        const res = await GetuserData({ user_id, roleLabel });
-        setUserData(res);
-        dispatch(loadUserInfo(res || null));
-    }
-
     const logOut = async () => {
         dispatch(loadUserInfo(null));
-        Object.keys(Cookies.get()).forEach(cookieName => {
+        Object.keys(Cookies.get()).forEach((cookieName) => {
             Cookies.remove(cookieName);
-
-            signOut()
         });
+        signOut();
     }
 
     return (
@@ -135,9 +118,9 @@ const StaffTopbar = () => {
                         <div className='flex gap-2 items-center cursor-pointer rounded-2xl px-1 py-1 md:px-3 md:py-2 transition-colors hover:bg-slate-800/60'>
                             <div className='hidden md:block'>
                                 <h1 className='text-slate-300 text-end text-sm leading-3'>{userData?.name}</h1>
-                                <h2 className='text-slate-400 text-end text-xs'>{userData?.email}</h2>
+                                {/* <h2 className='text-slate-400 text-end text-xs'>{userData?.email}</h2> */}
                                 {roleDomainText && (
-                                    <p className='text-[10px] text-slate-500 text-end'>{roleDomainText}</p>
+                                    <p className='text-[11px] text-slate-500 text-end font-semibold'>{roleDomainText}</p>
                                 )}
                             </div>
                             <Avatar size={40} src={userData?.avatar_url || '/avatar.png'} />
@@ -146,12 +129,12 @@ const StaffTopbar = () => {
                     <PopoverContent className='w-64 md:w-[170px] p-2 space-y-2 border border-slate-800/70 bg-slate-950/95 shadow-xl'>
                         <div className='rounded-lg border border-slate-800/70 bg-slate-900/40 p-2 md:hidden'>
                             <h2 className='text-sm font-semibold text-slate-200'>{userData?.name || "-"}</h2>
-                            <p className='text-xs text-slate-400'>{userData?.email || "-"}</p>
+                            {/* <p className='text-xs text-slate-400'>{userData?.email || "-"}</p> */}
                             <p className='mt-1 text-[11px] text-slate-400'>
-                                <span className='text-slate-500'>Role:</span> {formattedRoleLabel || "-"}
+                                <span className='text-slate-500'></span> {formattedRoleLabel || "-"}
                             </p>
                             <p className='text-[11px] text-slate-400'>
-                                <span className='text-slate-500'>Domain:</span> {formattedDomainLabel || "-"}
+                                <span className='text-slate-500'></span> {formattedDomainLabel || "-"}
                             </p>
                         </div>
                         <motion.button onClick={() => router.push(`/staff/profile`)} whileTap={{ scale: 0.98 }} className='w-full rounded-lg bg-secondary/70 px-2 py-1.5 text-sm flex gap-1 items-center justify-center transition-colors hover:bg-slate-800'>

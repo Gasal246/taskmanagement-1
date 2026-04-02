@@ -4,9 +4,10 @@ import { NextRequest, NextResponse } from "next/server";
 
 connectDB();
 
-export async function GET(req: NextRequest, { params }:{ params: { id: string }}){
+export async function GET(req: NextRequest, context: { params: Promise<{ id: string }> }) {
     try {
-        const superAdmin = await Superadmin.findById(params?.id, { password: 0 });
+        const { id } = await context.params;
+        const superAdmin = await Superadmin.findById(id, { password: 0 });
         return Response.json(superAdmin);
     } catch (error) {
         console.log(error)

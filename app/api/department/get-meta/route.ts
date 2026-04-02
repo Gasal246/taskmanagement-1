@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ message: "Department id is required", status: 400 }, { status: 400 });
     }
 
-    const regionDepartment = await Region_departments.findById(department_id).lean();
+    const regionDepartment: any = await Region_departments.findById(department_id).lean();
     if (regionDepartment) {
       return NextResponse.json(
         {
@@ -36,9 +36,9 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const areaDepartment = await Area_departments.findById(department_id).lean();
+    const areaDepartment: any = await Area_departments.findById(department_id).lean();
     if (areaDepartment) {
-      const area = await Business_areas.findById(areaDepartment.area_id).select("region_id").lean();
+      const area: any = await Business_areas.findById(areaDepartment.area_id).select("region_id").lean();
       return NextResponse.json(
         {
           status: 200,
@@ -52,12 +52,12 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const locationDepartment = await Location_departments.findById(department_id).lean();
+    const locationDepartment: any = await Location_departments.findById(department_id).lean();
     if (locationDepartment) {
-      const location = await Business_locations.findById(locationDepartment.location_id)
+      const location: any = await Business_locations.findById(locationDepartment.location_id)
         .select("area_id")
         .lean();
-      const area = location?.area_id
+      const area: any = location?.area_id
         ? await Business_areas.findById(location.area_id).select("region_id").lean()
         : null;
       return NextResponse.json(

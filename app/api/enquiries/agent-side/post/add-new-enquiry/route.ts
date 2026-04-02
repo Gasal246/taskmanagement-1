@@ -108,7 +108,7 @@ export async function POST(req:NextRequest){
         if(!session) return NextResponse.json({message: "Unauthorized Access", status: 401}, {status: 401});
 
         const body:Body = await req.json();
-        const businessAssignment =
+        const businessAssignment: any =
             (session?.user?.id
                 ? await Business_staffs.findOne({ user_id: session.user.id, status: 1 }).select("business_id").lean()
                 : null) ||

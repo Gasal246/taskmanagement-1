@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,17 +40,29 @@ export default function AddCampPage() {
         limit: 200
     });
 
-    const fetchCountries = async () => {
+    type AddCampFormValues = {
+        camp_name: string;
+        camp_type: string;
+        visited_status: string;
+        camp_capacity: string;
+        camp_occupancy: string;
+        latitude: string;
+        longitude: string;
+        landlord: string;
+        real_estate: string;
+        client_company: string;
+    };
+
+    const fetchCountries = useCallback(async () => {
         const res = await GetCountries();
         if (res?.status == 200) {
             setCountries(res?.countries);
         }
-    }
+    }, [GetCountries]);
 
     useEffect(() => {
         fetchCountries();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [fetchCountries]);
 
     useEffect(() => {
         if (headOfficeOpen) {
@@ -58,11 +70,18 @@ export default function AddCampPage() {
         }
     }, [headOfficeOpen, head_office_id]);
 
-    const { register, handleSubmit, reset, control } = useForm({
+    const { register, handleSubmit, reset, control } = useForm<AddCampFormValues>({
         defaultValues: {
+            camp_name: "",
+            camp_type: "",
+            camp_capacity: "",
+            camp_occupancy: "",
             visited_status: "To Visit",
             latitude: "",
             longitude: "",
+            landlord: "",
+            real_estate: "",
+            client_company: "",
         }
     });
 

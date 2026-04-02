@@ -11,7 +11,8 @@ import { useSession } from 'next-auth/react'
 import { DataTable } from './data-table'
 import { columns } from './columns'
 
-const StaffDepartmentRegion = ({ params }: { params: { regionid: string } }) => {
+const StaffDepartmentRegion = ({ params }: { params: Promise<{ regionid: string }> }) => {
+    const { regionid } = React.use(params);
     const { data: session }: any = useSession();
     const router = useRouter();
 
@@ -59,7 +60,7 @@ const StaffDepartmentRegion = ({ params }: { params: { regionid: string } }) => 
                 </div>
                 <div className="flex flex-wrap">
                     <div className="w-full lg:w-3/12 p-1">
-                        <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => router.push(`/staff/department/regionid/areaid`)} className="bg-slate-950/50 rounded-lg p-2 cursor-pointer">
+                        <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => router.push(`/staff/department/${regionid}/areaid`)} className="bg-slate-950/50 rounded-lg p-2 cursor-pointer">
                             <h1 className='text-sm flex gap-1 items-center'><LocateFixedIcon size={18} /> Area Name</h1>
                         </motion.div>
                     </div>

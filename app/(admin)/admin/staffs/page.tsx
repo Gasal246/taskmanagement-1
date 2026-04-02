@@ -235,21 +235,11 @@ const Staffs = () => {
                           const suffix = hours24 >= 12 ? "pm" : "am";
                           return `${hours12}.${minutes}${suffix}`;
                         };
-                        const formatDuration = (start: Date, end: Date) => {
-                          const diffMs = Math.max(0, end.getTime() - start.getTime());
-                          const diffMins = Math.round(diffMs / 60000);
-                          if (diffMins < 60) {
-                            return `${diffMins || 1} minute${diffMins === 1 ? "" : "s"}`;
-                          }
-                          const diffHours = Math.round(diffMins / 60);
-                          return `${diffHours} hour${diffHours === 1 ? "" : "s"}`;
-                        };
 
                         if (!lastLogin) {
                           return (
                             <>
-                              <h1 className="font-semibold text-[11px] text-slate-300">Not Yet!</h1>
-                              <h2 className="text-[10px] text-slate-500">-</h2>
+                              <h1 className="font-semibold text-[11px] text-slate-500">Not Logged In</h1>
                             </>
                           );
                         }
@@ -257,16 +247,12 @@ const Staffs = () => {
                         const dayLabel = formatDay(lastLogin);
                         const loginTime = formatTime(lastLogin);
                         const logoutTime = lastLogout ? formatTime(lastLogout) : null;
-                        const durationLabel = lastLogout ? formatDuration(lastLogin, lastLogout) : "-";
 
                         return (
                           <>
-                            <h1 className="font-semibold text-[11px] text-slate-300">
-                              {dayLabel}, {loginTime}{logoutTime ? ` to ${logoutTime}` : ""}
+                            <h1 className="font-semibold text-[11px] text-slate-300 text-center">
+                              {dayLabel}<br></br> {loginTime}{logoutTime ? ` to ${logoutTime}` : ""}
                             </h1>
-                            <h2 className="text-[10px] text-slate-500">
-                              {durationLabel}
-                            </h2>
                           </>
                         );
                       })()}

@@ -15,9 +15,9 @@ import { NextRequest, NextResponse } from "next/server";
 
 connectDB();
 
-export async function GET(req: NextRequest, {params}: { params: { projectid: string }}) {
+export async function GET(req: NextRequest, context: { params: Promise<{ projectid: string }> }) {
     try{
-        const {projectid} = params;
+        const { projectid } = await context.params;
         if (!mongoose.Types.ObjectId.isValid(projectid)) {
             return NextResponse.json({ message: "Invalid project id" }, { status: 400 });
         }

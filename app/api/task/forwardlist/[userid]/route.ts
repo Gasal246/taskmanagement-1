@@ -7,9 +7,10 @@ import { NextRequest, NextResponse } from "next/server";
 
 connectDB();
 
-export async function GET (req: NextRequest, { params }: { params: { userid: string }}) {
+export async function GET (req: NextRequest, context: { params: Promise<{ userid: string }> }) {
     try {
-        const userData = await Users.findById(params.userid, { Role: 1, Addedby: 1, Area: 1, Region: 1, Department: 1 });
+        const { userid } = await context.params;
+        const userData = await Users.findById(userid, { Role: 1, Addedby: 1, Area: 1, Region: 1, Department: 1 });
         let fieldsUnder = {
             "department": [],
             "region": [],
@@ -18,9 +19,9 @@ export async function GET (req: NextRequest, { params }: { params: { userid: str
         let yourStaffs = [];
         switch(userData?.Role) {
             case 'admin': {
-                fieldsUnder['department'] = await Business_departments.find({ AdminId: params.userid });
-                fieldsUnder['region'] = await Business_regions.find({ Administrator: params.userid });
-                fieldsUnder['area'] = await Business_areas.find({ Administrator: params.userid });
+                fieldsUnder['department'] = await Business_departments.find({ AdminId: userid });
+                fieldsUnder['region'] = await Business_regions.find({ Administrator: userid });
+                fieldsUnder['area'] = await Business_areas.find({ Administrator: userid });
             } break;
             case 'dep-head': {
                 const department = await Business_departments.findOne({ DepartmentHead: userData?._id }, { _id: 1 });

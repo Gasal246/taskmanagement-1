@@ -37,7 +37,7 @@ export default function ActivateCampPage() {
   const { mutateAsync: AssignCamp, isPending: isAssigning } = useAssignEqCamptoEnquiry();
 
   const requestedCamp = requestedCampData?.camp;
-  const existingCamps = existingCampData?.camps || [];
+  const existingCamps = useMemo(() => existingCampData?.camps || [], [existingCampData?.camps]);
   const saving = isActivating || isAssigning;
 
   useEffect(() => {
@@ -52,7 +52,7 @@ export default function ActivateCampPage() {
     );
     setLatitude(requestedCamp?.latitude || "");
     setLongitude(requestedCamp?.longitude || "");
-  }, [requestedCamp?._id]);
+  }, [requestedCamp]);
 
   const selectedCampPreview = useMemo(
     () => existingCamps.find((camp: any) => String(camp?._id) === selectedCamp),

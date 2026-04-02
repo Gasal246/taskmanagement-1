@@ -6,7 +6,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useGetEqCountries, useGetEqRegions, useGetEqProvince, useAddNewEqCity } from "@/query/enquirymanager/queries";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { useRouter } from "next/navigation";
@@ -32,25 +32,25 @@ export default function AddCityPage() {
     const { data: provinces } = useGetEqProvince(region_id);
     const { mutateAsync: AddCity, isPending: isAdding } = useAddNewEqCity();
 
-    const fetchCountries = async () => {
+    const fetchCountries = useCallback(async () => {
         const res = await getCountries();
         if (res?.status == 200) {
             setCountries(res?.countries);
         }
-    };
+    }, [getCountries]);
 
     useEffect(() => {
         fetchCountries();
-    }, []);
+    }, [fetchCountries]);
 
     useEffect(() => {
         form.setValue("region", "");
         form.setValue("province", "");
-    }, [country_id]);
+    }, [country_id, form]);
 
     useEffect(() => {
         form.setValue("province", "");
-    }, [region_id]);
+    }, [region_id, form]);
 
     const onSubmit = async (values: any) => {
         const res = await AddCity(values);

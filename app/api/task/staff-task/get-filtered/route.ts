@@ -20,9 +20,14 @@ export async function GET(req: NextRequest) {
     const type = searchParams.get("taskType");
     const startDate = searchParams.get("start_date");
     const endDate = searchParams.get("end_date");
+    const pageRaw = searchParams.get("page");
+    const limitRaw = searchParams.get("limit");
     const hasValidStart = Boolean(startDate && startDate !== "undefined");
     const hasValidEnd = Boolean(endDate && endDate !== "undefined");
     const hasType = Boolean(type);
+    const page = Math.max(1, Number(pageRaw) || 1);
+    const limit = Math.min(50, Math.max(1, Number(limitRaw) || 12));
+    const skip = (page - 1) * limit;
 
     // ✅ Prevent fetching everything if no filters are provided
     if (!hasType && !hasValidStart && !hasValidEnd) {
@@ -83,8 +88,25 @@ else if (type === "all") {
 
     console.log("task query: ", query);
 
-    const tasks = await Business_Tasks.find(query).exec();
-    return NextResponse.json({ data: tasks, status: 200 }, { status: 200 });
+    const [tasks, total] = await Promise.all([
+      Business_Tasks.find(query)
+        .sort({ updatedAt: -1, createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Business_Tasks.countDocuments(query),
+    ]);
+
+    return NextResponse.json({
+      data: tasks,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
+      },
+      status: 200,
+    }, { status: 200 });
   } catch (err) {
     console.log("Error while fetching All Task: ", err);
     return NextResponse.json(

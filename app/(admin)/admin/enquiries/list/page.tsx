@@ -131,7 +131,7 @@ export default function EnquiriesPage() {
 
   // Cascading dropdown lists
   const [countries, setCountries] = useState([]);
-  const [page, setPage] = useState(savedListState?.page || savedPage || 1);
+  const [page, setPage] = useState<number>(savedListState?.page || savedPage || 1);
   const [showFilters, setShowFilters] = useState(Boolean(savedListState?.showFilters));
   const [activeListFilter, setActiveListFilter] = useState<"all" | "waitingApproval">(savedListState?.activeListFilter === "waitingApproval" ? "waitingApproval" : "all");
   const [rangeValue, setRangeValue] = useState<any>(

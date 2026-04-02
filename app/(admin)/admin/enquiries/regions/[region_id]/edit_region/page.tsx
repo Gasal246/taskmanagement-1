@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Form, FormField, FormItem, FormLabel, FormControl } from "@/components/ui/form";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
@@ -41,15 +41,16 @@ export default function EditRegionPage() {
         ? { id: normalizeId(regionProfile.country_id), label: regionProfile.country_id?.country_name }
         : null;
 
+    const fetchCountries = useCallback(async () => {
+        const res = await GetCountries();
+        if (res?.status == 200) {
+            setCountries(res?.countries);
+        }
+    }, [GetCountries]);
+
     useEffect(() => {
-        const fetchCountries = async () => {
-            const res = await GetCountries();
-            if (res?.status == 200) {
-                setCountries(res?.countries);
-            }
-        };
         fetchCountries();
-    }, []);
+    }, [fetchCountries]);
 
     useEffect(() => {
         if (!regionProfile) return;
@@ -57,7 +58,7 @@ export default function EditRegionPage() {
             country: normalizeId(regionProfile.country_id),
             region_name: regionProfile.region_name || "",
         });
-    }, [regionProfile]);
+    }, [regionProfile, form]);
 
     const onSubmit = async (values: any) => {
         const payload = {

@@ -1,11 +1,12 @@
 "use client"
 
-import { formatDate, formatDateShortly, formatDateTiny, formatNumber } from "@/lib/utils"
+import { formatDate, formatNumber } from "@/lib/utils"
 import { ColumnDef, Row } from "@tanstack/react-table"
 import { Avatar, Tooltip } from "antd"
 import { ArrowDown } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
+import { useNow } from "@/hooks/useNow";
 
 interface CountdownCellProps {
   row: Row<any>;
@@ -13,39 +14,33 @@ interface CountdownCellProps {
 
 const CountdownCell: React.FC<CountdownCellProps> = ({ row }) => {
   const deadline = row.original?.task?.Deadline; // ISO date string
-  const [timeLeft, setTimeLeft] = useState<string>(''); // Type the state as a string
-  const [isLessThanFiveHours, setIsLessThanFiveHours] = useState<boolean>(false); // State to track if less than 5 hours
+  const now = useNow();
+  const countdown = useMemo(() => {
+    const endTime = new Date(deadline);
+    const diffInSeconds = Math.floor((endTime.getTime() - now) / 1000);
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const now = new Date();
-      const endTime = new Date(deadline);
-      const diffInSeconds = Math.floor((endTime.getTime() - now.getTime()) / 1000); // Time difference in seconds
-      if (diffInSeconds <= 0) {
-        clearInterval(interval); // Stop updating if the deadline has passed
-        setTimeLeft('Expired');
-        setIsLessThanFiveHours(false); // Reset color when expired
-      } else {
-        const days = Math.floor(diffInSeconds / (24 * 3600));
-        const hours = Math.floor((diffInSeconds % (24 * 3600)) / 3600);
-        const minutes = Math.floor((diffInSeconds % 3600) / 60);
-        const seconds = diffInSeconds % 60;
+    if (diffInSeconds <= 0) {
+      return { label: "Expired", isUrgent: false };
+    }
 
-        setTimeLeft(`${days}d ${hours}h ${minutes}m ${seconds}s`);
-        // Check if remaining time is less than 5 hours
-        setIsLessThanFiveHours(hours < 5);
-      }
-    }, 1000);
+    const days = Math.floor(diffInSeconds / (24 * 3600));
+    const hours = Math.floor((diffInSeconds % (24 * 3600)) / 3600);
+    const minutes = Math.floor((diffInSeconds % 3600) / 60);
+    const seconds = diffInSeconds % 60;
 
-    return () => clearInterval(interval); // Cleanup on component unmount
-  }, [deadline]);
-  // Conditional class for text color
+    return {
+      label: `${days}d ${hours}h ${minutes}m ${seconds}s`,
+      isUrgent: diffInSeconds < 5 * 3600,
+    };
+  }, [deadline, now]);
+
+  const isLessThanFiveHours = countdown.isUrgent;
   const textColorClass = isLessThanFiveHours ? 'text-red-600' : 'text-green-600';
 
   return (
     <Tooltip title={<h3 className="text-xs text-yellow-600">{formatDate(deadline)}</h3>}>
       <div className="w-[250px] bg-slate-950 rounded-full p-2">
-        <h1 className={`text-xs font-medium text-center flex items-center justify-center gap-1 ${textColorClass}`}><ArrowDown size={14} /> {timeLeft}</h1>
+        <h1 className={`text-xs font-medium text-center flex items-center justify-center gap-1 ${textColorClass}`}><ArrowDown size={14} /> {countdown.label}</h1>
       </div>
     </Tooltip>
   );

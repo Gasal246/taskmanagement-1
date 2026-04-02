@@ -1,14 +1,14 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 const UserActivityTracker = () => {
   const { data: session, status } = useSession();
   const lastUserId = useRef<string | null>(null);
   const logoutSent = useRef(false);
 
-  const sendActivity = (action: "login" | "logout", useBeacon = false) => {
+  const sendActivity = useCallback((action: "login" | "logout", useBeacon = false) => {
     if (!session?.user?.id || session?.user?.is_super) return;
 
     const payload = JSON.stringify({ action });
@@ -26,7 +26,7 @@ const UserActivityTracker = () => {
       keepalive: true,
       credentials: "include",
     }).catch(() => {});
-  };
+  }, [session?.user?.id, session?.user?.is_super]);
 
   useEffect(() => {
     if (status !== "authenticated" || !session?.user?.id || session?.user?.is_super) return;
@@ -36,7 +36,7 @@ const UserActivityTracker = () => {
       logoutSent.current = false;
       sendActivity("login");
     }
-  }, [status, session?.user?.id, session?.user?.is_super]);
+  }, [sendActivity, status, session?.user?.id, session?.user?.is_super]);
 
   useEffect(() => {
     if (status !== "authenticated" || !session?.user?.id || session?.user?.is_super) return;
@@ -54,14 +54,14 @@ const UserActivityTracker = () => {
       window.removeEventListener("beforeunload", handleLogout);
       window.removeEventListener("pagehide", handleLogout);
     };
-  }, [status, session?.user?.id, session?.user?.is_super]);
+  }, [sendActivity, status, session?.user?.id, session?.user?.is_super]);
 
   useEffect(() => {
     if (status === "unauthenticated" && lastUserId.current && !logoutSent.current) {
       sendActivity("logout");
       logoutSent.current = true;
     }
-  }, [status]);
+  }, [sendActivity, status]);
 
   return null;
 };

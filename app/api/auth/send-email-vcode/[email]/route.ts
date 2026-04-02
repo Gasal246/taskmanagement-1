@@ -6,9 +6,9 @@ import { NextRequest, NextResponse } from "next/server";
 
 connectDB();
 
-export async function POST(req: NextRequest, { params }:{ params: { email: string }}) {
+export async function POST(req: NextRequest, context: { params: Promise<{ email: string }> }) {
     try {
-        const email = params?.email;
+        const { email } = await context.params;
         if (!email) {
             return NextResponse.json({ message: "Email is required" }, { status: 400 });
         }

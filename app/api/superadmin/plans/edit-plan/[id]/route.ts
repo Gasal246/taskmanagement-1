@@ -13,9 +13,9 @@ interface Body {
     [key: string]: any;
 }
 
-export async function POST (req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST (req: NextRequest, context: { params: Promise<{ id: string }> }) {
     try {
-        
+        const { id } = await context.params;
         const session: any = await auth();
         if (!session) {
             return new NextResponse("Authorisation Error", { status: 401 })
@@ -30,7 +30,7 @@ export async function POST (req: NextRequest, { params }: { params: { id: string
             staff_count: body.staff_count,
             region_count: body.region_count,
         }
-        const updatedPlan = await Superadmin_plans.findByIdAndUpdate(params?.id, updationData, { new: true });
+        const updatedPlan = await Superadmin_plans.findByIdAndUpdate(id, updationData, { new: true });
         return NextResponse.json(updatedPlan);
     } catch (error) {
         console.log(error);

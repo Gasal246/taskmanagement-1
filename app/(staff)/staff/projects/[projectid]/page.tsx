@@ -141,7 +141,7 @@ const ProjectView = () => {
     fetchAreas();
   }, [selectedRegionId, getAreasForRegion, form]);
 
-  const teams = teamsData?.data ?? [];
+  const teams = useMemo(() => teamsData?.data ?? [], [teamsData?.data]);
 
   const projectTeamPeople = useMemo(() => {
     const peopleMap = new Map<string, any>();

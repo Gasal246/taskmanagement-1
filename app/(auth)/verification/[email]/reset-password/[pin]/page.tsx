@@ -24,9 +24,9 @@ const formSchema = z.object({
   path: ["cpassword"]
 });
 
-const ResetPassword = ({ params }: { params: { email: string, pin: string } }) => {
-  const email = decodeURIComponent(params?.email) || '';
-  const pin = params?.pin
+const ResetPassword = ({ params }: { params: Promise<{ email: string, pin: string }> }) => {
+  const { email: encodedEmail, pin } = React.use(params);
+  const email = decodeURIComponent(encodedEmail) || '';
   const router = useRouter()
   const { mutateAsync: verifyOtp } = useVerifyUserOtp();
   const { mutateAsync: setupNewPassword, isPending: settingupPassword } = useSetupUserPassword();

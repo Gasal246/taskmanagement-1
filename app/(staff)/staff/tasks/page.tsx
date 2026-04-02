@@ -10,8 +10,18 @@ import { useGetAllStaffTasks } from "@/query/business/queries";
 import Cookies from "js-cookie";
 import { toast } from "sonner";
 import LoaderSpin from "@/components/shared/LoaderSpin";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 const { RangePicker } = DatePicker;
+const PAGE_SIZE = 9;
 
 type TaskTab = "all" | "single" | "project";
 
@@ -62,6 +72,7 @@ const StaffTasks = () => {
     taskType: "all",
   });
   const [canAdd, setCanAdd] = useState(false);
+  const [page, setPage] = useState(1);
 
   const { data: tasks, isLoading } = useGetAllStaffTasks(filters);
 
@@ -84,8 +95,14 @@ const StaffTasks = () => {
       taskType: activeTab,
       start_date: appliedRange.start || undefined,
       end_date: appliedRange.end || undefined,
+      page: String(page),
+      limit: String(PAGE_SIZE),
     });
-  }, [activeTab, appliedRange]);
+  }, [activeTab, appliedRange, page]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [activeTab, appliedRange.start, appliedRange.end]);
 
   const handleDateChange = (dates: any, dateStrings: [string, string]) => {
     setRangeValue(dates);
@@ -105,9 +122,27 @@ const StaffTasks = () => {
     setRangeValue(null);
   };
 
-  const taskList = [...(tasks?.data ?? [])].sort(
-    (a: any, b: any) => getTaskSortTime(b) - getTaskSortTime(a)
-  );
+  const taskList = tasks?.data ?? [];
+  const pagination = tasks?.pagination ?? { page: 1, totalPages: 1, total: 0, limit: PAGE_SIZE };
+  const totalPages = Math.max(1, pagination.totalPages || 1);
+
+  const pageItems = React.useMemo(() => {
+    if (totalPages <= 1) return [];
+    if (totalPages <= 7) return Array.from({ length: totalPages }, (_, index) => index + 1);
+
+    const items: Array<number | "ellipsis"> = [];
+    const visiblePages = new Set([1, totalPages, page - 1, page, page + 1]);
+
+    for (let current = 1; current <= totalPages; current += 1) {
+      if (visiblePages.has(current)) {
+        items.push(current);
+      } else if (items[items.length - 1] !== "ellipsis") {
+        items.push("ellipsis");
+      }
+    }
+
+    return items;
+  }, [page, totalPages]);
 
   return (
     <div className="p-4 pb-20 space-y-3">
@@ -204,7 +239,7 @@ const StaffTasks = () => {
           <h2 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
             <ListTodo size={16} /> Tasks
           </h2>
-          <p className="text-xs text-slate-400">{taskList.length} tasks</p>
+          <p className="text-xs text-slate-400">{pagination.total || 0} tasks</p>
         </div>
 
         {isLoading && (
@@ -297,6 +332,53 @@ const StaffTasks = () => {
             );
           })}
         </div>
+
+        {totalPages > 1 && (
+          <div className="mt-4 flex justify-end">
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    href="#"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      setPage((current) => Math.max(1, current - 1));
+                    }}
+                    className={page <= 1 ? "pointer-events-none opacity-50" : ""}
+                  />
+                </PaginationItem>
+                {pageItems.map((item, index) => (
+                  <PaginationItem key={`${item}-${index}`}>
+                    {item === "ellipsis" ? (
+                      <PaginationEllipsis />
+                    ) : (
+                      <PaginationLink
+                        href="#"
+                        isActive={item === page}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          setPage(item);
+                        }}
+                      >
+                        {item}
+                      </PaginationLink>
+                    )}
+                  </PaginationItem>
+                ))}
+                <PaginationItem>
+                  <PaginationNext
+                    href="#"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      setPage((current) => Math.min(totalPages, current + 1));
+                    }}
+                    className={page >= totalPages ? "pointer-events-none opacity-50" : ""}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
+        )}
       </div>
     </div>
   );

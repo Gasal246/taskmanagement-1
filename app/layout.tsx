@@ -9,6 +9,7 @@ import ReduxProvider from "@/redux/ReduxProvider";
 import UserActivityTracker from "@/components/shared/UserActivityTracker";
 import FcmNotifications from "@/components/shared/FcmNotifications";
 import PwaInstallPrompt from "@/components/shared/PwaInstallPrompt";
+import AppBootstrap from "@/components/shared/AppBootstrap";
 
 const ar_one_sans = AR_One_Sans({ subsets: ["latin"] });
 
@@ -46,6 +47,7 @@ export default async function RootLayout({
         <SessionProvider session={session}>
           <TanstackProvider>
             <ReduxProvider>
+              <AppBootstrap />
               <UserActivityTracker />
               <PwaInstallPrompt />
               <FcmNotifications />

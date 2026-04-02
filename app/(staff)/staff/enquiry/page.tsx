@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Cookies from "js-cookie";
@@ -94,7 +94,7 @@ export default function EnquiriesPage() {
   );
   const [showFilters, setShowFilters] = useState(Boolean(savedListState?.showFilters));
   const [activeListFilter, setActiveListFilter] = useState(savedListState?.activeListFilter ?? "all");
-  const [page, setPage] = useState(savedListState?.page || 1);
+  const [page, setPage] = useState<number>(savedListState?.page || 1);
   const [businessId, setBusinessId] = useState("");
   const [enquiryBroughtByName, setEnquiryBroughtByName] = useState(savedListState?.enquiryBroughtByName ?? "");
   const [createdByName, setCreatedByName] = useState(savedListState?.createdByName ?? "");
@@ -118,6 +118,7 @@ export default function EnquiriesPage() {
 
   // Filters (linked to API keys)
   const [filters, setFilters] = useState(restoredFilters);
+  type FilterState = typeof restoredFilters;
 
   const normalizedFilters = useMemo(() => ({
     ...filters,
@@ -147,16 +148,16 @@ export default function EnquiriesPage() {
   const { data: areas, isLoading: isAreaLoading } = useGetEqAreas(filters.city_id);
   const { data: camps, isLoading: isCampLoading } = useGetEqCampsByArea(filters?.area_id);
 
-  const fetchCountries = async () => {
+  const fetchCountries = useCallback(async () => {
     const res = await GetCountries();
     if (res?.status == 200) {
       setCountries(res?.countries);
     }
-  }
+  }, [GetCountries]);
 
   useEffect(() => {
     fetchCountries();
-  }, []);
+  }, [fetchCountries]);
 
   useEffect(() => {
     const domainCookie = Cookies.get("user_domain");
@@ -193,8 +194,8 @@ export default function EnquiriesPage() {
      HANDLE FILTER UPDATES (auto triggers useQuery)
   ---------------------------------------------------------*/
 
-  const updateFilter = (key, value) => {
-    setFilters(prev => ({
+  const updateFilter = (key: keyof FilterState, value: string | undefined) => {
+    setFilters((prev: FilterState) => ({
       ...prev,
       [key]: value === undefined ? "" : value,   // force string or ""
     }));
@@ -265,22 +266,22 @@ export default function EnquiriesPage() {
           DATE HANDLERS
   ---------------------------------------------------------*/
 
-  const handleRangeChange = (dates, [from, to]) => {
+  const handleRangeChange = (dates: any, [from, to]: [string, string]) => {
     setRangeValue(dates || null);
     updateFilter("from_date", from || "");
     updateFilter("due_date", to || "");
   };
 
-  const handleLeaseChange = (date, dateString) => {
+  const handleLeaseChange = (date: any, dateString: string | string[]) => {
     setLeaseValue(date || null);
-    updateFilter("lease_expiry", dateString || "");
+    updateFilter("lease_expiry", Array.isArray(dateString) ? dateString[0] || "" : dateString || "");
   };
 
   const currentUserId = String(session?.user?.id || "");
-  const pageEnquiries = enquiries?.data ?? enquiries?.enquiries ?? [];
+  const pageEnquiries: any[] = enquiries?.data ?? enquiries?.enquiries ?? [];
   const pagination = enquiries?.pagination;
 
-  const isCreatedByCurrentUser = (enquiry) => {
+  const isCreatedByCurrentUser = (enquiry: any) => {
     if (!currentUserId) return false;
     return String(enquiry?.createdBy?._id ?? enquiry?.createdBy ?? "") === currentUserId;
   };
@@ -385,7 +386,7 @@ export default function EnquiriesPage() {
               type="text"
               placeholder="Search UUID or camp name, or use status: ..., priority: ..., occupancy: ..., wifi: ..."
               value={filters.search}
-              onChange={(e) => updateFilter("search", e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateFilter("search", e.target.value)}
               className="w-full rounded-lg border border-slate-700/70 bg-slate-950/40 py-2 pl-9 pr-3 text-sm text-slate-200 placeholder:text-slate-500 focus:border-slate-500 focus:outline-none"
             />
           </div>
@@ -419,7 +420,7 @@ export default function EnquiriesPage() {
                 label="Country"
                 value={filters.country_id}
                 options={countries}
-                onChange={(v) => updateFilter("country_id", v)}
+                onChange={(v: string) => updateFilter("country_id", v)}
                 disabled={false}
               />
 
@@ -428,7 +429,7 @@ export default function EnquiriesPage() {
                 label="Region"
                 value={filters.region_id}
                 options={regions?.region}
-                onChange={(v) => updateFilter("region_id", v)}
+                onChange={(v: string) => updateFilter("region_id", v)}
                 disabled={!filters.country_id}
               />
 
@@ -437,7 +438,7 @@ export default function EnquiriesPage() {
                 label="Province"
                 value={filters.province_id}
                 options={provinces?.provinces}
-                onChange={(v) => updateFilter("province_id", v)}
+                onChange={(v: string) => updateFilter("province_id", v)}
                 disabled={!filters.region_id}
               />
 
@@ -446,7 +447,7 @@ export default function EnquiriesPage() {
                 label="City"
                 value={filters.city_id}
                 options={cities?.cities}
-                onChange={(v) => updateFilter("city_id", v)}
+                onChange={(v: string) => updateFilter("city_id", v)}
                 disabled={!filters.province_id}
               />
 
@@ -455,7 +456,7 @@ export default function EnquiriesPage() {
                 label="Area"
                 value={filters.area_id}
                 options={areas?.areas}
-                onChange={(v) => updateFilter("area_id", v)}
+                onChange={(v: string) => updateFilter("area_id", v)}
                 disabled={!filters.city_id}
               />
 
@@ -464,7 +465,7 @@ export default function EnquiriesPage() {
                 label="Camp"
                 value={filters.camp_id}
                 options={camps?.camps}
-                onChange={(v) => updateFilter("camp_id", v)}
+                onChange={(v: string) => updateFilter("camp_id", v)}
                 disabled={!filters.area_id}
               />
 
@@ -504,7 +505,7 @@ export default function EnquiriesPage() {
                 value={filters.status}
                 disabled={false}
                 options={STATUS_OPTIONS}
-                onChange={(v) => updateFilter("status", v)}
+                onChange={(v: string) => updateFilter("status", v)}
               />
 
               {/* NEXT ACTION */}
@@ -513,7 +514,7 @@ export default function EnquiriesPage() {
                 value={filters.next_action}
                 disabled={false}
                 options={NEXT_ACTION_OPTIONS}
-                onChange={(v) => updateFilter("next_action", v)}
+                onChange={(v: string) => updateFilter("next_action", v)}
               />
 
               {/* Occupancy */}
@@ -530,7 +531,7 @@ export default function EnquiriesPage() {
                   <input
                     type="number"
                     value={filters.occupancy}
-                    onChange={(e) => updateFilter("occupancy", e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateFilter("occupancy", e.target.value)}
                     placeholder="Enter Occupancy"
                     className="w-full bg-transparent border border-slate-800 rounded p-2 text-slate-200 text-sm mt-[3px]"
                   />
@@ -546,7 +547,7 @@ export default function EnquiriesPage() {
                   { _id: "true", name: "Yes" },
                   { _id: "false", name: "No" },
                 ]}
-                onChange={(v) => updateFilter("wifi_available", v)}
+                onChange={(v: string) => updateFilter("wifi_available", v)}
               />
 
               {/* Competition */}
@@ -558,7 +559,7 @@ export default function EnquiriesPage() {
                   { _id: "true", name: "Active" },
                   { _id: "false", name: "None" },
                 ]}
-                onChange={(v) => updateFilter("competition", v)}
+                onChange={(v: string) => updateFilter("competition", v)}
               />
 
               {/* Camp Capacity */}
@@ -567,7 +568,7 @@ export default function EnquiriesPage() {
                 value={filters.capacity}
                 disabled={false}
                 options={Eq_CAPACITY_OPTIONS}
-                onChange={(v) => updateFilter("capacity", v)}
+                onChange={(v: string) => updateFilter("capacity", v)}
               />
 
               {/* Priority */}
@@ -576,7 +577,7 @@ export default function EnquiriesPage() {
                 value={filters.priority}
                 disabled={false}
                 options={PRIORITY_OPTIONS}
-                onChange={(v) => updateFilter("priority", v)}
+                onChange={(v: string) => updateFilter("priority", v)}
               />
 
               {/* Dates */}
@@ -788,7 +789,19 @@ export default function EnquiriesPage() {
 /* -------------------------------------------------------
      REUSABLE FILTER SELECT COMPONENT
 ---------------------------------------------------------*/
-function FilterSelect({ label, value, options, onChange, disabled }) {
+function FilterSelect({
+  label,
+  value,
+  options,
+  onChange,
+  disabled,
+}: {
+  label: string;
+  value: string;
+  options: any[];
+  onChange: (value: string) => void;
+  disabled: boolean;
+}) {
   const isActive = value !== "" && value !== undefined && value !== null && value !== "all";
   return (
     <div className="w-full lg:w-1/4 p-1">
@@ -808,7 +821,7 @@ function FilterSelect({ label, value, options, onChange, disabled }) {
 
         <Select
           value={value === "" ? undefined : value}
-          onValueChange={(v) => onChange(v)}
+          onValueChange={(v: string) => onChange(v)}
           disabled={disabled}
         >
           <SelectTrigger className={`${value ? "text-slate-200" : "text-slate-400"}`}>
@@ -816,7 +829,7 @@ function FilterSelect({ label, value, options, onChange, disabled }) {
           </SelectTrigger>
 
           <SelectContent>
-            {options?.map((o) => (
+            {options?.map((o: any) => (
               <SelectItem key={o._id} value={o._id}>
                 {o.country_name ||
                   o.region_name ||
@@ -835,7 +848,19 @@ function FilterSelect({ label, value, options, onChange, disabled }) {
   );
 }
 
-function FilterCapacity({ label, value, options, onChange, disabled }) {
+function FilterCapacity({
+  label,
+  value,
+  options,
+  onChange,
+  disabled,
+}: {
+  label: string;
+  value: string;
+  options: string[];
+  onChange: (value: string) => void;
+  disabled: boolean;
+}) {
   const isActive = value !== "" && value !== undefined && value !== null;
   return (
     <div className="w-full lg:w-1/4 p-1">
@@ -855,7 +880,7 @@ function FilterCapacity({ label, value, options, onChange, disabled }) {
 
         <Select
           value={value === "" ? undefined : value}
-          onValueChange={(v) => onChange(v)}
+          onValueChange={(v: string) => onChange(v)}
           disabled={disabled}
         >
           <SelectTrigger className={`${value ? "text-slate-200" : "text-slate-400"}`}>
@@ -863,7 +888,7 @@ function FilterCapacity({ label, value, options, onChange, disabled }) {
           </SelectTrigger>
 
           <SelectContent>
-            {options?.map((o, i) => (
+            {options?.map((o: string, i: number) => (
               <SelectItem key={i} value={o}>
                 {o}
               </SelectItem>

@@ -8,9 +8,9 @@ import Project_Teams from "@/models/project_team.model";
 import "@/models/business_skills.model";
 connectDB();
 
-export async function GET(req:NextRequest, {params}: {params: {taskid:string}}){
+export async function GET(req:NextRequest, context: {params: Promise<{taskid:string}>}){
     try{
-        const {taskid} = params;
+        const { taskid } = await context.params;
         
         let task = await Business_Tasks.findById(taskid);
         if(task){

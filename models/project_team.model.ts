@@ -22,6 +22,9 @@ const Project_TeamsSchema: Schema = new Schema({
     members_count: {type: Number}
 }, { timestamps: true });
 
+Project_TeamsSchema.index({ team_head: 1, _id: 1 });
+Project_TeamsSchema.index({ project_id: 1 });
+
 const Project_Teams = mongoose.models?.project_teams || mongoose.model<IProject_Teams>('project_teams', Project_TeamsSchema);
 
 export default Project_Teams;

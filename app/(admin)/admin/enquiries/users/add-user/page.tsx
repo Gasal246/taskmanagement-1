@@ -17,7 +17,7 @@ export default function AddUserPage() {
   const router = useRouter();
 
   const [search, setSearch] = useState("");
-  const [selectedUser, setSelectedUser] = useState(null);
+  const [selectedUser, setSelectedUser] = useState<any>(null);
 
   const { businessData } = useSelector((state: RootState) => state.user);
   const { data: loadedStaffs, isLoading: loadingStaffData } = useGetBusinessStaffs(businessData?._id);
@@ -34,7 +34,7 @@ export default function AddUserPage() {
         `${u.user_id.name} (${u.user_id.email})`.toLowerCase() === search.toLowerCase()
     );
     setSelectedUser(found?.user_id || null);
-  }, [search]);
+  }, [loadedStaffs, search]);
 
   const handleAdd = async() => {
     if (!selectedUser) {

@@ -1,5 +1,5 @@
 "use client"
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Popover, PopoverContent, PopoverTrigger, } from "@/components/ui/popover"
 import Image from 'next/image'
 import { Bell, ListTodo, Menu } from 'lucide-react'
@@ -13,8 +13,6 @@ import NotificationPane from '../shared/NotificationPane'
 import { useDispatch, useSelector } from 'react-redux'
 import { AppDispatch, RootState } from '@/redux/store'
 import Cookies from "js-cookie";
-import { getBusinessByIdFunc } from '@/query/business/functions'
-import { loadBusinessData } from '@/redux/slices/userdata'
 import GoogleTranslate from '../shared/GoogleTranslate'
 
 type AdminTopbarProps = {
@@ -37,22 +35,6 @@ const AdminTopbar = ({ onMobileMenuClick }: AdminTopbarProps) => {
     const roleText = roleLabel ? `Role: ${formattedRoleLabel}` : "";
     const domainText = domainLabel ? `Domain: ${formattedDomainLabel}` : "";
     const roleDomainText = [roleText, domainText].filter(Boolean).join(" | ");
-
-    const hydrateBusinessData = useCallback(async () => {
-        const cookieValue = Cookies.get("user_domain");
-        const businessId = cookieValue ? JSON.parse(cookieValue)?.value : null;
-        if (!businessId) return;
-        const res = await getBusinessByIdFunc(businessId);
-        if (res?.data?.info) {
-            dispatch(loadBusinessData(res.data.info));
-        }
-    }, [dispatch]);
-
-    useEffect(() => {
-        if (!businessData) {
-            hydrateBusinessData();
-        }
-    }, [businessData, hydrateBusinessData]);
 
     useEffect(() => {
         setIsHydrated(true);

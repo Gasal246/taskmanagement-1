@@ -209,7 +209,7 @@ const SelectDomainPage = () => {
   const showLoadingState = isFetchingDomains || domainsLoading;
 
   return (
-    <div className="min-h-screen w-full px-4 py-6 sm:p-6 flex items-center justify-center">
+    <div className="min-h-screen w-full px-4 py-6 sm:p-6 flex items-center justify-center bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900">
       <div className="w-full max-w-3xl space-y-3">
         <div className="rounded-xl border border-slate-800 bg-gradient-to-tr from-slate-950/70 to-slate-900/60 p-5">
           <h1 className="text-2xl font-semibold">Choose your domain</h1>

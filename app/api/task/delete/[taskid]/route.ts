@@ -7,10 +7,10 @@ connectDB();
 
 export async function DELETE(
   _req: NextRequest,
-  { params }: { params: { taskid: string } }
+  context: { params: Promise<{ taskid: string }> }
 ) {
   try {
-    const { taskid } = params;
+    const { taskid } = await context.params;
     if (!taskid) {
       return NextResponse.json({ message: "Please provide task_id" }, { status: 400 });
     }

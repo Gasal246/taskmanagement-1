@@ -201,7 +201,7 @@ export default function EditEnquiry() {
     const recentComments = sortedComments.slice(0, 3);
     const hasMoreComments = sortedComments.length > 3;
 
-    const form = useForm<any>({
+    const form = useForm<z.infer<typeof enquirySchema>>({
         resolver: zodResolver(enquirySchema),
         defaultValues: {
             enquiry_id: params.enquiry_id,
@@ -312,7 +312,7 @@ export default function EditEnquiry() {
 
 
     const { control, handleSubmit } = form;
-    const { fields, append, remove, replace } = useFieldArray({ control, name: "contacts" });
+    const { fields, append, remove, replace } = useFieldArray<z.infer<typeof enquirySchema>, "contacts">({ control, name: "contacts" });
     const selectClassName = "w-full rounded-md border border-slate-700 bg-slate-900 text-slate-200 p-2 focus:border-slate-500 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0";
 
     const formatDate = (dateString?: string | null) => {

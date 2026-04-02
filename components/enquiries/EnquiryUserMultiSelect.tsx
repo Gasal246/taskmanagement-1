@@ -29,7 +29,7 @@ export default function EnquiryUserMultiSelect({
   const [search, setSearch] = useState("");
   const [draftSelection, setDraftSelection] = useState<string[]>([]);
 
-  const safeValue = Array.isArray(value) ? value : [];
+  const safeValue = useMemo(() => (Array.isArray(value) ? value : []), [value]);
 
   useEffect(() => {
     if (open) {

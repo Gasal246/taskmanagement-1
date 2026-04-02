@@ -4,9 +4,9 @@ import { NextRequest, NextResponse } from "next/server";
 
 connectDB();
 
-export async function POST (req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST (req: NextRequest, context: { params: Promise<{ id: string }> }) {
     try {
-        const id = params.id;
+        const { id } = await context.params;
         const response = await Roles.findByIdAndDelete(id);
         return Response.json({ status: 200, data: response });
     } catch (error) {
