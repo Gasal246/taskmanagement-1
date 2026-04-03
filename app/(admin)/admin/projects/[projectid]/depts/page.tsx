@@ -91,7 +91,7 @@ const ProjectDepartments = () => {
   };
 
   return (
-    <div className='p-5 overflow-y-scroll pb-20 min-h-screen'>
+    <div className='p-4 sm:p-5 overflow-y-scroll pb-20 min-h-screen'>
       <Breadcrumb className='mb-4'>
         <BreadcrumbList>
           <BreadcrumbItem>
@@ -108,15 +108,15 @@ const ProjectDepartments = () => {
         </BreadcrumbList>
       </Breadcrumb>
 
-      <div className="rounded-2xl border border-slate-800 bg-gradient-to-tr from-slate-950/70 to-slate-900/70 p-5">
-        <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="rounded-2xl border border-slate-800 bg-gradient-to-tr from-slate-950/70 to-slate-900/70 p-4 sm:p-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           <div>
             <p className="text-[13px] font-semibold uppercase tracking-[0.35em] text-cyan-400/70">Project Departments</p>
           </div>
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            className='p-2.5 px-4 rounded-lg border border-slate-700 hover:border-cyan-500 bg-gradient-to-tr from-slate-900 to-slate-800 text-xs font-semibold flex gap-2 items-center'
+            className='p-2.5 px-4 rounded-lg border border-slate-700 hover:border-cyan-500 bg-gradient-to-tr from-slate-900 to-slate-800 text-xs font-semibold flex gap-2 items-center justify-center w-full sm:w-auto'
             onClick={() => setAddDepartmentDialog(true)}
           >
             <Plus size={14} />
@@ -142,7 +142,7 @@ const ProjectDepartments = () => {
       </div>
 
       <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
-        <div className="flex items-center justify-between mb-3">
+        <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
             <Building size={16} className="text-cyan-300" />
             Added Departments

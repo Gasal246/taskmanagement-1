@@ -459,7 +459,7 @@ const ProjectView = () => {
   }
 
   return (
-    <div className='p-5 overflow-y-scroll pb-20 min-h-screen'>
+    <div className='p-4 sm:p-5 overflow-y-scroll pb-20 min-h-screen'>
       <Breadcrumb className='mb-3'>
         <BreadcrumbList>
           <BreadcrumbItem>
@@ -473,20 +473,20 @@ const ProjectView = () => {
       </Breadcrumb>
 
       <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg min-h-[15vh] pb-3 mb-2 border border-slate-700/50">
-        <div className="mb-1 flex items-center justify-between">
+        <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h1 className='font-medium text-xs text-slate-200 flex items-center gap-1'>
             <PanelsTopLeft strokeWidth={2} size={14} /> Project Details
           </h1>
-          <div className='flex justify-end items-baseline gap-5'>
+          <div className='flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:justify-end sm:items-baseline sm:gap-3'>
             {project?.data?.is_approved ? null : (
-              <div>
-                {isApproving ? <Button disabled={true} className='text-xs'>Approving...</Button> : <Button onClick={markAsApproved} className='text-xs'>Approve</Button> }
+              <div className="w-full sm:w-auto">
+                {isApproving ? <Button disabled={true} className='w-full text-xs sm:w-auto'>Approving...</Button> : <Button onClick={markAsApproved} className='w-full text-xs sm:w-auto'>Approve</Button> }
               </div>
             )}
             <motion.div
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              className='p-2 px-4 group rounded-lg border border-slate-700 hover:border-slate-500 bg-gradient-to-tr from-slate-900 to-slate-800 cursor-pointer text-xs font-medium flex gap-1 items-center'
+              className='p-2 px-4 group rounded-lg border border-slate-700 hover:border-slate-500 bg-gradient-to-tr from-slate-900 to-slate-800 cursor-pointer text-xs font-medium flex gap-1 items-center justify-center w-full sm:w-auto'
               onClick={handleClickEdit}
             >
               <PencilRuler className='group-hover:text-pink-300' size={12} />
@@ -495,7 +495,7 @@ const ProjectView = () => {
             <motion.div
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              className='p-2 px-4 group rounded-lg border border-red-700/60 hover:border-red-500 bg-gradient-to-tr from-slate-900 to-slate-800 cursor-pointer text-xs font-medium flex gap-1 items-center text-red-300'
+              className='p-2 px-4 group rounded-lg border border-red-700/60 hover:border-red-500 bg-gradient-to-tr from-slate-900 to-slate-800 cursor-pointer text-xs font-medium flex gap-1 items-center justify-center text-red-300 w-full sm:w-auto'
               onClick={() => setDeleteProjectDialogOpen(true)}
             >
               <Trash2 className='group-hover:text-red-200' size={12} />
@@ -504,49 +504,49 @@ const ProjectView = () => {
           </div>
         </div>
         <div>
-          <div className="w-full lg:w-1/2 mb-2.5">
+          <div className="mb-2.5 w-full lg:w-1/2">
             <p className='text-xl text-slate-300 font-semibold'>{project?.data?.project_name || "-"}</p>
             <p className='text-sm text-slate-300 font-medium'>{project?.data?.project_description || "-"}</p>
           </div>
         </div>
-        <div className="w-full flex flex-wrap items-center lg:w-1/2">
-          <div className="w-full lg:w-1/2 mb-2.5">
+        <div className="w-full flex flex-wrap items-start sm:-mx-1 lg:w-1/2">
+          <div className="mb-2.5 w-full sm:w-1/2 sm:px-1">
             <p className='text-xs text-slate-400'>Progress</p>
             <p className='text-xs text-slate-300 font-semibold'>{progress || "0"}%</p>
           </div>
-          <div className="w-full lg:w-1/2 mb-2.5">
+          <div className="mb-2.5 w-full sm:w-1/2 sm:px-1">
             <p className='text-xs text-slate-400'>Start Date</p>
             <p className='text-xs text-slate-300 font-semibold'>{formatDateTiny(project?.data?.start_date) || "-"}</p>
           </div>
-          <div className="w-full lg:w-1/2 mb-2.5">
+          <div className="mb-2.5 w-full sm:w-1/2 sm:px-1">
             <p className='text-xs text-slate-400'>End Date</p>
             <p className='text-xs text-slate-300 font-semibold'>{formatDateTiny(project?.data?.end_date) || "-"}</p>
           </div>
-          <div className="w-full lg:w-1/2 mb-2.5">
+          <div className="mb-2.5 w-full sm:w-1/2 sm:px-1">
             <p className='text-xs text-slate-400'>Status</p>
             <p className={`text-xs font-semibold capitalize ${project?.data?.status == "Pending" ? 'text-gray-600' : project?.data.status == "completed" ? 'text-green-600' : project?.data?.status == "approved" ? 'text-blue-400' : project?.data?.status == "cancelled" ? 'text-red-600' : 'text-gray-600'}`}>
               {project?.data?.status}
             </p>
           </div>
 
-          <div className="w-full lg:w-1/2 mb-2.5">
+          <div className="mb-2.5 w-full sm:w-1/2 sm:px-1">
             <p className='text-xs text-slate-400'>Region</p>
             <p className='text-xs text-slate-300 font-semibold'>{project?.data?.region?.region_name || "-"}</p>
           </div>
 
-          <div className="w-full lg:w-1/2 mb-2.5">
+          <div className="mb-2.5 w-full sm:w-1/2 sm:px-1">
             <p className='text-xs text-slate-400'>Area</p>
             <p className='text-xs text-slate-300 font-semibold'>{project?.data?.area?.area_name || "-"}</p>
           </div>
 
-          <div className="w-full lg:w-1/2 mb-2.5">
+          <div className="mb-2.5 w-full sm:w-1/2 sm:px-1">
             <p className='text-xs text-slate-400'>Project Type</p>
             <p className={`text-xs font-semibold capitalize text-slate-300`}>
               {project?.data?.type}
             </p>
           </div>
 
-          <div className="w-full lg:w-1/2 mb-2.5">
+          <div className="mb-2.5 w-full sm:w-1/2 sm:px-1">
             <p className='text-xs text-slate-400'>Project Priority</p>
             <p className={`text-xs font-semibold capitalize ${project?.data?.priority == "high" ? 'text-red-600' : 'text-slate-300'} flex gap-1 items-center`}>
               <Square color='gray' strokeWidth={1} size={8} fill={project?.data?.priority === "high" ? '#ef4444' : project?.data?.priority === 'normal' ? 'gold' : 'silver'} /> {project?.data?.priority}
@@ -556,14 +556,14 @@ const ProjectView = () => {
       </div>
 
       <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg min-h-[20vh] mb-2 border border-slate-700/50">
-        <div className="mb-2 flex items-center justify-between">
+        <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="font-medium text-xs text-slate-300 flex items-center gap-1">
             <Building size={14} /> Project Departments
           </h1>
           <motion.div
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            className='p-2 px-4 rounded-lg border border-slate-700 hover:border-slate-500 bg-gradient-to-tr from-slate-900 to-slate-800 cursor-pointer text-xs font-medium flex gap-1 items-center'
+            className='p-2 px-4 rounded-lg border border-slate-700 hover:border-slate-500 bg-gradient-to-tr from-slate-900 to-slate-800 cursor-pointer text-xs font-medium flex gap-1 items-center justify-center w-full sm:w-auto'
             onClick={handleNavigateToDepts}
           >
             <PencilRuler size={12} />
@@ -572,7 +572,7 @@ const ProjectView = () => {
         </div>
         <div className="flex flex-wrap">
           {project?.data?.departments?.map((dept: any) => (
-            <div className="w-full lg:w-3/12 p-1" key={dept?._id}>
+            <div className="w-full p-1 sm:w-1/2 xl:w-1/4" key={dept?._id}>
               <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 px-3 py-2 rounded-lg border border-slate-700 hover:border-cyan-800 flex items-center justify-between">
                 <span className="font-medium text-xs text-slate-300">{dept?.department_name}</span>
                 {dept?.is_active && <CheckCircle size={14} className="text-cyan-500" />}
@@ -584,14 +584,14 @@ const ProjectView = () => {
       </div>
 
       <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg min-h-[20vh] mb-2 border border-slate-700/50">
-        <div className="mb-2 flex items-center justify-between">
+        <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="font-medium text-xs text-slate-300 flex items-center gap-1">
             <Users size={14} /> Teams
           </h1>
           <motion.div
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            className='p-2 px-4 rounded-lg border border-slate-700 hover:border-slate-500 bg-gradient-to-tr from-slate-900 to-slate-800 cursor-pointer text-xs font-medium flex gap-1 items-center'
+            className='p-2 px-4 rounded-lg border border-slate-700 hover:border-slate-500 bg-gradient-to-tr from-slate-900 to-slate-800 cursor-pointer text-xs font-medium flex gap-1 items-center justify-center w-full sm:w-auto'
             onClick={handleNavigateToTeams}
           >
             <PencilRuler size={12} />
@@ -606,7 +606,7 @@ const ProjectView = () => {
             <p className="text-xs text-slate-400">No teams added to this project.</p>
           )}
           {teams.map((team: any) => (
-            <div className="w-full lg:w-3/12 p-1" key={team?._id}>
+            <div className="w-full p-1 sm:w-1/2 xl:w-1/4" key={team?._id}>
               <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg border border-slate-700 hover:border-cyan-800 relative">
                 <h1 className="font-medium text-xs text-slate-300 flex items-center gap-1">{team?.team_name}</h1>
                 <p className="text-xs text-slate-400">Department: {team?.project_dept_id?.department_name || "-"}</p>
@@ -644,14 +644,14 @@ const ProjectView = () => {
       </div>
 
       <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg min-h-[20vh] mb-2 border border-slate-700/50">
-        <div className="mb-2 flex items-center justify-between">
+        <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="font-medium text-xs text-slate-300 flex items-center gap-1">
             <Workflow size={14} /> Project Flow (Logs)
           </h1>
           <motion.div
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            className='p-2 px-4 rounded-lg border border-slate-700 hover:border-slate-500 bg-gradient-to-tr from-slate-900 to-slate-800 cursor-pointer text-xs font-medium flex gap-1 items-center'
+            className='p-2 px-4 rounded-lg border border-slate-700 hover:border-slate-500 bg-gradient-to-tr from-slate-900 to-slate-800 cursor-pointer text-xs font-medium flex gap-1 items-center justify-center w-full sm:w-auto'
             onClick={handleNavigateToFlows}
           >
             <PencilRuler size={12} />
@@ -679,7 +679,7 @@ const ProjectView = () => {
       </div>
 
       <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg min-h-[20vh] mb-2 border border-slate-700/50">
-        <div className="mb-2 flex items-center justify-between">
+        <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="font-medium text-xs text-slate-300 flex items-center gap-1">
               <Files size={14} /> Project Documents
@@ -729,7 +729,7 @@ const ProjectView = () => {
                 </label>
               </div>
 
-              <div className="flex items-center gap-2 text-xs">
+              <div className="flex flex-wrap items-center gap-2 text-xs">
                 <button
                   type="button"
                   className={`px-3 py-2 rounded-md border ${docAccess === 'public' ? 'border-cyan-600 bg-cyan-900/40 text-cyan-200' : 'border-slate-700 text-slate-300'}`}
@@ -865,13 +865,13 @@ const ProjectView = () => {
                         )}
                       </div>
                       <div className="p-3 text-xs text-slate-200 space-y-2">
-                        <div className="flex items-center justify-between gap-2">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                           <p className="font-semibold truncate" title={doc?.doc_name}>{doc?.doc_name}</p>
                           <span className="px-2 py-0.5 rounded-full text-[10px] bg-slate-800 text-slate-300 border border-slate-700">
                             {docIsPdf ? 'PDF' : 'Image'}
                           </span>
                         </div>
-                        <div className="flex items-center justify-between text-[11px] text-slate-400">
+                        <div className="flex flex-col gap-2 text-[11px] text-slate-400 sm:flex-row sm:items-center sm:justify-between">
                           <span className={`px-2 py-0.5 rounded-full border ${doc?.access_type === 'private' ? 'border-amber-400 text-amber-200' : 'border-cyan-500 text-cyan-200'}`}>
                             {accessLabel}
                           </span>

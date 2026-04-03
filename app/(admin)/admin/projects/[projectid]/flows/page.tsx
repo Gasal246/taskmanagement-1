@@ -48,7 +48,7 @@ const ProjectFlowView = () => {
   }
 
   return (
-    <div className='p-5 overflow-y-scroll pb-20 min-h-screen'>
+    <div className='p-4 sm:p-5 overflow-y-scroll pb-20 min-h-screen'>
       <Breadcrumb className='mb-4'>
         <BreadcrumbList>
           <BreadcrumbItem>
@@ -65,14 +65,14 @@ const ProjectFlowView = () => {
         </BreadcrumbList>
       </Breadcrumb>
 
-      <div className="rounded-2xl border border-slate-800 bg-gradient-to-tr from-slate-950/70 to-slate-900/70 p-5">
-        <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="rounded-2xl border border-slate-800 bg-gradient-to-tr from-slate-950/70 to-slate-900/70 p-4 sm:p-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           <div>
             <p className="text-[11px] uppercase tracking-[0.35em] text-cyan-400/70">Project Flow</p>
             <h1 className="mt-2 text-lg font-semibold text-slate-100">A clean record of every milestone and change.</h1>
             <p className="mt-1 text-xs text-slate-400">Keep everyone aligned with clear, time-stamped activity logs.</p>
           </div>
-          <div className="flex items-center gap-3 text-xs text-slate-300">
+          <div className="flex flex-wrap items-center gap-3 text-xs text-slate-300">
             <div className="rounded-full border border-slate-700 px-3 py-1 flex items-center gap-2">
               <Activity size={14} className="text-cyan-300" />
               {totalLogs} logs
@@ -104,7 +104,7 @@ const ProjectFlowView = () => {
       </div>
 
       <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
-        <div className="flex items-center justify-between mb-3">
+        <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
             <Workflow size={16} className="text-cyan-300" />
             Activity Timeline

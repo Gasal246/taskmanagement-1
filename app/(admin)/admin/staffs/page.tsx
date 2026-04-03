@@ -94,6 +94,46 @@ const Staffs = () => {
   const startIndex = visibleStaffs.length === 0 ? 0 : (page - 1) * limit + 1;
   const endIndex = Math.min(page * limit, visibleStaffs.length);
 
+  const getLastLoginLabel = (staff: any) => {
+    const lastLogin = staff?.user_id?.last_login ? new Date(staff.user_id.last_login) : null;
+    const lastLogout = staff?.user_id?.last_logout ? new Date(staff.user_id.last_logout) : null;
+
+    const formatDay = (date: Date) => date.toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+
+    const formatTime = (date: Date) => {
+      const hours24 = date.getHours();
+      const hours12 = hours24 % 12 || 12;
+      const minutes = `${date.getMinutes()}`.padStart(2, "0");
+      const suffix = hours24 >= 12 ? "pm" : "am";
+      return `${hours12}.${minutes}${suffix}`;
+    };
+
+    if (!lastLogin) {
+      return "Not Logged In";
+    }
+
+    const dayLabel = formatDay(lastLogin);
+    const loginTime = formatTime(lastLogin);
+    const logoutTime = lastLogout ? formatTime(lastLogout) : null;
+
+    return `${dayLabel} ${loginTime}${logoutTime ? ` to ${logoutTime}` : ""}`;
+  };
+
+  const getDesktopLastLoginLabel = (staff: any) => {
+    const label = getLastLoginLabel(staff);
+    const splitIndex = label.lastIndexOf(" ");
+
+    if (splitIndex === -1 || label === "Not Logged In") {
+      return label;
+    }
+
+    return `${label.slice(0, splitIndex)}\n${label.slice(splitIndex + 1)}`;
+  };
+
   const handleViewStaff = async (user: any) => {
     dispatch(loadAdminBusinessStaff(user));
     router.push(`/admin/staffs/view-staff`);
@@ -109,10 +149,10 @@ const Staffs = () => {
   
   return (
     <div className='p-4 pb-10'>
-      <div className="flex justify-between items-center bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 m-1 rounded-lg">
+      <div className="m-1 flex flex-col gap-3 rounded-lg bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className='font-semibold text-md flex items-center gap-1'><Users size={16} /> Staff Management</h1>
-        <Link href="/admin/staffs/add-staff">
-          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className='p-2 px-4 rounded-lg border border-slate-700 hover:border-slate-500 bg-gradient-to-tr from-slate-900 to-slate-800 cursor-pointer  text-sm font-semibold flex gap-1 items-center'>
+        <Link href="/admin/staffs/add-staff" className="w-full sm:w-auto">
+          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className='flex w-full items-center justify-center gap-1 rounded-lg border border-slate-700 bg-gradient-to-tr from-slate-900 to-slate-800 p-2 px-4 text-sm font-semibold hover:border-slate-500 sm:w-auto'>
             <Plus size={18} />
             Add Staff
           </motion.button>
@@ -121,11 +161,11 @@ const Staffs = () => {
       <div className="w-full flex flex-wrap">
         <div className="w-full p-1">
           <div className="bg-gradient-to-tr from-slate-950/60 to-slate-900/60 p-3 rounded-lg min-h-[40vh]">
-            <div className='w-full flex items-center justify-between mb-3'>
+            <div className='mb-3 flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
               <h1 className="font-semibold text-sm text-slate-300 flex items-center gap-1"><Users2 size={16} /> Business Users</h1>
               <FilterStaffsSheet
                 trigger={
-                  <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className='p-2 px-10 rounded-lg border border-slate-700 hover:border-slate-500 bg-gradient-to-tr from-slate-800 to-slate-900 cursor-pointer text-xs font-semibold flex gap-1 items-center'>
+                  <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className='flex w-full items-center justify-center gap-1 rounded-lg border border-slate-700 bg-gradient-to-tr from-slate-800 to-slate-900 p-2 text-xs font-semibold hover:border-slate-500 sm:w-auto sm:px-10'>
                     <Filter size={14} />
                     Filter
                   </motion.div>
@@ -135,19 +175,19 @@ const Staffs = () => {
             {staffFilterValues && <div className="border border-slate-700 p-2 rounded-lg mb-2 border-dashed hover:border-slate-600 select-none">
               <h1 className="text-[10px] text-slate-400 mb-1">Filter Applied</h1>
               <div className="flex flex-wrap gap-1">
-                {staffFilterValues?.regionName && <div className="border border-slate-700 p-1 px-4 rounded-lg border-dotted hover:border-slate-600 cursor-pointer min-w-[150px]">
+                {staffFilterValues?.regionName && <div className="min-w-[130px] flex-1 rounded-lg border border-dotted border-slate-700 p-1 px-4 hover:border-slate-600 sm:flex-none sm:min-w-[150px]">
                   <h1 className="text-[10px] text-slate-400 ">Region</h1>
                   <p className="text-[11px] text-slate-300 ">{staffFilterValues?.regionName}</p>
                 </div>}
-                {staffFilterValues?.areaName && <div className="border border-slate-700 p-1 px-4 rounded-lg border-dotted hover:border-slate-600 cursor-pointer min-w-[150px]">
+                {staffFilterValues?.areaName && <div className="min-w-[130px] flex-1 rounded-lg border border-dotted border-slate-700 p-1 px-4 hover:border-slate-600 sm:flex-none sm:min-w-[150px]">
                   <h1 className="text-[10px] text-slate-400 ">Area</h1>
                   <p className="text-[11px] text-slate-300 ">{staffFilterValues?.areaName}</p>
                 </div>}
-                {staffFilterValues?.locationName && <div className="border border-slate-700 p-1 px-4 rounded-lg border-dotted hover:border-slate-600 cursor-pointer min-w-[150px]">
+                {staffFilterValues?.locationName && <div className="min-w-[130px] flex-1 rounded-lg border border-dotted border-slate-700 p-1 px-4 hover:border-slate-600 sm:flex-none sm:min-w-[150px]">
                   <h1 className="text-[10px] text-slate-400 ">Location</h1>
                   <p className="text-[11px] text-slate-300 ">{staffFilterValues?.locationName}</p>
                 </div>}
-                {staffFilterValues?.skillName && <div className="border border-slate-700 p-1 px-4 rounded-lg border-dotted hover:border-slate-600 cursor-pointer min-w-[150px]">
+                {staffFilterValues?.skillName && <div className="min-w-[130px] flex-1 rounded-lg border border-dotted border-slate-700 p-1 px-4 hover:border-slate-600 sm:flex-none sm:min-w-[150px]">
                   <h1 className="text-[10px] text-slate-400 ">Skill</h1>
                   <p className="text-[11px] text-slate-300 ">{staffFilterValues?.skillName}</p>
                 </div>}
@@ -172,7 +212,42 @@ const Staffs = () => {
               <p className='text-slate-300 text-sm'>{hasSearch ? "No matching staffs found" : "No staffs added"}</p>
             </div>}
             {visibleStaffs?.length > 0 && !loadingStaffData && <div className="w-full">
-              <table className="w-full bg-gradient-to-tr from-slate-950/40 to-slate-900/40 p-4 px-3 rounded-lg">
+              <div className="space-y-3 md:hidden">
+                {pagedStaffs?.map((staff: any) => (
+                  <div key={staff?._id} className="rounded-lg border border-slate-800 bg-gradient-to-tr from-slate-950/40 to-slate-900/40 p-3">
+                    <div className="flex items-start gap-3">
+                      <Avatar size={40} src={staff?.user_id?.avatar_url} />
+                      <div className="min-w-0 flex-1">
+                        <h1 className="truncate font-semibold text-sm text-slate-300">{staff?.user_id?.name}</h1>
+                        <p className="break-all text-xs text-slate-400">{staff?.user_id?.email}</p>
+                      </div>
+                    </div>
+                    <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      <div className="rounded-lg border border-slate-800 p-2">
+                        <h1 className="text-[10px] uppercase tracking-wide text-slate-500">Status</h1>
+                        <p className={`mt-1 text-xs font-semibold ${staff?.user_id?.status === 1 ? 'text-green-600' : 'text-red-600'}`}>
+                          {staff?.user_id?.status === 1 ? "Active" : "Blocked"}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border border-slate-800 p-2">
+                        <h1 className="text-[10px] uppercase tracking-wide text-slate-500">Last Login / Logout</h1>
+                        <p className="mt-1 text-xs text-slate-300">{getLastLoginLabel(staff)}</p>
+                      </div>
+                    </div>
+                    <motion.div
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      className='mt-3 flex items-center justify-center gap-1 rounded-lg border border-slate-800 px-4 py-2 text-xs font-semibold hover:border-slate-500'
+                      onClick={() => handleViewStaff(staff?.user_id)}
+                    >
+                      <Eye size={14} />
+                      Details
+                    </motion.div>
+                  </div>
+                ))}
+              </div>
+              <div className="hidden overflow-x-auto md:block">
+              <table className="w-full min-w-[760px] rounded-lg bg-gradient-to-tr from-slate-950/40 to-slate-900/40 p-4 px-3">
                 <thead>
                   <tr>
                     <th className='py-2 w-[40%] border border-slate-800'>
@@ -219,43 +294,9 @@ const Staffs = () => {
                   </td>
                   <td className=''>
                     <div className="flex flex-col items-center gap-0.5 px-3 border rounded border-slate-800 p-1 min-h-[50px] justify-center">
-                      {(() => {
-                        const lastLogin = staff?.user_id?.last_login ? new Date(staff.user_id.last_login) : null;
-                        const lastLogout = staff?.user_id?.last_logout ? new Date(staff.user_id.last_logout) : null;
-
-                        const formatDay = (date: Date) => date.toLocaleDateString("en-GB", {
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                        });
-                        const formatTime = (date: Date) => {
-                          const hours24 = date.getHours();
-                          const hours12 = hours24 % 12 || 12;
-                          const minutes = `${date.getMinutes()}`.padStart(2, "0");
-                          const suffix = hours24 >= 12 ? "pm" : "am";
-                          return `${hours12}.${minutes}${suffix}`;
-                        };
-
-                        if (!lastLogin) {
-                          return (
-                            <>
-                              <h1 className="font-semibold text-[11px] text-slate-500">Not Logged In</h1>
-                            </>
-                          );
-                        }
-
-                        const dayLabel = formatDay(lastLogin);
-                        const loginTime = formatTime(lastLogin);
-                        const logoutTime = lastLogout ? formatTime(lastLogout) : null;
-
-                        return (
-                          <>
-                            <h1 className="font-semibold text-[11px] text-slate-300 text-center">
-                              {dayLabel}<br></br> {loginTime}{logoutTime ? ` to ${logoutTime}` : ""}
-                            </h1>
-                          </>
-                        );
-                      })()}
+                      <h1 className="font-semibold text-[11px] text-slate-300 text-center whitespace-pre-line">
+                        {getDesktopLastLoginLabel(staff)}
+                      </h1>
                     </div>
                   </td>
                   <td className=''>
@@ -274,13 +315,14 @@ const Staffs = () => {
                 </tr>)}
                 </tbody>
               </table>
+              </div>
               {totalPages > 1 && (
                 <div className="flex flex-col gap-2 mt-4 text-xs text-slate-400">
                   <p>
                     Showing {startIndex}-{endIndex} of {visibleStaffs.length} staff members · All up to date.
                   </p>
                   <Pagination>
-                    <PaginationContent>
+                    <PaginationContent className="flex-wrap justify-center">
                       <PaginationItem>
                         <PaginationPrevious
                           href="#"

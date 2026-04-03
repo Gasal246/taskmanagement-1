@@ -150,7 +150,7 @@ const TasksPage = () => {
   }
 
   return (
-    <div className="p-5 overflow-y-scroll pb-20 min-h-screen">
+    <div className="p-4 sm:p-5 overflow-y-scroll pb-20 min-h-screen">
       <Breadcrumb className='mb-3'>
         <BreadcrumbList>
           <BreadcrumbItem>
@@ -168,14 +168,14 @@ const TasksPage = () => {
       </Breadcrumb>
 
       <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg min-h-[20vh] mb-2 border border-slate-700/50">
-        <div className="mb-2 flex items-center justify-between">
+        <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="font-medium text-xs text-slate-300 flex items-center gap-1">
             <MapPinned size={14} /> Tasks
           </h1>
           <motion.div
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            className="p-2 px-4 rounded-lg border border-slate-700 hover:border-slate-500 bg-gradient-to-tr from-slate-900 to-slate-800 cursor-pointer text-xs font-medium flex gap-1 items-center"
+            className="p-2 px-4 rounded-lg border border-slate-700 hover:border-slate-500 bg-gradient-to-tr from-slate-900 to-slate-800 cursor-pointer text-xs font-medium flex gap-1 items-center justify-center w-full sm:w-auto"
             onClick={handleAddTask}
           >
             <PencilRuler size={12} />
@@ -184,10 +184,10 @@ const TasksPage = () => {
         </div>
         <div className="flex flex-wrap">
           {tasks?.data?.map((task: any) => (
-            <div className="w-full lg:w-3/12 p-1" key={task._id}>
+            <div className="w-full p-1 md:w-1/2 xl:w-1/4" key={task._id}>
               <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg border border-slate-700 hover:border-cyan-800">
-                <div className="flex justify-between items-center">
-                  <h1 className="font-medium text-xs text-slate-300 flex items-center gap-1">
+                <div className="flex items-start justify-between gap-2">
+                  <h1 className="font-medium text-xs text-slate-300 flex items-center gap-1 pr-2">
                     {task.task_name} ({task.status})
                   </h1>
                   {/* <motion.div

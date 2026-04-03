@@ -116,12 +116,6 @@ const AdminTopbar = ({ onMobileMenuClick }: AdminTopbarProps) => {
                 </div>
             </div>
             <div className="flex items-center gap-3">
-                <GoogleTranslate
-                    id="google_translate_admin"
-                    variant="icon"
-                    triggerLabel="Translate"
-                    className="rounded-xl bg-slate-900/60 px-2 py-1.5 shadow-sm ring-1 ring-slate-800/80 transition-colors hover:bg-slate-900"
-                />
                 <NotificationPane trigger={
                     <div className="cursor-pointer rounded-xl p-2 transition-colors hover:bg-slate-800/60">
                         <Tooltip title={unreadCount <= 0 ? 'no new notifications.' : `${unreadCount} new notifications`}>
@@ -147,6 +141,12 @@ const AdminTopbar = ({ onMobileMenuClick }: AdminTopbarProps) => {
                             </motion.div>
                         </PopoverTrigger>
                         <PopoverContent className='w-56 space-y-2 border border-slate-800/70 bg-slate-950/95 p-2 shadow-xl'>
+                            <GoogleTranslate
+                                id="google_translate_admin"
+                                variant="icon"
+                                triggerLabel="Translate"
+                                className="w-full rounded-lg bg-secondary/70 px-2 py-1.5 text-sm shadow-none ring-0 transition-colors hover:bg-slate-800"
+                            />
                             <motion.button onClick={() => router.push(`/admin/profile`)} whileTap={{ scale: 0.98 }} className='w-full rounded-lg bg-secondary/70 px-2 py-1.5 text-sm flex gap-1 items-center justify-center transition-colors hover:bg-slate-800'>
                                 <Avatar src={businessData?.business_logo || '/avatar.png'} size={18} /> Profile
                             </motion.button>

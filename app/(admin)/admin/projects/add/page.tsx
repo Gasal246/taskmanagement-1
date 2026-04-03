@@ -391,8 +391,8 @@ const AddNewProject = () => {
         </BreadcrumbList>
       </Breadcrumb>
 
-      <div className="rounded-xl border border-slate-800 bg-gradient-to-tr from-slate-950/70 to-slate-900/70 p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="rounded-xl border border-slate-800 bg-gradient-to-tr from-slate-950/70 to-slate-900/70 p-4 sm:p-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.3em] text-cyan-400/70">Create Project</p>
             <h1 className="mt-1 text-lg font-semibold text-slate-100">Create a fresh project.</h1>
@@ -402,7 +402,7 @@ const AddNewProject = () => {
                 : "Capture the essentials now, refine teams and tasks later."}
             </p>
           </div>
-          <div className="flex items-center gap-2 text-[11px] text-slate-300">
+          <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-300">
             <span className="rounded-full border border-slate-700 px-3 py-1">Step 1 of 3</span>
             <span className="rounded-full border border-cyan-700/60 bg-cyan-500/10 px-3 py-1 text-cyan-200">Basic Info</span>
           </div>
@@ -659,18 +659,18 @@ const AddNewProject = () => {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-end gap-3">
+                <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-end">
                   <Button
                     type="button"
                     variant="ghost"
                     onClick={() => router.push('/admin/projects')}
-                    className="text-xs"
+                    className="w-full text-xs sm:w-auto"
                   >
                     Cancel
                   </Button>
                   <Button
                     type="submit"
-                    className="text-xs bg-cyan-600 hover:bg-cyan-700"
+                    className="w-full text-xs bg-cyan-600 hover:bg-cyan-700 sm:w-auto"
                     disabled={addingNewProject || isRegionLoading}
                   >
                     {addingNewProject ? "Saving..." : "Save Project"}
