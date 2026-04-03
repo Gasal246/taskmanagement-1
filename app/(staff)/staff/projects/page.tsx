@@ -235,7 +235,7 @@ const StaffProjects = () => {
   const selectedDomainLabel = DEPARTMENT_TYPES.find((d) => d.value === filters.type)?.label;
 
   return (
-    <div className='space-y-4 pb-10'>
+    <div className='space-y-4 pb-10 px-3'>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className='font-semibold text-lg text-slate-100 flex items-center gap-2'>

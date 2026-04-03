@@ -390,6 +390,7 @@ const ProfilPage = () => {
               <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:items-center sm:text-left">
                 <div
                   className={`
+                    shrink-0
                     w-[100px] h-[100px]
                     sm:w-[120px] sm:h-[120px]
                     md:w-[140px] md:h-[140px]

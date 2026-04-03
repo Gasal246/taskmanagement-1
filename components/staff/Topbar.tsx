@@ -98,14 +98,8 @@ const StaffTopbar = () => {
                 </div>
             </div>
             <div className='flex gap-3 items-center'>
-                <GoogleTranslate
-                    id="google_translate_staff"
-                    variant="icon"
-                    triggerLabel="Translate"
-                    className="rounded-xl bg-slate-900/60 px-2 py-1.5 shadow-sm ring-1 ring-slate-800/80 transition-colors hover:bg-slate-900"
-                />
                 <NotificationPane trigger={
-                    <div className='cursor-pointer rounded-xl p-2 transition-colors hover:bg-slate-800/60'>
+                    <div className='cursor-pointer rounded-xl  transition-colors hover:bg-slate-800/60'>
                         <Tooltip title={unreadCount <= 0 ? 'no new notifications.' : `${unreadCount} new notifications`}>
                             <Badge count={unreadCount} size='small'>
                                 <Bell className='text-primary' size={20} />
@@ -126,7 +120,7 @@ const StaffTopbar = () => {
                             <Avatar size={40} src={userData?.avatar_url || '/avatar.png'} />
                         </div>
                     </PopoverTrigger>
-                    <PopoverContent className='w-64 md:w-[170px] p-2 space-y-2 border border-slate-800/70 bg-slate-950/95 shadow-xl'>
+                    <PopoverContent className='w-64 md:w-[220px] p-2 space-y-2 border border-slate-800/70 bg-slate-950/95 shadow-xl'>
                         <div className='rounded-lg border border-slate-800/70 bg-slate-900/40 p-2 md:hidden'>
                             <h2 className='text-sm font-semibold text-slate-200'>{userData?.name || "-"}</h2>
                             {/* <p className='text-xs text-slate-400'>{userData?.email || "-"}</p> */}
@@ -137,6 +131,12 @@ const StaffTopbar = () => {
                                 <span className='text-slate-500'></span> {formattedDomainLabel || "-"}
                             </p>
                         </div>
+                        <GoogleTranslate
+                            id="google_translate_staff"
+                            variant="full"
+                            triggerLabel="Translate"
+                            className="w-full"
+                        />
                         <motion.button onClick={() => router.push(`/staff/profile`)} whileTap={{ scale: 0.98 }} className='w-full rounded-lg bg-secondary/70 px-2 py-1.5 text-sm flex gap-1 items-center justify-center transition-colors hover:bg-slate-800'>
                             <CircleUser size={16} strokeWidth={2} /> Profile
                         </motion.button>

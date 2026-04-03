@@ -118,86 +118,83 @@
 }
 
 .google-translate {
+  position: relative;
   display: flex;
   align-items: center;
 }
 
-.google-translate--icon {
+.google-translate__control {
   position: relative;
-}
-
-.google-translate__trigger {
-  display: inline-flex;
+  display: flex;
+  width: 100%;
   align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: #e2e8f0;
-  line-height: 1;
-  white-space: nowrap;
-}
-
-.google-translate__select {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-}
-
-.google-translate .goog-te-gadget {
-  font-size: 12px;
-  color: #e2e8f0;
-  line-height: 1;
-  margin: 0;
-}
-
-.google-translate .goog-te-combo {
-  min-width: 140px;
-  max-width: 160px;
   background: #0b1220;
   color: #e2e8f0;
   border: 1px solid #334155;
-  border-radius: 8px;
-  padding: 4px 8px;
-  margin: 0;
-  height: 28px;
-  font-size: 12px;
-  outline: none;
+  border-radius: 12px;
   box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.5);
+  transition: border-color 0.2s ease, background 0.2s ease;
 }
 
-.google-translate .goog-te-gadget span {
+.google-translate__control:focus-within,
+.google-translate__control:hover {
+  border-color: #475569;
+  background: #10192c;
+}
+
+.google-translate__native {
+  width: 100%;
+  min-width: 0;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: #e2e8f0;
+  font-size: 14px;
+  line-height: 1.2;
+  outline: none;
+  padding: 12px 40px 12px 14px;
+  cursor: pointer;
+}
+
+.google-translate__native:disabled {
+  cursor: wait;
   color: #94a3b8;
 }
 
-.google-translate .goog-te-gadget .goog-te-combo:focus {
-  border-color: #475569;
+.google-translate__native option {
+  color: #0f172a;
 }
 
-.google-translate .goog-te-gadget .goog-te-combo:hover {
-  border-color: #475569;
-}
-
-.google-translate .goog-logo-link,
-.google-translate .goog-te-gadget span {
-  display: none;
-}
-
-.google-translate--icon .goog-te-gadget {
+.google-translate__icon,
+.google-translate__chevron {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
+  pointer-events: none;
+  color: #cbd5e1;
 }
 
-.google-translate--icon .goog-te-combo {
+.google-translate__icon {
+  left: 12px;
+}
+
+.google-translate__chevron {
+  right: 12px;
+}
+
+.google-translate--icon .google-translate__native {
+  min-width: 170px;
+  padding-left: 36px;
+}
+
+.google-translate--full,
+.google-translate--default {
   width: 100%;
-  height: 100%;
-  min-width: 0;
-  max-width: none;
+}
+
+.google-translate__mount {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
   opacity: 0;
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-  padding: 0;
-  cursor: pointer;
-  appearance: none;
+  pointer-events: none;
 }

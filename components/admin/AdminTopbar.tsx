@@ -140,9 +140,9 @@ const AdminTopbar = ({ onMobileMenuClick }: AdminTopbarProps) => {
                                 <div className='hidden text-start md:block'>
                                     <h1 className='font-medium text-sm leading-4 text-slate-200'>{businessData?.business_name}</h1>
                                     <h1 className='font-medium text-xs text-slate-400'>{businessData?.business_email}</h1>
-                                    {roleDomainText && (
+                                    {/* {roleDomainText && (
                                         <h2 className='text-[10px] text-slate-500'>{roleDomainText}</h2>
-                                    )}
+                                    )} */}
                                 </div>
                             </motion.div>
                         </PopoverTrigger>

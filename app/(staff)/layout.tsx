@@ -39,7 +39,7 @@ const StaffLayout = async ({ children }: {
           <div className="sticky top-0 z-20 border-b border-slate-800/60 bg-slate-950/70 backdrop-blur">
             <StaffTopbar />
           </div>
-          <main className="flex-1 min-h-0 overflow-y-auto px-4 pb-28 pt-4 md:px-6 lg:pb-10">
+          <main className="flex-1 min-h-0 overflow-y-auto pb-28 pt-4 sm:px-4 md:px-6 lg:pb-10">
             <div className="mx-auto w-full max-w-[1400px] ">
               {children}
             </div>
