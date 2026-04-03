@@ -98,7 +98,9 @@ const GoogleTranslate = ({
             })
             : null;
 
-        observer?.observe(container, { childList: true, subtree: true });
+        if (container && observer) {
+            observer.observe(container, { childList: true, subtree: true });
+        }
 
         if (window.google?.translate?.TranslateElement && isCorrectScript) {
             init();
