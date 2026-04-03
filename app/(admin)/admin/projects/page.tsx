@@ -391,9 +391,9 @@ const ProjectsPage = () => {
                 onClick={() => router.push(`/admin/projects/${proj._id}`)}
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div>
+                  <div className='w-[65%]'>
                     <h3 className="text-sm font-semibold text-slate-100">{proj.project_name}</h3>
-                    <p className="mt-1 text-[11px] text-slate-400 truncate">{proj.project_description || "No description provided"}</p>
+                    <p className="mt-1 text-[11px] text-slate-400 truncate overflow-hidden w-full">{proj.project_description || "No description provided"}</p>
                   </div>
                   <span className={`px-2 py-1 rounded-full text-[10px] ${status.className}`}>{status.label}</span>
                 </div>
