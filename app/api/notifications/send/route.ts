@@ -1,3 +1,4 @@
+import { auth } from "@/auth";
 import { NextResponse } from "next/server";
 import { getAdminMessaging } from "@/lib/firebaseAdmin";
 import connectDB from "@/lib/mongo";
@@ -19,6 +20,28 @@ type Body = {
   meta?: Record<string, any>;
 };
 
+function resolveLink(
+  body: Body,
+  data: Record<string, string> | undefined,
+  req: Request
+): string {
+  const rawValue =
+    (typeof data?.link === "string" && data.link) ||
+    (typeof data?.url === "string" && data.url) ||
+    (typeof body.meta?.link === "string" && body.meta.link) ||
+    (typeof body.meta?.url === "string" && body.meta.url) ||
+    "/";
+
+  const trimmed = rawValue.trim();
+  if (!trimmed) return new URL("/", req.url).toString();
+
+  try {
+    return new URL(trimmed).toString();
+  } catch (_error) {
+    return new URL(trimmed.startsWith("/") ? trimmed : `/${trimmed}`, req.url).toString();
+  }
+}
+
 function normalizeData(
   data?: Record<string, string | number | boolean>
 ): Record<string, string> | undefined {
@@ -39,19 +62,21 @@ function isTokenInvalid(error: any): boolean {
 export async function POST(req: Request) {
   try {
     const apiKey = process.env.FCM_API_KEY;
-    if (apiKey) {
-      const headerKey = req.headers.get("x-api-key");
-      if (headerKey !== apiKey) {
-        return NextResponse.json(
-          { message: "Unauthorized", status: 401 },
-          { status: 401 }
-        );
-      }
+    const headerKey = req.headers.get("x-api-key");
+    const session: any = await auth();
+    const sessionUserId = session?.user?.id ? String(session.user.id) : "";
+    const hasValidApiKey = apiKey ? headerKey === apiKey : false;
+
+    if (!hasValidApiKey && !sessionUserId) {
+      return NextResponse.json(
+        { message: "Unauthorized", status: 401 },
+        { status: 401 }
+      );
     }
 
     const body: Body = await req.json();
     const token = body.token?.trim();
-    const tokens = body.tokens?.filter(Boolean) ?? [];
+    const tokens = body.tokens?.map((item) => item?.trim()).filter(Boolean) ?? [];
     const topic = body.topic?.trim();
     const notification =
       body.title || body.body
@@ -76,12 +101,14 @@ export async function POST(req: Request) {
       data?.heading ||
       "Notification";
     const bodyText = notification?.body || data?.body || "";
+    const webpushLink = resolveLink(body, data, req);
     const senderId =
       body.senderId?.trim() ||
+      sessionUserId ||
       (typeof body.data?.senderId === "string" ? body.data.senderId : "") ||
       (typeof body.data?.sender_id === "string" ? body.data.sender_id : "");
     const recipientIds = Array.isArray(body.recipientIds)
-      ? body.recipientIds.filter(Boolean)
+      ? body.recipientIds.map((id) => id?.trim()).filter(Boolean)
       : [];
     const kind =
       body.kind ||
@@ -120,19 +147,84 @@ export async function POST(req: Request) {
       await Notifications.insertMany(documents);
     };
 
-    if (tokens.length > 0) {
-      const response = await messaging.sendEachForMulticast({
-        tokens,
-        notification,
+    let targetTokens = Array.from(new Set(tokens));
+    let missingRecipientIds: string[] = [];
+
+    const buildMessagePayload = (payload: {
+      token?: string;
+      tokens?: string[];
+      topic?: string;
+    }) => ({
+      ...payload,
+      notification,
+      data,
+      webpush: {
+        headers: {
+          Urgency: "high",
+        },
+        notification: notification
+          ? {
+              title: notification.title || title,
+              body: notification.body || bodyText,
+              icon: "/logo.png",
+              badge: "/logo.png",
+            }
+          : undefined,
         data,
-      });
+        fcmOptions: {
+          link: webpushLink,
+        },
+      },
+    });
+
+    if (targetTokens.length === 0 && recipientIds.length > 0) {
+      const recipientTokenDocs = await FcmTokens.find(
+        { user_id: { $in: recipientIds } },
+        { token: 1, user_id: 1 }
+      ).lean();
+
+      targetTokens = Array.from(
+        new Set(
+          recipientTokenDocs
+            .map((doc: any) => doc?.token?.trim())
+            .filter(Boolean)
+        )
+      );
+
+      const resolvedRecipientIds = new Set(
+        recipientTokenDocs.map((doc: any) => String(doc.user_id))
+      );
+      missingRecipientIds = recipientIds.filter(
+        (recipientId) => !resolvedRecipientIds.has(recipientId)
+      );
+
+      if (targetTokens.length === 0) {
+        return NextResponse.json(
+          {
+            message: "No active push token found for the selected recipient(s)",
+            status: 404,
+            missingRecipientIds,
+          },
+          { status: 404 }
+        );
+      }
+    }
+
+    if (targetTokens.length > 0) {
+      const response = await messaging.sendEachForMulticast(
+        buildMessagePayload({
+          tokens: targetTokens,
+        })
+      );
       const invalidTokens = response.responses
-        .map((res, idx) => (isTokenInvalid(res.error) ? tokens[idx] : null))
+        .map((res, idx) =>
+          isTokenInvalid(res.error) ? targetTokens[idx] : null
+        )
         .filter(Boolean) as string[];
       if (invalidTokens.length > 0) {
         await FcmTokens.deleteMany({ token: { $in: invalidTokens } });
       }
-      const successTokens = tokens.filter(
+      const successTokens = targetTokens.filter(
         (_token, index) => response.responses[index]?.success
       );
       const resolvedIds = await resolveRecipients(successTokens);
@@ -143,8 +235,9 @@ export async function POST(req: Request) {
           status: 200,
           successCount: response.successCount,
           failureCount: response.failureCount,
+          missingRecipientIds,
           responses: response.responses.map((res, idx) => ({
-            token: tokens[idx],
+            token: targetTokens[idx],
             success: res.success,
             messageId: res.messageId || null,
             error: res.error?.message || null,
@@ -157,11 +250,11 @@ export async function POST(req: Request) {
     if (token) {
       let messageId = "";
       try {
-        messageId = await messaging.send({
-          token,
-          notification,
-          data,
-        });
+        messageId = await messaging.send(
+          buildMessagePayload({
+            token,
+          })
+        );
       } catch (error: any) {
         if (isTokenInvalid(error)) {
           await FcmTokens.deleteOne({ token });
@@ -181,11 +274,11 @@ export async function POST(req: Request) {
     }
 
     if (topic) {
-      const messageId = await messaging.send({
-        topic,
-        notification,
-        data,
-      });
+      const messageId = await messaging.send(
+        buildMessagePayload({
+          topic,
+        })
+      );
       await saveNotifications([]);
       return NextResponse.json(
         { message: "Sent", status: 200, messageId },

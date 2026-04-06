@@ -236,18 +236,20 @@ const StaffProjects = () => {
 
   return (
     <div className='space-y-4 pb-10 px-3'>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className='font-semibold text-lg text-slate-100 flex items-center gap-2'>
-            <PanelsTopLeft size={18} /> Projects
-          </h1>
-          <p className='text-xs text-slate-400'>Track approvals, timelines, and ownership across your projects.</p>
+      <div className="rounded-2xl border border-slate-800/80 bg-gradient-to-r from-slate-950/80 via-slate-900/70 to-cyan-950/25 p-4 shadow-[0_12px_30px_-22px_rgba(34,211,238,0.35)]">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className='font-semibold text-lg text-slate-100 flex items-center gap-2'>
+              <PanelsTopLeft size={18} className="text-cyan-300" /> Projects
+            </h1>
+            <p className='text-xs text-slate-300'>Track approvals, timelines, and ownership across your projects.</p>
+          </div>
+          {canAdd && (
+            <Button className='flex items-center gap-2 border border-cyan-800/60 bg-cyan-950/40 text-white hover:bg-cyan-900/50 hover:text-white' onClick={() => router.push('/staff/projects/add')}>
+              Add Project <CalendarPlus size={16} />
+            </Button>
+          )}
         </div>
-        {canAdd && (
-          <Button className='flex items-center gap-2' onClick={() => router.push('/staff/projects/add')}>
-            Add Project <CalendarPlus size={16} />
-          </Button>
-        )}
       </div>
 
       <div className="rounded-xl border border-slate-800 bg-gradient-to-tr from-slate-950/60 to-slate-900/60 p-4">

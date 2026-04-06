@@ -7,16 +7,80 @@ import {
   onForegroundMessage,
   requestFcmToken,
 } from "@/firebase/messaging";
-import { useDispatch } from "react-redux";
-import type { AppDispatch } from "@/redux/store";
+import { useDispatch, useSelector } from "react-redux";
+import type { AppDispatch, RootState } from "@/redux/store";
 import {
-  incrementUnreadCount,
   setUnreadCount,
 } from "@/redux/slices/notifications";
 import { Button } from "@/components/ui/button";
 
 const tokenStorageKey = "fcm-token";
 const notificationPromptKey = "notification-permission-dismissed-until";
+const badgeCacheName = "taskmanager-meta-v1";
+const badgeCountCacheKey = "/__badge_count__";
+
+type BadgeNavigator = Navigator & {
+  setAppBadge?: (contents?: number) => Promise<void>;
+  clearAppBadge?: () => Promise<void>;
+};
+
+async function persistBadgeCount(count: number) {
+  if (typeof window === "undefined") return;
+  if (!("caches" in window)) return;
+
+  const cache = await window.caches.open(badgeCacheName);
+  await cache.put(
+    badgeCountCacheKey,
+    new Response(JSON.stringify({ count: Math.max(0, count) }), {
+      headers: {
+        "Content-Type": "application/json",
+      },
+    })
+  );
+}
+
+async function syncAppBadge(count: number) {
+  if (typeof window === "undefined") return;
+
+  await persistBadgeCount(count);
+
+  const badgeNavigator = navigator as BadgeNavigator;
+  if (count > 0 && typeof badgeNavigator.setAppBadge === "function") {
+    await badgeNavigator.setAppBadge(count);
+    return;
+  }
+
+  if (typeof badgeNavigator.clearAppBadge === "function") {
+    await badgeNavigator.clearAppBadge();
+  }
+}
+
+function getTokenStorageKeys(userId?: string | null) {
+  return userId
+    ? [`${tokenStorageKey}:${userId}`, tokenStorageKey]
+    : [tokenStorageKey];
+}
+
+function getStoredToken(userId?: string | null) {
+  if (typeof window === "undefined") return null;
+
+  const keys = getTokenStorageKeys(userId);
+  for (const key of keys) {
+    const value = window.localStorage.getItem(key);
+    if (value) return value;
+  }
+
+  return null;
+}
+
+function setStoredToken(userId: string | null | undefined, token: string) {
+  if (typeof window === "undefined") return;
+
+  const keys = getTokenStorageKeys(userId);
+  keys.forEach((key) => {
+    window.localStorage.setItem(key, token);
+  });
+}
 
 function formatNotification(payload: {
   notification?: { title?: string; body?: string };
@@ -31,6 +95,9 @@ function formatNotification(payload: {
 const FcmNotifications = () => {
   const { data: session } = useSession();
   const dispatch = useDispatch<AppDispatch>();
+  const unreadCount = useSelector(
+    (state: RootState) => state.notifications.unreadCount
+  );
   const [showPermissionPrompt, setShowPermissionPrompt] = useState(false);
   const [permissionState, setPermissionState] = useState<NotificationPermission>(
     "default"
@@ -52,13 +119,12 @@ const FcmNotifications = () => {
   }, [dispatch]);
 
   const storeToken = useCallback(async () => {
-    if (typeof window === "undefined") return;
-    const storageKey = userId ? `${tokenStorageKey}:${userId}` : tokenStorageKey;
+    if (typeof window === "undefined") return false;
     const token = await requestFcmToken();
-    if (!token) return;
+    if (!token) return false;
 
-    const storedToken = window.localStorage.getItem(storageKey);
-    if (storedToken === token) return;
+    const storedToken = getStoredToken(userId);
+    if (storedToken === token) return true;
 
     const response = await fetch("/api/notifications/fcm-token", {
       method: "POST",
@@ -71,8 +137,8 @@ const FcmNotifications = () => {
     });
 
     if (response.ok) {
-      window.localStorage.setItem(storageKey, token);
-      return;
+      setStoredToken(userId, token);
+      return true;
     }
 
     let message = "Failed to store FCM token.";
@@ -83,7 +149,36 @@ const FcmNotifications = () => {
       console.error("Failed to parse FCM token response", error);
     }
     console.error(message);
+    return false;
   }, [userId]);
+
+  const ensureClientToken = useCallback(
+    async (permission: NotificationPermission) => {
+      if (typeof window === "undefined") return;
+
+      const storedToken = getStoredToken(userId);
+      if (storedToken) {
+        if (permission !== "denied") {
+          setShowPermissionPrompt(false);
+        }
+        return;
+      }
+
+      if (permission === "granted") {
+        const stored = await storeToken();
+        if (stored) {
+          setShowPermissionPrompt(false);
+        }
+        return;
+      }
+
+      // Browsers do not allow silent token creation without notification permission.
+      // If the local token cache is missing, surface the prompt again for this client.
+      window.localStorage.removeItem(notificationPromptKey);
+      setShowPermissionPrompt(true);
+    },
+    [storeToken, userId]
+  );
 
   const handleRequestPermission = async () => {
     if (typeof window === "undefined") return;
@@ -118,7 +213,7 @@ const FcmNotifications = () => {
     onForegroundMessage((payload) => {
       const { title, body } = formatNotification(payload);
       toast(title, { description: body || undefined });
-      dispatch(incrementUnreadCount(1));
+      refreshUnreadCount();
     }).then((unsub) => {
       if (!active) {
         unsub();
@@ -131,7 +226,34 @@ const FcmNotifications = () => {
       active = false;
       if (unsubscribe) unsubscribe();
     };
-  }, [dispatch]);
+  }, [dispatch, refreshUnreadCount]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!("serviceWorker" in navigator)) return;
+
+    const handleServiceWorkerMessage = (event: MessageEvent) => {
+      if (event.data?.type !== "fcm-background-message") return;
+
+      const payload = event.data?.payload || {};
+      const { title, body } = formatNotification(payload);
+
+      refreshUnreadCount();
+
+      if (document.visibilityState === "visible") {
+        toast(title, { description: body || undefined });
+      }
+    };
+
+    navigator.serviceWorker.addEventListener("message", handleServiceWorkerMessage);
+
+    return () => {
+      navigator.serviceWorker.removeEventListener(
+        "message",
+        handleServiceWorkerMessage
+      );
+    };
+  }, [refreshUnreadCount]);
 
   useEffect(() => {
     if (!userId) return;
@@ -150,20 +272,31 @@ const FcmNotifications = () => {
       setShowPermissionPrompt(true);
     }
 
-    if (permission === "granted") {
-      storeToken().catch((error) => {
-        console.error("Failed to initialize FCM", error);
-      });
-    }
-  }, [userId, storeToken]);
+    ensureClientToken(permission).catch((error) => {
+      console.error("Failed to initialize FCM", error);
+    });
+  }, [ensureClientToken, userId]);
 
   useEffect(() => {
     if (!userId) return;
     refreshUnreadCount();
-    const handleFocus = () => refreshUnreadCount();
+    const handleFocus = () => {
+      refreshUnreadCount();
+      if (typeof window === "undefined" || !("Notification" in window)) return;
+      ensureClientToken(Notification.permission).catch((error) => {
+        console.error("Failed to re-check FCM token", error);
+      });
+    };
     window.addEventListener("focus", handleFocus);
     return () => window.removeEventListener("focus", handleFocus);
-  }, [refreshUnreadCount, userId]);
+  }, [ensureClientToken, refreshUnreadCount, userId]);
+
+  useEffect(() => {
+    if (!userId) return;
+    syncAppBadge(unreadCount).catch((error) => {
+      console.error("Failed to sync app badge", error);
+    });
+  }, [unreadCount, userId]);
 
   if (!userId || !showPermissionPrompt) {
     return null;

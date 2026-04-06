@@ -206,16 +206,18 @@ const ProjectsPage = () => {
 
   return (
     <div className='space-y-4 pb-10'>
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-        <div>
-          <h1 className='font-semibold text-lg text-slate-100 flex items-center gap-2'>
-            <PanelsTopLeft size={18} /> Projects
-          </h1>
-          <p className='text-xs text-slate-400'>Track approvals, timelines, and ownership across your business projects.</p>
+      <div className="rounded-2xl border border-slate-800/80 bg-gradient-to-r from-slate-950/80 via-slate-900/70 to-cyan-950/25 p-4 shadow-[0_12px_30px_-22px_rgba(34,211,238,0.35)]">
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+          <div>
+            <h1 className='font-semibold text-lg text-slate-100 flex items-center gap-2'>
+              <PanelsTopLeft size={18} className="text-cyan-300" /> Projects
+            </h1>
+            <p className='text-xs text-slate-300'>Track approvals, timelines, and ownership across your business projects.</p>
+          </div>
+          <Button className='flex w-full items-center justify-center gap-2 border border-cyan-800/60 bg-cyan-950/40 text-white hover:bg-cyan-900/50 hover:text-white sm:w-auto' onClick={() => router.push('/admin/projects/add')}>
+            Add Project <CalendarPlus size={16} />
+          </Button>
         </div>
-        <Button className='flex w-full items-center justify-center gap-2 sm:w-auto' onClick={() => router.push('/admin/projects/add')}>
-          Add Project <CalendarPlus size={16} />
-        </Button>
       </div>
 
       <div className="rounded-xl border border-slate-800 bg-gradient-to-tr from-slate-950/60 to-slate-900/60 p-4">
@@ -363,13 +365,7 @@ const ProjectsPage = () => {
           <div className="text-xs text-slate-400">{pagination.total || 0} projects</div>
         </div>
 
-        {isLoading && (
-          <div className="flex items-center justify-center w-full h-[18vh]">
-            <LoaderSpin size={20} title="Loading projects..." />
-          </div>
-        )}
-
-        {!isLoading && projects?.length === 0 && (
+        {projects?.length === 0 && (
           <div className="flex flex-col items-center justify-center py-10 text-xs text-slate-400">
             <Clock3 size={18} className="mb-2 text-slate-500" />
             No projects match the selected filters.

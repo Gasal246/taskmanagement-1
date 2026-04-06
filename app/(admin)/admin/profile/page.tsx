@@ -11,6 +11,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import {
   Form,
   FormControl,
@@ -19,10 +20,17 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { useGetAdminProfile, useUpdateStaffProfile } from '@/query/user/queries'
+import { useGetAdminProfile, useGetBusinessStaffs, useUpdateStaffProfile } from '@/query/user/queries'
 import Cookies from "js-cookie"
 import { toast } from 'sonner'
 import { useSelector } from 'react-redux'
@@ -40,6 +48,12 @@ const editNameSchema = z.object({
 const changePasswordSchema = z.object({
   oldPassword: z.string().min(1, "Old password is required"),
   newPassword: z.string().min(6, "New password must be at least 6 characters"),
+})
+
+const sendPushSchema = z.object({
+  staffId: z.string().min(1, "Select a staff member"),
+  title: z.string().min(2, "Title must be at least 2 characters"),
+  message: z.string().min(3, "Message must be at least 3 characters"),
 })
 
 // ──────────────────────────────────────────────
@@ -76,11 +90,14 @@ const ProfilPage = () => {
   // Modal States
   const [editNameOpen, setEditNameOpen] = useState(false)
   const [changePwOpen, setChangePwOpen] = useState(false)
+  const [sendPushOpen, setSendPushOpen] = useState(false)
   const [showPassword, setShowPassword] = React.useState(false);
   const [businessPlan, setBusinessPlan] = useState<any>(null);
+  const [isSendingPush, setIsSendingPush] = useState(false);
 
   //Api
   const {data: userData, isLoading: loadingUser, refetch} = useGetAdminProfile(businessData?._id);
+  const { data: businessStaffs, isLoading: loadingBusinessStaffs } = useGetBusinessStaffs(businessData?._id);
   const { mutateAsync: UpdateProfile, isPending: isUpdating } = useUpdateStaffProfile();
 
   useEffect(()=> {
@@ -113,6 +130,15 @@ const ProfilPage = () => {
     defaultValues: { oldPassword: "", newPassword: "" }
   })
 
+  const sendPushForm = useForm<z.infer<typeof sendPushSchema>>({
+    resolver: zodResolver(sendPushSchema),
+    defaultValues: { staffId: "", title: "", message: "" }
+  })
+
+  const staffOptions = (businessStaffs ?? []).filter(
+    (staff: any) => staff?.user_id?._id
+  );
+
   // Open Modals
   const openEditName = () => {
     editNameForm.setValue("name", userData?.user_details?.name)
@@ -121,6 +147,14 @@ const ProfilPage = () => {
   const openChangePw = () => {
     changePwForm.reset()
     setChangePwOpen(true)
+  }
+  const openSendPush = () => {
+    sendPushForm.reset({
+      staffId: "",
+      title: "",
+      message: "",
+    })
+    setSendPushOpen(true)
   }
 
   // Submit Handlers (Plug your logic here)
@@ -154,6 +188,68 @@ const ProfilPage = () => {
       toast.error(res?.message);
     }
     setChangePwOpen(false)
+  }
+
+  const onSendPushSubmit = async (data: z.infer<typeof sendPushSchema>) => {
+    try {
+      setIsSendingPush(true);
+      const selectedStaff = staffOptions.find(
+        (staff: any) => staff?.user_id?._id === data.staffId
+      );
+
+      const response = await fetch("/api/notifications/send", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          recipientIds: [data.staffId],
+          title: data.title.trim(),
+          body: data.message.trim(),
+          kind: "custom_test_push",
+          senderId: userData?.user_details?._id,
+          data: {
+            type: "custom_test_push",
+            title: data.title.trim(),
+            body: data.message.trim(),
+            link: "/notifications",
+            recipientName: selectedStaff?.user_id?.name || "",
+          },
+          meta: {
+            source: "admin-profile",
+            testPush: true,
+          },
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        toast.error(result?.message || "Failed to send push notification", {
+          description:
+            result?.status === 404
+              ? "The selected staff has no saved browser/device push token yet."
+              : undefined,
+        });
+        return;
+      }
+
+      if ((result?.failureCount ?? 0) > 0 || (result?.missingRecipientIds?.length ?? 0) > 0) {
+        toast.warning("Push sent with warnings", {
+          description: `${result?.successCount ?? 0} device(s) succeeded, ${result?.failureCount ?? 0} failed.`,
+        });
+      } else {
+        toast.success(`Push notification sent to ${selectedStaff?.user_id?.name || "staff"}.`);
+      }
+
+      setSendPushOpen(false);
+      sendPushForm.reset();
+    } catch (error) {
+      console.error("Failed to send custom push notification", error);
+      toast.error("Failed to send push notification");
+    } finally {
+      setIsSendingPush(false);
+    }
   }
 
   const handleSwitchRole = () => {
@@ -339,6 +435,22 @@ const ProfilPage = () => {
                   <p className="text-xs text-slate-400">No plan assigned to this business yet.</p>
                 )}
               </div>
+
+              <div className="bg-slate-950/50 p-4 rounded-lg border border-slate-800">
+                <h2 className="text-sm font-semibold text-slate-300 mb-2">Push Notification Test</h2>
+                <p className="text-xs text-slate-400">
+                  Send a manual push notification to a staff account to verify browser and PWA delivery.
+                </p>
+                <motion.button
+                  type="button"
+                  onClick={openSendPush}
+                  whileTap={{ scale: 0.98 }}
+                  whileHover={{ scale: 1.02 }}
+                  className="mt-4 w-full bg-gradient-to-tr from-slate-950/60 to-slate-900/60 p-2 rounded-lg border border-slate-700 hover:border-cyan-600 text-xs font-semibold"
+                >
+                  Send Custom Push Notification
+                </motion.button>
+              </div>
             </div>
           </div>
         </>
@@ -473,6 +585,97 @@ const ProfilPage = () => {
                   disabled={isUpdating}
                 >
                   {isUpdating ? "Updating..." : "Update Password"}
+                </motion.button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={sendPushOpen} onOpenChange={setSendPushOpen}>
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle>Send Custom Push Notification</DialogTitle>
+            <DialogDescription>
+              Select a staff member and send a test push notification to their registered device or browser.
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...sendPushForm}>
+            <form onSubmit={sendPushForm.handleSubmit(onSendPushSubmit)} className="space-y-4">
+              <FormField
+                control={sendPushForm.control}
+                name="staffId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs text-slate-300 font-semibold">Staff</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger className="border-slate-600 focus:border-slate-400">
+                          <SelectValue placeholder={loadingBusinessStaffs ? "Loading staff..." : "Select staff"} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {staffOptions.map((staff: any) => (
+                          <SelectItem key={staff.user_id._id} value={staff.user_id._id}>
+                            {staff.user_id.name} ({staff.user_id.email})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={sendPushForm.control}
+                name="title"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs text-slate-300 font-semibold">Title</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Enter notification title"
+                        {...field}
+                        className="border-slate-600 focus:border-slate-400"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={sendPushForm.control}
+                name="message"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs text-slate-300 font-semibold">Message</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Enter notification message"
+                        {...field}
+                        className="min-h-[120px] border-slate-600 focus-visible:ring-0"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <p className="text-xs text-slate-400">
+                System push will only arrive if that user has already allowed notifications on the device and the app has saved an FCM token for that browser/PWA install.
+              </p>
+
+              <div className="w-full flex items-center justify-end">
+                <motion.button
+                  type="submit"
+                  whileTap={{ scale: 0.98 }}
+                  whileHover={{ scale: 1.02 }}
+                  className="bg-gradient-to-tr from-cyan-950/60 to-cyan-900/60 p-2 px-4 rounded-lg border border-cyan-700 hover:border-cyan-400 text-sm font-semibold"
+                  disabled={isSendingPush}
+                >
+                  {isSendingPush ? "Sending..." : "Send Push"}
                 </motion.button>
               </div>
             </form>

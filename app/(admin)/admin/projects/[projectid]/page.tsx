@@ -450,14 +450,6 @@ const ProjectView = () => {
     toast.error(res?.message || "Failed to delete project.");
   };
 
-  if (isLoading) {
-    return (
-      <div className='p-5 overflow-y-scroll pb-20 bg-gradient-to-tr from-slate-950/50 to-slate-900/50 min-h-screen flex items-center justify-center'>
-        <LoaderSpin size={40} />
-      </div>
-    )
-  }
-
   return (
     <div className='p-4 sm:p-5 overflow-y-scroll pb-20 min-h-screen'>
       <Breadcrumb className='mb-3'>

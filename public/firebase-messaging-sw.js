@@ -6,6 +6,8 @@ importScripts(
 
 const PRECACHE_NAME = "taskmanager-precache-v2";
 const RUNTIME_CACHE_NAME = "taskmanager-runtime-v2";
+const BADGE_CACHE_NAME = "taskmanager-meta-v1";
+const BADGE_COUNT_CACHE_KEY = "/__badge_count__";
 const CORE_ASSETS = ["/", "/logo.png", "/avatar.png", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
@@ -87,6 +89,69 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
+async function readBadgeCount() {
+  const cache = await caches.open(BADGE_CACHE_NAME);
+  const response = await cache.match(BADGE_COUNT_CACHE_KEY);
+  if (!response) return 0;
+
+  try {
+    const data = await response.json();
+    const count = Number(data?.count ?? 0);
+    return Number.isFinite(count) ? Math.max(0, count) : 0;
+  } catch (_error) {
+    return 0;
+  }
+}
+
+async function persistBadgeCount(count) {
+  const cache = await caches.open(BADGE_CACHE_NAME);
+  await cache.put(
+    BADGE_COUNT_CACHE_KEY,
+    new Response(JSON.stringify({ count: Math.max(0, count) }), {
+      headers: {
+        "Content-Type": "application/json",
+      },
+    })
+  );
+}
+
+async function syncAppBadge(count) {
+  await persistBadgeCount(count);
+
+  const badgeNavigator = self.navigator;
+  if (count > 0 && typeof badgeNavigator?.setAppBadge === "function") {
+    await badgeNavigator.setAppBadge(count);
+    return;
+  }
+
+  if (typeof badgeNavigator?.clearAppBadge === "function") {
+    await badgeNavigator.clearAppBadge();
+  }
+}
+
+async function incrementAppBadge(payload) {
+  const payloadCount = Number(payload?.data?.badgeCount);
+  const nextCount = Number.isFinite(payloadCount)
+    ? Math.max(0, payloadCount)
+    : (await readBadgeCount()) + 1;
+
+  await syncAppBadge(nextCount);
+}
+
+async function broadcastToClients(payload) {
+  const windowClients = await clients.matchAll({
+    type: "window",
+    includeUncontrolled: true,
+  });
+
+  windowClients.forEach((client) => {
+    client.postMessage({
+      type: "fcm-background-message",
+      payload,
+    });
+  });
+}
+
 messaging.onBackgroundMessage((payload) => {
   const title =
     payload?.notification?.title ||
@@ -100,7 +165,11 @@ messaging.onBackgroundMessage((payload) => {
     data: payload?.data || {},
   };
 
-  self.registration.showNotification(title, options);
+  Promise.all([
+    self.registration.showNotification(title, options),
+    broadcastToClients(payload),
+    incrementAppBadge(payload),
+  ]).catch(() => undefined);
 });
 
 self.addEventListener("notificationclick", (event) => {
