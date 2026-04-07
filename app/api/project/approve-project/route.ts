@@ -4,6 +4,7 @@ import Business_Project from "@/models/business_project.model";
 import { NextRequest, NextResponse } from "next/server";
 import Flow_Log from "@/models/Flow_Log.model";
 import Users from "@/models/users.model";
+import { notifyProjectHeadChange } from "@/app/api/helpers/project-head-notifications";
 
 connectDB();
 
@@ -31,6 +32,27 @@ export async function PUT(req:NextRequest){
         });
 
         await flowLog.save();
+
+        const projectHeadIds = Array.from(
+            new Set(
+                [
+                    ...(Array.isArray(projectToApprove?.project_heads) ? projectToApprove.project_heads : []),
+                    projectToApprove?.project_head,
+                ]
+                    .filter(Boolean)
+                    .map((id: any) => id?.toString?.() ?? String(id))
+            )
+        );
+
+        if (projectHeadIds.length > 0) {
+            await notifyProjectHeadChange({
+                recipientIds: projectHeadIds,
+                actorId: session?.user?.id,
+                projectId: String(projectToApprove?._id || project_id),
+                projectName: projectToApprove?.project_name || "project",
+                event: "assigned",
+            });
+        }
 
         return NextResponse.json({message: "Project marked as Approved"}, {status: 200});
 

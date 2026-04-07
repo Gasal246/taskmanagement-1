@@ -832,6 +832,42 @@ export async function UpdateProjectFunc(payload:any){
     }
 }
 
+export async function AddProjectHeadFunc(payload: { project_id: string; user_id: string }) {
+    try {
+        const res = await axios.post('/api/project/heads', payload);
+        return res.data;
+    } catch (err) {
+        console.log(err);
+    }
+}
+
+export async function RemoveProjectHeadFunc(project_id: string, user_id: string) {
+    try {
+        const res = await axios.delete(`/api/project/heads?project_id=${project_id}&user_id=${user_id}`);
+        return res.data;
+    } catch (err) {
+        console.log(err);
+    }
+}
+
+export async function AddProjectSupervisorFunc(payload: { project_id: string; user_id: string }) {
+    try {
+        const res = await axios.post('/api/project/supervisors', payload);
+        return res.data;
+    } catch (err) {
+        console.log(err);
+    }
+}
+
+export async function RemoveProjectSupervisorFunc(project_id: string, user_id: string) {
+    try {
+        const res = await axios.delete(`/api/project/supervisors?project_id=${project_id}&user_id=${user_id}`);
+        return res.data;
+    } catch (err) {
+        console.log(err);
+    }
+}
+
 export async function ApproveProjectFunc(project_id:string){
     try{
         const res = await axios.put(`/api/project/approve-project?project_id=${project_id}`);

@@ -1,4 +1,4 @@
-import { AlarmClockCheck, FolderGit2, Home, LandPlot, ShieldQuestionIcon, Users, type LucideIcon } from "lucide-react";
+import { AlarmClockCheck, CalendarDays, FolderGit2, Home, LandPlot, ShieldQuestionIcon, Users, type LucideIcon } from "lucide-react";
 
 type StaffNavContext = {
   canViewEnquiry: boolean;
@@ -27,6 +27,13 @@ const allStaffNavItems: StaffNavItem[] = [
     label: "Tasks",
     icon: AlarmClockCheck,
     isActive: (pathname) => pathname.includes("/staff/tasks"),
+    show: () => true,
+  },
+  {
+    href: "/staff/calendar",
+    label: "Calendar",
+    icon: CalendarDays,
+    isActive: (pathname) => pathname.includes("/staff/calendar"),
     show: () => true,
   },
   {

@@ -54,6 +54,7 @@ export async function POST(req: NextRequest) {
             camp_id: existingEnq.camp_id,
             enquiry_id: existingEnq.enquiry_id,
             assigned_to: assignedToList,
+            forwarded_by: session?.user?.id,
             step_number: ++existingEnq.step_number,
             priority: body.priority,
             is_finished: body.is_finished,

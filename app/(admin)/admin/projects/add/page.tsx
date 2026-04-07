@@ -1,16 +1,21 @@
 "use client"
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import LoaderSpin from '@/components/shared/LoaderSpin';
 import { DEPARTMENT_TYPES } from '@/lib/constants';
 import { useAddNewProject, useGetAreasandDeptsForRegion, useGetBusinessClients, useGetBusinessRegions } from '@/query/business/queries';
 import { useGetEnquiryById, useGetEnquiryContacts, useGetEqCampsById } from '@/query/enquirymanager/queries';
+import { useGetBusinessStaffs } from '@/query/user/queries';
 import { RootState } from '@/redux/store';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { Avatar } from 'antd';
 import Cookies from 'js-cookie';
-import { CalendarCheck, CheckCircle2, MapPinned, Sparkles } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { CalendarCheck, Check, CheckCircle2, MapPinned, Plus, Sparkles } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
@@ -28,7 +33,8 @@ const formSchema = z.object({
   business_id: z.string(),
   priority: z.string().optional(),
   region_id: z.string(),
-  area_id: z.string().nullable().optional()
+  area_id: z.string().nullable().optional(),
+  project_head: z.string().min(1, "Project head is required")
 });
 
 const formatSummaryValue = (value: any, fallback = "Not specified") => {
@@ -191,11 +197,15 @@ const AddNewProject = () => {
   const [role_id, setRole_id] = useState("");
   const prefillAppliedRef = useRef<string>("");
   const enquiryId = searchParams.get("enquiry_id") || "";
+  const [projectHeadDialogOpen, setProjectHeadDialogOpen] = useState(false);
+  const [projectHeadSearch, setProjectHeadSearch] = useState("");
+  const [selectedProjectHeadId, setSelectedProjectHeadId] = useState("");
 
   const { mutateAsync: getBusinessClients, isPending: loadingBusinessClients } = useGetBusinessClients();
   const { mutateAsync: addNewProject, isPending: addingNewProject } = useAddNewProject();
   const { mutateAsync: getRegions, isPending: isRegionLoading } = useGetBusinessRegions();
   const { mutateAsync: getAreasForRegion, isPending: loadingAreas } = useGetAreasandDeptsForRegion();
+  const { data: businessStaffs, isLoading: loadingBusinessStaffs } = useGetBusinessStaffs(businessData?._id);
   const { data: enquiryPrefill, isLoading: isEnquiryPrefillLoading } = useGetEnquiryById(enquiryId);
   const baseCampId = enquiryPrefill?.enquiry?.camp_id?._id ?? enquiryPrefill?.enquiry?.camp_id;
   const { data: enquiryCampPrefill, isLoading: isCampPrefillLoading } = useGetEqCampsById(baseCampId || "");
@@ -213,11 +223,13 @@ const AddNewProject = () => {
       business_id: "",
       priority: "normal",
       region_id: "",
-      area_id: ""
+      area_id: "",
+      project_head: ""
     },
   });
 
   const selectedRegionId = form.watch("region_id");
+  const selectedProjectHead = form.watch("project_head");
   const summaryValues = form.watch();
 
   useEffect(() => {
@@ -251,6 +263,7 @@ const AddNewProject = () => {
       priority: "normal",
       region_id: "",
       area_id: "",
+      project_head: "",
     });
 
     prefillAppliedRef.current = enquiryId;
@@ -350,8 +363,11 @@ const AddNewProject = () => {
           business_id: businessData?._id ?? "",
           priority: "normal",
           region_id: "",
-          area_id: ""
+          area_id: "",
+          project_head: ""
         });
+        setSelectedProjectHeadId("");
+        setProjectHeadSearch("");
       } else {
         toast.error(response?.message || "Failed to add project");
       }
@@ -376,6 +392,32 @@ const AddNewProject = () => {
   const selectedTypeLabel = useMemo(() => {
     return DEPARTMENT_TYPES.find((type) => type.value === summaryValues.type)?.label || "-";
   }, [summaryValues.type]);
+
+  const filteredProjectHeadStaffs = useMemo(() => {
+    const searchTerm = projectHeadSearch.trim().toLowerCase();
+    return (businessStaffs ?? []).filter((staff: any) => {
+      const name = staff?.user_id?.name || "";
+      const email = staff?.user_id?.email || "";
+      return `${name} ${email}`.toLowerCase().includes(searchTerm);
+    });
+  }, [businessStaffs, projectHeadSearch]);
+
+  const selectedProjectHeadData = useMemo(() => {
+    return (businessStaffs ?? []).find((staff: any) => staff?.user_id?._id === selectedProjectHead);
+  }, [businessStaffs, selectedProjectHead]);
+
+  const handleOpenProjectHeadDialog = () => {
+    setSelectedProjectHeadId(form.getValues("project_head"));
+    setProjectHeadDialogOpen(true);
+  };
+
+  const handleConfirmProjectHead = () => {
+    if (!selectedProjectHeadId) {
+      return toast.error("User not selected.");
+    }
+    form.setValue("project_head", selectedProjectHeadId, { shouldValidate: true, shouldDirty: true });
+    setProjectHeadDialogOpen(false);
+  };
 
   return (
     <div className="space-y-6 pb-10">
@@ -449,6 +491,37 @@ const AddNewProject = () => {
                             />
                           </FormControl>
                           <FormDescription className="text-[11px] text-slate-500">Optional, but helps teams align quickly.</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="project_head"
+                      render={() => (
+                        <FormItem className="md:col-span-2">
+                          <FormLabel className="text-xs text-slate-300 font-semibold">Select Project Head</FormLabel>
+                          <FormControl>
+                            <button
+                              type="button"
+                              onClick={handleOpenProjectHeadDialog}
+                              className="flex min-h-[124px] w-full items-center justify-center rounded-xl border border-dashed border-slate-700 bg-slate-950/40 p-4 text-center transition hover:border-cyan-500"
+                            >
+                              {selectedProjectHeadData ? (
+                                <div className="flex items-center gap-3 text-left">
+                                  <Avatar src={selectedProjectHeadData?.user_id?.avatar_url || '/avatar.png'} size={42} />
+                                  <div>
+                                    <p className="text-sm font-semibold text-slate-100">{selectedProjectHeadData?.user_id?.name}</p>
+                                    <p className="text-xs text-slate-400">{selectedProjectHeadData?.user_id?.email}</p>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="flex flex-col items-center gap-2 text-slate-400">
+                                  <Plus size={24} className="text-cyan-400" />
+                                </div>
+                              )}
+                            </button>
+                          </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -710,6 +783,10 @@ const AddNewProject = () => {
                   <p className="text-slate-300">{summaryValues.client_id ? selectedClientName : "-"}</p>
                 </div>
                 <div>
+                  <p className="text-[11px] text-slate-500">Project Head</p>
+                  <p className="text-slate-300">{selectedProjectHeadData?.user_id?.name || "-"}</p>
+                </div>
+                <div>
                   <p className="text-[11px] text-slate-500">Timeline</p>
                   <p className="text-slate-300">
                     {summaryValues.start_date || "-"} to {summaryValues.end_date || "-"}
@@ -729,6 +806,70 @@ const AddNewProject = () => {
           </div>
         </div>
       </div>
+
+      <Dialog open={projectHeadDialogOpen} onOpenChange={setProjectHeadDialogOpen}>
+        <DialogContent className="sm:max-w-[425px] max-h-[70vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Select Project Head</DialogTitle>
+            <DialogDescription>Choose a staff member to assign as the project head.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Input
+              placeholder="Search staff by name"
+              value={projectHeadSearch}
+              onChange={(e) => setProjectHeadSearch(e.target.value)}
+            />
+          </div>
+          <div className="relative flex-1 overflow-y-auto pb-16">
+            {loadingBusinessStaffs && (
+              <div className="flex h-[10vh] items-center justify-center">
+                <LoaderSpin size={30} />
+              </div>
+            )}
+            {!loadingBusinessStaffs && filteredProjectHeadStaffs.length === 0 && (
+              <div className='w-full h-[10vh] flex items-center justify-center'>
+                <h1 className="text-xs font-medium text-slate-400">
+                  {projectHeadSearch.trim() ? "No matching users" : "No business staffs found"}
+                </h1>
+              </div>
+            )}
+            {filteredProjectHeadStaffs.map((staff: any) => (
+              <motion.div
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                key={staff?._id}
+                className="mt-2 flex cursor-pointer items-center justify-start gap-1 rounded-lg border border-slate-700 bg-gradient-to-br from-slate-900/60 to-slate-800/60 p-2 px-4 text-sm font-medium group relative"
+                onClick={() => setSelectedProjectHeadId(staff?.user_id?._id)}
+              >
+                <div className="flex items-center gap-1">
+                  <Avatar src={staff?.user_id?.avatar_url || '/avatar.png'} size={30} />
+                  <div>
+                    <h1 className="text-xs font-medium">{staff?.user_id?.name}</h1>
+                    <p className="text-xs text-slate-400">{staff?.user_id?.email}</p>
+                  </div>
+                </div>
+                {staff?.user_id?._id === selectedProjectHeadId && (
+                  <div className="absolute top-1 right-2">
+                    <Check className="text-cyan-600" strokeWidth={3} size={18} />
+                  </div>
+                )}
+              </motion.div>
+            ))}
+          </div>
+          <DialogFooter className='w-full'>
+            <div className="w-full bg-slate-950/80 pt-2">
+              <motion.div
+                whileTap={{ scale: 0.98 }}
+                whileHover={{ scale: 1.02 }}
+                className='flex cursor-pointer items-center justify-center gap-1 rounded-lg border border-slate-700 bg-gradient-to-br from-slate-950/70 to-slate-800/70 p-2 px-4 text-sm font-medium group'
+                onClick={handleConfirmProjectHead}
+              >
+                <CheckCircle2 className="group-hover:text-cyan-600" size={18} /> Select Project Head
+              </motion.div>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

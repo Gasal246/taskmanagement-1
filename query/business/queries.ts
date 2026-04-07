@@ -27,6 +27,8 @@ import {
     addLocationDepartmentStaffFunc,
     addNewBusinessFunc,
     AddNewProjectByStaff,
+    AddProjectHeadFunc,
+    AddProjectSupervisorFunc,
     addNewTeamFunc,
     AddProjectDepartmentFunc,
     addRegionAreaFunc,
@@ -90,6 +92,8 @@ import {
     GetTeamsForProjectsFunc,
     GetUserDetails,
     postNewProjectFunc,
+    RemoveProjectHeadFunc,
+    RemoveProjectSupervisorFunc,
     RemoveAddedProjectDepartmentFunc,
     removeAreaDepartmentFunc,
     removeAreaDepartmentHeadFunc,
@@ -719,6 +723,30 @@ export const useUpdateProject = () => {
     return useMutation({
         mutationFn: (payload:any) => UpdateProjectFunc(payload)
     })
+};
+
+export const useAddProjectHead = () => {
+    return useMutation({
+        mutationFn: (payload: { project_id: string; user_id: string }) => AddProjectHeadFunc(payload)
+    });
+};
+
+export const useRemoveProjectHead = () => {
+    return useMutation({
+        mutationFn: ({ project_id, user_id }: { project_id: string; user_id: string }) => RemoveProjectHeadFunc(project_id, user_id)
+    });
+};
+
+export const useAddProjectSupervisor = () => {
+    return useMutation({
+        mutationFn: (payload: { project_id: string; user_id: string }) => AddProjectSupervisorFunc(payload)
+    });
+};
+
+export const useRemoveProjectSupervisor = () => {
+    return useMutation({
+        mutationFn: ({ project_id, user_id }: { project_id: string; user_id: string }) => RemoveProjectSupervisorFunc(project_id, user_id)
+    });
 };
 
 export const useApproveProject = () => {

@@ -4,7 +4,7 @@ import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { DashboardIcon } from '@radix-ui/react-icons'
-import { Building2, CalendarCheck, EarthIcon, HandPlatter, PanelsTopLeft, ShieldQuestion, UsersIcon } from 'lucide-react'
+import { Building2, CalendarCheck, CalendarDays, EarthIcon, HandPlatter, PanelsTopLeft, ShieldQuestion, UsersIcon } from 'lucide-react'
 
 type AdminSidebarMode = "full" | "compact";
 
@@ -22,6 +22,7 @@ const navItems = [
     { href: "/admin/skills", label: "Manage Skills", isActive: (path: string) => path.includes("/skills"), icon: HandPlatter },
     { href: "/admin/projects", label: "Manage Projects", isActive: (path: string) => path.includes("/projects"), icon: PanelsTopLeft },
     { href: "/admin/tasks", label: "Manage Tasks", isActive: (path: string) => path.includes("/tasks"), icon: CalendarCheck },
+    { href: "/admin/calendar", label: "Calendar", isActive: (path: string) => path.includes("/calendar"), icon: CalendarDays },
     { href: "/admin/enquiries", label: "Enquiry Manager", isActive: (path: string) => path.includes("/enquiries"), icon: ShieldQuestion },
 ] as const;
 

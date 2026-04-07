@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { useParams, useRouter } from 'next/navigation';
-import { Building, CheckCircle, EllipsisVertical, Eye, Files, FileText, Loader2, PanelsTopLeft, PencilRuler, Square, Upload, Users, Workflow, X } from 'lucide-react';
+import { Building, Check, CheckCircle, EllipsisVertical, Eye, Files, FileText, Loader2, PanelsTopLeft, PencilRuler, Square, Trash2, Upload, Users, Workflow, X } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useGetProjectsbyIdForStaffs, useUpdateProject, useAddProjectDoc, useRemoveProjectDoc, useGetBusinessRegions, useGetAreasandDeptsForRegion, useGetTeamsForProjects } from '@/query/business/queries';
+import { useGetProjectsbyIdForStaffs, useUpdateProject, useAddProjectDoc, useRemoveProjectDoc, useGetBusinessRegions, useGetAreasandDeptsForRegion, useGetTeamsForProjects, useAddProjectHead, useRemoveProjectHead, useAddProjectSupervisor, useRemoveProjectSupervisor } from '@/query/business/queries';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { DEPARTMENT_TYPES } from '@/lib/constants';
@@ -23,6 +23,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useSession } from 'next-auth/react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import Cookies from "js-cookie";
+import { Avatar } from 'antd';
+import { useGetBusinessStaffs } from '@/query/user/queries';
 
 // Validation schema for project update form
 const formSchema = z.object({
@@ -59,16 +61,28 @@ const ProjectView = () => {
   const [businessRegions, setBusinessRegions] = React.useState<any[]>([]);
   const [regionAreas, setRegionAreas] = React.useState<any[]>([]);
   const [isHead, setIsHead] = useState(false);
+  const [projectHeadDialogOpen, setProjectHeadDialogOpen] = useState(false);
+  const [projectHeadSearch, setProjectHeadSearch] = useState("");
+  const [selectedProjectHeadId, setSelectedProjectHeadId] = useState("");
+  const [projectSupervisorDialogOpen, setProjectSupervisorDialogOpen] = useState(false);
+  const [projectSupervisorSearch, setProjectSupervisorSearch] = useState("");
+  const [selectedProjectSupervisorId, setSelectedProjectSupervisorId] = useState("");
   const params = useParams<{ projectid: string }>();
   const { data: session }:any = useSession();
 
   const { data: project, isLoading, refetch } = useGetProjectsbyIdForStaffs(params.projectid);
   const { data: teamsData, isLoading: loadingTeams } = useGetTeamsForProjects(params.projectid);
   const { mutateAsync: UpdateProject, isPending: UpdatingProject } = useUpdateProject();
+  const { mutateAsync: addProjectHead, isPending: addingProjectHead } = useAddProjectHead();
+  const { mutateAsync: removeProjectHead, isPending: removingProjectHead } = useRemoveProjectHead();
+  const { mutateAsync: addProjectSupervisor, isPending: addingProjectSupervisor } = useAddProjectSupervisor();
+  const { mutateAsync: removeProjectSupervisor, isPending: removingProjectSupervisor } = useRemoveProjectSupervisor();
   const { mutateAsync: addProjectDoc } = useAddProjectDoc();
   const { mutateAsync: removeProjectDoc } = useRemoveProjectDoc();
   const { mutateAsync: getRegions } = useGetBusinessRegions();
   const { mutateAsync: getAreasForRegion, isPending: loadingAreas } = useGetAreasandDeptsForRegion();
+  const businessId = project?.data?.business_id?.toString?.() ?? project?.data?.business_id ?? "";
+  const { data: businessStaffs, isLoading: loadingBusinessStaffs } = useGetBusinessStaffs(businessId);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -142,6 +156,8 @@ const ProjectView = () => {
   }, [selectedRegionId, getAreasForRegion, form]);
 
   const teams = useMemo(() => teamsData?.data ?? [], [teamsData?.data]);
+  const projectHeads = useMemo(() => project?.data?.project_heads ?? [], [project?.data?.project_heads]);
+  const projectSupervisors = useMemo(() => project?.data?.project_supervisors ?? [], [project?.data?.project_supervisors]);
 
   const projectTeamPeople = useMemo(() => {
     const peopleMap = new Map<string, any>();
@@ -189,6 +205,38 @@ const ProjectView = () => {
     }));
   }, [teams]);
 
+  const filteredProjectHeadStaffs = useMemo(() => {
+    const searchTerm = projectHeadSearch.trim().toLowerCase();
+    const existingIds = new Set(
+      projectHeads
+        .map((head: any) => head?._id?.toString?.() ?? head?._id)
+        .filter(Boolean)
+    );
+    return (businessStaffs ?? []).filter((staff: any) => {
+      const userId = staff?.user_id?._id?.toString?.() ?? staff?.user_id?._id;
+      if (!userId || existingIds.has(userId)) return false;
+      const name = staff?.user_id?.name || "";
+      const email = staff?.user_id?.email || "";
+      return `${name} ${email}`.toLowerCase().includes(searchTerm);
+    });
+  }, [businessStaffs, projectHeadSearch, projectHeads]);
+
+  const filteredProjectSupervisorStaffs = useMemo(() => {
+    const searchTerm = projectSupervisorSearch.trim().toLowerCase();
+    const existingIds = new Set(
+      projectSupervisors
+        .map((user: any) => user?._id?.toString?.() ?? user?._id)
+        .filter(Boolean)
+    );
+    return (businessStaffs ?? []).filter((staff: any) => {
+      const userId = staff?.user_id?._id?.toString?.() ?? staff?.user_id?._id;
+      if (!userId || existingIds.has(userId)) return false;
+      const name = staff?.user_id?.name || "";
+      const email = staff?.user_id?.email || "";
+      return `${name} ${email}`.toLowerCase().includes(searchTerm);
+    });
+  }, [businessStaffs, projectSupervisorSearch, projectSupervisors]);
+
   useEffect(() => {
     if (docAccess === 'public') {
       setSelectedPeople([]);
@@ -228,6 +276,80 @@ const ProjectView = () => {
   const handleNavigateToDepts = () => {
     router.push(`/staff/projects/${params.projectid}/depts`);
   }
+
+  const handleOpenProjectHeadDialog = () => {
+    setSelectedProjectHeadId("");
+    setProjectHeadSearch("");
+    setProjectHeadDialogOpen(true);
+  };
+
+  const handleAddProjectHead = async () => {
+    if (!selectedProjectHeadId) {
+      return toast.error("User not selected.");
+    }
+    const res = await addProjectHead({
+      project_id: params.projectid,
+      user_id: selectedProjectHeadId,
+    });
+    if (res?.status === 200) {
+      toast.success(res?.message || "Project head added.");
+      setProjectHeadDialogOpen(false);
+      setSelectedProjectHeadId("");
+      await refetch();
+      return;
+    }
+    toast.error(res?.message || "Failed to add project head.");
+  };
+
+  const handleRemoveProjectHead = async (userId: string) => {
+    const res = await removeProjectHead({
+      project_id: params.projectid,
+      user_id: userId,
+    });
+    if (res?.status === 200) {
+      toast.success(res?.message || "Project head removed.");
+      await refetch();
+      return;
+    }
+    toast.error(res?.message || "Failed to remove project head.");
+  };
+
+  const handleOpenProjectSupervisorDialog = () => {
+    setSelectedProjectSupervisorId("");
+    setProjectSupervisorSearch("");
+    setProjectSupervisorDialogOpen(true);
+  };
+
+  const handleAddProjectSupervisor = async () => {
+    if (!selectedProjectSupervisorId) {
+      return toast.error("User not selected.");
+    }
+    const res = await addProjectSupervisor({
+      project_id: params.projectid,
+      user_id: selectedProjectSupervisorId,
+    });
+    if (res?.status === 200) {
+      toast.success(res?.message || "Project supervisor added.");
+      setProjectSupervisorDialogOpen(false);
+      setSelectedProjectSupervisorId("");
+      await refetch();
+      return;
+    }
+    toast.error(res?.message || "Failed to add project supervisor.");
+  };
+
+  const handleRemoveProjectSupervisor = async (userId: string) => {
+    const res = await removeProjectSupervisor({
+      project_id: params.projectid,
+      user_id: userId,
+    });
+    if (res?.status === 200) {
+      toast.success(res?.message || "Project supervisor removed.");
+      await refetch();
+      return;
+    }
+    toast.error(res?.message || "Failed to remove project supervisor.");
+  };
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     const updateProject = {
@@ -530,6 +652,106 @@ const ProjectView = () => {
               <Square color='gray' strokeWidth={1} size={8} fill={project?.data?.priority === "high" ? '#ef4444' : project?.data?.priority === 'normal' ? 'gold' : 'silver'} /> {project?.data?.priority}
             </p>
           </div>
+        </div>
+      </div>
+
+      <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg min-h-[20vh] mb-2 border border-slate-700/50">
+        <div className="mb-2 flex items-center justify-between">
+          <h1 className="font-medium text-xs text-slate-300 flex items-center gap-1">
+            <Users size={14} /> Project Heads
+          </h1>
+          {canManageProject && (
+            <motion.div
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className='p-2 px-4 rounded-lg border border-slate-700 hover:border-slate-500 bg-gradient-to-tr from-slate-900 to-slate-800 cursor-pointer text-xs font-medium flex gap-1 items-center'
+              onClick={handleOpenProjectHeadDialog}
+            >
+              <PencilRuler size={12} />
+              Assign Head
+            </motion.div>
+          )}
+        </div>
+        <div className="flex flex-wrap">
+          {projectHeads.length === 0 && !canManageProject && (
+            <p className="text-xs text-slate-400">No project heads assigned.</p>
+          )}
+          {projectHeads.map((head: any) => {
+            const headId = head?._id?.toString?.() ?? head?._id ?? "";
+            return (
+              <div className="w-full lg:w-3/12 p-1" key={headId}>
+                <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg border border-slate-700 hover:border-cyan-800 relative">
+                  <div className="flex items-center gap-3">
+                    <Avatar src={head?.avatar_url || '/avatar.png'} size={40} />
+                    <div>
+                      <p className="text-sm font-semibold text-slate-200">{head?.name || "-"}</p>
+                      <p className="text-xs text-slate-400">{head?.email || "-"}</p>
+                    </div>
+                  </div>
+                  {canManageProject && (
+                    <button
+                      type="button"
+                      className="absolute right-2 top-2 rounded-full p-1 text-red-300 transition hover:bg-slate-800 hover:text-red-200"
+                      onClick={() => handleRemoveProjectHead(headId)}
+                      disabled={removingProjectHead}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg min-h-[20vh] mb-2 border border-slate-700/50">
+        <div className="mb-2 flex items-center justify-between">
+          <h1 className="font-medium text-xs text-slate-300 flex items-center gap-1">
+            <Users size={14} /> Project Supervisors
+          </h1>
+          {canManageProject && (
+            <motion.div
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className='p-2 px-4 rounded-lg border border-slate-700 hover:border-slate-500 bg-gradient-to-tr from-slate-900 to-slate-800 cursor-pointer text-xs font-medium flex gap-1 items-center'
+              onClick={handleOpenProjectSupervisorDialog}
+            >
+              <PencilRuler size={12} />
+              Assign Supervisor
+            </motion.div>
+          )}
+        </div>
+        <div className="flex flex-wrap">
+          {projectSupervisors.length === 0 && !canManageProject && (
+            <p className="text-xs text-slate-400">No project supervisors assigned.</p>
+          )}
+          {projectSupervisors.map((user: any) => {
+            const userId = user?._id?.toString?.() ?? user?._id ?? "";
+            return (
+              <div className="w-full lg:w-3/12 p-1" key={userId}>
+                <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg border border-slate-700 hover:border-cyan-800 relative">
+                  <div className="flex items-center gap-3">
+                    <Avatar src={user?.avatar_url || '/avatar.png'} size={40} />
+                    <div>
+                      <p className="text-sm font-semibold text-slate-200">{user?.name || "-"}</p>
+                      <p className="text-xs text-slate-400">{user?.email || "-"}</p>
+                    </div>
+                  </div>
+                  {canManageProject && (
+                    <button
+                      type="button"
+                      className="absolute right-2 top-2 rounded-full p-1 text-red-300 transition hover:bg-slate-800 hover:text-red-200"
+                      onClick={() => handleRemoveProjectSupervisor(userId)}
+                      disabled={removingProjectSupervisor}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -1102,6 +1324,120 @@ const ProjectView = () => {
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => { setDeleteDocDialogOpen(false); setDocToDelete(null); }}>Cancel</Button>
             <Button variant="destructive" onClick={() => { if(docToDelete) handleRemoveDoc(docToDelete); setDeleteDocDialogOpen(false); setDocToDelete(null); }}>Remove</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={projectHeadDialogOpen} onOpenChange={setProjectHeadDialogOpen}>
+        <DialogContent className="sm:max-w-[425px] max-h-[70vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Select Project Head</DialogTitle>
+            <DialogDescription>Add another project head to this project.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Input
+              placeholder="Search staff by name"
+              value={projectHeadSearch}
+              onChange={(e) => setProjectHeadSearch(e.target.value)}
+            />
+          </div>
+          <div className="relative flex-1 overflow-y-auto pb-4">
+            {loadingBusinessStaffs && (
+              <div className="flex h-[10vh] items-center justify-center">
+                <LoaderSpin size={30} />
+              </div>
+            )}
+            {!loadingBusinessStaffs && filteredProjectHeadStaffs.length === 0 && (
+              <div className='w-full h-[10vh] flex items-center justify-center'>
+                <h1 className="text-xs font-medium text-slate-400">
+                  {projectHeadSearch.trim() ? "No matching users" : "No available staffs found"}
+                </h1>
+              </div>
+            )}
+            {filteredProjectHeadStaffs.map((staff: any) => (
+              <motion.div
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                key={staff?._id}
+                className="mt-2 flex cursor-pointer items-center justify-start gap-1 rounded-lg border border-slate-700 bg-gradient-to-br from-slate-900/60 to-slate-800/60 p-2 px-4 text-sm font-medium group relative"
+                onClick={() => setSelectedProjectHeadId(staff?.user_id?._id)}
+              >
+                <div className="flex items-center gap-2">
+                  <Avatar src={staff?.user_id?.avatar_url || '/avatar.png'} size={30} />
+                  <div>
+                    <h1 className="text-xs font-medium">{staff?.user_id?.name}</h1>
+                    <p className="text-xs text-slate-400">{staff?.user_id?.email}</p>
+                  </div>
+                </div>
+                {staff?.user_id?._id === selectedProjectHeadId && (
+                  <div className="absolute right-2 top-1">
+                    <Check className="text-cyan-600" strokeWidth={3} size={18} />
+                  </div>
+                )}
+              </motion.div>
+            ))}
+          </div>
+          <div className="flex justify-end">
+            <Button onClick={handleAddProjectHead} disabled={addingProjectHead}>
+              {addingProjectHead ? "Adding..." : "Add Project Head"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={projectSupervisorDialogOpen} onOpenChange={setProjectSupervisorDialogOpen}>
+        <DialogContent className="sm:max-w-[425px] max-h-[70vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Select Project Supervisor</DialogTitle>
+            <DialogDescription>Add a supervisor to this project.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Input
+              placeholder="Search staff by name"
+              value={projectSupervisorSearch}
+              onChange={(e) => setProjectSupervisorSearch(e.target.value)}
+            />
+          </div>
+          <div className="relative flex-1 overflow-y-auto pb-4">
+            {loadingBusinessStaffs && (
+              <div className="flex h-[10vh] items-center justify-center">
+                <LoaderSpin size={30} />
+              </div>
+            )}
+            {!loadingBusinessStaffs && filteredProjectSupervisorStaffs.length === 0 && (
+              <div className='w-full h-[10vh] flex items-center justify-center'>
+                <h1 className="text-xs font-medium text-slate-400">
+                  {projectSupervisorSearch.trim() ? "No matching users" : "No available staffs found"}
+                </h1>
+              </div>
+            )}
+            {filteredProjectSupervisorStaffs.map((staff: any) => (
+              <motion.div
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                key={staff?._id}
+                className="mt-2 flex cursor-pointer items-center justify-start gap-1 rounded-lg border border-slate-700 bg-gradient-to-br from-slate-900/60 to-slate-800/60 p-2 px-4 text-sm font-medium group relative"
+                onClick={() => setSelectedProjectSupervisorId(staff?.user_id?._id)}
+              >
+                <div className="flex items-center gap-2">
+                  <Avatar src={staff?.user_id?.avatar_url || '/avatar.png'} size={30} />
+                  <div>
+                    <h1 className="text-xs font-medium">{staff?.user_id?.name}</h1>
+                    <p className="text-xs text-slate-400">{staff?.user_id?.email}</p>
+                  </div>
+                </div>
+                {staff?.user_id?._id === selectedProjectSupervisorId && (
+                  <div className="absolute right-2 top-1">
+                    <Check className="text-cyan-600" strokeWidth={3} size={18} />
+                  </div>
+                )}
+              </motion.div>
+            ))}
+          </div>
+          <div className="flex justify-end">
+            <Button onClick={handleAddProjectSupervisor} disabled={addingProjectSupervisor}>
+              {addingProjectSupervisor ? "Adding..." : "Add Project Supervisor"}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

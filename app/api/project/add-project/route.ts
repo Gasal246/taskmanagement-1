@@ -15,6 +15,7 @@ import Area_dep_staffs from "@/models/area_dep_staffs.model";
 import Location_dep_staffs from "@/models/location_dep_staffs.model";
 import Business_regions from "@/models/business_regions.model";
 import Eq_enquiry from "@/models/eq_enquiries.model";
+import { notifyProjectHeadChange } from "@/app/api/helpers/project-head-notifications";
 
 connectDB();
 
@@ -34,6 +35,7 @@ interface Body {
     area_id: string | null,
     role_id: string,
     dept_id: string | null,
+    project_head: string | null,
     enquiry_id?: string | null
 }
 
@@ -65,6 +67,8 @@ export async function POST(req: NextRequest){
                 status: "approved",
                 client_id: body.client_id,
                 creator: session?.user?.id,
+                project_head: body.project_head || null,
+                project_heads: body.project_head ? [body.project_head] : [],
                 start_date: body.start_date,
                 end_date: body.end_date,
                 task_count: 0,
@@ -78,6 +82,15 @@ export async function POST(req: NextRequest){
             })
 
             const savedProject = await newProject.save();
+            if (body.project_head) {
+                await notifyProjectHeadChange({
+                    recipientIds: [body.project_head],
+                    actorId: session?.user?.id,
+                    projectId: String(savedProject._id),
+                    projectName: body.project_name,
+                    event: "assigned",
+                });
+            }
             const flowLog = new Flow_Log({
                 user_id: session?.user?.id,
                 Log: `Project Created and Approved by Business Admin -${username.name}`,
@@ -98,6 +111,8 @@ export async function POST(req: NextRequest){
                         business_id: body.business_id,
                         status: "pending",
                         creator: session?.user?.id,
+                        project_head: body.project_head || null,
+                        project_heads: body.project_head ? [body.project_head] : [],
                         client_id: body.client_id,
                         start_date: body.start_date,
                         end_date: body.end_date,
@@ -130,6 +145,8 @@ export async function POST(req: NextRequest){
                         business_id: body.business_id,
                         status: "pending",
                         creator: session?.user?.id,
+                        project_head: body.project_head || null,
+                        project_heads: body.project_head ? [body.project_head] : [],
                         client_id: body.client_id,
                         start_date: body.start_date,
                         end_date: body.end_date,
@@ -162,6 +179,8 @@ export async function POST(req: NextRequest){
                         business_id: body.business_id,
                         status: "pending",
                         creator: session?.user?.id,
+                        project_head: body.project_head || null,
+                        project_heads: body.project_head ? [body.project_head] : [],
                         client_id: body.client_id,
                         start_date: body.start_date,
                         end_date: body.end_date,
@@ -193,6 +212,8 @@ export async function POST(req: NextRequest){
                         business_id: body.business_id,
                         status: "pending",
                         creator: session?.user?.id,
+                        project_head: body.project_head || null,
+                        project_heads: body.project_head ? [body.project_head] : [],
                         client_id: body.client_id,
                         start_date: body.start_date,
                         end_date: body.end_date,
@@ -222,6 +243,8 @@ export async function POST(req: NextRequest){
                         business_id: body.business_id,
                         status: "pending",
                         creator: session?.user?.id,
+                        project_head: body.project_head || null,
+                        project_heads: body.project_head ? [body.project_head] : [],
                         client_id: body.client_id,
                         start_date: body.start_date,
                         end_date: body.end_date,
@@ -252,6 +275,8 @@ export async function POST(req: NextRequest){
                         business_id: body.business_id,
                         status: "pending",
                         creator: session?.user?.id,
+                        project_head: body.project_head || null,
+                        project_heads: body.project_head ? [body.project_head] : [],
                         client_id: body.client_id,
                         start_date: body.start_date,
                         end_date: body.end_date,

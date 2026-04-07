@@ -39,6 +39,17 @@ export async function GET(req: NextRequest) {
         }
 
         const projectObj: any = project.toObject();
+        const rawProjectHeadIds = [
+            ...(Array.isArray(projectObj?.project_heads) ? projectObj.project_heads : []),
+            projectObj?.project_head,
+        ]
+            .filter(Boolean)
+            .map((id: any) => id?.toString?.() ?? String(id))
+            .filter((id: string) => mongoose.Types.ObjectId.isValid(id));
+        const rawProjectSupervisorIds = (Array.isArray(projectObj?.project_supervisors) ? projectObj.project_supervisors : [])
+            .filter(Boolean)
+            .map((id: any) => id?.toString?.() ?? String(id))
+            .filter((id: string) => mongoose.Types.ObjectId.isValid(id));
 
         try {
             if (mongoose.Types.ObjectId.isValid(project?.region_id)) {
@@ -66,6 +77,40 @@ export async function GET(req: NextRequest) {
         } catch (err) {
             console.log("Error while fetching project area: ", err);
             projectObj.area = null;
+        }
+
+        try {
+            if (rawProjectHeadIds.length > 0) {
+                const heads = await Users.find({ _id: { $in: rawProjectHeadIds }, status: 1 })
+                    .select({ name: 1, email: 1, avatar_url: 1 })
+                    .lean();
+                const headMap = new Map(heads.map((head: any) => [head?._id?.toString?.(), head]));
+                projectObj.project_heads = rawProjectHeadIds
+                    .map((id: string) => headMap.get(id))
+                    .filter(Boolean);
+            } else {
+                projectObj.project_heads = [];
+            }
+        } catch (err) {
+            console.log("Error while fetching project heads: ", err);
+            projectObj.project_heads = [];
+        }
+
+        try {
+            if (rawProjectSupervisorIds.length > 0) {
+                const supervisors = await Users.find({ _id: { $in: rawProjectSupervisorIds }, status: 1 })
+                    .select({ name: 1, email: 1, avatar_url: 1 })
+                    .lean();
+                const supervisorMap = new Map(supervisors.map((user: any) => [user?._id?.toString?.(), user]));
+                projectObj.project_supervisors = rawProjectSupervisorIds
+                    .map((id: string) => supervisorMap.get(id))
+                    .filter(Boolean);
+            } else {
+                projectObj.project_supervisors = [];
+            }
+        } catch (err) {
+            console.log("Error while fetching project supervisors: ", err);
+            projectObj.project_supervisors = [];
         }
 
         const departments = await Project_Departments.find({ project_id: projectid })
