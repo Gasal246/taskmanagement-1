@@ -160,7 +160,9 @@ export async function GET(req: NextRequest) {
       match.$or = membershipFilters;
     }
 
-    if (status) match.status = status;
+    const statusValues = status?.split(",").map((value) => value.trim()).filter((value) => value && value !== "all") ?? [];
+    if (statusValues.length === 1) match.status = statusValues[0];
+    if (statusValues.length > 1) match.status = { $in: statusValues };
     if (country_id) match.country_id = country_id;
     if (region_id) match.region_id = region_id;
     if (province_id) match.province_id = province_id;

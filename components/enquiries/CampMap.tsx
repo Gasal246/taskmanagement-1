@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-type CampMapItem = {
+export type CampMapItem = {
   _id: string;
   camp_name: string;
   camp_type: string;
@@ -18,8 +18,20 @@ type CampMapItem = {
   area: string;
 };
 
+export type CustomMapPin = {
+  id: string;
+  title: string;
+  description: string;
+  latitude: number;
+  longitude: number;
+};
+
 type CampMapProps = {
   camps: CampMapItem[];
+  customPins?: CustomMapPin[];
+  customPinsFocusKey?: number;
+  focusedCampId?: string;
+  focusedCampKey?: number;
   isLoading?: boolean;
   hasCountrySelection: boolean;
 };
@@ -32,6 +44,8 @@ declare global {
 
 const DEFAULT_CENTER = { lat: 24.7136, lng: 46.6753 };
 const DEFAULT_ZOOM = 5;
+const CUSTOM_PIN_COLOR = "#9333ea";
+const CUSTOM_PIN_BORDER_COLOR = "#7e22ce";
 
 const STATUS_META: Record<string, { color: string; softColor: string }> = {
   "Just Added": {
@@ -114,6 +128,39 @@ const getMarkerIconUrl = (color: string) => {
   `;
 
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg.trim())}`;
+};
+
+const openGoogleDirections = (latitude: number, longitude: number) => {
+  const destination = `${latitude},${longitude}`;
+
+  const openDirections = (origin?: string) => {
+    const url = new URL("https://www.google.com/maps/dir/");
+    url.searchParams.set("api", "1");
+    url.searchParams.set("destination", destination);
+    url.searchParams.set("travelmode", "driving");
+    if (origin) {
+      url.searchParams.set("origin", origin);
+    }
+    window.open(url.toString(), "_blank", "noopener,noreferrer");
+  };
+
+  if (!navigator.geolocation) {
+    openDirections();
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      openDirections(`${position.coords.latitude},${position.coords.longitude}`);
+    },
+    () => {
+      openDirections();
+    },
+    {
+      enableHighAccuracy: true,
+      timeout: 10000,
+    }
+  );
 };
 
 const createInfoWindowContent = (camp: CampMapItem) => {
@@ -200,36 +247,7 @@ const createInfoWindowContent = (camp: CampMapItem) => {
   direction.style.boxShadow = "0 8px 18px rgba(37, 99, 235, 0.22)";
   direction.style.cursor = "pointer";
   direction.addEventListener("click", () => {
-    const destination = `${camp.latitude},${camp.longitude}`;
-
-    const openDirections = (origin?: string) => {
-      const url = new URL("https://www.google.com/maps/dir/");
-      url.searchParams.set("api", "1");
-      url.searchParams.set("destination", destination);
-      url.searchParams.set("travelmode", "driving");
-      if (origin) {
-        url.searchParams.set("origin", origin);
-      }
-      window.open(url.toString(), "_blank", "noopener,noreferrer");
-    };
-
-    if (!navigator.geolocation) {
-      openDirections();
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        openDirections(`${position.coords.latitude},${position.coords.longitude}`);
-      },
-      () => {
-        openDirections();
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-      }
-    );
+    openGoogleDirections(camp.latitude, camp.longitude);
   });
   actions.appendChild(direction);
 
@@ -238,7 +256,67 @@ const createInfoWindowContent = (camp: CampMapItem) => {
   return wrapper;
 };
 
-export default function CampMap({ camps, isLoading = false, hasCountrySelection }: CampMapProps) {
+const createCustomInfoWindowContent = (pin: CustomMapPin) => {
+  const wrapper = document.createElement("div");
+  wrapper.style.maxWidth = "260px";
+  wrapper.style.padding = "6px 4px 2px";
+  wrapper.style.color = "#0f172a";
+  wrapper.style.fontFamily = "Arial, sans-serif";
+
+  const title = document.createElement("div");
+  title.textContent = pin.title;
+  title.style.fontSize = "15px";
+  title.style.fontWeight = "700";
+  title.style.marginBottom = "8px";
+  wrapper.appendChild(title);
+
+  const description = document.createElement("div");
+  description.textContent = pin.description || "Custom pin";
+  description.style.fontSize = "12px";
+  description.style.marginBottom = "8px";
+  description.style.lineHeight = "1.35";
+  wrapper.appendChild(description);
+
+  const coordinates = document.createElement("div");
+  coordinates.textContent = `Coordinates: ${pin.latitude}, ${pin.longitude}`;
+  coordinates.style.fontSize = "12px";
+  coordinates.style.marginBottom = "12px";
+  coordinates.style.lineHeight = "1.35";
+  wrapper.appendChild(coordinates);
+
+  const direction = document.createElement("button");
+  direction.type = "button";
+  direction.textContent = "Direction";
+  direction.style.display = "inline-flex";
+  direction.style.alignItems = "center";
+  direction.style.justifyContent = "center";
+  direction.style.minHeight = "38px";
+  direction.style.padding = "0 16px";
+  direction.style.borderRadius = "999px";
+  direction.style.fontSize = "13px";
+  direction.style.fontWeight = "700";
+  direction.style.color = "#ffffff";
+  direction.style.background = CUSTOM_PIN_COLOR;
+  direction.style.border = `1px solid ${CUSTOM_PIN_BORDER_COLOR}`;
+  direction.style.boxShadow = "0 8px 18px rgba(147, 51, 234, 0.22)";
+  direction.style.cursor = "pointer";
+  direction.addEventListener("click", () => {
+    openGoogleDirections(pin.latitude, pin.longitude);
+  });
+  wrapper.appendChild(direction);
+
+  return wrapper;
+};
+
+export default function CampMap({
+  camps,
+  customPins = [],
+  customPinsFocusKey = 0,
+  focusedCampId = "",
+  focusedCampKey = 0,
+  isLoading = false,
+  hasCountrySelection,
+}: CampMapProps) {
   const mapRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<any>(null);
   const infoWindowRef = useRef<any>(null);
@@ -296,7 +374,7 @@ export default function CampMap({ camps, isLoading = false, hasCountrySelection 
     markersRef.current.forEach((marker) => marker.setMap(null));
     markersRef.current = [];
 
-    if (!camps.length) {
+    if (!camps.length && !customPins.length) {
       map.setCenter(DEFAULT_CENTER);
       map.setZoom(DEFAULT_ZOOM);
       return;
@@ -304,7 +382,7 @@ export default function CampMap({ camps, isLoading = false, hasCountrySelection 
 
     const bounds = new google.maps.LatLngBounds();
 
-    markersRef.current = camps.map((camp) => {
+    const campMarkers = camps.map((camp) => {
       const meta = STATUS_META[camp.visited_status] || STATUS_META["Just Added"];
       const marker = new google.maps.Marker({
         position: { lat: camp.latitude, lng: camp.longitude },
@@ -327,8 +405,48 @@ export default function CampMap({ camps, isLoading = false, hasCountrySelection 
       return marker;
     });
 
-    if (camps.length === 1) {
-      map.setCenter({ lat: camps[0].latitude, lng: camps[0].longitude });
+    const customPinMarkers = customPins.map((pin) => {
+      const marker = new google.maps.Marker({
+        position: { lat: pin.latitude, lng: pin.longitude },
+        map,
+        title: pin.title,
+        icon: {
+          url: getMarkerIconUrl(CUSTOM_PIN_COLOR),
+          scaledSize: new google.maps.Size(34, 42),
+          anchor: new google.maps.Point(17, 42),
+        },
+      });
+
+      marker.addListener("click", () => {
+        if (!infoWindowRef.current) return;
+        infoWindowRef.current.setContent(createCustomInfoWindowContent(pin));
+        infoWindowRef.current.open({ map, anchor: marker });
+      });
+
+      bounds.extend(marker.getPosition());
+      return marker;
+    });
+
+    markersRef.current = [...campMarkers, ...customPinMarkers];
+
+    if (customPins.length === 1 && customPinMarkers[0] && infoWindowRef.current) {
+      infoWindowRef.current.setContent(createCustomInfoWindowContent(customPins[0]));
+      infoWindowRef.current.open({ map, anchor: customPinMarkers[0] });
+    }
+
+    const focusedCampIndex = focusedCampId ? camps.findIndex((camp) => camp._id === focusedCampId) : -1;
+    if (focusedCampIndex >= 0 && campMarkers[focusedCampIndex] && infoWindowRef.current) {
+      const focusedCamp = camps[focusedCampIndex];
+      infoWindowRef.current.setContent(createInfoWindowContent(focusedCamp));
+      infoWindowRef.current.open({ map, anchor: campMarkers[focusedCampIndex] });
+      map.setCenter({ lat: focusedCamp.latitude, lng: focusedCamp.longitude });
+      map.setZoom(14);
+      return;
+    }
+
+    if (markersRef.current.length === 1) {
+      const onlyPin = camps[0] || customPins[0];
+      map.setCenter({ lat: onlyPin.latitude, lng: onlyPin.longitude });
       map.setZoom(14);
       return;
     }
@@ -339,7 +457,7 @@ export default function CampMap({ camps, isLoading = false, hasCountrySelection 
         map.setZoom(14);
       }
     });
-  }, [camps]);
+  }, [camps, customPins, customPinsFocusKey, focusedCampId, focusedCampKey]);
 
   return (
     <div className="relative overflow-hidden rounded-[28px] border border-slate-800/80 bg-slate-950/80">
@@ -353,13 +471,13 @@ export default function CampMap({ camps, isLoading = false, hasCountrySelection 
         </div>
       ) : null}
 
-      {!mapError && !hasCountrySelection ? (
+      {!mapError && !hasCountrySelection && customPins.length === 0 ? (
         <div className="absolute left-4 top-4 rounded-full border border-slate-700/80 bg-slate-950/85 px-4 py-2 text-xs font-medium text-slate-300 shadow-lg shadow-slate-950/40">
           Select a country to load camp pins.
         </div>
       ) : null}
 
-      {!mapError && hasCountrySelection && !isLoading && camps.length === 0 ? (
+      {!mapError && hasCountrySelection && !isLoading && camps.length === 0 && customPins.length === 0 ? (
         <div className="absolute left-4 top-4 rounded-full border border-slate-700/80 bg-slate-950/85 px-4 py-2 text-xs font-medium text-slate-300 shadow-lg shadow-slate-950/40">
           No camps with coordinates match the selected filters.
         </div>

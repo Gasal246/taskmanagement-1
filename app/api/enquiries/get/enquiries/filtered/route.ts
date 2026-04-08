@@ -41,7 +41,9 @@ export async function GET(req: NextRequest) {
 
     // --- Status / Boolean filters ---
     const status = searchParams.get("status");
-    if (status && status !== "all") filter.status = status;
+    const statusValues = status?.split(",").map((value) => value.trim()).filter((value) => value && value !== "all") ?? [];
+    if (statusValues.length === 1) filter.status = statusValues[0];
+    if (statusValues.length > 1) filter.status = { $in: statusValues };
 
     const next_action = searchParams.get("next_action");
     const actionFilter = next_action && next_action !== "all" ? next_action : "";

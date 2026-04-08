@@ -61,7 +61,9 @@ export async function POST(req: NextRequest) {
       if (camp_id) filter.camp_id = camp_id;
       if (enquiry_brought_by) filter.enquiry_brought_by = enquiry_brought_by;
       if (created_by) filter.createdBy = created_by;
-      if (status && status !== "all") filter.status = status;
+      const statusValues = String(status ?? "").split(",").map((value) => value.trim()).filter((value) => value && value !== "all");
+      if (statusValues.length === 1) filter.status = statusValues[0];
+      if (statusValues.length > 1) filter.status = { $in: statusValues };
       actionFilter = next_action && next_action !== "all" ? next_action : "";
       if (priority) filter.priority = priority;
       if (enquiry_uuid) filter.enquiry_uuid = { $regex: enquiry_uuid, $options: "i" };

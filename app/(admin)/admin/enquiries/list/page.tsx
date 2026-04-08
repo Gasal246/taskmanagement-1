@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -146,6 +147,7 @@ export default function EnquiriesPage() {
     restoredFilters.lease_expiry ? dayjs(restoredFilters.lease_expiry) : null
   );
   const [exportOpen, setExportOpen] = useState(false);
+  const [filteredExportOpen, setFilteredExportOpen] = useState(false);
   const [exportSearch, setExportSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [exportScope, setExportScope] = useState<"selected" | "filtered" | null>(null);
@@ -515,6 +517,7 @@ export default function EnquiriesPage() {
       }
       await exportToExcel(exportData, buildExportFileName("filtered"));
       toast.success(`Exported ${exportData.length} enquiries.`);
+      setFilteredExportOpen(false);
     } catch (err) {
       console.log(err);
       toast.error("Failed to export enquiries.");
@@ -771,7 +774,7 @@ export default function EnquiriesPage() {
               />
 
               {/* STATUS */}
-              <FilterSelect
+              <StatusMultiSelect
                 label="Status"
                 value={filters.status}
                 disabled={false}
@@ -888,14 +891,42 @@ export default function EnquiriesPage() {
             {hasActiveFilters && (
               <div className="mt-2 px-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
                 <span>Export filtered: {filteredCount} result{filteredCount === 1 ? "" : "s"}</span>
-                <Button
-                  variant="ghost"
-                  className="text-xs"
-                  onClick={handleExportFiltered}
-                  disabled={!filteredCount || isExporting}
-                >
-                  {exportScope === "filtered" ? "Exporting..." : "Export filtered"}
-                </Button>
+                <Dialog open={filteredExportOpen} onOpenChange={setFilteredExportOpen}>
+                  <DialogTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      className="text-xs"
+                      disabled={!filteredCount || isExporting}
+                    >
+                      Export Filtered
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Export filtered enquiries</DialogTitle>
+                      <DialogDescription>
+                        This will export {filteredCount} enquiry{filteredCount === 1 ? "" : "s"} matching the active filters.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                      <Button
+                        variant="ghost"
+                        className="text-xs"
+                        onClick={() => setFilteredExportOpen(false)}
+                        disabled={isExporting}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        className="text-xs"
+                        onClick={handleExportFiltered}
+                        disabled={!filteredCount || isExporting}
+                      >
+                        {exportScope === "filtered" ? "Exporting..." : "Export Filtered"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
               </div>
             )}
           </>
@@ -1113,6 +1144,75 @@ function FilterSelect({ label, value, options, onChange, disabled }: any) {
           </SelectContent>
         </Select>
 
+      </div>
+    </div>
+  );
+}
+
+function StatusMultiSelect({ label, value, options, onChange, disabled }: any) {
+  const selectedValues = value && value !== "all"
+    ? String(value).split(",").filter(Boolean)
+    : [];
+  const isActive = selectedValues.length > 0;
+  const displayValue = selectedValues.length
+    ? selectedValues.map((selected) => options?.find((o: any) => o._id === selected)?.name || selected).join(", ")
+    : `Select ${label}`;
+
+  const toggleValue = (status: string) => {
+    const nextValues = selectedValues.includes(status)
+      ? selectedValues.filter((selected) => selected !== status)
+      : [...selectedValues, status];
+
+    onChange(nextValues.length ? nextValues.join(",") : "all");
+  };
+
+  return (
+    <div className="w-full lg:w-1/4 p-1">
+      <div
+        className={`bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg p-2 ${disabled ? "opacity-40 cursor-not-allowed" : ""
+          } ${isActive ? "ring-1 ring-cyan-500/40" : ""
+          }`}
+      >
+        <div className="mb-1 flex items-center justify-between gap-2">
+          <Label className="text-xs text-slate-400 block">{label}</Label>
+          {isActive && (
+            <span className="inline-flex items-center rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2 py-1">
+              <span className="size-1.5 rounded-full bg-cyan-300" />
+            </span>
+          )}
+        </div>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild disabled={disabled}>
+            <button
+              type="button"
+              disabled={disabled}
+              className={`flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-left text-sm shadow-sm ${isActive ? "text-slate-200" : "text-slate-400"}`}
+            >
+              <span className="line-clamp-1">{displayValue}</span>
+              <ChevronDown className="ml-2 h-4 w-4 opacity-50" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-64">
+            <DropdownMenuCheckboxItem
+              checked={!isActive}
+              onCheckedChange={() => onChange("all")}
+              onSelect={(event) => event.preventDefault()}
+            >
+              All
+            </DropdownMenuCheckboxItem>
+            {options?.filter((o: any) => o._id !== "all").map((o: any) => (
+              <DropdownMenuCheckboxItem
+                key={o._id}
+                checked={selectedValues.includes(o._id)}
+                onCheckedChange={() => toggleValue(o._id)}
+                onSelect={(event) => event.preventDefault()}
+              >
+                {o.name}
+              </DropdownMenuCheckboxItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );

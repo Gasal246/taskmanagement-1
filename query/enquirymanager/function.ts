@@ -326,6 +326,50 @@ export async function GetEqCampsForMap(queryParams:any){
     }
 }
 
+//Get custom map pins
+export async function GetEqCustomMapPins(){
+    try{
+        const res = await axios.get("/api/enquiries/custom-pins");
+        return res.data;
+    }catch(err){
+        console.log(err);
+        return { pins: [], status: 500 };
+    }
+}
+
+//Add custom map pin
+export async function AddEqCustomMapPin(payload: any){
+    try{
+        const res = await axios.post("/api/enquiries/custom-pins", payload);
+        return res.data;
+    }catch(err){
+        console.log(err);
+        return (err as any)?.response?.data;
+    }
+}
+
+//Update custom map pin
+export async function UpdateEqCustomMapPin(payload: any){
+    try{
+        const res = await axios.put("/api/enquiries/custom-pins", payload);
+        return res.data;
+    }catch(err){
+        console.log(err);
+        return (err as any)?.response?.data;
+    }
+}
+
+//Delete custom map pin
+export async function DeleteEqCustomMapPin(id: string){
+    try{
+        const res = await axios.delete(`/api/enquiries/custom-pins?id=${id}`);
+        return res.data;
+    }catch(err){
+        console.log(err);
+        return (err as any)?.response?.data;
+    }
+}
+
 //Get Camps filtered (Staff - created by current user)
 export async function GetStaffEqCampsFiltered(queryParams:any){
     try{

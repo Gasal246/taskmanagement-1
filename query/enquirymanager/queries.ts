@@ -1,10 +1,11 @@
 import { useMutation, useQuery } from "@tanstack/react-query"
-import { AcceptEnquiryEdits, ActivateDeactivateEqAgents, ActivateEqCamp, AddEqUser, AddEnquiryComment, AddNewCampContact, AddNewContactAgent, AddNewEnquiry, AddNewEqArea, AddNewEqCamp, AddNewEqCity, AddNewEqCountry, AddNewEqHeadOffice, AddNewEqProvince, AddNewEqRegion, AddNewStaffEqHeadOffice, AssignEqCamptoEnquiry, CloseEqnuiry, DeleteEnquiryComment, EnquiryToProject, ForwardEnquiryByStaff, ForwardHistory, GetAccessEnquiriesForStaffs, GetAgentEnquiries, GetAgentsByBusiness, GetAllEnquiryHistoryForStaffs, GetEnquiriesWithFilters, GetEnquiryById, GetEnquiryByIdForStaffs, GetEnquiryComments, GetEnquiryContacts, GetEnquiryHistories, GetEnquiryHistoryById, GetEqAgentByID, GetEqAreaById, GetEqAreaProfile, GetEqAreasByCity,
+import { AcceptEnquiryEdits, ActivateDeactivateEqAgents, ActivateEqCamp, AddEqCustomMapPin, AddEqUser, AddEnquiryComment, AddNewCampContact, AddNewContactAgent, AddNewEnquiry, AddNewEqArea, AddNewEqCamp, AddNewEqCity, AddNewEqCountry, AddNewEqHeadOffice, AddNewEqProvince, AddNewEqRegion, AddNewStaffEqHeadOffice, AssignEqCamptoEnquiry, CloseEqnuiry, DeleteEnquiryComment, DeleteEqCustomMapPin, EnquiryToProject, ForwardEnquiryByStaff, ForwardHistory, GetAccessEnquiriesForStaffs, GetAgentEnquiries, GetAgentsByBusiness, GetAllEnquiryHistoryForStaffs, GetEnquiriesWithFilters, GetEnquiryById, GetEnquiryByIdForStaffs, GetEnquiryComments, GetEnquiryContacts, GetEnquiryHistories, GetEnquiryHistoryById, GetEqAgentByID, GetEqAreaById, GetEqAreaProfile, GetEqAreasByCity,
      GetEqAreasFiltered,
      GetEqCampsByArea, 
      GetEqCampsByEnquiry, 
      GetEqCampsById, 
      GetEqCampsForMap,
+     GetEqCustomMapPins,
      GetEqCampsFiltered, 
      GetStaffEqCampsFiltered,
      GetEqCitiesByProvince, 
@@ -50,6 +51,7 @@ import { AcceptEnquiryEdits, ActivateDeactivateEqAgents, ActivateEqCamp, AddEqUs
      UpdateEqCampContact,
      UpdateEqCity,
      UpdateEqCountry,
+     UpdateEqCustomMapPin,
      UpdateEqHeadOffice,
      UpdateStaffEqHeadOffice,
      UpdateEqProvince,
@@ -366,6 +368,35 @@ export const useGetEqCampsForMap = (queryParams: Record<string, string | number 
         queryKey: ["camps-map", queryParams],
         queryFn: () => GetEqCampsForMap(queryParams),
         enabled,
+    })
+}
+
+//Get custom map pins
+export const useGetEqCustomMapPins = () => {
+    return useQuery({
+        queryKey: ["custom-map-pins"],
+        queryFn: () => GetEqCustomMapPins(),
+    })
+}
+
+//Add custom map pin
+export const useAddEqCustomMapPin = () => {
+    return useMutation({
+        mutationFn: (payload: any) => AddEqCustomMapPin(payload),
+    })
+}
+
+//Update custom map pin
+export const useUpdateEqCustomMapPin = () => {
+    return useMutation({
+        mutationFn: (payload: any) => UpdateEqCustomMapPin(payload),
+    })
+}
+
+//Delete custom map pin
+export const useDeleteEqCustomMapPin = () => {
+    return useMutation({
+        mutationFn: (id: string) => DeleteEqCustomMapPin(id),
     })
 }
 
