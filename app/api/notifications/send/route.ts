@@ -150,12 +150,7 @@ export async function POST(req: Request) {
     let targetTokens = Array.from(new Set(tokens));
     let missingRecipientIds: string[] = [];
 
-    const buildMessagePayload = (payload: {
-      token?: string;
-      tokens?: string[];
-      topic?: string;
-    }) => ({
-      ...payload,
+    const baseMessagePayload = {
       notification,
       data,
       webpush: {
@@ -175,7 +170,7 @@ export async function POST(req: Request) {
           link: webpushLink,
         },
       },
-    });
+    };
 
     if (targetTokens.length === 0 && recipientIds.length > 0) {
       const recipientTokenDocs = await FcmTokens.find(
@@ -212,9 +207,10 @@ export async function POST(req: Request) {
 
     if (targetTokens.length > 0) {
       const response = await messaging.sendEachForMulticast(
-        buildMessagePayload({
+        {
           tokens: targetTokens,
-        })
+          ...baseMessagePayload,
+        }
       );
       const invalidTokens = response.responses
         .map((res, idx) =>
@@ -251,9 +247,10 @@ export async function POST(req: Request) {
       let messageId = "";
       try {
         messageId = await messaging.send(
-          buildMessagePayload({
+          {
             token,
-          })
+            ...baseMessagePayload,
+          }
         );
       } catch (error: any) {
         if (isTokenInvalid(error)) {
@@ -275,9 +272,10 @@ export async function POST(req: Request) {
 
     if (topic) {
       const messageId = await messaging.send(
-        buildMessagePayload({
+        {
           topic,
-        })
+          ...baseMessagePayload,
+        }
       );
       await saveNotifications([]);
       return NextResponse.json(
