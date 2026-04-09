@@ -10,9 +10,10 @@ import { Input } from "@/components/ui/input";
 import { toast } from 'sonner';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useAddNewTeam, useGetAddedProjectDepartments, useGetBusinessDepartmentsByBusiness_id, useGetProjectsbyIdForStaffs, useGetStaffsByDepartment, useGetTeamsForProjects, useRemoveProjectTeams, useUpdateTeam } from '@/query/business/queries';
+import { useAddNewTeam, useGetAddedProjectDepartments, useGetProjectsbyIdForStaffs, useGetStaffsByDepartment, useGetTeamsForProjects, useRemoveProjectTeams, useUpdateTeam } from '@/query/business/queries';
 import LoaderSpin from '@/components/shared/LoaderSpin';
 import { Avatar } from 'antd';
+import { useSession } from 'next-auth/react';
 
 const ProjectTeams = () => {
   const router = useRouter();
@@ -21,9 +22,8 @@ const ProjectTeams = () => {
   const [addTeamDialog, setAddTeamDialog] = useState(false);
   const [editTeamDialog, setEditTeamDialog] = useState(false);
   const [currentEditingTeam, setCurrentEditingTeam] = useState<any | null>(null);
+  const { data: session }: any = useSession();
   const { data: project } = useGetProjectsbyIdForStaffs(params.projectid);
-  const businessId = project?.data?.business_id?.toString?.() ?? project?.data?.business_id;
-  const { data: businessDepartmentsData } = useGetBusinessDepartmentsByBusiness_id(businessId);
   const { data: project_depts } = useGetAddedProjectDepartments(params.projectid);
   const { data: teamsForProject, isPending: fetchingTeamsForProject, refetch: refetchTeamsForProject } = useGetTeamsForProjects(params.projectid);
   const { mutateAsync: addNewTeam, isPending: addingNewTeam } = useAddNewTeam();
@@ -40,44 +40,22 @@ const ProjectTeams = () => {
   const [searchQueryLead, setSearchQueryLead] = useState("");
   const [searchQueryMembers, setSearchQueryMembers] = useState("");
 
-  const projectRegionId = project?.data?.region_id?.toString?.() ?? project?.data?.region_id ?? "";
-  const projectAreaId = project?.data?.area_id?.toString?.() ?? project?.data?.area_id ?? "";
-
-  const allowedDepartmentIds = useMemo(() => {
-    if (!businessDepartmentsData || !projectRegionId) return new Set<string>();
-    const ids = new Set<string>();
-    const allSources = [
-      ...(businessDepartmentsData?.region_departments || []),
-      ...(businessDepartmentsData?.area_departments || []),
-      ...(businessDepartmentsData?.location_departments || []),
-    ];
-
-    allSources.forEach((item: any) => {
-      const departments = Array.isArray(item?.departments) ? item.departments : [item];
-      departments.forEach((dept: any) => {
-        const depId = dept?._id?.toString?.() ?? dept?._id;
-        const depRegion = dept?.region_id?.toString?.() ?? dept?.region_id;
-        const depArea = dept?.area_id?.toString?.() ?? dept?.area_id;
-        if (!depId || depRegion !== projectRegionId) return;
-        if (projectAreaId) {
-          if (!depArea || depArea !== projectAreaId) return;
-        }
-        ids.add(depId);
-      });
-    });
-
-    return ids;
-  }, [businessDepartmentsData, projectAreaId, projectRegionId]);
-
-  const filteredProjectDepts = useMemo(() => {
-    const current = project_depts?.data || [];
-    if (!businessDepartmentsData) return current;
-    if (allowedDepartmentIds.size === 0) return [];
-    return current.filter((dept: any) => {
-      const depId = dept?.department_id?.toString?.() ?? dept?.department_id;
-      return depId ? allowedDepartmentIds.has(depId) : false;
-    });
-  }, [allowedDepartmentIds, businessDepartmentsData, project_depts?.data]);
+  const currentUserId = session?.user?.id?.toString?.() ?? "";
+  const projectHeadIds = useMemo(() => {
+    const data = project?.data;
+    return Array.from(
+      new Set(
+        [
+          ...(Array.isArray(data?.project_heads) ? data.project_heads : []),
+          data?.project_head,
+        ]
+          .filter(Boolean)
+          .map((item: any) => item?._id?.toString?.() ?? item?.toString?.() ?? String(item))
+      )
+    );
+  }, [project?.data]);
+  const canManageTeams = currentUserId ? projectHeadIds.includes(currentUserId) : false;
+  const filteredProjectDepts = project_depts?.data || [];
 
   const teams = teamsForProject?.data ?? [];
   const totalMembers = teams.reduce((sum: number, team: any) => sum + (team?.members?.length ?? 0), 0);
@@ -251,6 +229,7 @@ const ProjectTeams = () => {
             whileTap={{ scale: 0.98 }}
             className='p-2.5 px-4 rounded-lg border border-slate-700 hover:border-cyan-500 bg-gradient-to-tr from-slate-900 to-slate-800 text-xs font-semibold flex gap-2 items-center'
             onClick={() => setAddTeamDialog(true)}
+            disabled={!canManageTeams}
           >
             <Plus size={14} />
             Add Team
@@ -304,7 +283,7 @@ const ProjectTeams = () => {
                         <UserRound size={14} className="text-slate-300" />
                       </motion.button>
                     </PopoverTrigger>
-                    <PopoverContent className='w-[140px] p-0 border border-slate-800 rounded-lg overflow-hidden'>
+                  <PopoverContent className='w-[140px] p-0 border border-slate-800 rounded-lg overflow-hidden'>
                       <div className='flex flex-col items-start gap-1 bg-black rounded-lg p-1'>
                         <motion.button
                           whileTap={{ scale: 0.98 }}
@@ -315,25 +294,29 @@ const ProjectTeams = () => {
                           <Eye size={12} />
                           <span className='text-xs font-medium'>View</span>
                         </motion.button>
-                        <motion.button
-                          whileTap={{ scale: 0.98 }}
-                          whileHover={{ scale: 1.02 }}
-                          className='bg-slate-800/50 w-full p-2 text-emerald-400 cursor-pointer hover:text-emerald-300 flex items-center justify-center gap-1 border border-dashed border-slate-700 rounded-lg'
-                          onClick={() => setCurrentEditingTeam(team)}
-                        >
-                          <Edit size={12} />
-                          <span className='text-xs font-medium'>Edit</span>
-                        </motion.button>
-                        <motion.button
-                          whileTap={{ scale: 0.98 }}
-                          whileHover={{ scale: 1.02 }}
-                          className='bg-slate-800/50 w-full p-2 text-red-400 cursor-pointer hover:text-red-300 flex items-center justify-center gap-1 border border-dashed border-slate-700 rounded-lg'
-                          onClick={() => handleRemoveTeam(team._id)}
-                          disabled={isDeleting}
-                        >
-                          <Trash2 size={12} />
-                          <span className='text-xs font-medium'>Remove</span>
-                        </motion.button>
+                        {canManageTeams && (
+                          <motion.button
+                            whileTap={{ scale: 0.98 }}
+                            whileHover={{ scale: 1.02 }}
+                            className='bg-slate-800/50 w-full p-2 text-emerald-400 cursor-pointer hover:text-emerald-300 flex items-center justify-center gap-1 border border-dashed border-slate-700 rounded-lg'
+                            onClick={() => setCurrentEditingTeam(team)}
+                          >
+                            <Edit size={12} />
+                            <span className='text-xs font-medium'>Edit</span>
+                          </motion.button>
+                        )}
+                        {canManageTeams && (
+                          <motion.button
+                            whileTap={{ scale: 0.98 }}
+                            whileHover={{ scale: 1.02 }}
+                            className='bg-slate-800/50 w-full p-2 text-red-400 cursor-pointer hover:text-red-300 flex items-center justify-center gap-1 border border-dashed border-slate-700 rounded-lg'
+                            onClick={() => handleRemoveTeam(team._id)}
+                            disabled={isDeleting}
+                          >
+                            <Trash2 size={12} />
+                            <span className='text-xs font-medium'>Remove</span>
+                          </motion.button>
+                        )}
                       </div>
                     </PopoverContent>
                   </Popover>
@@ -369,7 +352,7 @@ const ProjectTeams = () => {
         </div>
       </div>
 
-      <Dialog open={addTeamDialog || editTeamDialog} onOpenChange={(open) => {
+      <Dialog open={(addTeamDialog || editTeamDialog) && canManageTeams} onOpenChange={(open) => {
         if (!open) {
           setAddTeamDialog(false);
           setEditTeamDialog(false);
@@ -402,7 +385,7 @@ const ProjectTeams = () => {
                 <SelectContent>
                   {filteredProjectDepts?.length === 0 && (
                     <SelectItem value="no-departments" disabled>
-                      No departments for this project region/area
+                      No departments added to this project
                     </SelectItem>
                   )}
                   {filteredProjectDepts?.map((dept: any) => (

@@ -435,46 +435,46 @@ const StaffProjects = () => {
             return (
               <div
                 key={proj._id}
-                className="rounded-xl border border-slate-800 bg-gradient-to-tr from-slate-950/60 to-slate-900/60 p-4 hover:border-cyan-500/40 transition cursor-pointer"
+                className="min-w-0 w-full rounded-xl border border-slate-800 bg-gradient-to-tr from-slate-950/60 to-slate-900/60 p-4 hover:border-cyan-500/40 transition cursor-pointer"
                 onClick={() => router.push(`/staff/projects/${proj._id}`)}
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h3 className="text-sm font-semibold text-slate-100">{proj.project_name}</h3>
-                    <p className="mt-1 text-[11px] text-slate-400 truncate">{proj.project_description || "No description provided"}</p>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className='min-w-0 flex-1'>
+                    <h3 className="break-words text-sm font-semibold text-slate-100">{proj.project_name}</h3>
+                    <p className="mt-1 w-full overflow-hidden text-[11px] text-slate-400 truncate">{proj.project_description || "No description provided"}</p>
                   </div>
-                  <span className={`px-2 py-1 rounded-full text-[10px] ${status.className}`}>{status.label}</span>
+                  <span className={`inline-flex w-fit px-2 py-1 rounded-full text-[10px] ${status.className}`}>{status.label}</span>
                 </div>
 
                 <div className="mt-3 grid gap-2 text-[11px] text-slate-300 sm:grid-cols-2">
-                  <div>
+                  <div className="min-w-0">
                     <span className="text-slate-500">Client</span>
-                    <p className="text-slate-200">{clientName}</p>
+                    <p className="break-words text-slate-200">{clientName}</p>
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <span className="text-slate-500">Domain</span>
-                    <p className="text-slate-200">{typeLabel}</p>
+                    <p className="break-words text-slate-200">{typeLabel}</p>
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <span className="text-slate-500">Region</span>
-                    <p className="text-slate-200">{regionName}</p>
+                    <p className="break-words text-slate-200">{regionName}</p>
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <span className="text-slate-500">Area</span>
-                    <p className="text-slate-200">{areaName}</p>
+                    <p className="break-words text-slate-200">{areaName}</p>
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <span className="text-slate-500">Priority</span>
-                    <p className="text-slate-200 capitalize">{proj.priority || "normal"}</p>
+                    <p className="break-words text-slate-200 capitalize">{proj.priority || "normal"}</p>
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <span className="text-slate-500">Timeline</span>
-                    <p className="text-slate-200">{formatDate(proj.start_date)} - {formatDate(proj.end_date)}</p>
+                    <p className="break-words text-slate-200">{formatDate(proj.start_date)} - {formatDate(proj.end_date)}</p>
                   </div>
                 </div>
 
-                <div className="mt-3 flex items-center justify-between text-[11px] text-slate-400">
-                  <span>Created by {createdBy}</span>
+                <div className="mt-3 flex flex-col gap-2 text-[11px] text-slate-400 sm:flex-row sm:items-center sm:justify-between">
+                  <span className="break-words">Created by {createdBy}</span>
                   <span className="flex items-center gap-1 text-slate-500">
                     <CheckCircle2 size={12} /> {formatDate(proj.createdAt)}
                   </span>

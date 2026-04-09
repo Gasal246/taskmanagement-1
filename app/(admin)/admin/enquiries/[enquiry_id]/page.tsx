@@ -8,7 +8,7 @@ import { useGetEnquiryById, useGetEnquiryComments, useGetEnquiryContacts, useGet
 import { formatDateTiny } from "@/lib/utils";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 
 
@@ -23,6 +23,7 @@ export default function SingleEnquiryPage() {
   const { mutateAsync: RemoveEnquiry, isPending: isDeleting } = useRemoveEnquiry();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [commentsDialogOpen, setCommentsDialogOpen] = useState(false);
+  const [awardedAction, setAwardedAction] = useState<"edit" | "forward" | null>(null);
   const camp = campData?.camp || enquiry?.enquiry?.camp_id;
   const contacts = contactsData?.contacts ?? enquiry?.contacts ?? [];
   const sortedComments = useMemo(() => {
@@ -133,6 +134,32 @@ export default function SingleEnquiryPage() {
     toast.error(res?.message || "Failed to delete enquiry");
   };
 
+  const isProjectAwarded = enquiry?.enquiry?.status === "Project Awarded";
+
+  const handleProtectedNavigation = (action: "edit" | "forward") => {
+    if (isProjectAwarded) {
+      setAwardedAction(action);
+      return;
+    }
+
+    router.replace(
+      action === "edit"
+        ? `/admin/enquiries/${params.enquiry_id}/edit`
+        : `/admin/enquiries/${params.enquiry_id}/forward-enquiry`
+    );
+  };
+
+  const handleProceedAwardedAction = () => {
+    if (!awardedAction) return;
+
+    router.replace(
+      awardedAction === "edit"
+        ? `/admin/enquiries/${params.enquiry_id}/edit`
+        : `/admin/enquiries/${params.enquiry_id}/forward-enquiry`
+    );
+    setAwardedAction(null);
+  };
+
   if (isLoading || (baseCampId && isCampLoading)) {
     return (
       <div className="flex items-center justify-center h-40">
@@ -199,7 +226,7 @@ export default function SingleEnquiryPage() {
                     variant="outline"
                     size="sm"
                     className="gap-2"
-                    onClick={() => router.replace(`/admin/enquiries/${params.enquiry_id}/edit`)}
+                    onClick={() => handleProtectedNavigation("edit")}
                   >
                     <Pencil size={14} /> Edit
                   </Button>
@@ -261,6 +288,29 @@ export default function SingleEnquiryPage() {
                 {isDeleting ? "Deleting..." : "Delete"}
               </Button>
             </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={!!awardedAction} onOpenChange={(open) => !open && setAwardedAction(null)}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>
+                {awardedAction === "edit" ? "Edit awarded enquiry?" : "Forward awarded enquiry?"}
+              </DialogTitle>
+              <DialogDescription>
+                {awardedAction === "edit"
+                  ? "You are editing an enquiry that is already Project Awarded. Nothing you do here will reflect on the project anymore. Are you sure you want to continue editing?"
+                  : "You are trying to forward an enquiry that is already Project Awarded. There will not be any effect on the project that has already been created. Are you sure you want to continue?"}
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setAwardedAction(null)}>
+                Cancel
+              </Button>
+              <Button onClick={handleProceedAwardedAction}>
+                Continue
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
 
@@ -535,7 +585,7 @@ export default function SingleEnquiryPage() {
 
           <div className="flex items-center gap-3">
             <Button
-              onClick={() => router.replace(`/admin/enquiries/${params.enquiry_id}/forward-enquiry`)}
+              onClick={() => handleProtectedNavigation("forward")}
               className="flex items-center gap-1"
               disabled={!enquiry?.enquiry?.is_active}
             >

@@ -7,6 +7,7 @@ import { motion } from 'framer-motion';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from '@/components/ui/input';
+import { Textarea } from "@/components/ui/textarea";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -15,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { DEPARTMENT_TYPES } from '@/lib/constants';
 import LoaderSpin from '@/components/shared/LoaderSpin';
+import MarkdownPreview from '@/components/shared/MarkdownPreview';
 import { Label } from '@/components/ui/label';
 import Image from 'next/image';
 import { deleteObject, getDownloadURL, ref, uploadBytes } from 'firebase/storage';
@@ -156,7 +158,17 @@ const ProjectView = () => {
   }, [selectedRegionId, getAreasForRegion, form]);
 
   const teams = useMemo(() => teamsData?.data ?? [], [teamsData?.data]);
-  const projectHeads = useMemo(() => project?.data?.project_heads ?? [], [project?.data?.project_heads]);
+  const projectHeads = useMemo(() => {
+    const heads = project?.data?.project_heads ?? [];
+    const seenHeadIds = new Set<string>();
+
+    return heads.filter((head: any) => {
+      const headId = head?._id?.toString?.() ?? head?._id;
+      if (!headId || seenHeadIds.has(headId)) return false;
+      seenHeadIds.add(headId);
+      return true;
+    });
+  }, [project?.data?.project_heads]);
   const projectSupervisors = useMemo(() => project?.data?.project_supervisors ?? [], [project?.data?.project_supervisors]);
 
   const projectTeamPeople = useMemo(() => {
@@ -584,17 +596,18 @@ const ProjectView = () => {
         </BreadcrumbList>
       </Breadcrumb>
 
-      <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg min-h-[15vh] pb-3 mb-2 border border-slate-700/50">
-        <div className="mb-1 flex items-center justify-between">
+      <div className="relative overflow-hidden rounded-2xl border border-cyan-900/40 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-4 shadow-[0_18px_60px_-30px_rgba(34,211,238,0.35)] mb-2">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.16),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(16,185,129,0.12),transparent_28%)]" />
+        <div className="relative mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h1 className='font-medium text-xs text-slate-200 flex items-center gap-1'>
             <PanelsTopLeft strokeWidth={2} size={14} /> Project Details
           </h1>
-          <div className='flex justify-end items-baseline gap-5'>
+          <div className='flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:justify-end sm:items-baseline sm:gap-3'>
             {canManageProject && (
               <motion.div
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                className='p-2 px-4 group rounded-lg border border-slate-700 hover:border-slate-500 bg-gradient-to-tr from-slate-900 to-slate-800 cursor-pointer text-xs font-medium flex gap-1 items-center'
+                className='p-2 px-4 group rounded-lg border border-slate-700 hover:border-slate-500 bg-gradient-to-tr from-slate-900 to-slate-800 cursor-pointer text-xs font-medium flex gap-1 items-center justify-center w-full sm:w-auto'
                 onClick={handleClickEdit}
               >
                 <PencilRuler className='group-hover:text-pink-300' size={12} />
@@ -603,54 +616,79 @@ const ProjectView = () => {
             )}
           </div>
         </div>
-        <div>
-          <div className="w-full lg:w-1/2 mb-2.5">
-            <p className='text-xl text-slate-300 font-semibold'>{project?.data?.project_name || "-"}</p>
-            <p className='text-sm text-slate-300 font-medium'>{project?.data?.project_description || "-"}</p>
-          </div>
-        </div>
-        <div className="w-full flex flex-wrap items-center lg:w-1/2">
-          <div className="w-full lg:w-1/2 mb-2.5">
-            <p className='text-xs text-slate-400'>Progress</p>
-            <p className='text-xs text-slate-300 font-semibold'>{progress || "0"}%</p>
-          </div>
-          <div className="w-full lg:w-1/2 mb-2.5">
-            <p className='text-xs text-slate-400'>Start Date</p>
-            <p className='text-xs text-slate-300 font-semibold'>{formatDateTiny(project?.data?.start_date) || "-"}</p>
-          </div>
-          <div className="w-full lg:w-1/2 mb-2.5">
-            <p className='text-xs text-slate-400'>End Date</p>
-            <p className='text-xs text-slate-300 font-semibold'>{formatDateTiny(project?.data?.end_date) || "-"}</p>
-          </div>
-          <div className="w-full lg:w-1/2 mb-2.5">
-            <p className='text-xs text-slate-400'>Status</p>
-            <p className={`text-xs font-semibold capitalize ${project?.data?.status == "Pending" ? 'text-gray-600' : project?.data.status == "completed" ? 'text-green-600' : project?.data?.status == "approved" ? 'text-blue-400' : project?.data?.status == "cancelled" ? 'text-red-600' : 'text-gray-600'}`}>
-              {project?.data?.status}
-            </p>
+
+        <div className="relative grid gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,0.9fr)]">
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
+              <p className='text-xl font-semibold tracking-tight text-white'>{project?.data?.project_name || "-"}</p>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-4">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Overview</p>
+              <MarkdownPreview content={project?.data?.project_description} className="text-sm text-slate-200" />
+            </div>
           </div>
 
-          <div className="w-full lg:w-1/2 mb-2.5">
-            <p className='text-xs text-slate-400'>Region</p>
-            <p className='text-xs text-slate-300 font-semibold'>{project?.data?.region?.region_name || "-"}</p>
-          </div>
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-cyan-400/15 bg-slate-950/55 p-4">
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Progress</p>
+                  <p className="mt-1 text-3xl font-semibold text-white">{progress || 0}%</p>
+                </div>
+                <div className={`rounded-full px-3 py-1 text-[11px] font-semibold capitalize ${
+                  project?.data?.status == "Pending"
+                    ? 'bg-slate-700/50 text-slate-200'
+                    : project?.data?.status == "completed"
+                      ? 'bg-emerald-500/15 text-emerald-200'
+                      : project?.data?.status == "approved"
+                        ? 'bg-cyan-500/15 text-cyan-200'
+                        : project?.data?.status == "cancelled"
+                          ? 'bg-red-500/15 text-red-200'
+                          : 'bg-slate-700/50 text-slate-200'
+                }`}>
+                  {project?.data?.status || "-"}
+                </div>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-slate-800">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-cyan-400 via-sky-400 to-emerald-400 transition-all"
+                  style={{ width: `${Math.min(Math.max(progress || 0, 0), 100)}%` }}
+                />
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <div className="rounded-xl border border-white/8 bg-white/[0.03] p-3">
+                  <p className="text-[11px] uppercase tracking-[0.14em] text-slate-500">Start Date</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-100">{formatDateTiny(project?.data?.start_date) || "-"}</p>
+                </div>
+                <div className="rounded-xl border border-white/8 bg-white/[0.03] p-3">
+                  <p className="text-[11px] uppercase tracking-[0.14em] text-slate-500">End Date</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-100">{formatDateTiny(project?.data?.end_date) || "-"}</p>
+                </div>
+              </div>
+            </div>
 
-          <div className="w-full lg:w-1/2 mb-2.5">
-            <p className='text-xs text-slate-400'>Area</p>
-            <p className='text-xs text-slate-300 font-semibold'>{project?.data?.area?.area_name || "-"}</p>
-          </div>
-
-          <div className="w-full lg:w-1/2 mb-2.5">
-            <p className='text-xs text-slate-400'>Project Type</p>
-            <p className={`text-xs font-semibold capitalize text-slate-300`}>
-              {project?.data?.type}
-            </p>
-          </div>
-
-          <div className="w-full lg:w-1/2 mb-2.5">
-            <p className='text-xs text-slate-400'>Project Priority</p>
-            <p className={`text-xs font-semibold capitalize ${project?.data?.priority == "high" ? 'text-red-600' : 'text-slate-300'} flex gap-1 items-center`}>
-              <Square color='gray' strokeWidth={1} size={8} fill={project?.data?.priority === "high" ? '#ef4444' : project?.data?.priority === 'normal' ? 'gold' : 'silver'} /> {project?.data?.priority}
-            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
+                <p className='text-[11px] uppercase tracking-[0.18em] text-slate-500'>Region</p>
+                <p className='mt-2 text-sm font-semibold text-slate-100'>{project?.data?.region?.region_name || "-"}</p>
+              </div>
+              <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
+                <p className='text-[11px] uppercase tracking-[0.18em] text-slate-500'>Area</p>
+                <p className='mt-2 text-sm font-semibold text-slate-100'>{project?.data?.area?.area_name || "-"}</p>
+              </div>
+              <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
+                <p className='text-[11px] uppercase tracking-[0.18em] text-slate-500'>Project Type</p>
+                <p className='mt-2 text-sm font-semibold capitalize text-slate-100'>{project?.data?.type || "-"}</p>
+              </div>
+              <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
+                <p className='text-[11px] uppercase tracking-[0.18em] text-slate-500'>Priority</p>
+                <p className={`mt-2 flex items-center gap-2 text-sm font-semibold capitalize ${project?.data?.priority == "high" ? 'text-red-300' : 'text-slate-100'}`}>
+                  <Square color='gray' strokeWidth={1} size={8} fill={project?.data?.priority === "high" ? '#ef4444' : project?.data?.priority === 'normal' ? 'gold' : 'silver'} />
+                  {project?.data?.priority || "-"}
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -682,7 +720,7 @@ const ProjectView = () => {
               <div className="w-full lg:w-3/12 p-1" key={headId}>
                 <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg border border-slate-700 hover:border-cyan-800 relative">
                   <div className="flex items-center gap-3">
-                    <Avatar src={head?.avatar_url || '/avatar.png'} size={40} />
+                    <Avatar className="shrink-0" src={head?.avatar_url || '/avatar.png'} size={40} />
                     <div>
                       <p className="text-sm font-semibold text-slate-200">{head?.name || "-"}</p>
                       <p className="text-xs text-slate-400">{head?.email || "-"}</p>
@@ -732,7 +770,7 @@ const ProjectView = () => {
               <div className="w-full lg:w-3/12 p-1" key={userId}>
                 <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg border border-slate-700 hover:border-cyan-800 relative">
                   <div className="flex items-center gap-3">
-                    <Avatar src={user?.avatar_url || '/avatar.png'} size={40} />
+                    <Avatar className="shrink-0" src={user?.avatar_url || '/avatar.png'} size={40} />
                     <div>
                       <p className="text-sm font-semibold text-slate-200">{user?.name || "-"}</p>
                       <p className="text-xs text-slate-400">{user?.email || "-"}</p>
@@ -1111,7 +1149,7 @@ const ProjectView = () => {
       </div>
 
       <Dialog open={updateProjectDialog} onOpenChange={setUpdateProjectDialog}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="w-[calc(100vw-1.5rem)] max-w-none sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Update Project</DialogTitle>
             <DialogDescription>Updating project details.</DialogDescription>
@@ -1139,7 +1177,11 @@ const ProjectView = () => {
                     <FormItem>
                       <FormLabel className="text-xs text-slate-300 font-semibold">Description</FormLabel>
                       <FormControl className="border-slate-600 focus:border-slate-400 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0">
-                        <Input placeholder="Project description" {...field} />
+                        <Textarea
+                          placeholder="Project description"
+                          className="min-h-32 resize-y"
+                          {...field}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -1363,7 +1405,7 @@ const ProjectView = () => {
                 onClick={() => setSelectedProjectHeadId(staff?.user_id?._id)}
               >
                 <div className="flex items-center gap-2">
-                  <Avatar src={staff?.user_id?.avatar_url || '/avatar.png'} size={30} />
+                  <Avatar className="shrink-0" src={staff?.user_id?.avatar_url || '/avatar.png'} size={30} />
                   <div>
                     <h1 className="text-xs font-medium">{staff?.user_id?.name}</h1>
                     <p className="text-xs text-slate-400">{staff?.user_id?.email}</p>
@@ -1420,7 +1462,7 @@ const ProjectView = () => {
                 onClick={() => setSelectedProjectSupervisorId(staff?.user_id?._id)}
               >
                 <div className="flex items-center gap-2">
-                  <Avatar src={staff?.user_id?.avatar_url || '/avatar.png'} size={30} />
+                  <Avatar className="shrink-0" src={staff?.user_id?.avatar_url || '/avatar.png'} size={30} />
                   <div>
                     <h1 className="text-xs font-medium">{staff?.user_id?.name}</h1>
                     <p className="text-xs text-slate-400">{staff?.user_id?.email}</p>

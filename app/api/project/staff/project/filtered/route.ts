@@ -84,6 +84,48 @@ export async function GET(req: NextRequest) {
             if (condition) scopeOr.push(condition);
         };
 
+        const [directAssignedProjects, headedTeams, teamMembershipRows] = await Promise.all([
+            Business_Project.find({
+                $or: [
+                    { project_head: session?.user?.id },
+                    { project_heads: session?.user?.id },
+                    { project_supervisors: session?.user?.id },
+                ],
+            })
+                .select("_id")
+                .lean(),
+            Project_Teams.find({ team_head: session?.user?.id })
+                .select("project_id")
+                .lean(),
+            Project_Team_Members.find({ user_id: session?.user?.id })
+                .select("project_team_id")
+                .lean(),
+        ]);
+
+        const teamIds = teamMembershipRows
+            .map((row: any) => row?.project_team_id)
+            .filter(Boolean);
+        const memberTeamProjects = teamIds.length > 0
+            ? await Project_Teams.find({ _id: { $in: teamIds } })
+                .select("project_id")
+                .lean()
+            : [];
+        const assignedProjectIds = Array.from(
+            new Set(
+                [
+                    ...directAssignedProjects.map((project: any) => project?._id),
+                    ...headedTeams.map((team: any) => team?.project_id),
+                    ...memberTeamProjects.map((team: any) => team?.project_id),
+                ]
+                    .filter(Boolean)
+                    .map((id: any) => id?.toString?.() ?? String(id))
+            )
+        );
+
+        if (assignedProjectIds.length > 0) {
+            addScope({ _id: { $in: assignedProjectIds } });
+        }
+
         switch (roleName) {
             case "REGION_HEAD": {
                 const regions = await Region_heads.find({ user_id: session?.user?.id, status: 1 })
@@ -185,18 +227,6 @@ export async function GET(req: NextRequest) {
             case "AREA_DEP_STAFF":
             case "LOCATION_DEP_STAFF":
             case "AGENT": {
-                const teamIds = await Project_Team_Members.find({ user_id: session?.user?.id })
-                    .select("project_team_id")
-                    .lean();
-                const teamProjectIds = await Project_Teams.find({
-                    _id: { $in: teamIds.map((t: any) => t.project_team_id) },
-                })
-                    .select("project_id")
-                    .lean();
-                const assignedProjectIds = teamProjectIds.map((p: any) => p?.project_id).filter(Boolean);
-                if (assignedProjectIds.length > 0) {
-                    addScope({ _id: { $in: assignedProjectIds } });
-                }
                 addScope({ creator: session?.user?.id });
                 break;
             }

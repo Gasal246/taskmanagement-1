@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator, BreadcrumbPage } from "@/components/ui/breadcrumb";
 import { useParams, useRouter } from 'next/navigation';
 import { Edit, Eye, Plus, Search, Trash2, Users, UserRound } from 'lucide-react';
@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from 'sonner';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useAddNewTeam, useGetAddedProjectDepartments, useGetBusinessDepartmentsByBusiness_id, useGetProjectById, useGetStaffsByDepartment, useGetTeamsForProjects, useRemoveProjectTeams, useUpdateTeam } from '@/query/business/queries';
+import { useAddNewTeam, useGetAddedProjectDepartments, useGetStaffsByDepartment, useGetTeamsForProjects, useRemoveProjectTeams, useUpdateTeam } from '@/query/business/queries';
 import LoaderSpin from '@/components/shared/LoaderSpin';
 import { Avatar } from 'antd';
 
@@ -21,9 +21,6 @@ const ProjectTeams = () => {
   const [addTeamDialog, setAddTeamDialog] = useState(false);
   const [editTeamDialog, setEditTeamDialog] = useState(false);
   const [currentEditingTeam, setCurrentEditingTeam] = useState<any | null>(null);
-  const { data: project } = useGetProjectById(params.projectid);
-  const businessId = project?.data?.business_id?.toString?.() ?? project?.data?.business_id;
-  const { data: businessDepartmentsData } = useGetBusinessDepartmentsByBusiness_id(businessId);
   const { data: project_depts } = useGetAddedProjectDepartments(params.projectid);
   const { data: teamsForProject, isPending: fetchingTeamsForProject, refetch: refetchTeamsForProject } = useGetTeamsForProjects(params.projectid);
   const { mutateAsync: addNewTeam, isPending: addingNewTeam } = useAddNewTeam();
@@ -40,44 +37,7 @@ const ProjectTeams = () => {
   const [searchQueryLead, setSearchQueryLead] = useState("");
   const [searchQueryMembers, setSearchQueryMembers] = useState("");
 
-  const projectRegionId = project?.data?.region_id?.toString?.() ?? project?.data?.region_id ?? "";
-  const projectAreaId = project?.data?.area_id?.toString?.() ?? project?.data?.area_id ?? "";
-
-  const allowedDepartmentIds = useMemo(() => {
-    if (!businessDepartmentsData || !projectRegionId) return new Set<string>();
-    const ids = new Set<string>();
-    const allSources = [
-      ...(businessDepartmentsData?.region_departments || []),
-      ...(businessDepartmentsData?.area_departments || []),
-      ...(businessDepartmentsData?.location_departments || []),
-    ];
-
-    allSources.forEach((item: any) => {
-      const departments = Array.isArray(item?.departments) ? item.departments : [item];
-      departments.forEach((dept: any) => {
-        const depId = dept?._id?.toString?.() ?? dept?._id;
-        const depRegion = dept?.region_id?.toString?.() ?? dept?.region_id;
-        const depArea = dept?.area_id?.toString?.() ?? dept?.area_id;
-        if (!depId || depRegion !== projectRegionId) return;
-        if (projectAreaId) {
-          if (!depArea || depArea !== projectAreaId) return;
-        }
-        ids.add(depId);
-      });
-    });
-
-    return ids;
-  }, [businessDepartmentsData, projectAreaId, projectRegionId]);
-
-  const filteredProjectDepts = useMemo(() => {
-    const current = project_depts?.data || [];
-    if (!businessDepartmentsData) return current;
-    if (allowedDepartmentIds.size === 0) return [];
-    return current.filter((dept: any) => {
-      const depId = dept?.department_id?.toString?.() ?? dept?.department_id;
-      return depId ? allowedDepartmentIds.has(depId) : false;
-    });
-  }, [allowedDepartmentIds, businessDepartmentsData, project_depts?.data]);
+  const filteredProjectDepts = project_depts?.data || [];
 
   const teams = teamsForProject?.data ?? [];
   const totalMembers = teams.reduce((sum: number, team: any) => sum + (team?.members?.length ?? 0), 0);
@@ -402,7 +362,7 @@ const ProjectTeams = () => {
                 <SelectContent>
                   {filteredProjectDepts?.length === 0 && (
                     <SelectItem value="no-departments" disabled>
-                      No departments for this project region/area
+                      No departments added to this project
                     </SelectItem>
                   )}
                   {filteredProjectDepts?.map((dept: any) => (

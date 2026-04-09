@@ -5,6 +5,7 @@ import Flow_Log from "@/models/Flow_Log.model";
 import Users from "@/models/users.model";
 import mongoose from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
+import { notifyProjectAssignmentChange } from "@/app/api/helpers/project-assignment-notifications";
 
 connectDB();
 
@@ -53,6 +54,15 @@ export async function POST(req: NextRequest) {
             project_id,
         }).save();
 
+        await notifyProjectAssignmentChange({
+            recipientIds: [String(user_id)],
+            actorId: session?.user?.id,
+            projectId: String(project_id),
+            projectName: project?.project_name || "project",
+            role: "project-supervisor",
+            event: "assigned",
+        });
+
         return NextResponse.json({ message: "Project supervisor added", status: 200 }, { status: 200 });
     } catch (error) {
         console.log("Error while adding project supervisor", error);
@@ -95,6 +105,15 @@ export async function DELETE(req: NextRequest) {
             description: `${targetUser?.name || "User"} removed from project supervisors.`,
             project_id,
         }).save();
+
+        await notifyProjectAssignmentChange({
+            recipientIds: [String(user_id)],
+            actorId: session?.user?.id,
+            projectId: String(project_id),
+            projectName: project?.project_name || "project",
+            role: "project-supervisor",
+            event: "removed",
+        });
 
         return NextResponse.json({ message: "Project supervisor removed", status: 200 }, { status: 200 });
     } catch (error) {

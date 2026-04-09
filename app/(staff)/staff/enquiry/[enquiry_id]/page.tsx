@@ -7,7 +7,7 @@ import { useGetEnquiryByIdForStaffs, useGetEnquiryComments, useGetEnquiryContact
 import { formatDateTiny } from "@/lib/utils";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 
 export default function SingleEnquiryPage() {
@@ -19,6 +19,7 @@ export default function SingleEnquiryPage() {
   const baseCampId = enquiry?.enquiry?.camp_id?._id ?? enquiry?.enquiry?.camp_id;
   const { data: campData, isLoading: isCampLoading } = useGetEqCampsById(baseCampId || "");
   const [commentsDialogOpen, setCommentsDialogOpen] = useState(false);
+  const [awardedAction, setAwardedAction] = useState<"edit" | "forward" | null>(null);
   const camp = campData?.camp || enquiry?.enquiry?.camp_id;
   const contacts = contactsData?.contacts ?? enquiry?.contacts ?? [];
   const sortedComments = useMemo(() => {
@@ -120,6 +121,32 @@ export default function SingleEnquiryPage() {
     </div>
   );
 
+  const isProjectAwarded = enquiry?.enquiry?.status === "Project Awarded";
+
+  const handleProtectedNavigation = (action: "edit" | "forward") => {
+    if (isProjectAwarded) {
+      setAwardedAction(action);
+      return;
+    }
+
+    router.replace(
+      action === "edit"
+        ? `/staff/enquiry/${params.enquiry_id}/edit`
+        : `/staff/enquiry/${params.enquiry_id}/forward-enquiry`
+    );
+  };
+
+  const handleProceedAwardedAction = () => {
+    if (!awardedAction) return;
+
+    router.replace(
+      awardedAction === "edit"
+        ? `/staff/enquiry/${params.enquiry_id}/edit`
+        : `/staff/enquiry/${params.enquiry_id}/forward-enquiry`
+    );
+    setAwardedAction(null);
+  };
+
   if (isLoading || (baseCampId && isCampLoading)) {
     return (
       <div className="flex items-center justify-center h-40">
@@ -179,7 +206,7 @@ export default function SingleEnquiryPage() {
               {enquiry?.canEdit && (
                 <Button
                   variant="outline"
-                  onClick={() => router.replace(`/staff/enquiry/${params.enquiry_id}/edit`)}
+                  onClick={() => handleProtectedNavigation("edit")}
                   className="flex items-center gap-1"
                 >
                   <Pencil size={14} /> Edit Enquiry
@@ -196,6 +223,29 @@ export default function SingleEnquiryPage() {
             </div>
           </div>
         </div>
+
+        <Dialog open={!!awardedAction} onOpenChange={(open) => !open && setAwardedAction(null)}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>
+                {awardedAction === "edit" ? "Edit awarded enquiry?" : "Forward awarded enquiry?"}
+              </DialogTitle>
+              <DialogDescription>
+                {awardedAction === "edit"
+                  ? "You are editing an enquiry that is already Project Awarded. Nothing you do here will reflect on the project anymore. Are you sure you want to continue editing?"
+                  : "You are trying to forward an enquiry that is already Project Awarded. There will not be any effect on the project that has already been created. Are you sure you want to continue?"}
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setAwardedAction(null)}>
+                Cancel
+              </Button>
+              <Button onClick={handleProceedAwardedAction}>
+                Continue
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         <div className="bg-gradient-to-tr from-slate-950/60 to-slate-900/60 p-5 rounded-xl border border-slate-800 space-y-6">
           <div className="rounded-lg border border-slate-800 bg-slate-900/40 p-4">
@@ -462,7 +512,7 @@ export default function SingleEnquiryPage() {
             {enquiry?.canForward && (
               <Button
                 className="gap-2"
-                onClick={() => router.replace(`/staff/enquiry/${params.enquiry_id}/forward-enquiry`)}
+                onClick={() => handleProtectedNavigation("forward")}
               >
                 <Send size={16} />
                 Forward Enquiry

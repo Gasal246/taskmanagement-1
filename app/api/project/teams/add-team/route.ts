@@ -1,12 +1,12 @@
 import { auth } from "@/auth";
-import { description } from "@/components/charts/ProjectsCompletedAndPending";
 import connectDB from "@/lib/mongo";
+import Business_Project from "@/models/business_project.model";
 import Flow_Log from "@/models/Flow_Log.model";
 import Project_Teams from "@/models/project_team.model";
 import Project_Team_Members from "@/models/project_team_members.model";
-import Team_Members from "@/models/team_members.model";
 import Users from "@/models/users.model";
 import { NextRequest, NextResponse } from "next/server";
+import { notifyProjectAssignmentChange } from "@/app/api/helpers/project-assignment-notifications";
 
 connectDB();
 
@@ -25,9 +25,9 @@ export async function POST(req: NextRequest){
          const session: any = await auth();
         if(!session) return NextResponse.json({message: "Un Authorized Access", status: 401}, { status: 401 });
 
-        const username = await Users.findById(session?.user?.id).select("name");
-
         const body:Body = await req.json();
+        const username = await Users.findById(session?.user?.id).select("name");
+        const project = await Business_Project.findById(body?.project_id).select("project_name");
 
         const project_team = new Project_Teams({
             team_name: body.team_name,
@@ -55,6 +55,35 @@ export async function POST(req: NextRequest){
         })
 
         await flows.save();
+
+        if (body.team_lead_id) {
+            await notifyProjectAssignmentChange({
+                recipientIds: [body.team_lead_id],
+                actorId: session?.user?.id,
+                projectId: body.project_id,
+                projectName: project?.project_name || "project",
+                role: "team-head",
+                event: "assigned",
+                teamId: String(savedProjectTeam._id),
+                teamName: body.team_name,
+            });
+        }
+
+        const memberRecipientIds = Array.from(
+            new Set((body.team_member_ids || []).filter((id) => id && id !== body.team_lead_id))
+        );
+        if (memberRecipientIds.length > 0) {
+            await notifyProjectAssignmentChange({
+                recipientIds: memberRecipientIds,
+                actorId: session?.user?.id,
+                projectId: body.project_id,
+                projectName: project?.project_name || "project",
+                role: "team-member",
+                event: "assigned",
+                teamId: String(savedProjectTeam._id),
+                teamName: body.team_name,
+            });
+        }
 
         return NextResponse.json({ message: "Project Team created successfully", status: 201 }, { status: 201 });
 
