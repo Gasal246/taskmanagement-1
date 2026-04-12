@@ -73,6 +73,11 @@ function getStoredToken(userId?: string | null) {
   return null;
 }
 
+function getUserScopedToken(userId?: string | null) {
+  if (typeof window === "undefined" || !userId) return null;
+  return window.localStorage.getItem(`${tokenStorageKey}:${userId}`);
+}
+
 function setStoredToken(userId: string | null | undefined, token: string) {
   if (typeof window === "undefined") return;
 
@@ -123,8 +128,11 @@ const FcmNotifications = () => {
     const token = await requestFcmToken();
     if (!token) return false;
 
-    const storedToken = getStoredToken(userId);
-    if (storedToken === token) return true;
+    const userScopedToken = getUserScopedToken(userId);
+    if (userScopedToken === token) {
+      setStoredToken(userId, token);
+      return true;
+    }
 
     const response = await fetch("/api/notifications/fcm-token", {
       method: "POST",
@@ -156,12 +164,17 @@ const FcmNotifications = () => {
     async (permission: NotificationPermission) => {
       if (typeof window === "undefined") return;
 
-      const storedToken = getStoredToken(userId);
-      if (storedToken) {
+      const userScopedToken = getUserScopedToken(userId);
+      if (userScopedToken) {
         if (permission !== "denied") {
           setShowPermissionPrompt(false);
         }
         return;
+      }
+
+      const legacyToken = getStoredToken();
+      if (legacyToken && userId) {
+        window.localStorage.removeItem(tokenStorageKey);
       }
 
       if (permission === "granted") {
