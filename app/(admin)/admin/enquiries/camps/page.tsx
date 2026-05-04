@@ -5,10 +5,12 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
-import { useGetEqCountries, useGetEqRegions, useGetEqCities, useGetEqProvince, useGetEqAreas, useGetEqCampsFiltered } from "@/query/enquirymanager/queries";
+import { useGetEqCountries, useGetEqRegions, useGetEqCities, useGetEqProvince, useGetEqAreas, useGetEqCampsFiltered, useUpdateEqCamp } from "@/query/enquirymanager/queries";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { useRouter } from "next/navigation";
 import { ArrowRight, HandPlatter, Plus, Search } from "lucide-react";
+import { EQ_CAMP_VISITED_STATUS_OPTIONS } from "@/lib/constants";
+import { toast } from "sonner";
 import {
   Pagination,
   PaginationContent,
@@ -24,8 +26,11 @@ const CAMP_VISITED_STATUS_FILTER_OPTIONS = [
   { value: "Visited", label: "Visited" },
   { value: "To Visit", label: "To Visit" },
   { value: "Cancelled", label: "Cancelled" },
+  { value: "Awarded", label: "Awarded" },
   { value: "just_added", label: "Just Added" },
 ] as const;
+
+const CAMP_VISITED_STATUS_OPTIONS = [...EQ_CAMP_VISITED_STATUS_OPTIONS, "Just Added", "Awarded"] as const;
 
 export default function CampsListPage() {
   const router = useRouter();
@@ -38,9 +43,12 @@ export default function CampsListPage() {
   const [visited_status, setVisitedStatus] = useState("all");
   const [search, setSearch] = React.useState("");
   const [page, setPage] = React.useState(1);
+  const [statusOverrides, setStatusOverrides] = useState<Record<string, string>>({});
+  const [updatingCampId, setUpdatingCampId] = useState("");
   const limit = 15;
 
   const { mutateAsync: GetCountries } = useGetEqCountries();
+  const { mutateAsync: UpdateCamp } = useUpdateEqCamp();
   const { data: regions } = useGetEqRegions(country_id);
   const { data: provinces } = useGetEqProvince(region_id);
   const { data: cities } = useGetEqCities(province_id);
@@ -105,6 +113,47 @@ export default function CampsListPage() {
   useEffect(() => {
     setPage(1);
   }, [country_id, region_id, province_id, city_id, area_id, visited_status, search]);
+
+  const getVisitedStatusTone = (status?: string | null) => {
+    switch (status) {
+      case "Visited":
+        return "bg-green-900/60 text-green-100";
+      case "Cancelled":
+        return "bg-blue-900/60 text-blue-100";
+      case "To Visit":
+        return "bg-amber-700/50 text-amber-100";
+      case "Awarded":
+        return "bg-emerald-900/60 text-emerald-100";
+      default:
+        return "bg-red-900/60 text-red-100";
+    }
+  };
+
+  const handleVisitedStatusChange = async (camp: any, nextStatus: string) => {
+    const currentStatus = statusOverrides[camp._id] ?? camp.visited_status ?? "Just Added";
+    if (currentStatus === nextStatus) return;
+
+    setUpdatingCampId(camp._id);
+    try {
+      const res = await UpdateCamp({
+        camp_id: camp._id,
+        visited_status: nextStatus,
+      });
+
+      if (res?.status === 200) {
+        setStatusOverrides((prev) => ({ ...prev, [camp._id]: nextStatus }));
+        toast.success("Camp visited status updated");
+        return;
+      }
+
+      toast.error(res?.message || "Failed to update visited status");
+    } catch (err) {
+      console.log(err);
+      toast.error("Failed to update visited status");
+    } finally {
+      setUpdatingCampId("");
+    }
+  };
 
   return (
     <div className="p-4 pb-10">
@@ -234,19 +283,26 @@ export default function CampsListPage() {
                       <td className="px-4 py-3 text-slate-300">{camp.area_id?.area_name}</td>
                       <td className="px-4 py-3 font-medium text-slate-100">{camp.camp_name}</td>
                       <td className="px-4 py-3">
-                        <span
-                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
-                            camp.visited_status === "Visited"
-                              ? "bg-green-900/60 text-green-100"
-                              : camp.visited_status === "Cancelled"
-                                ? "bg-blue-900/60 text-blue-100"
-                                : camp.visited_status === "To Visit"
-                                  ? "bg-amber-700/50 text-amber-100"
-                                  : "bg-red-900/60 text-red-100"
-                          }`}
+                        <Select
+                          value={statusOverrides[camp._id] ?? camp.visited_status ?? "Just Added"}
+                          onValueChange={(value) => handleVisitedStatusChange(camp, value)}
+                          disabled={updatingCampId === camp._id}
                         >
-                          {camp.visited_status || "Just Added"}
-                        </span>
+                          <SelectTrigger
+                            className={`h-8 w-[140px] rounded-full border-0 px-2.5 text-xs font-semibold ${getVisitedStatusTone(
+                              statusOverrides[camp._id] ?? camp.visited_status ?? "Just Added"
+                            )}`}
+                          >
+                            <SelectValue placeholder="Visited Status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {CAMP_VISITED_STATUS_OPTIONS.map((status) => (
+                              <SelectItem key={status} value={status}>
+                                {status}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex justify-end">

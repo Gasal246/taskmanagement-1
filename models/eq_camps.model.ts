@@ -1,4 +1,5 @@
 import mongoose, { ObjectId, Schema } from "mongoose";
+import { CAMP_VISITED_STATUS_VALUES } from "@/lib/enquiries/camp-visited-status";
 
 export interface IEq_camps extends Document{
     _id: ObjectId,
@@ -40,7 +41,7 @@ const Eq_campsSchema: Schema = new Schema({
     camp_occupancy: {type: Number},
     is_active: {type: Boolean, default: false},
     is_eq_added: {type: Boolean},
-    visited_status: {type: String, enum: ["Visited", "To Visit", "Cancelled"], default: "To Visit"},
+    visited_status: {type: String, enum: CAMP_VISITED_STATUS_VALUES, default: "Just Added"},
     latitude: {type: String},
     longitude: {type: String},
 }, {timestamps: true});

@@ -1,3 +1,4 @@
+import { getCampVisitedStatusFromEnquiryStatus } from "@/lib/enquiries/camp-visited-status";
 import connectDB from "@/lib/mongo";
 import Eq_camps from "@/models/eq_camps.model";
 import Eq_enquiry from "@/models/eq_enquiries.model";
@@ -20,13 +21,14 @@ export async function PUT(req: NextRequest){
     try{
         const body: IBody = await req.json();
         const enquiry = await Eq_enquiry.findById(body.enquiry_id);
+        const visitedStatus = getCampVisitedStatusFromEnquiryStatus(enquiry?.status) || "Just Added";
         const campToEdit = await Eq_camps.findByIdAndUpdate(body.camp_id, {$set: {
             camp_name: body.camp_name,
             camp_capacity: body.camp_capacity,
             camp_occupancy: body.camp_occupancy,
             camp_type: body.camp_type,
             is_active: true,
-            visited_status: "Visited",
+            visited_status: visitedStatus,
             country_id: enquiry?.country_id,
             region_id: enquiry?.region_id,
             province_id: enquiry?.province_id,

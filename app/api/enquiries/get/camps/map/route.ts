@@ -1,4 +1,5 @@
 import connectDB from "@/lib/mongo";
+import { normalizeCampVisitedStatusForMap } from "@/lib/enquiries/camp-visited-status";
 import Eq_camps from "@/models/eq_camps.model";
 import { NextRequest, NextResponse } from "next/server";
 import "@/models/eq_countries.model";
@@ -8,22 +9,6 @@ import "@/models/eq_city.model";
 import "@/models/eq_area.model";
 
 connectDB();
-
-const normalizeVisitedStatus = (value?: string | null) => {
-    if (value === "Visited" || value === "To Visit") {
-        return value;
-    }
-
-    if (value === "Awarded" || value === "Project Awarded") {
-        return "Awarded";
-    }
-
-    if (value === "On Hold" || value === "On hold" || value === "Cancelled") {
-        return "On Hold / Cancelled";
-    }
-
-    return "Just Added";
-};
 
 const parseCoordinate = (value?: string | null) => {
     if (!value) return null;
@@ -65,7 +50,7 @@ export async function GET(req: NextRequest) {
                     return null;
                 }
 
-                const visited_status = normalizeVisitedStatus(camp?.visited_status);
+                const visited_status = normalizeCampVisitedStatusForMap(camp?.visited_status);
 
                 return {
                     _id: String(camp?._id),

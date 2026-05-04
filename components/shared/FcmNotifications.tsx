@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 
 const tokenStorageKey = "fcm-token";
 const notificationPromptKey = "notification-permission-dismissed-until";
+const refreshAttemptKey = "fcm-token-refresh-attempted";
 const badgeCacheName = "taskmanager-meta-v1";
 const badgeCountCacheKey = "/__badge_count__";
 
@@ -78,6 +79,21 @@ function getUserScopedToken(userId?: string | null) {
   return window.localStorage.getItem(`${tokenStorageKey}:${userId}`);
 }
 
+function hasAttemptedRefresh() {
+  if (typeof window === "undefined") return false;
+  return window.sessionStorage.getItem(refreshAttemptKey) === "1";
+}
+
+function markRefreshAttempt() {
+  if (typeof window === "undefined") return;
+  window.sessionStorage.setItem(refreshAttemptKey, "1");
+}
+
+function clearRefreshAttempt() {
+  if (typeof window === "undefined") return;
+  window.sessionStorage.removeItem(refreshAttemptKey);
+}
+
 function setStoredToken(userId: string | null | undefined, token: string) {
   if (typeof window === "undefined") return;
 
@@ -104,6 +120,7 @@ const FcmNotifications = () => {
     (state: RootState) => state.notifications.unreadCount
   );
   const [showPermissionPrompt, setShowPermissionPrompt] = useState(false);
+  const [showRefreshPrompt, setShowRefreshPrompt] = useState(false);
   const [permissionState, setPermissionState] = useState<NotificationPermission>(
     "default"
   );
@@ -131,6 +148,7 @@ const FcmNotifications = () => {
     const userScopedToken = getUserScopedToken(userId);
     if (userScopedToken === token) {
       setStoredToken(userId, token);
+      clearRefreshAttempt();
       return true;
     }
 
@@ -146,6 +164,7 @@ const FcmNotifications = () => {
 
     if (response.ok) {
       setStoredToken(userId, token);
+      clearRefreshAttempt();
       return true;
     }
 
@@ -166,11 +185,22 @@ const FcmNotifications = () => {
 
       const userScopedToken = getUserScopedToken(userId);
       if (userScopedToken) {
+        clearRefreshAttempt();
+        setShowRefreshPrompt(false);
         if (permission !== "denied") {
           setShowPermissionPrompt(false);
         }
         return;
       }
+
+      const storedToken = getStoredToken(userId);
+      if (!storedToken && !hasAttemptedRefresh()) {
+        setShowPermissionPrompt(false);
+        setShowRefreshPrompt(true);
+        return;
+      }
+
+      setShowRefreshPrompt(false);
 
       const legacyToken = getStoredToken();
       if (legacyToken && userId) {
@@ -201,6 +231,7 @@ const FcmNotifications = () => {
       const permission = await Notification.requestPermission();
       setPermissionState(permission);
       if (permission === "granted") {
+        setShowRefreshPrompt(false);
         setShowPermissionPrompt(false);
         await storeToken();
       }
@@ -217,6 +248,23 @@ const FcmNotifications = () => {
       nextDismissUntil.toISOString()
     );
     setShowPermissionPrompt(false);
+  };
+
+  const handleRefreshApp = async () => {
+    if (typeof window === "undefined") return;
+
+    markRefreshAttempt();
+
+    try {
+      if ("serviceWorker" in navigator) {
+        const registration = await navigator.serviceWorker.getRegistration("/");
+        await registration?.update();
+      }
+    } catch (error) {
+      console.error("Failed to update service worker before refresh", error);
+    } finally {
+      window.location.reload();
+    }
   };
 
   useEffect(() => {
@@ -311,11 +359,17 @@ const FcmNotifications = () => {
     });
   }, [unreadCount, userId]);
 
-  if (!userId || !showPermissionPrompt) {
+  if (!userId || (!showPermissionPrompt && !showRefreshPrompt)) {
     return null;
   }
 
   const blocked = permissionState === "denied";
+  const title = showRefreshPrompt ? "Refresh required" : "Enable notifications";
+  const description = showRefreshPrompt
+    ? "This device does not have an FCM token yet, which usually means the app is still on an older version. Refresh now to load the latest version and finish notification setup for this device."
+    : blocked
+      ? "Notifications are blocked in your browser settings. Enable them to receive updates even when you are away."
+      : "Stay updated even when this tab is closed. Allow notifications to receive task updates and alerts.";
 
   return (
     <div className="fixed inset-0 z-[9999]">
@@ -324,29 +378,35 @@ const FcmNotifications = () => {
         <div className="w-full max-w-md space-y-4 rounded-2xl border border-slate-800/70 bg-slate-950/95 p-6 shadow-2xl">
           <div className="space-y-2">
             <h2 className="text-lg font-semibold text-slate-100">
-              Enable notifications
+              {title}
             </h2>
             <p className="text-sm text-slate-400">
-              {blocked
-                ? "Notifications are blocked in your browser settings. Enable them to receive updates even when you are away."
-                : "Stay updated even when this tab is closed. Allow notifications to receive task updates and alerts."}
+              {description}
             </p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={handleDismissPrompt}
-            >
-              Not now
-            </Button>
-            <Button
-              type="button"
-              onClick={handleRequestPermission}
-              disabled={blocked}
-            >
-              {blocked ? "Blocked in browser" : "Allow notifications"}
-            </Button>
+            {showRefreshPrompt ? (
+              <Button type="button" onClick={handleRefreshApp}>
+                Refresh now
+              </Button>
+            ) : (
+              <>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={handleDismissPrompt}
+                >
+                  Not now
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleRequestPermission}
+                  disabled={blocked}
+                >
+                  {blocked ? "Blocked in browser" : "Allow notifications"}
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </div>

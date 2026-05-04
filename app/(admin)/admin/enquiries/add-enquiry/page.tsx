@@ -29,10 +29,13 @@ import { RootState } from "@/redux/store";
 
 const priorityLevels = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"];
 const ENQUIRY_STATUS_OPTIONS = [
-    "Pending",
-    "In Progress",
+    "Lead Received",
+    "Initial Meeting Over",
+    "Survey Completed",
+    "Proposal Submitted",
+    "Waiting For Client Response",
     "On Hold",
-    "Closed",
+    "Project Awarded",
 ] as const;
 
 const MAX_DOC_SIZE = 5 * 1024 * 1024; // 5MB

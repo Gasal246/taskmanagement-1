@@ -41,6 +41,7 @@ export async function GET(req:NextRequest){
         if (visited_status === "just_added") {
             andConditions.push({
                 $or: [
+                    { visited_status: "Just Added" },
                     { visited_status: { $exists: false } },
                     { visited_status: null },
                     { visited_status: "" },

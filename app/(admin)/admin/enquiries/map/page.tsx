@@ -84,37 +84,52 @@ const isValidCoordinates = (latitude: number, longitude: number) => {
   return Number.isFinite(latitude) && Number.isFinite(longitude) && latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180;
 };
 
-const openGoogleDirections = (pin: Pick<CustomMapPin, "latitude" | "longitude">) => {
+const isAppleDevice = () => {
+  const userAgent = window.navigator.userAgent;
+  return /iPad|iPhone|iPod/.test(userAgent) || (userAgent.includes("Mac") && "ontouchend" in document);
+};
+
+const openPreferredMap = (pin: Pick<CustomMapPin, "latitude" | "longitude">, provider: "google-app" | "apple" | "google-web") => {
   const destination = `${pin.latitude},${pin.longitude}`;
+  const googleWebUrl = new URL("https://www.google.com/maps/dir/");
+  googleWebUrl.searchParams.set("api", "1");
+  googleWebUrl.searchParams.set("destination", destination);
+  googleWebUrl.searchParams.set("travelmode", "driving");
 
-  const openDirections = (origin?: string) => {
-    const url = new URL("https://www.google.com/maps/dir/");
-    url.searchParams.set("api", "1");
-    url.searchParams.set("destination", destination);
-    url.searchParams.set("travelmode", "driving");
-    if (origin) {
-      url.searchParams.set("origin", origin);
-    }
-    window.open(url.toString(), "_blank", "noopener,noreferrer");
-  };
-
-  if (!navigator.geolocation) {
-    openDirections();
+  if (provider === "apple") {
+    const appleMapsUrl = new URL("https://maps.apple.com/");
+    appleMapsUrl.searchParams.set("daddr", destination);
+    appleMapsUrl.searchParams.set("dirflg", "d");
+    window.location.assign(appleMapsUrl.toString());
     return;
   }
 
-  navigator.geolocation.getCurrentPosition(
-    (position) => {
-      openDirections(`${position.coords.latitude},${position.coords.longitude}`);
-    },
-    () => {
-      openDirections();
-    },
-    {
-      enableHighAccuracy: true,
-      timeout: 10000,
+  if (provider === "google-web") {
+    window.location.assign(googleWebUrl.toString());
+    return;
+  }
+
+  const appUrl = isAppleDevice() ? `comgooglemaps://?daddr=${destination}&directionsmode=driving` : `google.navigation:q=${destination}&mode=d`;
+  const fallbackUrl = googleWebUrl.toString();
+  const fallbackTimer = window.setTimeout(() => {
+    window.location.assign(fallbackUrl);
+  }, 1200);
+
+  const clearFallback = () => {
+    window.clearTimeout(fallbackTimer);
+    window.removeEventListener("pagehide", clearFallback);
+    document.removeEventListener("visibilitychange", handleVisibilityChange);
+  };
+
+  const handleVisibilityChange = () => {
+    if (document.visibilityState === "hidden") {
+      clearFallback();
     }
-  );
+  };
+
+  window.addEventListener("pagehide", clearFallback, { once: true });
+  document.addEventListener("visibilitychange", handleVisibilityChange);
+  window.location.href = appUrl;
 };
 
 export default function EnquiriesMapPage() {
@@ -133,6 +148,8 @@ export default function EnquiriesMapPage() {
   const [customPinDialogOpen, setCustomPinDialogOpen] = useState(false);
   const [editingCustomPinId, setEditingCustomPinId] = useState("");
   const [deletingCustomPin, setDeletingCustomPin] = useState<CustomMapPin | null>(null);
+  const [directionsTarget, setDirectionsTarget] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [showAppleMapsOption, setShowAppleMapsOption] = useState(false);
   const [locationMode, setLocationMode] = useState<"link" | "coordinates">("link");
   const [customPinForm, setCustomPinForm] = useState({
     title: "",
@@ -209,6 +226,19 @@ export default function EnquiriesMapPage() {
     setCustomPinDialogOpen(true);
   };
 
+  const openDirectionsDialog = (pin: Pick<CustomMapPin, "latitude" | "longitude">) => {
+    setDirectionsTarget({
+      latitude: pin.latitude,
+      longitude: pin.longitude,
+    });
+  };
+
+  const handleOpenDirections = (provider: "google-app" | "apple" | "google-web") => {
+    if (!directionsTarget) return;
+    openPreferredMap(directionsTarget, provider);
+    setDirectionsTarget(null);
+  };
+
   const handleSaveCustomPin = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -273,6 +303,7 @@ export default function EnquiriesMapPage() {
 
   useEffect(() => {
     fetchCountries();
+    setShowAppleMapsOption(isAppleDevice());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -587,7 +618,7 @@ export default function EnquiriesMapPage() {
                         </button>
                       </PopoverContent>
                     </Popover>
-                    <Button type="button" className="rounded-full bg-purple-600 text-white hover:bg-purple-700" onClick={() => openGoogleDirections(pin)}>
+                    <Button type="button" className="rounded-full bg-purple-600 text-white hover:bg-purple-700" onClick={() => openDirectionsDialog(pin)}>
                       <Navigation size={14} className="mr-2" /> Direction
                     </Button>
                   </div>
@@ -726,6 +757,29 @@ export default function EnquiriesMapPage() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={!!directionsTarget} onOpenChange={(open) => !open && setDirectionsTarget(null)}>
+        <DialogContent className="border-slate-800 bg-slate-950 text-slate-100 sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Open Directions</DialogTitle>
+            <DialogDescription className="text-slate-400">Choose how you want to open the route.</DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-3">
+            <Button type="button" className="bg-purple-600 text-white hover:bg-purple-700" onClick={() => handleOpenDirections("google-app")}>
+              Google Maps App
+            </Button>
+            {showAppleMapsOption ? (
+              <Button type="button" variant="outline" className="border-slate-700 bg-slate-900/70 text-slate-100 hover:bg-slate-800" onClick={() => handleOpenDirections("apple")}>
+                Apple Maps
+              </Button>
+            ) : null}
+            <Button type="button" variant="outline" className="border-slate-700 bg-slate-900/70 text-slate-100 hover:bg-slate-800" onClick={() => handleOpenDirections("google-web")}>
+              Google Maps Web
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <AlertDialog open={!!deletingCustomPin} onOpenChange={(open) => !open && setDeletingCustomPin(null)}>
         <AlertDialogContent className="border-slate-800 bg-slate-950 text-slate-100">
           <AlertDialogHeader>
@@ -803,7 +857,7 @@ export default function EnquiriesMapPage() {
                     >
                       <LocateFixed size={16} />
                     </Button>
-                    <Button type="button" className="rounded-full bg-blue-600 text-white hover:bg-blue-700" onClick={() => openGoogleDirections(camp)}>
+                    <Button type="button" className="rounded-full bg-blue-600 text-white hover:bg-blue-700" onClick={() => openDirectionsDialog(camp)}>
                       <Navigation size={14} className="mr-2" /> Direction
                     </Button>
                   </div>

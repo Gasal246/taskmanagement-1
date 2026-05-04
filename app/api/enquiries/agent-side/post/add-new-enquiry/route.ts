@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import Admin_assign_business from "@/models/admin_assign_business.model";
 import Business_staffs from "@/models/business_staffs.model";
+import { getCampVisitedStatusFromEnquiryStatus } from "@/lib/enquiries/camp-visited-status";
 import connectDB from "@/lib/mongo";
 import Eq_area from "@/models/eq_area.model";
 import Eq_camp_client_company from "@/models/eq_camp_client_company.model";
@@ -300,7 +301,7 @@ export async function POST(req:NextRequest){
                 camp_capacity: body.camp_capacity,
                 camp_occupancy: body.camp_occupancy,
                 is_active: false,
-                visited_status: "Visited",
+                visited_status: "Just Added",
                 latitude: body.latitude,
                 longitude: body.longitude,
             })
@@ -308,13 +309,23 @@ export async function POST(req:NextRequest){
             const savedCamp = await newCamp.save();
             campId = savedCamp._id;
         } else {
-            await Eq_camps.findByIdAndUpdate(campId, {$set: {
-                latitude: body.latitude,
-                longitude: body.longitude,
-                camp_capacity: body.camp_capacity,
-                camp_occupancy: body.camp_occupancy,
-                visited_status: "Visited"
-            }});
+            const campToUpdate = await Eq_camps.findById(campId);
+            if (campToUpdate) {
+                campToUpdate.latitude = body.latitude;
+                campToUpdate.longitude = body.longitude;
+                campToUpdate.camp_capacity = body.camp_capacity;
+                campToUpdate.camp_occupancy = body.camp_occupancy;
+                if (campToUpdate.is_active) {
+                    const mappedVisitedStatus = getCampVisitedStatusFromEnquiryStatus(body.followup_status);
+                    if (mappedVisitedStatus && campToUpdate.visited_status !== mappedVisitedStatus) {
+                        campToUpdate.visited_status = mappedVisitedStatus;
+                    }
+                } else if (campToUpdate.visited_status !== "Just Added") {
+                    campToUpdate.visited_status = "Just Added";
+                }
+
+                await campToUpdate.save();
+            }
         }
 
         const newEnquiry = new Eq_enquiry({

@@ -1,4 +1,5 @@
 import { auth } from "@/auth";
+import { getCampVisitedStatusFromEnquiryStatus } from "@/lib/enquiries/camp-visited-status";
 import connectDB from "@/lib/mongo";
 import Eq_area from "@/models/eq_area.model";
 import Eq_camp_client_company from "@/models/eq_camp_client_company.model";
@@ -486,6 +487,7 @@ export async function PUT(req: NextRequest) {
                 camp_capacity: toTextOrNull(body.camp_capacity),
                 camp_occupancy: toNumberOrNull(body.camp_occupancy),
                 is_active: false,
+                visited_status: "Just Added",
                 latitude: toTextOrNull(body.latitude),
                 longitude: toTextOrNull(body.longitude),
             });
@@ -586,6 +588,14 @@ export async function PUT(req: NextRequest) {
             campToEdit.area_id = areaId;
             campToEdit.latitude = toTextOrNull(body.latitude);
             campToEdit.longitude = toTextOrNull(body.longitude);
+            if (campToEdit.is_active) {
+                const mappedVisitedStatus = getCampVisitedStatusFromEnquiryStatus(body.followup_status);
+                if (mappedVisitedStatus && campToEdit.visited_status !== mappedVisitedStatus) {
+                    campToEdit.visited_status = mappedVisitedStatus;
+                }
+            } else if (campToEdit.visited_status !== "Just Added") {
+                campToEdit.visited_status = "Just Added";
+            }
 
             await campToEdit.save();
         }
