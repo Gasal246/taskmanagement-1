@@ -1,3 +1,4 @@
+import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import Business_Tasks from "@/models/business_tasks.model";
 import Task_Activities from "@/models/task_activities.model";
@@ -5,20 +6,55 @@ import { NextRequest, NextResponse } from "next/server";
 import Users from "@/models/users.model";
 import Business_Project from "@/models/business_project.model";
 import Project_Teams from "@/models/project_team.model";
+import Team_Members from "@/models/team_members.model";
 import "@/models/business_skills.model";
 connectDB();
 
 export async function GET(req:NextRequest, context: {params: Promise<{taskid:string}>}){
     try{
         const { taskid } = await context.params;
+        const { searchParams } = new URL(req.url);
+        const activityScope = searchParams.get("activityScope");
+        const isAssignedActivityScope = activityScope === "assigned";
+        const session: any = isAssignedActivityScope ? await auth() : null;
+
+        if (isAssignedActivityScope && !session) {
+            return NextResponse.json({ message: "Un-Authorized Access" }, { status: 401 });
+        }
         
         let task = await Business_Tasks.findById(taskid);
         if(task){
+            const userId = session?.user?.id;
+            const assignedActivityQuery: any = isAssignedActivityScope
+                ? { task_id: taskid, assigned_to: userId }
+                : null;
+
+            if (isAssignedActivityScope) {
+                const isDirectAssignee = String(task.assigned_to || "") === String(userId);
+                const isCreator = String(task.creator || "") === String(userId);
+                const hasAssignedActivity = Boolean(await Task_Activities.exists(assignedActivityQuery));
+                let hasTeamAccess = false;
+
+                if (task.is_project_task && task.assigned_teams) {
+                    const [teamMembership, teamHead] = await Promise.all([
+                        Team_Members.exists({ user_id: userId, team_id: task.assigned_teams }),
+                        Project_Teams.exists({ _id: task.assigned_teams, team_head: userId }),
+                    ]);
+                    hasTeamAccess = Boolean(teamMembership || teamHead);
+                }
+
+                if (!isDirectAssignee && !isCreator && !hasTeamAccess && !hasAssignedActivity) {
+                    return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+                }
+            }
+
             const taskObj = task.toObject();
-            const activities = await Task_Activities.find({task_id: taskid})
+            const activities = await Task_Activities.find(
+                isAssignedActivityScope ? assignedActivityQuery : {task_id: taskid}
+            )
                 .populate({ path: "assigned_to", select: "name email avatar_url" })
                 .populate({ path: "assigned_skill", select: "skill_name" });
-            if(activities.length > 0) taskObj.activities = activities;
+            if(activities.length > 0 || isAssignedActivityScope) taskObj.activities = activities;
             if(task.is_project_task){
                 const assigned_teams = await Project_Teams.findById(task.assigned_teams).select("team_name");
                 const project_details = await Business_Project.findById(task.project_id).select("project_name");
@@ -28,8 +64,6 @@ export async function GET(req:NextRequest, context: {params: Promise<{taskid:str
                 const assigned_user= await Users.findById(task.assigned_to).select("name");
                 taskObj.assigned_user = assigned_user;
             }
-            console.log("task: ",taskObj );
-            
             return NextResponse.json({data: taskObj}, {status:200});
         } else {
             return NextResponse.json({message: "No Content"}, {status:203});

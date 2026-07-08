@@ -1013,9 +1013,10 @@ export async function DeleteBusinessTaskFunc(task_id: string){
     }
 }
 
-export async function GetTaskByIdFunc(taskid:string){
+export async function GetTaskByIdFunc(taskid:string, activityScope?: "assigned"){
     try{
-        const res = await axios.get(`/api/task/getid/${taskid}`);
+        const params = activityScope ? `?activityScope=${activityScope}` : "";
+        const res = await axios.get(`/api/task/getid/${taskid}${params}`);
         return res.data;
     }catch(err){
         console.log(err);

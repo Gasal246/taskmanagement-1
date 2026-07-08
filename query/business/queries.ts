@@ -875,10 +875,10 @@ export const useDeleteBusinessTask = () => {
     })
 }
 
-export const useGetTaskById = (taskid:string) => {
+export const useGetTaskById = (taskid:string, activityScope?: "assigned") => {
     return useQuery({
-        queryKey: ["task", taskid],
-        queryFn: ()=> GetTaskByIdFunc(taskid),
+        queryKey: ["task", taskid, activityScope],
+        queryFn: ()=> GetTaskByIdFunc(taskid, activityScope),
         enabled: !!taskid
     })
 }

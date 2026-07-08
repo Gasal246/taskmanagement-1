@@ -144,7 +144,7 @@ const normalizeStaff = (staff: any) => {
 const TaskDetails = () => {
   const router = useRouter();
   const params = useParams<{ taskid: string }>();
-  const { data: task, isLoading, refetch } = useGetTaskById(params.taskid);
+  const { data: task, isLoading, refetch } = useGetTaskById(params.taskid, "assigned");
   const { mutateAsync: AddTaskActivity, isPending: isAddingActivity } = useAddTaskActivity();
   const { mutateAsync: UpdateTaskActivity, isPending: isUpdatingActivity } = useUpdateTaskActivity();
   const { mutateAsync: DeleteTaskActivity, isPending: isDeletingActivity } = useDeleteTaskActivity();
@@ -187,9 +187,12 @@ const TaskDetails = () => {
 
   const taskData = task?.data;
   const isProjectTask = Boolean(taskData?.is_project_task);
+  const visibleActivities = Array.isArray(taskData?.activities) ? taskData.activities : [];
+  const visibleActivityCount = visibleActivities.length;
+  const visibleCompletedActivityCount = visibleActivities.filter((activity: any) => activity?.is_done).length;
   const progress = getProgressValue(
-    Number(taskData?.completed_activity || 0),
-    Number(taskData?.activity_count || 0)
+    visibleCompletedActivityCount,
+    visibleActivityCount
   );
 
   const activityForm = useForm<z.infer<typeof activitySchema>>({
@@ -675,9 +678,9 @@ const TaskDetails = () => {
           <div className="rounded-lg border border-slate-800/70 bg-slate-900/60 p-3">
             <p className="text-[11px] uppercase tracking-wide text-slate-500">Activities</p>
             <p className="text-base font-semibold text-slate-100 mt-1">
-              {taskData.activity_count || 0}
+              {visibleActivityCount}
             </p>
-            <p className="text-xs text-slate-400">Completed {taskData.completed_activity || 0}</p>
+            <p className="text-xs text-slate-400">Completed {visibleCompletedActivityCount}</p>
           </div>
           <div className="rounded-lg border border-slate-800/70 bg-slate-900/60 p-3">
             <p className="text-[11px] uppercase tracking-wide text-slate-500">Assigned</p>
@@ -736,8 +739,8 @@ const TaskDetails = () => {
         </div>
 
         <div className="flex flex-wrap">
-          {taskData.activities?.length > 0 ? (
-            taskData.activities.map((activity: any) => (
+          {visibleActivities.length > 0 ? (
+            visibleActivities.map((activity: any) => (
               <div key={activity._id} className="w-full p-1">
                 <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg border border-slate-700 hover:border-cyan-800">
                   <div className="flex flex-wrap items-start justify-between gap-3">

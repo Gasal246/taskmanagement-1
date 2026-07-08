@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import Business_Tasks from "@/models/business_tasks.model";
 import Project_Teams from "@/models/project_team.model";
+import Task_Activities from "@/models/task_activities.model";
 import Team_Members from "@/models/team_members.model";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -17,14 +18,15 @@ export async function GET(req: NextRequest) {
       );
 
     const { searchParams } = new URL(req.url);
-    const type = searchParams.get("taskType");
+    const typeParam = searchParams.get("taskType");
+    const type = typeParam === "single" || typeParam === "project" ? typeParam : "all";
     const startDate = searchParams.get("start_date");
     const endDate = searchParams.get("end_date");
     const pageRaw = searchParams.get("page");
     const limitRaw = searchParams.get("limit");
     const hasValidStart = Boolean(startDate && startDate !== "undefined");
     const hasValidEnd = Boolean(endDate && endDate !== "undefined");
-    const hasType = Boolean(type);
+    const hasType = Boolean(typeParam);
     const page = Math.max(1, Number(pageRaw) || 1);
     const limit = Math.min(50, Math.max(1, Number(limitRaw) || 12));
     const skip = (page - 1) * limit;
@@ -48,45 +50,39 @@ export async function GET(req: NextRequest) {
         query.start_date.$lte = new Date(endDate);
     }
 
-    // 👥 Type Filter
-    // Filter with Type
-if (type === "single") {
-  query.$or = [
-    { assigned_to: session?.user?.id },
-    { creator: session?.user?.id },
-  ];
-} 
-else if (type === "project") {
-  const teams = await Team_Members.find({ user_id: session?.user?.id });
-  const headOfTasks = await Project_Teams.find({ team_head: session?.user?.id });
+    const userId = session?.user?.id;
+    const [teams, headOfTasks, activityTaskIds] = await Promise.all([
+      Team_Members.find({ user_id: userId }).select("team_id").lean(),
+      Project_Teams.find({ team_head: userId }).select("_id").lean(),
+      Task_Activities.distinct("task_id", { assigned_to: userId }),
+    ]);
 
-  const teamIds = [
-    ...teams.map((t) => t.team_id),
-    ...headOfTasks.map((head) => head._id),
-  ];
+    const teamIds = [
+      ...teams.map((t: any) => t.team_id).filter(Boolean),
+      ...headOfTasks.map((head: any) => head._id).filter(Boolean),
+    ];
 
-  query.assigned_teams = { $in: teamIds };
-} 
-else if (type === "all") {
-  // Combine all conditions
-  const teams = await Team_Members.find({ user_id: session?.user?.id });
-  const headOfTasks = await Project_Teams.find({ team_head: session?.user?.id });
-  console.log("teamsHead: ", headOfTasks);
-
-  const teamIds = [
-    ...teams.map((t) => t.team_id),
-    ...headOfTasks.map((head) => head._id),
-  ];
-
-  query.$or = [
-    { assigned_to: session?.user?.id },
-    { creator: session?.user?.id },
-    { assigned_teams: { $in: teamIds } },
-  ];
-}
-
-
-    console.log("task query: ", query);
+    if (type === "single") {
+      query.is_project_task = false;
+      query.$or = [
+        { assigned_to: userId },
+        { creator: userId },
+        { _id: { $in: activityTaskIds } },
+      ];
+    } else if (type === "project") {
+      query.is_project_task = true;
+      query.$or = [
+        { assigned_teams: { $in: teamIds } },
+        { _id: { $in: activityTaskIds } },
+      ];
+    } else if (type === "all") {
+      query.$or = [
+        { assigned_to: userId },
+        { creator: userId },
+        { assigned_teams: { $in: teamIds } },
+        { _id: { $in: activityTaskIds } },
+      ];
+    }
 
     const [tasks, total] = await Promise.all([
       Business_Tasks.find(query)
