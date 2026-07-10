@@ -78,6 +78,9 @@ export async function GET(req:NextRequest){
                     break;
                 case 'all':
                     break;
+                case 'admin-created':
+                    query.creator = session.user.id;
+                    break;
             }
         }
 

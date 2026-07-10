@@ -26,7 +26,7 @@ import {
 const { RangePicker } = DatePicker;
 const PAGE_SIZE = 9;
 
-type TaskTab = "all" | "single" | "project";
+type TaskTab = "all" | "single" | "project" | "admin-created";
 
 type RangeState = {
   start: string;
@@ -232,6 +232,12 @@ const TasksPage = () => {
                   value="project"
                 >
                   Project Tasks
+                </TabsTrigger>
+                <TabsTrigger
+                  className="text-slate-400 data-[state=active]:bg-slate-200/10 data-[state=active]:text-slate-100"
+                  value="admin-created"
+                >
+                  Admin Created
                 </TabsTrigger>
               </TabsList>
             </Tabs>
