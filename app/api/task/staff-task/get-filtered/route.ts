@@ -5,6 +5,8 @@ import Project_Teams from "@/models/project_team.model";
 import Task_Activities from "@/models/task_activities.model";
 import Team_Members from "@/models/team_members.model";
 import { NextRequest, NextResponse } from "next/server";
+import { getHeadStaffIds, getRoleNameFromRequest, escapeRegex } from "@/app/api/helpers/task-filter-scope";
+import mongoose from "mongoose";
 
 connectDB();
 
@@ -24,6 +26,8 @@ export async function GET(req: NextRequest) {
     const endDate = searchParams.get("end_date");
     const pageRaw = searchParams.get("page");
     const limitRaw = searchParams.get("limit");
+    const nameQuery = (searchParams.get("nameQuery") || "").trim();
+    const staffId = (searchParams.get("staffId") || "").trim();
     const hasValidStart = Boolean(startDate && startDate !== "undefined");
     const hasValidEnd = Boolean(endDate && endDate !== "undefined");
     const hasType = Boolean(typeParam);
@@ -31,8 +35,7 @@ export async function GET(req: NextRequest) {
     const limit = Math.min(50, Math.max(1, Number(limitRaw) || 12));
     const skip = (page - 1) * limit;
 
-    // ✅ Prevent fetching everything if no filters are provided
-    if (!hasType && !hasValidStart && !hasValidEnd) {
+    if (!hasType && !hasValidStart && !hasValidEnd && !nameQuery && !staffId) {
       return NextResponse.json(
         { message: "No filters provided", data: [], status: 203 },
         { status: 203 }
@@ -40,6 +43,7 @@ export async function GET(req: NextRequest) {
     }
 
     const query: any = {};
+    const roleName = getRoleNameFromRequest(req);
 
     // 📅 Date Filter
     if (hasValidStart || hasValidEnd) {
@@ -62,7 +66,16 @@ export async function GET(req: NextRequest) {
       ...headOfTasks.map((head: any) => head._id).filter(Boolean),
     ];
 
-    if (type === "single") {
+    const headStaffIds = staffId ? await getHeadStaffIds(userId, roleName) : [];
+    if (staffId && (!mongoose.isValidObjectId(staffId) || !headStaffIds.includes(staffId))) {
+      return NextResponse.json({ message: "Staff filter is not permitted", status: 403 }, { status: 403 });
+    }
+
+    if (staffId) {
+      // Heads may inspect all assignments belonging to a subordinate in their own domain.
+      if (type === "single") query.is_project_task = false;
+      if (type === "project") query.is_project_task = true;
+    } else if (type === "single") {
       query.is_project_task = false;
       query.$or = [
         { assigned_to: userId },
@@ -84,9 +97,26 @@ export async function GET(req: NextRequest) {
       ];
     }
 
+    const matchMetadata = new Map<string, { staffActivityAssigned?: boolean; nameMatched?: boolean }>();
+    if (nameQuery) {
+      const regex = new RegExp(escapeRegex(nameQuery), "i");
+      const matchingActivities = await Task_Activities.find({ activity: regex }).select("task_id").lean();
+      const activityTaskIds = matchingActivities.map((item: any) => item.task_id).filter(Boolean);
+      query.$and = [...(query.$and || []), { $or: [{ task_name: regex }, { _id: { $in: activityTaskIds } }] }];
+      activityTaskIds.forEach((id: any) => matchMetadata.set(id.toString(), { nameMatched: true }));
+    }
+    if (staffId) {
+      const matchingActivities = await Task_Activities.find({ assigned_to: staffId }).select("task_id").lean();
+      const activityTaskIds = matchingActivities.map((item: any) => item.task_id).filter(Boolean);
+      query.$and = [...(query.$and || []), { $or: [{ assigned_to: staffId }, { _id: { $in: activityTaskIds } }] }];
+      activityTaskIds.forEach((id: any) => {
+        const previous = matchMetadata.get(id.toString()) || {};
+        matchMetadata.set(id.toString(), { ...previous, staffActivityAssigned: true });
+      });
+    }
+
     const [tasks, total] = await Promise.all([
       Business_Tasks.find(query)
-        .sort({ updatedAt: -1, createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .lean(),
@@ -94,7 +124,17 @@ export async function GET(req: NextRequest) {
     ]);
 
     return NextResponse.json({
-      data: tasks,
+      data: tasks.map((task: any) => {
+        const metadata = matchMetadata.get(task._id.toString()) || {};
+        return {
+          ...task,
+          match: {
+            nameMatched: Boolean(nameQuery && (metadata.nameMatched || new RegExp(escapeRegex(nameQuery), "i").test(task.task_name || ""))),
+            staffTaskAssigned: Boolean(staffId && task.assigned_to?.toString() === staffId),
+            staffActivityAssigned: Boolean(staffId && metadata.staffActivityAssigned),
+          },
+        };
+      }),
       pagination: {
         page,
         limit,

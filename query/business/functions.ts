@@ -850,6 +850,42 @@ export async function RemoveProjectHeadFunc(project_id: string, user_id: string)
     }
 }
 
+export async function AddAccountManagerFunc(payload: { project_id: string; user_id: string }) {
+    try {
+        const res = await axios.post('/api/project/account-managers', payload);
+        return res.data;
+    } catch (err) {
+        console.log(err);
+    }
+}
+
+export async function RemoveAccountManagerFunc(project_id: string, user_id: string) {
+    try {
+        const res = await axios.delete(`/api/project/account-managers?project_id=${project_id}&user_id=${user_id}`);
+        return res.data;
+    } catch (err) {
+        console.log(err);
+    }
+}
+
+export async function AddSiteOperationalHeadFunc(payload: { project_id: string; user_id: string }) {
+    try {
+        const res = await axios.post('/api/project/site-operational-heads', payload);
+        return res.data;
+    } catch (err) {
+        console.log(err);
+    }
+}
+
+export async function RemoveSiteOperationalHeadFunc(project_id: string, user_id: string) {
+    try {
+        const res = await axios.delete(`/api/project/site-operational-heads?project_id=${project_id}&user_id=${user_id}`);
+        return res.data;
+    } catch (err) {
+        console.log(err);
+    }
+}
+
 export async function AddProjectSupervisorFunc(payload: { project_id: string; user_id: string }) {
     try {
         const res = await axios.post('/api/project/supervisors', payload);

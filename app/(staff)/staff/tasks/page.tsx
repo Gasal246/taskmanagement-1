@@ -2,14 +2,17 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarPlus, ListTodo } from "lucide-react";
+import { CalendarPlus, ListTodo, X } from "lucide-react";
 import { DatePicker } from "antd";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useGetAllStaffTasks } from "@/query/business/queries";
+import { useGetAllStaffsForStaff } from "@/query/business/queries";
 import Cookies from "js-cookie";
 import { toast } from "sonner";
 import LoaderSpin from "@/components/shared/LoaderSpin";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Pagination,
   PaginationContent,
@@ -73,6 +76,14 @@ const StaffTasks = () => {
   });
   const [canAdd, setCanAdd] = useState(false);
   const [page, setPage] = useState(1);
+  const [nameSearch, setNameSearch] = useState("");
+  const [appliedNameSearch, setAppliedNameSearch] = useState("");
+  const [showNameFilter, setShowNameFilter] = useState(false);
+  const [showStaffFilter, setShowStaffFilter] = useState(false);
+  const [staffSearch, setStaffSearch] = useState("");
+  const [selectedStaffId, setSelectedStaffId] = useState("");
+  const [staffOptions, setStaffOptions] = useState<Array<{ id: string; label: string }>>([]);
+  const { mutateAsync: getStaffsForHead } = useGetAllStaffsForStaff();
 
   const { data: tasks, isLoading } = useGetAllStaffTasks(filters);
 
@@ -95,14 +106,41 @@ const StaffTasks = () => {
       taskType: activeTab,
       start_date: appliedRange.start || undefined,
       end_date: appliedRange.end || undefined,
+      nameQuery: appliedNameSearch || undefined,
+      staffId: selectedStaffId || undefined,
       page: String(page),
       limit: String(PAGE_SIZE),
     });
-  }, [activeTab, appliedRange, page]);
+  }, [activeTab, appliedRange, appliedNameSearch, selectedStaffId, page]);
 
   useEffect(() => {
     setPage(1);
-  }, [activeTab, appliedRange.start, appliedRange.end]);
+  }, [activeTab, appliedRange.start, appliedRange.end, appliedNameSearch, selectedStaffId]);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setAppliedNameSearch(nameSearch.trim()), 350);
+    return () => window.clearTimeout(timeout);
+  }, [nameSearch]);
+
+  useEffect(() => {
+    if (!canAdd) return;
+    const roleCookie = Cookies.get("user_role");
+    const domainCookie = Cookies.get("user_domain");
+    try {
+      const role = roleCookie ? JSON.parse(roleCookie) : null;
+      const domain = domainCookie ? JSON.parse(domainCookie) : null;
+      const roleName = role?.role_name || "";
+      const domainId = roleName.startsWith("REGION_DEP") ? domain?.department_id
+        : roleName.startsWith("AREA_DEP") ? domain?.department_id
+        : roleName.startsWith("LOCATION_DEP") ? domain?.department_id
+        : roleName.startsWith("REGION") ? domain?.region_id
+        : roleName.startsWith("AREA") ? domain?.area_id : domain?.location_id;
+      if (!role?._id || !domainId) return;
+      getStaffsForHead({ role_id: role._id, domain_id: domainId }).then((response: any) => {
+        if (response?.status === 200) setStaffOptions((response.data || []).map((staff: any) => ({ id: String(staff._id), label: [staff.name, staff.email].filter(Boolean).join(" — ") })).filter((staff: any) => staff.id && staff.label));
+      });
+    } catch { setStaffOptions([]); }
+  }, [canAdd, getStaffsForHead]);
 
   const handleDateChange = (dates: any, dateStrings: [string, string]) => {
     setRangeValue(dates);
@@ -120,6 +158,13 @@ const StaffTasks = () => {
     setDraftRange({ start: "", end: "" });
     setAppliedRange({ start: "", end: "" });
     setRangeValue(null);
+  };
+
+  const selectedStaff = staffOptions.find((staff) => staff.id === selectedStaffId);
+  const selectStaffFromLabel = (label: string) => {
+    setStaffSearch(label);
+    const staff = staffOptions.find((option) => option.label === label);
+    setSelectedStaffId(staff?.id || "");
   };
 
   const taskList = tasks?.data ?? [];
@@ -206,6 +251,29 @@ const StaffTasks = () => {
             </Tabs>
           </div>
           <div className="flex flex-wrap items-end gap-2">
+            <Select onValueChange={(value) => {
+              if (value === "name") setShowNameFilter(true);
+              if (value === "staff") setShowStaffFilter(true);
+            }}>
+              <SelectTrigger className="w-[180px] border-slate-700 bg-slate-900 text-slate-200"><SelectValue placeholder="Add search filter" /></SelectTrigger>
+              <SelectContent>
+                {!showNameFilter && <SelectItem value="name">By task or activity</SelectItem>}
+                {canAdd && !showStaffFilter && <SelectItem value="staff">By staff</SelectItem>}
+              </SelectContent>
+            </Select>
+            {showNameFilter && (
+              <div className="relative min-w-[230px]">
+                <Input value={nameSearch} onChange={(event) => setNameSearch(event.target.value)} placeholder="Task or activity name" className="border-slate-700 bg-slate-900 pr-9 text-slate-100" />
+                <button aria-label="Remove task or activity filter" onClick={() => { setShowNameFilter(false); setNameSearch(""); }} className="absolute right-2 top-2 text-slate-400 hover:text-slate-100"><X size={16} /></button>
+              </div>
+            )}
+            {showStaffFilter && canAdd && (
+              <div className="relative min-w-[250px]">
+                <Input list="staff-task-staff-options" value={staffSearch} onChange={(event) => selectStaffFromLabel(event.target.value)} placeholder="Search staff" className="border-slate-700 bg-slate-900 pr-9 text-slate-100" />
+                <datalist id="staff-task-staff-options">{staffOptions.map((staff) => <option key={staff.id} value={staff.label} />)}</datalist>
+                <button aria-label="Remove staff filter" onClick={() => { setShowStaffFilter(false); setStaffSearch(""); setSelectedStaffId(""); }} className="absolute right-2 top-2 text-slate-400 hover:text-slate-100"><X size={16} /></button>
+              </div>
+            )}
             <div className="min-w-[240px]">
               <p className="text-[11px] text-slate-400 mb-1">Within Period</p>
               <RangePicker
@@ -316,6 +384,14 @@ const StaffTasks = () => {
                     Completed: {task.completed_activity || 0}
                   </span>
                 </div>
+
+                {(task?.match?.nameMatched || task?.match?.staffTaskAssigned || task?.match?.staffActivityAssigned) && (
+                  <div className="mt-3 flex flex-wrap gap-1.5 text-[10px] text-cyan-100">
+                    {task.match.nameMatched && <span className="rounded border border-cyan-700/50 bg-cyan-950/40 px-2 py-1">Match: &quot;{appliedNameSearch}&quot; in task or activity name</span>}
+                    {task.match.staffTaskAssigned && <span className="rounded border border-cyan-700/50 bg-cyan-950/40 px-2 py-1">Match: &quot;{selectedStaff?.label || staffSearch}&quot; in task assignee</span>}
+                    {task.match.staffActivityAssigned && <span className="rounded border border-cyan-700/50 bg-cyan-950/40 px-2 py-1">Match: &quot;{selectedStaff?.label || staffSearch}&quot; in one activity assignee</span>}
+                  </div>
+                )}
 
                 <div className="mt-3 flex items-center gap-3">
                   <div className="h-2 flex-1 rounded-full bg-slate-800/80">

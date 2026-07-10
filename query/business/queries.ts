@@ -28,6 +28,8 @@ import {
     addNewBusinessFunc,
     AddNewProjectByStaff,
     AddProjectHeadFunc,
+    AddAccountManagerFunc,
+    AddSiteOperationalHeadFunc,
     AddProjectSupervisorFunc,
     addNewTeamFunc,
     AddProjectDepartmentFunc,
@@ -93,6 +95,8 @@ import {
     GetUserDetails,
     postNewProjectFunc,
     RemoveProjectHeadFunc,
+    RemoveAccountManagerFunc,
+    RemoveSiteOperationalHeadFunc,
     RemoveProjectSupervisorFunc,
     RemoveAddedProjectDepartmentFunc,
     removeAreaDepartmentFunc,
@@ -734,6 +738,30 @@ export const useAddProjectHead = () => {
 export const useRemoveProjectHead = () => {
     return useMutation({
         mutationFn: ({ project_id, user_id }: { project_id: string; user_id: string }) => RemoveProjectHeadFunc(project_id, user_id)
+    });
+};
+
+export const useAddAccountManager = () => {
+    return useMutation({
+        mutationFn: (payload: { project_id: string; user_id: string }) => AddAccountManagerFunc(payload)
+    });
+};
+
+export const useRemoveAccountManager = () => {
+    return useMutation({
+        mutationFn: ({ project_id, user_id }: { project_id: string; user_id: string }) => RemoveAccountManagerFunc(project_id, user_id)
+    });
+};
+
+export const useAddSiteOperationalHead = () => {
+    return useMutation({
+        mutationFn: (payload: { project_id: string; user_id: string }) => AddSiteOperationalHeadFunc(payload)
+    });
+};
+
+export const useRemoveSiteOperationalHead = () => {
+    return useMutation({
+        mutationFn: ({ project_id, user_id }: { project_id: string; user_id: string }) => RemoveSiteOperationalHeadFunc(project_id, user_id)
     });
 };
 

@@ -5,6 +5,8 @@ import Users from "@/models/users.model";
 
 type ProjectAssignmentRole =
   | "project-head"
+  | "account-manager"
+  | "site-operational-head"
   | "project-supervisor"
   | "team-head"
   | "team-member";
@@ -18,6 +20,14 @@ const ROLE_CONFIG: Record<
   "project-head": {
     title: "Project Head",
     kind: "project-head",
+  },
+  "account-manager": {
+    title: "Account Manager",
+    kind: "account-manager",
+  },
+  "site-operational-head": {
+    title: "Site Head / Operational Head",
+    kind: "site-operational-head",
   },
   "project-supervisor": {
     title: "Project Supervisor",

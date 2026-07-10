@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useApproveProject, useGetProjectById, useUpdateProject, useAddProjectDoc, useRemoveProjectDoc, useDeleteProject, useGetBusinessRegions, useGetAreasandDeptsForRegion, useGetTeamsForProjects, useAddProjectHead, useRemoveProjectHead, useAddProjectSupervisor, useRemoveProjectSupervisor } from '@/query/business/queries';
+import { useApproveProject, useGetProjectById, useUpdateProject, useAddProjectDoc, useRemoveProjectDoc, useDeleteProject, useGetBusinessRegions, useGetAreasandDeptsForRegion, useGetTeamsForProjects, useAddProjectHead, useRemoveProjectHead, useAddAccountManager, useRemoveAccountManager, useAddSiteOperationalHead, useRemoveSiteOperationalHead, useAddProjectSupervisor, useRemoveProjectSupervisor } from '@/query/business/queries';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { DEPARTMENT_TYPES } from '@/lib/constants';
@@ -26,6 +26,8 @@ import { useSession } from 'next-auth/react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Avatar } from 'antd';
 import { useGetBusinessStaffs } from '@/query/user/queries';
+import ProjectAssignmentSection from '@/components/projects/ProjectAssignmentSection';
+import ProjectAssignmentDialog from '@/components/projects/ProjectAssignmentDialog';
 
 // Validation schema for project update form
 const formSchema = z.object({
@@ -65,6 +67,12 @@ const ProjectView = () => {
   const [projectHeadDialogOpen, setProjectHeadDialogOpen] = useState(false);
   const [projectHeadSearch, setProjectHeadSearch] = useState("");
   const [selectedProjectHeadId, setSelectedProjectHeadId] = useState("");
+  const [accountManagerDialogOpen, setAccountManagerDialogOpen] = useState(false);
+  const [accountManagerSearch, setAccountManagerSearch] = useState("");
+  const [selectedAccountManagerId, setSelectedAccountManagerId] = useState("");
+  const [siteOperationalHeadDialogOpen, setSiteOperationalHeadDialogOpen] = useState(false);
+  const [siteOperationalHeadSearch, setSiteOperationalHeadSearch] = useState("");
+  const [selectedSiteOperationalHeadId, setSelectedSiteOperationalHeadId] = useState("");
   const [projectSupervisorDialogOpen, setProjectSupervisorDialogOpen] = useState(false);
   const [projectSupervisorSearch, setProjectSupervisorSearch] = useState("");
   const [selectedProjectSupervisorId, setSelectedProjectSupervisorId] = useState("");
@@ -77,6 +85,10 @@ const ProjectView = () => {
   const { mutateAsync: UpdateProject, isPending: UpdatingProject } = useUpdateProject();
   const { mutateAsync: addProjectHead, isPending: addingProjectHead } = useAddProjectHead();
   const { mutateAsync: removeProjectHead, isPending: removingProjectHead } = useRemoveProjectHead();
+  const { mutateAsync: addAccountManager, isPending: addingAccountManager } = useAddAccountManager();
+  const { mutateAsync: removeAccountManager, isPending: removingAccountManager } = useRemoveAccountManager();
+  const { mutateAsync: addSiteOperationalHead, isPending: addingSiteOperationalHead } = useAddSiteOperationalHead();
+  const { mutateAsync: removeSiteOperationalHead, isPending: removingSiteOperationalHead } = useRemoveSiteOperationalHead();
   const { mutateAsync: addProjectSupervisor, isPending: addingProjectSupervisor } = useAddProjectSupervisor();
   const { mutateAsync: removeProjectSupervisor, isPending: removingProjectSupervisor } = useRemoveProjectSupervisor();
   const { mutateAsync: addProjectDoc } = useAddProjectDoc();
@@ -159,6 +171,8 @@ const ProjectView = () => {
     });
   }, [project?.data?.project_heads]);
   const projectSupervisors = useMemo(() => project?.data?.project_supervisors ?? [], [project?.data?.project_supervisors]);
+  const accountManagers = useMemo(() => project?.data?.account_managers ?? [], [project?.data?.account_managers]);
+  const siteOperationalHeads = useMemo(() => project?.data?.site_operational_heads ?? [], [project?.data?.site_operational_heads]);
 
   const projectTeamPeople = useMemo(() => {
     const peopleMap = new Map<string, any>();
@@ -237,6 +251,26 @@ const ProjectView = () => {
       return `${name} ${email}`.toLowerCase().includes(searchTerm);
     });
   }, [businessStaffs, projectSupervisorSearch, projectSupervisors]);
+
+  const filteredAccountManagerStaffs = useMemo(() => {
+    const searchTerm = accountManagerSearch.trim().toLowerCase();
+    const existingIds = new Set(accountManagers.map((user: any) => user?._id?.toString?.() ?? user?._id).filter(Boolean));
+    return (businessStaffs ?? []).filter((staff: any) => {
+      const userId = staff?.user_id?._id?.toString?.() ?? staff?.user_id?._id;
+      if (!userId || existingIds.has(userId)) return false;
+      return `${staff?.user_id?.name || ""} ${staff?.user_id?.email || ""}`.toLowerCase().includes(searchTerm);
+    });
+  }, [businessStaffs, accountManagerSearch, accountManagers]);
+
+  const filteredSiteOperationalHeadStaffs = useMemo(() => {
+    const searchTerm = siteOperationalHeadSearch.trim().toLowerCase();
+    const existingIds = new Set(siteOperationalHeads.map((user: any) => user?._id?.toString?.() ?? user?._id).filter(Boolean));
+    return (businessStaffs ?? []).filter((staff: any) => {
+      const userId = staff?.user_id?._id?.toString?.() ?? staff?.user_id?._id;
+      if (!userId || existingIds.has(userId)) return false;
+      return `${staff?.user_id?.name || ""} ${staff?.user_id?.email || ""}`.toLowerCase().includes(searchTerm);
+    });
+  }, [businessStaffs, siteOperationalHeadSearch, siteOperationalHeads]);
 
   useEffect(() => {
     if (docAccess === 'public') {
@@ -329,6 +363,64 @@ const ProjectView = () => {
     setSelectedProjectSupervisorId("");
     setProjectSupervisorSearch("");
     setProjectSupervisorDialogOpen(true);
+  };
+
+  const handleOpenAccountManagerDialog = () => {
+    setSelectedAccountManagerId("");
+    setAccountManagerSearch("");
+    setAccountManagerDialogOpen(true);
+  };
+
+  const handleAddAccountManager = async () => {
+    if (!selectedAccountManagerId) return toast.error("User not selected.");
+    const res = await addAccountManager({ project_id: params.projectid, user_id: selectedAccountManagerId });
+    if (res?.status === 200) {
+      toast.success(res?.message || "Account manager added.");
+      setAccountManagerDialogOpen(false);
+      setSelectedAccountManagerId("");
+      await refetch();
+      return;
+    }
+    toast.error(res?.message || "Failed to add account manager.");
+  };
+
+  const handleRemoveAccountManager = async (userId: string) => {
+    const res = await removeAccountManager({ project_id: params.projectid, user_id: userId });
+    if (res?.status === 200) {
+      toast.success(res?.message || "Account manager removed.");
+      await refetch();
+      return;
+    }
+    toast.error(res?.message || "Failed to remove account manager.");
+  };
+
+  const handleOpenSiteOperationalHeadDialog = () => {
+    setSelectedSiteOperationalHeadId("");
+    setSiteOperationalHeadSearch("");
+    setSiteOperationalHeadDialogOpen(true);
+  };
+
+  const handleAddSiteOperationalHead = async () => {
+    if (!selectedSiteOperationalHeadId) return toast.error("User not selected.");
+    const res = await addSiteOperationalHead({ project_id: params.projectid, user_id: selectedSiteOperationalHeadId });
+    if (res?.status === 200) {
+      toast.success(res?.message || "Site/operational head added.");
+      setSiteOperationalHeadDialogOpen(false);
+      setSelectedSiteOperationalHeadId("");
+      await refetch();
+      return;
+    }
+    toast.error(res?.message || "Failed to add site/operational head.");
+  };
+
+  const handleRemoveSiteOperationalHead = async (userId: string) => {
+    const res = await removeSiteOperationalHead({ project_id: params.projectid, user_id: userId });
+    if (res?.status === 200) {
+      toast.success(res?.message || "Site/operational head removed.");
+      await refetch();
+      return;
+    }
+    toast.error(res?.message || "Failed to remove site/operational head.");
   };
 
   const handleAddProjectSupervisor = async () => {
@@ -752,6 +844,26 @@ const ProjectView = () => {
           })}
         </div>
       </div>
+
+      <ProjectAssignmentSection
+        title="Account Managers"
+        assignLabel="Assign Account Manager"
+        emptyLabel="No account managers assigned."
+        users={accountManagers}
+        removing={removingAccountManager}
+        onAssign={handleOpenAccountManagerDialog}
+        onRemove={handleRemoveAccountManager}
+      />
+
+      <ProjectAssignmentSection
+        title="Operational Head"
+        assignLabel="Assign Operational Head"
+        emptyLabel="No operational heads assigned."
+        users={siteOperationalHeads}
+        removing={removingSiteOperationalHead}
+        onAssign={handleOpenSiteOperationalHeadDialog}
+        onRemove={handleRemoveSiteOperationalHead}
+      />
 
       <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg min-h-[20vh] mb-2 border border-slate-700/50">
         <div className="mb-2 flex items-center justify-between">
@@ -1443,6 +1555,38 @@ const ProjectView = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ProjectAssignmentDialog
+        open={accountManagerDialogOpen}
+        onOpenChange={setAccountManagerDialogOpen}
+        title="Select Account Manager"
+        description="Add an account manager to this project."
+        search={accountManagerSearch}
+        onSearchChange={setAccountManagerSearch}
+        staffs={filteredAccountManagerStaffs}
+        loadingStaffs={loadingBusinessStaffs}
+        selectedId={selectedAccountManagerId}
+        onSelect={setSelectedAccountManagerId}
+        onAdd={handleAddAccountManager}
+        adding={addingAccountManager}
+        addLabel="Add Account Manager"
+      />
+
+      <ProjectAssignmentDialog
+        open={siteOperationalHeadDialogOpen}
+        onOpenChange={setSiteOperationalHeadDialogOpen}
+        title="Select Site Head / Operational Head"
+        description="Add a site or operational head to this project."
+        search={siteOperationalHeadSearch}
+        onSearchChange={setSiteOperationalHeadSearch}
+        staffs={filteredSiteOperationalHeadStaffs}
+        loadingStaffs={loadingBusinessStaffs}
+        selectedId={selectedSiteOperationalHeadId}
+        onSelect={setSelectedSiteOperationalHeadId}
+        onAdd={handleAddSiteOperationalHead}
+        adding={addingSiteOperationalHead}
+        addLabel="Add Site/Operational Head"
+      />
 
       <Dialog open={projectSupervisorDialogOpen} onOpenChange={setProjectSupervisorDialogOpen}>
         <DialogContent className="sm:max-w-[425px] max-h-[70vh] flex flex-col">

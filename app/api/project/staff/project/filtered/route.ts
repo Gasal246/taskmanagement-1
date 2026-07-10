@@ -89,6 +89,8 @@ export async function GET(req: NextRequest) {
                 $or: [
                     { project_head: session?.user?.id },
                     { project_heads: session?.user?.id },
+                    { account_managers: session?.user?.id },
+                    { site_operational_heads: session?.user?.id },
                     { project_supervisors: session?.user?.id },
                 ],
             })

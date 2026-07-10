@@ -2,14 +2,17 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarPlus, ListTodo } from "lucide-react";
+import { CalendarPlus, ListTodo, X } from "lucide-react";
 import { DatePicker } from "antd";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSelector } from "react-redux";
 import { RootState } from "@/redux/store";
 import { useGetAllTasks } from "@/query/business/queries";
+import { useGetBusinessStaffsWithSkills } from "@/query/business/queries";
 import LoaderSpin from "@/components/shared/LoaderSpin";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Pagination,
   PaginationContent,
@@ -71,6 +74,17 @@ const TasksPage = () => {
   const [appliedRange, setAppliedRange] = useState<RangeState>({ start: "", end: "" });
   const [filters, setFilters] = useState<Record<string, string | undefined>>({});
   const [page, setPage] = useState(1);
+  const [nameSearch, setNameSearch] = useState("");
+  const [appliedNameSearch, setAppliedNameSearch] = useState("");
+  const [showNameFilter, setShowNameFilter] = useState(false);
+  const [showStaffFilter, setShowStaffFilter] = useState(false);
+  const [staffSearch, setStaffSearch] = useState("");
+  const [selectedStaffId, setSelectedStaffId] = useState("");
+  const { data: staffResponse } = useGetBusinessStaffsWithSkills(businessData?._id || "");
+  const staffOptions = React.useMemo(() => (staffResponse?.data || []).map((staff: any) => {
+    const user = staff?.user_id || staff;
+    return { id: String(user?._id || ""), label: [user?.name, user?.email].filter(Boolean).join(" — ") };
+  }).filter((staff: any) => staff.id && staff.label), [staffResponse]);
 
   useEffect(() => {
     if (!businessData?._id) return;
@@ -79,14 +93,21 @@ const TasksPage = () => {
       type: activeTab,
       startDate: appliedRange.start || undefined,
       endDate: appliedRange.end || undefined,
+      nameQuery: appliedNameSearch || undefined,
+      staffId: selectedStaffId || undefined,
       page: String(page),
       limit: String(PAGE_SIZE),
     });
-  }, [businessData?._id, activeTab, appliedRange, page]);
+  }, [businessData?._id, activeTab, appliedRange, appliedNameSearch, selectedStaffId, page]);
 
   useEffect(() => {
     setPage(1);
-  }, [activeTab, appliedRange.start, appliedRange.end]);
+  }, [activeTab, appliedRange.start, appliedRange.end, appliedNameSearch, selectedStaffId]);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setAppliedNameSearch(nameSearch.trim()), 350);
+    return () => window.clearTimeout(timeout);
+  }, [nameSearch]);
 
   const { data: tasks, isLoading } = useGetAllTasks(filters);
 
@@ -106,6 +127,13 @@ const TasksPage = () => {
     setDraftRange({ start: "", end: "" });
     setAppliedRange({ start: "", end: "" });
     setRangeValue(null);
+  };
+
+  const selectedStaff = staffOptions.find((staff: any) => staff.id === selectedStaffId);
+  const selectStaffFromLabel = (label: string) => {
+    setStaffSearch(label);
+    const staff = staffOptions.find((option: any) => option.label === label);
+    setSelectedStaffId(staff?.id || "");
   };
 
   const taskList = tasks?.data ?? [];
@@ -190,6 +218,29 @@ const TasksPage = () => {
             </Tabs>
           </div>
           <div className="flex flex-wrap items-end gap-2">
+            <Select onValueChange={(value) => {
+              if (value === "name") setShowNameFilter(true);
+              if (value === "staff") setShowStaffFilter(true);
+            }}>
+              <SelectTrigger className="w-[180px] border-slate-700 bg-slate-900 text-slate-200"><SelectValue placeholder="Add search filter" /></SelectTrigger>
+              <SelectContent>
+                {!showNameFilter && <SelectItem value="name">By task or activity</SelectItem>}
+                {!showStaffFilter && <SelectItem value="staff">By staff</SelectItem>}
+              </SelectContent>
+            </Select>
+            {showNameFilter && (
+              <div className="relative min-w-[230px]">
+                <Input value={nameSearch} onChange={(event) => setNameSearch(event.target.value)} placeholder="Task or activity name" className="border-slate-700 bg-slate-900 pr-9 text-slate-100" />
+                <button aria-label="Remove task or activity filter" onClick={() => { setShowNameFilter(false); setNameSearch(""); }} className="absolute right-2 top-2 text-slate-400 hover:text-slate-100"><X size={16} /></button>
+              </div>
+            )}
+            {showStaffFilter && (
+              <div className="relative min-w-[250px]">
+                <Input list="admin-task-staff-options" value={staffSearch} onChange={(event) => selectStaffFromLabel(event.target.value)} placeholder="Search staff" className="border-slate-700 bg-slate-900 pr-9 text-slate-100" />
+                <datalist id="admin-task-staff-options">{staffOptions.map((staff: any) => <option key={staff.id} value={staff.label} />)}</datalist>
+                <button aria-label="Remove staff filter" onClick={() => { setShowStaffFilter(false); setStaffSearch(""); setSelectedStaffId(""); }} className="absolute right-2 top-2 text-slate-400 hover:text-slate-100"><X size={16} /></button>
+              </div>
+            )}
             <div className="min-w-[240px]">
               <p className="text-[11px] text-slate-400 mb-1">Within Period</p>
               <RangePicker
@@ -293,6 +344,14 @@ const TasksPage = () => {
                     Completed: {task.completed_activity || 0}
                   </span>
                 </div>
+
+                {(task?.match?.nameMatched || task?.match?.staffTaskAssigned || task?.match?.staffActivityAssigned) && (
+                  <div className="mt-3 flex flex-wrap gap-1.5 text-[10px] text-cyan-100">
+                    {task.match.nameMatched && <span className="rounded border border-cyan-700/50 bg-cyan-950/40 px-2 py-1">Match: &quot;{appliedNameSearch}&quot; in task or activity name</span>}
+                    {task.match.staffTaskAssigned && <span className="rounded border border-cyan-700/50 bg-cyan-950/40 px-2 py-1">Match: &quot;{selectedStaff?.label || staffSearch}&quot; in task assignee</span>}
+                    {task.match.staffActivityAssigned && <span className="rounded border border-cyan-700/50 bg-cyan-950/40 px-2 py-1">Match: &quot;{selectedStaff?.label || staffSearch}&quot; in one activity assignee</span>}
+                  </div>
+                )}
 
                 <div className="mt-3 flex items-center gap-3">
                   <div className="h-2 flex-1 rounded-full bg-slate-800/80">

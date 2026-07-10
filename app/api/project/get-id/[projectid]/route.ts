@@ -38,6 +38,14 @@ export async function GET(req: NextRequest, context: { params: Promise<{ project
             .filter(Boolean)
             .map((id: any) => id?.toString?.() ?? String(id))
             .filter((id: string) => mongoose.Types.ObjectId.isValid(id));
+        const rawAccountManagerIds = (Array.isArray(projectObj?.account_managers) ? projectObj.account_managers : [])
+            .filter(Boolean)
+            .map((id: any) => id?.toString?.() ?? String(id))
+            .filter((id: string) => mongoose.Types.ObjectId.isValid(id));
+        const rawSiteOperationalHeadIds = (Array.isArray(projectObj?.site_operational_heads) ? projectObj.site_operational_heads : [])
+            .filter(Boolean)
+            .map((id: any) => id?.toString?.() ?? String(id))
+            .filter((id: string) => mongoose.Types.ObjectId.isValid(id));
 
         try{
             if (mongoose.Types.ObjectId.isValid(project?.region_id)) {
@@ -95,6 +103,19 @@ export async function GET(req: NextRequest, context: { params: Promise<{ project
         } catch (err) {
             console.log("Error while fetching project supervisors: ", err);
             projectObj.project_supervisors = [];
+        }
+
+        try {
+            const users = await Users.find({ _id: { $in: [...rawAccountManagerIds, ...rawSiteOperationalHeadIds] }, status: 1 })
+                .select({ name: 1, email: 1, avatar_url: 1 })
+                .lean();
+            const userMap = new Map(users.map((user: any) => [user?._id?.toString?.(), user]));
+            projectObj.account_managers = rawAccountManagerIds.map((id: string) => userMap.get(id)).filter(Boolean);
+            projectObj.site_operational_heads = rawSiteOperationalHeadIds.map((id: string) => userMap.get(id)).filter(Boolean);
+        } catch (err) {
+            console.log("Error while fetching account managers and site/operational heads: ", err);
+            projectObj.account_managers = [];
+            projectObj.site_operational_heads = [];
         }
 
         //Fetch Departments
