@@ -7,6 +7,9 @@ import Location_dep_heads from "@/models/location_dep_heads.model";
 import Location_dep_staffs from "@/models/location_dep_staffs.model";
 import Location_heads from "@/models/location_heads.model";
 import Location_staffs from "@/models/location_staffs.model";
+import Business_staffs from "@/models/business_staffs.model";
+import User_roles from "@/models/user_roles.model";
+import "@/models/roles.model";
 import Region_dep_heads from "@/models/region_dep_heads.model";
 import Region_dep_staffs from "@/models/region_dep_staffs.model";
 import Region_heads from "@/models/region_heads.model";
@@ -63,6 +66,31 @@ export async function getHeadStaffIds(userId: string, roleName: string) {
         .filter(Boolean)
     )
   );
+}
+
+export async function getBusinessHeads(businessId: string) {
+  const staff = await Business_staffs.find({ business_id: businessId, status: 1 })
+    .populate({ path: "user_id", select: "name email status", match: { status: 1 } })
+    .lean();
+  const people = staff
+    .map((item: any) => item.user_id)
+    .filter(Boolean);
+  const userIds = people.map((user: any) => user._id);
+  if (!userIds.length) return [];
+
+  const roles = await User_roles.find({ user_id: { $in: userIds }, status: 1 })
+    .populate("role_id", "role_name")
+    .lean();
+  const headIds = new Set(
+    roles
+      .filter((role: any) => HEAD_ROLES.includes(String(role.role_id?.role_name || "")))
+      .map((role: any) => role.user_id?.toString())
+      .filter(Boolean)
+  );
+
+  return people
+    .filter((user: any) => headIds.has(user._id.toString()))
+    .map((user: any) => ({ id: user._id.toString(), name: user.name || "Unknown user", email: user.email || "" }));
 }
 
 export const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

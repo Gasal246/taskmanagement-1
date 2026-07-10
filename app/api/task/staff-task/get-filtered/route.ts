@@ -7,6 +7,7 @@ import Team_Members from "@/models/team_members.model";
 import { NextRequest, NextResponse } from "next/server";
 import { getHeadStaffIds, getRoleNameFromRequest, escapeRegex } from "@/app/api/helpers/task-filter-scope";
 import mongoose from "mongoose";
+import { addTaskAssignmentSummaries } from "@/app/api/helpers/task-assignment-summary";
 
 connectDB();
 
@@ -123,8 +124,9 @@ export async function GET(req: NextRequest) {
       Business_Tasks.countDocuments(query),
     ]);
 
+    const tasksWithAssignments = await addTaskAssignmentSummaries(tasks);
     return NextResponse.json({
-      data: tasks.map((task: any) => {
+      data: tasksWithAssignments.map((task: any) => {
         const metadata = matchMetadata.get(task._id.toString()) || {};
         return {
           ...task,

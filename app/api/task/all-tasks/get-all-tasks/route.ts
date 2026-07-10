@@ -5,9 +5,10 @@ import Team_Members from "@/models/team_members.model";
 import Task_Activities from "@/models/task_activities.model";
 import { auth } from "@/auth";
 import { resolveActiveBusinessIdForUser } from "@/app/api/helpers/resolve-user-business";
-import { escapeRegex, getRoleNameFromRequest } from "@/app/api/helpers/task-filter-scope";
+import { escapeRegex, getBusinessHeads, getRoleNameFromRequest } from "@/app/api/helpers/task-filter-scope";
 import Business_staffs from "@/models/business_staffs.model";
 import mongoose from "mongoose";
+import { addTaskAssignmentSummaries } from "@/app/api/helpers/task-assignment-summary";
 import { NextRequest, NextResponse } from "next/server";
 
 connectDB();
@@ -27,6 +28,7 @@ export async function GET(req:NextRequest){
         const limitRaw = searchParams.get("limit");
         const nameQuery = (searchParams.get("nameQuery") || "").trim();
         const staffId = (searchParams.get("staffId") || "").trim();
+        const assignedById = (searchParams.get("assignedById") || "").trim();
         const parseDate = (value: string | null) => {
             if (!value || value === "undefined" || value === "null") return null;
             const date = new Date(value);
@@ -53,6 +55,16 @@ export async function GET(req:NextRequest){
             if (!allowedStaff) {
                 return NextResponse.json({ message: "Staff filter is not permitted", status: 403 }, { status: 403 });
             }
+        }
+        if (assignedById) {
+            if (!mongoose.isValidObjectId(assignedById)) {
+                return NextResponse.json({ message: "Invalid assigned-by filter", status: 400 }, { status: 400 });
+            }
+            const headIds = (await getBusinessHeads(business_id)).map((head) => head.id);
+            if (!headIds.includes(assignedById)) {
+                return NextResponse.json({ message: "Assigned-by filter is not permitted", status: 403 }, { status: 403 });
+            }
+            query.creator = assignedById;
         }
         query.business_id = business_id;
         const taskType = type || "all";
@@ -123,7 +135,8 @@ export async function GET(req:NextRequest){
             Business_Tasks.countDocuments(query),
         ]);
 
-        const data = tasks.map((task: any) => {
+        const tasksWithAssignments = await addTaskAssignmentSummaries(tasks);
+        const data = tasksWithAssignments.map((task: any) => {
             const metadata = matchMetadata.get(task._id.toString()) || {};
             return {
                 ...task,
@@ -131,6 +144,7 @@ export async function GET(req:NextRequest){
                     nameMatched: Boolean(nameQuery && (metadata.nameMatched || new RegExp(escapeRegex(nameQuery), "i").test(task.task_name || ""))),
                     staffTaskAssigned: Boolean(staffId && task.assigned_to?.toString() === staffId),
                     staffActivityAssigned: Boolean(staffId && metadata.staffActivityAssigned),
+                    assignedByMatched: Boolean(assignedById && task.creator?.toString() === assignedById),
                 },
             };
         });

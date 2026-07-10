@@ -385,6 +385,14 @@ const StaffTasks = () => {
                   </span>
                 </div>
 
+                <div className="mt-3 space-y-1 text-xs text-slate-400">
+                  <p>Assigned by: <span className="text-slate-200">{task.assignment?.assignedBy?.name || "Unknown"}</span></p>
+                  <p>
+                    Assigned to: <span className="text-slate-200">{task.assignment?.assignedTo?.[0]?.name || "Unassigned"}</span>
+                    {(task.assignment?.assignedTo?.length || 0) > 1 && <span className="ml-1 text-cyan-300">+{task.assignment.assignedTo.length - 1} more</span>}
+                  </p>
+                </div>
+
                 {(task?.match?.nameMatched || task?.match?.staffTaskAssigned || task?.match?.staffActivityAssigned) && (
                   <div className="mt-3 flex flex-wrap gap-1.5 text-[10px] text-cyan-100">
                     {task.match.nameMatched && <span className="rounded border border-cyan-700/50 bg-cyan-950/40 px-2 py-1">Match: &quot;{appliedNameSearch}&quot; in task or activity name</span>}

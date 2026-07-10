@@ -80,6 +80,10 @@ const TasksPage = () => {
   const [showStaffFilter, setShowStaffFilter] = useState(false);
   const [staffSearch, setStaffSearch] = useState("");
   const [selectedStaffId, setSelectedStaffId] = useState("");
+  const [showAssignedByFilter, setShowAssignedByFilter] = useState(false);
+  const [assignedBySearch, setAssignedBySearch] = useState("");
+  const [selectedAssignedById, setSelectedAssignedById] = useState("");
+  const [headOptions, setHeadOptions] = useState<Array<{ id: string; label: string }>>([]);
   const { data: staffResponse } = useGetBusinessStaffsWithSkills(businessData?._id || "");
   const staffOptions = React.useMemo(() => (staffResponse?.data || []).map((staff: any) => {
     const user = staff?.user_id || staff;
@@ -95,19 +99,28 @@ const TasksPage = () => {
       endDate: appliedRange.end || undefined,
       nameQuery: appliedNameSearch || undefined,
       staffId: selectedStaffId || undefined,
+      assignedById: selectedAssignedById || undefined,
       page: String(page),
       limit: String(PAGE_SIZE),
     });
-  }, [businessData?._id, activeTab, appliedRange, appliedNameSearch, selectedStaffId, page]);
+  }, [businessData?._id, activeTab, appliedRange, appliedNameSearch, selectedStaffId, selectedAssignedById, page]);
 
   useEffect(() => {
     setPage(1);
-  }, [activeTab, appliedRange.start, appliedRange.end, appliedNameSearch, selectedStaffId]);
+  }, [activeTab, appliedRange.start, appliedRange.end, appliedNameSearch, selectedStaffId, selectedAssignedById]);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => setAppliedNameSearch(nameSearch.trim()), 350);
     return () => window.clearTimeout(timeout);
   }, [nameSearch]);
+
+  useEffect(() => {
+    if (!businessData?._id) return;
+    fetch(`/api/task/heads?business_id=${encodeURIComponent(businessData._id)}`)
+      .then((response) => response.json())
+      .then((response) => setHeadOptions((response?.data || []).map((head: any) => ({ id: String(head.id), label: [head.name, head.email].filter(Boolean).join(" — ") }))))
+      .catch(() => setHeadOptions([]));
+  }, [businessData?._id]);
 
   const { data: tasks, isLoading } = useGetAllTasks(filters);
 
@@ -134,6 +147,12 @@ const TasksPage = () => {
     setStaffSearch(label);
     const staff = staffOptions.find((option: any) => option.label === label);
     setSelectedStaffId(staff?.id || "");
+  };
+  const selectedAssignedBy = headOptions.find((head) => head.id === selectedAssignedById);
+  const selectAssignedByFromLabel = (label: string) => {
+    setAssignedBySearch(label);
+    const head = headOptions.find((option) => option.label === label);
+    setSelectedAssignedById(head?.id || "");
   };
 
   const taskList = tasks?.data ?? [];
@@ -221,11 +240,13 @@ const TasksPage = () => {
             <Select onValueChange={(value) => {
               if (value === "name") setShowNameFilter(true);
               if (value === "staff") setShowStaffFilter(true);
+              if (value === "assigned-by") setShowAssignedByFilter(true);
             }}>
               <SelectTrigger className="w-[180px] border-slate-700 bg-slate-900 text-slate-200"><SelectValue placeholder="Add search filter" /></SelectTrigger>
               <SelectContent>
                 {!showNameFilter && <SelectItem value="name">By task or activity</SelectItem>}
                 {!showStaffFilter && <SelectItem value="staff">By staff</SelectItem>}
+                {!showAssignedByFilter && <SelectItem value="assigned-by">By assigned by</SelectItem>}
               </SelectContent>
             </Select>
             {showNameFilter && (
@@ -239,6 +260,13 @@ const TasksPage = () => {
                 <Input list="admin-task-staff-options" value={staffSearch} onChange={(event) => selectStaffFromLabel(event.target.value)} placeholder="Search staff" className="border-slate-700 bg-slate-900 pr-9 text-slate-100" />
                 <datalist id="admin-task-staff-options">{staffOptions.map((staff: any) => <option key={staff.id} value={staff.label} />)}</datalist>
                 <button aria-label="Remove staff filter" onClick={() => { setShowStaffFilter(false); setStaffSearch(""); setSelectedStaffId(""); }} className="absolute right-2 top-2 text-slate-400 hover:text-slate-100"><X size={16} /></button>
+              </div>
+            )}
+            {showAssignedByFilter && (
+              <div className="relative min-w-[250px]">
+                <Input list="admin-task-head-options" value={assignedBySearch} onChange={(event) => selectAssignedByFromLabel(event.target.value)} placeholder="Search assigned by head" className="border-slate-700 bg-slate-900 pr-9 text-slate-100" />
+                <datalist id="admin-task-head-options">{headOptions.map((head) => <option key={head.id} value={head.label} />)}</datalist>
+                <button aria-label="Remove assigned-by filter" onClick={() => { setShowAssignedByFilter(false); setAssignedBySearch(""); setSelectedAssignedById(""); }} className="absolute right-2 top-2 text-slate-400 hover:text-slate-100"><X size={16} /></button>
               </div>
             )}
             <div className="min-w-[240px]">
@@ -345,11 +373,20 @@ const TasksPage = () => {
                   </span>
                 </div>
 
-                {(task?.match?.nameMatched || task?.match?.staffTaskAssigned || task?.match?.staffActivityAssigned) && (
+                <div className="mt-3 space-y-1 text-xs text-slate-400">
+                  <p>Assigned by: <span className="text-slate-200">{task.assignment?.assignedBy?.name || "Unknown"}</span></p>
+                  <p>
+                    Assigned to: <span className="text-slate-200">{task.assignment?.assignedTo?.[0]?.name || "Unassigned"}</span>
+                    {(task.assignment?.assignedTo?.length || 0) > 1 && <span className="ml-1 text-cyan-300">+{task.assignment.assignedTo.length - 1} more</span>}
+                  </p>
+                </div>
+
+                {(task?.match?.nameMatched || task?.match?.staffTaskAssigned || task?.match?.staffActivityAssigned || task?.match?.assignedByMatched) && (
                   <div className="mt-3 flex flex-wrap gap-1.5 text-[10px] text-cyan-100">
                     {task.match.nameMatched && <span className="rounded border border-cyan-700/50 bg-cyan-950/40 px-2 py-1">Match: &quot;{appliedNameSearch}&quot; in task or activity name</span>}
                     {task.match.staffTaskAssigned && <span className="rounded border border-cyan-700/50 bg-cyan-950/40 px-2 py-1">Match: &quot;{selectedStaff?.label || staffSearch}&quot; in task assignee</span>}
                     {task.match.staffActivityAssigned && <span className="rounded border border-cyan-700/50 bg-cyan-950/40 px-2 py-1">Match: &quot;{selectedStaff?.label || staffSearch}&quot; in one activity assignee</span>}
+                    {task.match.assignedByMatched && <span className="rounded border border-cyan-700/50 bg-cyan-950/40 px-2 py-1">Match: &quot;{selectedAssignedBy?.label || assignedBySearch}&quot; in assigned by</span>}
                   </div>
                 )}
 
