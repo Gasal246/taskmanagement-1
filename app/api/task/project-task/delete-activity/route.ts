@@ -5,6 +5,8 @@ import Task_Activities from "@/models/task_activities.model";
 import Users from "@/models/users.model";
 import { NextRequest, NextResponse } from "next/server";
 import { notifyTaskActivityChange } from "@/app/api/helpers/task-activity-notifications";
+import ActivityComments from "@/models/activity_comments.model";
+import ActivityCommentReads from "@/models/activity_comment_reads.model";
 
 connectDB();
 
@@ -24,7 +26,12 @@ export async function DELETE(req:NextRequest){
             return NextResponse.json({message: "Activity not found"}, {status:404});
         }
 
-        await Task_Activities.findByIdAndDelete(activity_id);
+        const commentIds = await ActivityComments.find({ activity_id }).distinct("_id");
+        await Promise.all([
+            Task_Activities.findByIdAndDelete(activity_id),
+            ActivityComments.deleteMany({ activity_id }),
+            ActivityCommentReads.deleteMany({ comment_id: { $in: commentIds } }),
+        ]);
 
         if(activityToDelete.is_done){
             const afterDel = await Business_Tasks.findByIdAndUpdate(activityToDelete.task_id, {

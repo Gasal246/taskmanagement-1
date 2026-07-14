@@ -47,6 +47,8 @@ const NotificationCard = ({
     notification.meta?.taskId;
   const isActivity =
     notification.kind === "task-activity" ||
+    notification.kind === "task-activity-comment" ||
+    notification.data?.type === "task-activity-comment" ||
     notification.data?.type === "task-activity";
   const isEnquiry =
     notification.kind === "enquiry" ||
@@ -358,11 +360,14 @@ const NotificationPane = ({ trigger }: { trigger: React.ReactNode }) => {
     const taskId = notification.data?.taskId || notification.meta?.taskId || "";
     const enquiryId =
       notification.data?.enquiryId || notification.meta?.enquiryId || "";
+    const taskLink = taskId
+      ? `${resolveTaskLink(taskId)}${notification.data?.linkSuffix || notification.meta?.linkSuffix || ""}`
+      : "";
     const link =
       notification.data?.link ||
       notification.data?.url ||
       (taskId
-        ? resolveTaskLink(taskId)
+        ? taskLink
         : enquiryId
         ? resolveEnquiryLink(enquiryId)
         : "");

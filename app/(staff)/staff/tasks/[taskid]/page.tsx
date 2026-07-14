@@ -8,7 +8,7 @@ import {
   BreadcrumbList,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   CheckCircle,
   CheckCircle2,
@@ -65,6 +65,7 @@ import { Avatar } from "antd";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import Cookies from "js-cookie";
 import { getSession } from "next-auth/react";
+import ActivityCommentsSheet from "@/components/task/ActivityCommentsSheet";
 
 const statusStyles: Record<string, string> = {
   Completed: "border-emerald-500/40 bg-emerald-500/15 text-emerald-200",
@@ -144,6 +145,7 @@ const normalizeStaff = (staff: any) => {
 const TaskDetails = () => {
   const router = useRouter();
   const params = useParams<{ taskid: string }>();
+  const searchParams = useSearchParams();
   const { data: task, isLoading, refetch } = useGetTaskById(params.taskid, "assigned");
   const { mutateAsync: AddTaskActivity, isPending: isAddingActivity } = useAddTaskActivity();
   const { mutateAsync: UpdateTaskActivity, isPending: isUpdatingActivity } = useUpdateTaskActivity();
@@ -764,6 +766,11 @@ const TaskDetails = () => {
                       )}
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
+                      <ActivityCommentsSheet
+                        activity={activity}
+                        taskId={params.taskid}
+                        initiallyOpen={searchParams.get("comments") === "open" && searchParams.get("activityId") === String(activity._id)}
+                      />
                       {isProjectTask && isCreator && (
                         <motion.button
                           whileHover={{ scale: 1.02 }}

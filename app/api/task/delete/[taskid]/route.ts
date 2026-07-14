@@ -1,6 +1,8 @@
 import connectDB from "@/lib/mongo";
 import Business_Tasks from "@/models/business_tasks.model";
 import Task_Activities from "@/models/task_activities.model";
+import ActivityComments from "@/models/activity_comments.model";
+import ActivityCommentReads from "@/models/activity_comment_reads.model";
 import { NextRequest, NextResponse } from "next/server";
 
 connectDB();
@@ -20,7 +22,12 @@ export async function DELETE(
       return NextResponse.json({ message: "Task not found" }, { status: 404 });
     }
 
-    await Task_Activities.deleteMany({ task_id: taskid });
+    const commentIds = await ActivityComments.find({ task_id: taskid }).distinct("_id");
+    await Promise.all([
+      Task_Activities.deleteMany({ task_id: taskid }),
+      ActivityComments.deleteMany({ task_id: taskid }),
+      ActivityCommentReads.deleteMany({ comment_id: { $in: commentIds } }),
+    ]);
 
     return NextResponse.json({ message: "Task deleted", status: 200 }, { status: 200 });
   } catch (err) {

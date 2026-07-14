@@ -8,7 +8,7 @@ import {
   BreadcrumbList,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   Check,
   CheckCircle,
@@ -64,6 +64,7 @@ import { TASK_STATUS } from "@/lib/constants";
 import LoaderSpin from "@/components/shared/LoaderSpin";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "antd";
+import ActivityCommentsSheet from "@/components/task/ActivityCommentsSheet";
 
 const statusStyles: Record<string, string> = {
   Completed: "border-emerald-500/40 bg-emerald-500/15 text-emerald-200",
@@ -112,6 +113,7 @@ const taskSchema = z.object({
 const TaskDetailPage = () => {
   const router = useRouter();
   const params = useParams<{ taskid: string }>();
+  const searchParams = useSearchParams();
   const { businessData } = useSelector((state: RootState) => state.user);
   const { data: task, isLoading, refetch } = useGetTaskById(params.taskid);
   const { mutateAsync: AddTaskActivity, isPending: isAddingActivity } = useAddTaskActivity();
@@ -669,6 +671,11 @@ const TaskDetailPage = () => {
                       )}
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
+                      <ActivityCommentsSheet
+                        activity={activity}
+                        taskId={params.taskid}
+                        initiallyOpen={searchParams.get("comments") === "open" && searchParams.get("activityId") === String(activity._id)}
+                      />
                       <motion.button
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
