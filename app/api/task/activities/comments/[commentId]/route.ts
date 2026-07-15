@@ -3,6 +3,7 @@ import connectDB from "@/lib/mongo";
 import { resolveSessionUserId } from "@/lib/utils";
 import ActivityComments from "@/models/activity_comments.model";
 import { authorizeActivityViewer } from "@/app/api/helpers/activity-comments";
+import { deleteActivityCommentAttachment } from "@/app/api/helpers/activity-comment-attachments";
 import mongoose from "mongoose";
 import { NextResponse } from "next/server";
 
@@ -23,10 +24,16 @@ export async function DELETE(
   if (access.status !== 200) return NextResponse.json({ message: "Forbidden" }, { status: access.status });
   if (String(comment.author_id) !== userId) return NextResponse.json({ message: "You can only delete your own comments" }, { status: 403 });
   if (!comment.deleted_at) {
+    try {
+      await deleteActivityCommentAttachment(comment.attachment?.storage_path);
+    } catch (error) {
+      console.log("Failed to delete activity comment attachment", error);
+      return NextResponse.json({ message: "Could not delete the attached file. Please try again." }, { status: 502 });
+    }
     const deletedAt = new Date();
     await ActivityComments.updateOne(
       { _id: comment._id },
-      { $set: { body: "", deleted_at: deletedAt } }
+      { $set: { body: "", deleted_at: deletedAt, attachment: null } }
     );
     comment.deleted_at = deletedAt;
   }

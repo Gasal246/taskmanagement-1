@@ -9,10 +9,30 @@ export interface IActivityComment extends Document {
   root_id: ObjectId | null;
   depth: number;
   body: string;
+  attachment: {
+    url: string;
+    storage_path: string;
+    name: string;
+    mime_type: string;
+    extension: string;
+    size: number;
+  } | null;
   deleted_at: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
+
+const ActivityCommentAttachmentSchema = new Schema(
+  {
+    url: { type: String, required: true },
+    storage_path: { type: String, required: true },
+    name: { type: String, required: true },
+    mime_type: { type: String, required: true },
+    extension: { type: String, required: true },
+    size: { type: Number, required: true },
+  },
+  { _id: false }
+);
 
 const ActivityCommentSchema = new Schema<IActivityComment>(
   {
@@ -22,7 +42,8 @@ const ActivityCommentSchema = new Schema<IActivityComment>(
     parent_id: { type: Schema.Types.ObjectId, ref: "activity_comments", default: null },
     root_id: { type: Schema.Types.ObjectId, ref: "activity_comments", default: null },
     depth: { type: Number, min: 0, max: 2, required: true, default: 0 },
-    body: { type: String, required: true, trim: true, maxlength: 2000 },
+    body: { type: String, default: "", trim: true, maxlength: 2000 },
+    attachment: { type: ActivityCommentAttachmentSchema, default: null },
     deleted_at: { type: Date, default: null },
   },
   { timestamps: true }

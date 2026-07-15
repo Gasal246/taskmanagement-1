@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { notifyTaskActivityChange } from "@/app/api/helpers/task-activity-notifications";
 import ActivityComments from "@/models/activity_comments.model";
 import ActivityCommentReads from "@/models/activity_comment_reads.model";
+import { deleteActivityCommentAttachments } from "@/app/api/helpers/activity-comment-attachments";
 
 connectDB();
 
@@ -26,7 +27,11 @@ export async function DELETE(req:NextRequest){
             return NextResponse.json({message: "Activity not found"}, {status:404});
         }
 
-        const commentIds = await ActivityComments.find({ activity_id }).distinct("_id");
+        const comments = await ActivityComments.find({ activity_id })
+            .select("_id attachment.storage_path")
+            .lean();
+        const commentIds = comments.map((comment: any) => comment._id);
+        await deleteActivityCommentAttachments(comments);
         await Promise.all([
             Task_Activities.findByIdAndDelete(activity_id),
             ActivityComments.deleteMany({ activity_id }),

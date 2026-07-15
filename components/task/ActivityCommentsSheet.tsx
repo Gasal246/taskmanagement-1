@@ -1,13 +1,33 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
-import { Avatar, Popconfirm } from "antd";
-import { Loader2, MessageCircle, MessagesSquare, Reply, Send, Trash2, X } from "lucide-react";
+import { Avatar } from "antd";
+import { deleteObject, getDownloadURL, ref, uploadBytes } from "firebase/storage";
+import { FileSpreadsheet, FileText, Loader2, MessageCircle, MessagesSquare, Paperclip, Reply, Send, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Sheet,
   SheetContent,
@@ -17,6 +37,22 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
+import { storage } from "@/firebase/config";
+import {
+  ACTIVITY_COMMENT_ATTACHMENT_ACCEPT,
+  ACTIVITY_COMMENT_ATTACHMENT_MAX_BYTES,
+  ActivityCommentAttachment,
+  ActivityCommentAttachmentPayload,
+  getAttachmentExtension,
+  getCanonicalAttachmentMimeType,
+  isAllowedAttachmentExtension,
+  isExcelAttachment,
+  isImageAttachment,
+  isMimeTypeAllowedForExtension,
+  isPdfAttachment,
+  isWordAttachment,
+  sanitizeAttachmentFileName,
+} from "@/lib/activityCommentAttachments";
 
 export type ActivityComment = {
   id: string;
@@ -26,12 +62,19 @@ export type ActivityComment = {
   rootId: string | null;
   depth: number;
   body: string;
+  attachment: ActivityCommentAttachment | null;
   deletedAt: string | null;
   createdAt: string;
   updatedAt: string;
   isSeen: boolean;
   canDelete: boolean;
   author: { id: string; name: string; avatarUrl: string };
+};
+
+type PendingAttachment = {
+  file: File;
+  previewUrl: string | null;
+  attachment: ActivityCommentAttachment;
 };
 
 type CommentsResponse = { comments: ActivityComment[] };
@@ -49,12 +92,87 @@ const formatCommentDate = (value: string) =>
     timeStyle: "short",
   }).format(new Date(value));
 
+function AttachmentTile({
+  attachment,
+  onOpen,
+  onRemove,
+  disabled = false,
+}: {
+  attachment: ActivityCommentAttachment;
+  onOpen?: () => void;
+  onRemove?: () => void;
+  disabled?: boolean;
+}) {
+  const image = isImageAttachment(attachment);
+  const pdf = isPdfAttachment(attachment);
+  const word = isWordAttachment(attachment);
+  const excel = isExcelAttachment(attachment);
+  const label = attachment.extension ? attachment.extension.toUpperCase() : "DOC";
+
+  return (
+    <div
+      className={cn(
+        "relative h-[100px] w-[100px] shrink-0 overflow-hidden rounded-xl border border-slate-700 bg-slate-900 shadow-sm",
+        onOpen && "transition hover:border-cyan-600 hover:ring-2 hover:ring-cyan-500/10"
+      )}
+      title={attachment.name}
+    >
+      {image && attachment.url ? (
+        <Image
+          src={attachment.url}
+          alt={attachment.name}
+          fill
+          unoptimized
+          sizes="100px"
+          className="object-cover"
+        />
+      ) : (
+        <div
+          className={cn(
+            "flex h-full w-full flex-col items-center justify-center gap-1.5",
+            pdf && "bg-red-950/60 text-red-300",
+            word && "bg-blue-950/60 text-blue-300",
+            excel && "bg-emerald-950/60 text-emerald-300",
+            !pdf && !word && !excel && "bg-slate-900 text-slate-300"
+          )}
+        >
+          {excel ? <FileSpreadsheet size={30} /> : <FileText size={30} />}
+          <span className="max-w-[82px] truncate rounded bg-black/25 px-1.5 py-0.5 text-[10px] font-bold tracking-wide">
+            {label}
+          </span>
+        </div>
+      )}
+      {onOpen && (
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={onOpen}
+          className="absolute inset-0 z-[1] cursor-pointer rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 disabled:cursor-default"
+          aria-label={`Open ${attachment.name}`}
+        />
+      )}
+      {onRemove && (
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={onRemove}
+          className="absolute right-1.5 top-1.5 z-[2] rounded-full bg-slate-950/90 p-1 text-slate-200 shadow transition hover:bg-rose-700 hover:text-white disabled:opacity-50"
+          aria-label={`Remove ${attachment.name}`}
+        >
+          <X size={13} />
+        </button>
+      )}
+    </div>
+  );
+}
+
 function CommentRow({
   comment,
   children,
   onReply,
   onDelete,
   onView,
+  onAttachmentClick,
   deleting,
 }: {
   comment: ActivityComment;
@@ -62,6 +180,7 @@ function CommentRow({
   onReply: (comment: ActivityComment) => void;
   onDelete: (comment: ActivityComment) => void;
   onView: (id: string) => void;
+  onAttachmentClick: (attachment: ActivityCommentAttachment) => void;
   deleting: boolean;
 }) {
   const rowRef = useRef<HTMLDivElement>(null);
@@ -131,9 +250,19 @@ function CommentRow({
                 </p>
               </div>
             </div>
-            <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-slate-300">
-              {comment.body}
-            </p>
+            {comment.body && (
+              <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-slate-300">
+                {comment.body}
+              </p>
+            )}
+            {comment.attachment && (
+              <div className="mt-3">
+                <AttachmentTile
+                  attachment={comment.attachment}
+                  onOpen={() => onAttachmentClick(comment.attachment!)}
+                />
+              </div>
+            )}
             <div className="mt-3 flex items-center gap-1 border-t border-slate-800/70 pt-2.5">
               {comment.depth < 2 && !comment.id.startsWith("temp-") && (
                 <button
@@ -145,21 +274,34 @@ function CommentRow({
                 </button>
               )}
               {comment.canDelete && (
-                <Popconfirm
-                  title="Delete this comment?"
-                  description="Replies will remain visible."
-                  okText="Delete"
-                  okButtonProps={{ danger: true }}
-                  onConfirm={() => onDelete(comment)}
-                >
-                  <button
+                <AlertDialog>
+                  <AlertDialogTrigger
                     type="button"
                     disabled={deleting}
                     className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] text-slate-500 transition hover:bg-rose-950/40 hover:text-rose-300 disabled:opacity-50"
                   >
                     {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />} Delete
-                  </button>
-                </Popconfirm>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent className="border-slate-800 bg-slate-950 text-slate-100">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete this comment?</AlertDialogTitle>
+                      <AlertDialogDescription className="text-slate-400">
+                        The comment and its attachment will be deleted. Replies will remain visible.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel className="border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800 hover:text-white">
+                        Cancel
+                      </AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => onDelete(comment)}
+                        className="bg-rose-700 text-white hover:bg-rose-600"
+                      >
+                        Delete
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               )}
             </div>
           </>
@@ -186,8 +328,11 @@ export default function ActivityCommentsSheet({
   const [open, setOpen] = useState(initiallyOpen);
   const [draft, setDraft] = useState("");
   const [replyTo, setReplyTo] = useState<ActivityComment | null>(null);
+  const [pendingAttachment, setPendingAttachment] = useState<PendingAttachment | null>(null);
+  const [viewerAttachment, setViewerAttachment] = useState<ActivityCommentAttachment | null>(null);
   const [unreadCount, setUnreadCount] = useState(Number(activity?.unread_comment_count || 0));
   const [totalCount, setTotalCount] = useState(Number(activity?.comment_count || 0));
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const pendingSeen = useRef(new Set<string>());
   const seenTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -196,6 +341,12 @@ export default function ActivityCommentsSheet({
   useEffect(() => {
     if (initiallyOpen) setOpen(true);
   }, [initiallyOpen]);
+  useEffect(() => {
+    const previewUrl = pendingAttachment?.previewUrl;
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [pendingAttachment?.previewUrl]);
 
   const commentsQuery = useQuery<CommentsResponse>({
     queryKey,
@@ -212,13 +363,64 @@ export default function ActivityCommentsSheet({
   }, [comments, commentsQuery.data]);
 
   const addComment = useMutation({
-    mutationFn: (variables: { body: string; parent: ActivityComment | null }) =>
-      requestJson(`/api/task/activities/${activityId}/comments`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ body: variables.body, parentId: variables.parent?.id || null }),
-      }),
-    onMutate: async ({ body, parent }) => {
+    mutationFn: async (variables: { body: string; parent: ActivityComment | null; pending: PendingAttachment | null }) => {
+      const userId = String(session?.user?.id || "");
+      let uploadedRef: ReturnType<typeof ref> | null = null;
+      let uploaded = false;
+      let attachment: ActivityCommentAttachmentPayload | null = null;
+
+      try {
+        if (variables.pending) {
+          if (!userId) throw new Error("Your session could not be verified. Please sign in again.");
+          const { file } = variables.pending;
+          const extension = getAttachmentExtension(file.name);
+          const mimeType = getCanonicalAttachmentMimeType(extension);
+          const uniqueId = typeof crypto.randomUUID === "function"
+            ? crypto.randomUUID()
+            : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+          const storagePath = `task-activity-comments/${taskId}/${activityId}/${userId}/${uniqueId}-${sanitizeAttachmentFileName(file.name)}`;
+          uploadedRef = ref(storage, storagePath);
+          await uploadBytes(uploadedRef, file, {
+            contentType: mimeType,
+            customMetadata: {
+              taskId,
+              activityId,
+              uploaderId: userId,
+              originalName: file.name,
+            },
+          });
+          uploaded = true;
+          attachment = {
+            url: await getDownloadURL(uploadedRef),
+            storagePath,
+            name: file.name,
+            mimeType,
+            extension,
+            size: file.size,
+          };
+        }
+
+        return await requestJson(`/api/task/activities/${activityId}/comments`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            body: variables.body,
+            parentId: variables.parent?.id || null,
+            attachment,
+          }),
+        });
+      } catch (error) {
+        if (uploaded && uploadedRef) {
+          try {
+            await deleteObject(uploadedRef);
+          } catch (cleanupError) {
+            console.log("Failed to roll back activity comment attachment", cleanupError);
+          }
+        }
+        throw error;
+      }
+    },
+    onMutate: async ({ body, parent, pending }) => {
       await queryClient.cancelQueries({ queryKey });
       const previous = queryClient.getQueryData<CommentsResponse>(queryKey);
       const tempId = `temp-${Date.now()}`;
@@ -230,6 +432,7 @@ export default function ActivityCommentsSheet({
         rootId: parent ? parent.rootId || parent.id : null,
         depth: parent ? parent.depth + 1 : 0,
         body,
+        attachment: pending?.attachment || null,
         deletedAt: null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -238,8 +441,6 @@ export default function ActivityCommentsSheet({
         author: { id: session?.user?.id || "me", name: "You", avatarUrl: "" },
       };
       queryClient.setQueryData<CommentsResponse>(queryKey, (old) => ({ comments: [...(old?.comments || []), temp] }));
-      setDraft("");
-      setReplyTo(null);
       return { previous, tempId };
     },
     onError: (error: Error, _variables, context) => {
@@ -250,6 +451,9 @@ export default function ActivityCommentsSheet({
       queryClient.setQueryData<CommentsResponse>(queryKey, (old) => ({
         comments: (old?.comments || []).map((comment) => comment.id === context?.tempId ? data.comment : comment),
       }));
+      setDraft("");
+      setReplyTo(null);
+      setPendingAttachment(null);
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey }),
   });
@@ -262,7 +466,7 @@ export default function ActivityCommentsSheet({
       const previous = queryClient.getQueryData<CommentsResponse>(queryKey);
       queryClient.setQueryData<CommentsResponse>(queryKey, (old) => ({
         comments: (old?.comments || []).map((item) => item.id === comment.id
-          ? { ...item, body: "", deletedAt: new Date().toISOString(), canDelete: false, isSeen: true }
+          ? { ...item, body: "", attachment: null, deletedAt: new Date().toISOString(), canDelete: false, isSeen: true }
           : item),
       }));
       return { previous };
@@ -313,6 +517,67 @@ export default function ActivityCommentsSheet({
     if (pendingSeen.current.size) void flushSeen();
   }, [flushSeen]);
 
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    const extension = getAttachmentExtension(file.name);
+    if (!isAllowedAttachmentExtension(extension) || !isMimeTypeAllowedForExtension(file.type, extension)) {
+      toast.error("Unsupported file type", {
+        description: "Choose an image, PDF, Word, or Excel file.",
+      });
+      return;
+    }
+    if (file.size <= 0 || file.size >= ACTIVITY_COMMENT_ATTACHMENT_MAX_BYTES) {
+      toast.error("File must be smaller than 5MB");
+      return;
+    }
+
+    const mimeType = getCanonicalAttachmentMimeType(extension);
+    const baseAttachment: ActivityCommentAttachment = {
+      url: "",
+      name: file.name,
+      mimeType,
+      extension,
+      size: file.size,
+    };
+    const previewUrl = isImageAttachment(baseAttachment) ? URL.createObjectURL(file) : null;
+    setPendingAttachment({
+      file,
+      previewUrl,
+      attachment: { ...baseAttachment, url: previewUrl || "" },
+    });
+  };
+
+  const downloadAttachment = useCallback(async (attachment: ActivityCommentAttachment) => {
+    try {
+      const response = await fetch(attachment.url);
+      if (!response.ok) throw new Error("Download failed");
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = attachment.name;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+      toast.success("File Downloaded", { description: attachment.name });
+    } catch (error) {
+      console.log("Failed to download activity comment attachment", error);
+      toast.error("Download failed", { description: "The file could not be downloaded." });
+    }
+  }, []);
+
+  const handleAttachmentClick = useCallback((attachment: ActivityCommentAttachment) => {
+    if (isImageAttachment(attachment) || isPdfAttachment(attachment)) {
+      setViewerAttachment(attachment);
+      return;
+    }
+    void downloadAttachment(attachment);
+  }, [downloadAttachment]);
+
   const childrenByParent = useMemo(() => {
     const map = new Map<string | null, ActivityComment[]>();
     comments.forEach((comment) => {
@@ -331,6 +596,7 @@ export default function ActivityCommentsSheet({
         deleting={deleteComment.isPending && deleteComment.variables?.id === comment.id}
         onDelete={(item) => deleteComment.mutate(item)}
         onView={handleView}
+        onAttachmentClick={handleAttachmentClick}
       >
         {(childrenByParent.get(comment.id) || []).map(renderBranch)}
       </CommentRow>
@@ -339,11 +605,12 @@ export default function ActivityCommentsSheet({
 
   const submit = () => {
     const body = draft.trim();
-    if (!body || addComment.isPending) return;
-    addComment.mutate({ body, parent: replyTo });
+    if ((!body && !pendingAttachment) || addComment.isPending) return;
+    addComment.mutate({ body, parent: replyTo, pending: pendingAttachment });
   };
 
   return (
+    <>
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
         <button
@@ -428,12 +695,22 @@ export default function ActivityCommentsSheet({
           {replyTo && (
             <div className="mb-2.5 flex items-center justify-between rounded-xl border border-cyan-900/60 bg-cyan-950/25 px-3 py-2.5 text-xs text-cyan-200">
               <span className="flex min-w-0 items-center gap-2"><Reply size={13} className="shrink-0" /><span className="truncate">Replying to <strong>{replyTo.author.name}</strong></span></span>
-              <button type="button" onClick={() => setReplyTo(null)} className="ml-2 rounded-md p-1 text-cyan-400 transition hover:bg-cyan-900/50 hover:text-cyan-200" aria-label="Cancel reply"><X size={14} /></button>
+              <button type="button" disabled={addComment.isPending} onClick={() => setReplyTo(null)} className="ml-2 rounded-md p-1 text-cyan-400 transition hover:bg-cyan-900/50 hover:text-cyan-200 disabled:opacity-50" aria-label="Cancel reply"><X size={14} /></button>
             </div>
           )}
           <div className="rounded-2xl border border-slate-700/80 bg-slate-950/70 p-2 shadow-inner transition focus-within:border-cyan-700/70 focus-within:ring-2 focus-within:ring-cyan-500/10">
+            {pendingAttachment && (
+              <div className="px-2 pb-2 pt-1">
+                <AttachmentTile
+                  attachment={pendingAttachment.attachment}
+                  disabled={addComment.isPending}
+                  onRemove={() => setPendingAttachment(null)}
+                />
+              </div>
+            )}
             <Textarea
               value={draft}
+              disabled={addComment.isPending}
               maxLength={2000}
               rows={2}
               placeholder={replyTo ? "Write a reply…" : "Write a comment…"}
@@ -443,14 +720,32 @@ export default function ActivityCommentsSheet({
               }}
               className="max-h-40 min-h-[72px] resize-none border-0 bg-transparent px-2 py-2 text-sm shadow-none focus-visible:ring-0"
             />
-            <div className="flex items-center justify-between border-t border-slate-800/80 px-1 pt-2">
-              <div className="flex items-center gap-2 text-[10px] text-slate-600">
-                <span>{draft.length}/2000</span>
-                <span className="hidden sm:inline">Ctrl/⌘ + Enter to send</span>
+            <div className="flex items-center justify-between gap-2 border-t border-slate-800/80 px-1 pt-2">
+              <div className="flex min-w-0 items-center gap-2 text-[10px] text-slate-600">
+                <button
+                  type="button"
+                  disabled={addComment.isPending}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-800 hover:text-cyan-300 disabled:opacity-50"
+                  aria-label={pendingAttachment ? "Replace attachment" : "Attach a file"}
+                  title={pendingAttachment ? "Replace attachment" : "Attach a file"}
+                >
+                  <Paperclip size={15} />
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept={ACTIVITY_COMMENT_ATTACHMENT_ACCEPT}
+                  disabled={addComment.isPending}
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+                <span className="shrink-0">{draft.length}/2000</span>
+                <span className="hidden truncate sm:inline">Ctrl/⌘ + Enter to send</span>
               </div>
               <Button
                 type="button"
-                disabled={!draft.trim() || addComment.isPending}
+                disabled={(!draft.trim() && !pendingAttachment) || addComment.isPending}
                 onClick={submit}
                 className="h-9 rounded-xl bg-cyan-700 px-3.5 text-xs font-semibold text-white shadow-[0_6px_20px_rgba(8,145,178,0.2)] hover:bg-cyan-600 disabled:shadow-none"
                 aria-label="Send comment"
@@ -463,5 +758,45 @@ export default function ActivityCommentsSheet({
         </div>
       </SheetContent>
     </Sheet>
+    <Dialog
+      open={Boolean(viewerAttachment)}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) setViewerAttachment(null);
+      }}
+    >
+      <DialogContent className="max-h-[92vh] w-[calc(100vw-2rem)] max-w-5xl overflow-hidden border-slate-800 bg-slate-950 p-4 sm:p-6">
+        {viewerAttachment && (
+          <>
+            <DialogHeader className="pr-8 text-left">
+              <DialogTitle className="truncate text-base text-slate-100" title={viewerAttachment.name}>
+                {viewerAttachment.name}
+              </DialogTitle>
+              <DialogDescription>
+                {isPdfAttachment(viewerAttachment) ? "PDF preview" : "Image preview"}
+              </DialogDescription>
+            </DialogHeader>
+            {isImageAttachment(viewerAttachment) ? (
+              <div className="relative h-[76vh] min-h-[240px] overflow-hidden rounded-xl bg-black/40">
+                <Image
+                  src={viewerAttachment.url}
+                  alt={viewerAttachment.name}
+                  fill
+                  unoptimized
+                  sizes="100vw"
+                  className="object-contain"
+                />
+              </div>
+            ) : (
+              <iframe
+                src={`${viewerAttachment.url}#toolbar=1&navpanes=0`}
+                title={viewerAttachment.name}
+                className="h-[76vh] min-h-[420px] w-full rounded-xl border border-slate-800 bg-white"
+              />
+            )}
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }

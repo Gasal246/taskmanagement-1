@@ -6,6 +6,11 @@ import ActivityComments from "@/models/activity_comments.model";
 import Users from "@/models/users.model";
 import { authorizeActivityViewer } from "@/app/api/helpers/activity-comments";
 import { notifyActivityComment } from "@/app/api/helpers/task-activity-comment-notifications";
+import {
+  AttachmentValidationError,
+  deleteActivityCommentAttachment,
+  validateActivityCommentAttachment,
+} from "@/app/api/helpers/activity-comment-attachments";
 import mongoose from "mongoose";
 import { NextResponse } from "next/server";
 
@@ -22,6 +27,13 @@ const serialize = (comment: any, seenIds: Set<string>, userId: string) => ({
   rootId: comment.root_id ? String(comment.root_id) : null,
   depth: comment.depth,
   body: comment.deleted_at ? "" : comment.body,
+  attachment: comment.deleted_at || !comment.attachment ? null : {
+    url: comment.attachment.url,
+    name: comment.attachment.name,
+    mimeType: comment.attachment.mime_type,
+    extension: comment.attachment.extension,
+    size: comment.attachment.size,
+  },
   deletedAt: comment.deleted_at || null,
   createdAt: comment.createdAt,
   updatedAt: comment.updatedAt,
@@ -73,8 +85,8 @@ export async function POST(
   if (access.status !== 200) return unauthorized(access.status);
   const payload = await req.json();
   const body = String(payload?.body || "").trim();
-  if (!body || body.length > 2000) {
-    return NextResponse.json({ message: "Comment must contain 1–2000 characters" }, { status: 400 });
+  if (body.length > 2000) {
+    return NextResponse.json({ message: "Comment cannot exceed 2000 characters" }, { status: 400 });
   }
 
   let parent: any = null;
@@ -86,15 +98,56 @@ export async function POST(
     if (parent.depth >= 2) return NextResponse.json({ message: "Maximum reply depth reached" }, { status: 400 });
   }
 
-  const created = await ActivityComments.create({
-    task_id: access.task._id,
-    activity_id: activityId,
-    author_id: userId,
-    parent_id: parent?._id || null,
-    root_id: parent ? parent.root_id || parent._id : null,
-    depth: parent ? parent.depth + 1 : 0,
-    body,
-  });
+  let attachment = null;
+  if (payload?.attachment) {
+    try {
+      attachment = await validateActivityCommentAttachment(payload.attachment, {
+        taskId: String(access.task._id),
+        activityId,
+        userId,
+      });
+    } catch (error) {
+      if (error instanceof AttachmentValidationError) {
+        return NextResponse.json({ message: error.message }, { status: error.status });
+      }
+      console.log("Failed to validate activity comment attachment", error);
+      return NextResponse.json({ message: "Could not validate the attachment" }, { status: 502 });
+    }
+  }
+  if (!body && !attachment) {
+    return NextResponse.json({ message: "Add a comment or attachment" }, { status: 400 });
+  }
+
+  let created: any;
+  try {
+    created = await ActivityComments.create({
+      task_id: access.task._id,
+      activity_id: activityId,
+      author_id: userId,
+      parent_id: parent?._id || null,
+      root_id: parent ? parent.root_id || parent._id : null,
+      depth: parent ? parent.depth + 1 : 0,
+      body,
+      attachment: attachment ? {
+        url: attachment.url,
+        storage_path: attachment.storagePath,
+        name: attachment.name,
+        mime_type: attachment.mimeType,
+        extension: attachment.extension,
+        size: attachment.size,
+      } : null,
+    });
+  } catch (error) {
+    if (attachment?.storagePath) {
+      try {
+        await deleteActivityCommentAttachment(attachment.storagePath);
+      } catch (cleanupError) {
+        console.log("Failed to roll back activity comment attachment", cleanupError);
+      }
+    }
+    console.log("Failed to create activity comment", error);
+    return NextResponse.json({ message: "Could not add the comment" }, { status: 500 });
+  }
   const populated: any = await ActivityComments.findById(created._id)
     .populate({ path: "author_id", select: "name avatar_url" })
     .lean();

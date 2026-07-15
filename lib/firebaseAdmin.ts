@@ -1,5 +1,6 @@
 import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getMessaging } from "firebase-admin/messaging";
+import { getStorage } from "firebase-admin/storage";
 
 type ServiceAccount = {
   projectId: string;
@@ -55,15 +56,25 @@ function loadServiceAccount(): ServiceAccount {
   throw new Error("Missing Firebase service account credentials.");
 }
 
-export function getAdminMessaging() {
+const DEFAULT_STORAGE_BUCKET = "taskmanager-4b024.firebasestorage.app";
+
+function getAdminApp() {
+  if (getApps().length > 0) return getApps()[0];
   const serviceAccount = loadServiceAccount();
 
-  const app =
-    getApps().length > 0
-      ? getApps()[0]
-      : initializeApp({
-          credential: cert(serviceAccount),
-        });
+  return initializeApp({
+    credential: cert(serviceAccount),
+    storageBucket: process.env.FIREBASE_STORAGE_BUCKET || DEFAULT_STORAGE_BUCKET,
+  });
+}
+
+export function getAdminMessaging() {
+  const app = getAdminApp();
 
   return getMessaging(app);
+}
+
+export function getAdminStorageBucket() {
+  const app = getAdminApp();
+  return getStorage(app).bucket(process.env.FIREBASE_STORAGE_BUCKET || DEFAULT_STORAGE_BUCKET);
 }

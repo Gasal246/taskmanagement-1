@@ -28,7 +28,7 @@ export async function notifyActivityComment({
   const taskId = String(task._id);
   const activityId = String(activity._id);
   const commentId = String(comment._id);
-  const body = excerpt(comment.body || "");
+  const body = excerpt(comment.body || comment.attachment?.name || "Attached a file");
   const title = action === "replied" ? "New Activity Reply" : "New Activity Comment";
   const linkSuffix = `?activityId=${encodeURIComponent(activityId)}&comments=open`;
   const data: Record<string, string> = {
