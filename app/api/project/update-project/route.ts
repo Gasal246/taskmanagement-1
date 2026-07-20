@@ -16,6 +16,7 @@ interface Body {
     end_date: Date,
     priority: string,
     type: string,
+    client_id?: string | null,
     region_id?: string | null,
     area_id?: string | null
 }
@@ -42,6 +43,10 @@ export async function PUT(req: NextRequest) {
 
         if (body.region_id !== undefined) {
             updateData.region_id = body.region_id === "" ? null : body.region_id;
+        }
+
+        if (body.client_id !== undefined) {
+            updateData.client_id = body.client_id === "" ? null : body.client_id;
         }
 
         if (body.area_id !== undefined) {

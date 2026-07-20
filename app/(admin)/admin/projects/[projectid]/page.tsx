@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useApproveProject, useGetProjectById, useUpdateProject, useAddProjectDoc, useRemoveProjectDoc, useDeleteProject, useGetBusinessRegions, useGetAreasandDeptsForRegion, useGetTeamsForProjects, useAddProjectHead, useRemoveProjectHead, useAddAccountManager, useRemoveAccountManager, useAddSiteOperationalHead, useRemoveSiteOperationalHead, useAddProjectSupervisor, useRemoveProjectSupervisor } from '@/query/business/queries';
+import { useApproveProject, useGetProjectById, useUpdateProject, useAddProjectDoc, useRemoveProjectDoc, useDeleteProject, useGetBusinessClients, useGetBusinessRegions, useGetAreasandDeptsForRegion, useGetTeamsForProjects, useAddProjectHead, useRemoveProjectHead, useAddAccountManager, useRemoveAccountManager, useAddSiteOperationalHead, useRemoveSiteOperationalHead, useAddProjectSupervisor, useRemoveProjectSupervisor } from '@/query/business/queries';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { DEPARTMENT_TYPES } from '@/lib/constants';
@@ -38,6 +38,7 @@ const formSchema = z.object({
   status: z.string().optional(),
   priority: z.string().optional(),
   type: z.string().optional(),
+  client_id: z.string().nullable().optional(),
   region_id: z.string().min(1, { message: "Region is required." }),
   area_id: z.string().nullable().optional()
 });
@@ -62,6 +63,7 @@ const ProjectView = () => {
   const [docToDelete, setDocToDelete] = React.useState<any | null>(null);
   const [deleteDocDialogOpen, setDeleteDocDialogOpen] = React.useState(false);
   const [deleteProjectDialogOpen, setDeleteProjectDialogOpen] = React.useState(false);
+  const [businessClients, setBusinessClients] = React.useState<any[]>([]);
   const [businessRegions, setBusinessRegions] = React.useState<any[]>([]);
   const [regionAreas, setRegionAreas] = React.useState<any[]>([]);
   const [projectHeadDialogOpen, setProjectHeadDialogOpen] = useState(false);
@@ -94,6 +96,7 @@ const ProjectView = () => {
   const { mutateAsync: addProjectDoc } = useAddProjectDoc();
   const { mutateAsync: removeProjectDoc } = useRemoveProjectDoc();
   const { mutateAsync: deleteProject, isPending: deletingProject } = useDeleteProject();
+  const { mutateAsync: getBusinessClients, isPending: loadingBusinessClients } = useGetBusinessClients();
   const { mutateAsync: getRegions } = useGetBusinessRegions();
   const { mutateAsync: getAreasForRegion, isPending: loadingAreas } = useGetAreasandDeptsForRegion();
   const businessId = project?.data?.business_id?.toString?.() ?? project?.data?.business_id ?? "";
@@ -109,6 +112,7 @@ const ProjectView = () => {
       status: "approved",
       priority: "low",
       type: "R&D",
+      client_id: "",
       region_id: "",
       area_id: ""
     },
@@ -126,18 +130,25 @@ const ProjectView = () => {
   }, [project]);
 
   useEffect(() => {
-    const businessId = project?.data?.business_id?.toString?.() ?? project?.data?.business_id;
     if (!businessId) return;
-    const fetchRegions = async () => {
-      const res = await getRegions({ business_id: businessId });
-      if (res?.status === 200) {
-        setBusinessRegions(res?.data ?? []);
+    const fetchProjectOptions = async () => {
+      const [regionsRes, clientsRes] = await Promise.all([
+        getRegions({ business_id: businessId }),
+        getBusinessClients(businessId),
+      ]);
+      if (regionsRes?.status === 200) {
+        setBusinessRegions(regionsRes?.data ?? []);
       } else {
         setBusinessRegions([]);
       }
+      if (clientsRes?.status === 200) {
+        setBusinessClients(clientsRes?.data ?? []);
+      } else {
+        setBusinessClients([]);
+      }
     };
-    fetchRegions();
-  }, [project?.data?.business_id, getRegions]);
+    fetchProjectOptions();
+  }, [businessId, getRegions, getBusinessClients]);
 
   useEffect(() => {
     const fetchAreas = async () => {
@@ -173,6 +184,10 @@ const ProjectView = () => {
   const projectSupervisors = useMemo(() => project?.data?.project_supervisors ?? [], [project?.data?.project_supervisors]);
   const accountManagers = useMemo(() => project?.data?.account_managers ?? [], [project?.data?.account_managers]);
   const siteOperationalHeads = useMemo(() => project?.data?.site_operational_heads ?? [], [project?.data?.site_operational_heads]);
+  const associatedClient = useMemo(() => {
+    const clientId = project?.data?.client_id?._id ?? project?.data?.client_id;
+    return businessClients.find((client: any) => String(client?._id) === String(clientId)) ?? project?.data?.client_id;
+  }, [businessClients, project?.data?.client_id]);
 
   const projectTeamPeople = useMemo(() => {
     const peopleMap = new Map<string, any>();
@@ -303,6 +318,8 @@ const ProjectView = () => {
     form.setValue("status", project?.data?.status);
     form.setValue("priority", project?.data?.priority);
     form.setValue("type", project?.data?.type);
+    const clientValue = project?.data?.client_id?._id ?? project?.data?.client_id ?? "";
+    form.setValue("client_id", clientValue?.toString?.() ?? clientValue);
     const regionValue = project?.data?.region?._id ?? project?.data?.region_id ?? "";
     const areaValue = project?.data?.area?._id ?? project?.data?.area_id ?? "";
     form.setValue("region_id", regionValue?.toString?.() ?? regionValue ?? "");
@@ -464,6 +481,7 @@ const ProjectView = () => {
       end_date: values.endDate,
       priority: values.priority,
       type: values.type,
+      client_id: values.client_id == "" ? null : values.client_id,
       region_id: values.region_id,
       area_id: values.area_id == "" ? null : values.area_id
     };
@@ -775,6 +793,19 @@ const ProjectView = () => {
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-4 sm:col-span-2">
+                <p className='text-[11px] uppercase tracking-[0.18em] text-slate-500'>Client Information</p>
+                {associatedClient && typeof associatedClient === "object" ? (
+                  <div className="mt-2 grid gap-2 text-sm sm:grid-cols-2">
+                    <div><p className="text-[11px] text-slate-500">Name</p><p className="font-semibold text-slate-100">{associatedClient.client_name || "-"}</p></div>
+                    <div><p className="text-[11px] text-slate-500">Category</p><p className="text-slate-300">{associatedClient.category || "-"}</p></div>
+                    <div><p className="text-[11px] text-slate-500">Industry</p><p className="text-slate-400">{associatedClient.industry || "-"}</p></div>
+                    <div><p className="text-[11px] text-slate-500">Address</p><p className="text-slate-400">{associatedClient.company_address || "-"}</p></div>
+                  </div>
+                ) : (
+                  <p className="mt-2 text-sm text-slate-400">No client associated.</p>
+                )}
+              </div>
               <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
                 <p className='text-[11px] uppercase tracking-[0.18em] text-slate-500'>Region</p>
                 <p className='mt-2 text-sm font-semibold text-slate-100'>{project?.data?.region?.region_name || "-"}</p>
@@ -1391,6 +1422,30 @@ const ProjectView = () => {
                     )}
                   />
                 )}
+
+                <FormField
+                  control={form.control}
+                  name="client_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs text-slate-300 font-semibold">Client (Optional)</FormLabel>
+                      <FormControl>
+                        <select
+                          {...field}
+                          value={field.value ?? ""}
+                          className='w-full rounded-md border border-slate-700 bg-slate-900 text-white p-2 focus:border-slate-500 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0'
+                        >
+                          <option value="">Select Client</option>
+                          {businessClients.map((client: any) => (
+                            <option key={client._id} value={client._id}>{client.client_name}</option>
+                          ))}
+                        </select>
+                      </FormControl>
+                      {loadingBusinessClients && <FormDescription className="text-xs text-slate-400">Loading clients...</FormDescription>}
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
                 <FormField
                   control={form.control}
