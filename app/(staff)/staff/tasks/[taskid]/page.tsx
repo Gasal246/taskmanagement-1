@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -47,10 +47,6 @@ import {
   useDeleteBusinessTask,
   useDeleteTaskActivity,
   useGetAllStaffsForStaff,
-  useGetDeptsforLoation,
-  useGetLocationsandDeptsForArea,
-  useGetAreasandDeptsForRegion,
-  useGetStaffsByDepartment,
   useGetTaskById,
   useUpdateBusinessTask,
   useUpdateTaskActivity,
@@ -58,11 +54,10 @@ import {
 import { toast } from "sonner";
 import { formatDateTiny } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { TASK_STATUS } from "@/lib/constants";
+import { HEAD_ROLES, TASK_STATUS } from "@/lib/constants";
 import LoaderSpin from "@/components/shared/LoaderSpin";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "antd";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import Cookies from "js-cookie";
 import { getSession } from "next-auth/react";
 import ActivityCommentsSheet from "@/components/task/ActivityCommentsSheet";
@@ -153,10 +148,6 @@ const TaskDetails = () => {
   const { mutateAsync: UpdateTask, isPending: isUpdatingTask } = useUpdateBusinessTask();
   const { mutateAsync: DeleteTask, isPending: isDeletingTask } = useDeleteBusinessTask();
   const { mutateAsync: getMyStaffs } = useGetAllStaffsForStaff();
-  const { mutateAsync: getStaffsByDepartment } = useGetStaffsByDepartment();
-  const { mutateAsync: getAreasAndDeptsForRegion } = useGetAreasandDeptsForRegion();
-  const { mutateAsync: getLocationsAndDeptsForArea } = useGetLocationsandDeptsForArea();
-  const { mutateAsync: getDeptsForLocation } = useGetDeptsforLoation();
 
   const [roleId, setRoleId] = useState("");
   const [roleName, setRoleName] = useState("");
@@ -172,11 +163,6 @@ const TaskDetails = () => {
   const [editingActivity, setEditingActivity] = useState<any>(null);
 
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
-  const [assignScope, setAssignScope] = useState<"my" | "other">("my");
-  const [selectedDepartmentId, setSelectedDepartmentId] = useState<string | null>(null);
-  const [selectedDepartmentName, setSelectedDepartmentName] = useState("");
-  const [departmentTree, setDepartmentTree] = useState<any>(null);
-  const [loadingDepartments, setLoadingDepartments] = useState(false);
   const [staffOptions, setStaffOptions] = useState<any[]>([]);
   const [selectedStaff, setSelectedStaff] = useState<any>(null);
   const [staffSearch, setStaffSearch] = useState("");
@@ -188,7 +174,7 @@ const TaskDetails = () => {
   const [pendingStatusValue, setPendingStatusValue] = useState<boolean | null>(null);
 
   const taskData = task?.data;
-  const isProjectTask = Boolean(taskData?.is_project_task);
+  const isHead = HEAD_ROLES.includes(roleName);
   const visibleActivities = Array.isArray(taskData?.activities) ? taskData.activities : [];
   const visibleActivityCount = visibleActivities.length;
   const visibleCompletedActivityCount = visibleActivities.filter((activity: any) => activity?.is_done).length;
@@ -253,13 +239,7 @@ const TaskDetails = () => {
     fetchAuthority();
   }, [taskData]);
 
-  const fetchDepartmentMeta = async (departmentId: string) => {
-    const response = await fetch(`/api/department/get-meta?department_id=${departmentId}`);
-    const data = await response.json();
-    return data?.data;
-  };
-
-  const loadMyStaffs = async () => {
+  const loadMyStaffs = useCallback(async () => {
     if (!roleId || !roleName || !domainData) return;
     const domainId = resolveDomainId(roleName, domainData);
     if (!domainId) return;
@@ -271,135 +251,17 @@ const TaskDetails = () => {
       setStaffOptions([]);
     }
     setLoadingStaffs(false);
-  };
-
-  const loadDepartmentTree = async () => {
-    if (!roleName || !domainData) return;
-    setLoadingDepartments(true);
-
-    if (roleName.includes("REGION")) {
-      let regionId = roleName === "REGION_HEAD" ? domainData?.region_id : null;
-      if (!regionId && domainData?.department_id) {
-        const meta = await fetchDepartmentMeta(domainData.department_id);
-        regionId = meta?.region_id || null;
-      }
-      if (!regionId) {
-        setDepartmentTree(null);
-        setLoadingDepartments(false);
-        return;
-      }
-      const regionRes = await getAreasAndDeptsForRegion(regionId);
-      const regionDepartments = regionRes?.data?.region_departments || [];
-      const areas = regionRes?.data?.areas || [];
-      const areaNodes = await Promise.all(
-        areas.map(async (area: any) => {
-          const areaRes = await getLocationsAndDeptsForArea(area._id);
-          const areaDepartments = areaRes?.data?.area_departments || [];
-          const locations = areaRes?.data?.locations || [];
-          const locationNodes = await Promise.all(
-            locations.map(async (location: any) => {
-              const locRes = await getDeptsForLocation(location._id);
-              return {
-                location: locRes?.data?.location || location,
-                locationDepartments: locRes?.data?.location_departments || [],
-              };
-            })
-          );
-          return {
-            area: areaRes?.data?.area || area,
-            areaDepartments,
-            locations: locationNodes,
-          };
-        })
-      );
-      setDepartmentTree({ mode: "region", regionDepartments, areas: areaNodes });
-      setLoadingDepartments(false);
-      return;
-    }
-
-    if (roleName.includes("AREA")) {
-      let areaId = roleName === "AREA_HEAD" ? domainData?.area_id : null;
-      if (!areaId && domainData?.department_id) {
-        const meta = await fetchDepartmentMeta(domainData.department_id);
-        areaId = meta?.area_id || null;
-      }
-      if (!areaId) {
-        setDepartmentTree(null);
-        setLoadingDepartments(false);
-        return;
-      }
-      const areaRes = await getLocationsAndDeptsForArea(areaId);
-      const areaDepartments = areaRes?.data?.area_departments || [];
-      const locations = areaRes?.data?.locations || [];
-      const locationNodes = await Promise.all(
-        locations.map(async (location: any) => {
-          const locRes = await getDeptsForLocation(location._id);
-          return {
-            location: locRes?.data?.location || location,
-            locationDepartments: locRes?.data?.location_departments || [],
-          };
-        })
-      );
-      setDepartmentTree({ mode: "area", area: areaRes?.data?.area || null, areaDepartments, locations: locationNodes });
-      setLoadingDepartments(false);
-      return;
-    }
-
-    if (roleName.includes("LOCATION")) {
-      let locationId = roleName === "LOCATION_HEAD" ? domainData?.location_id : null;
-      if (!locationId && domainData?.department_id) {
-        const meta = await fetchDepartmentMeta(domainData.department_id);
-        locationId = meta?.location_id || null;
-      }
-      if (!locationId) {
-        setDepartmentTree(null);
-        setLoadingDepartments(false);
-        return;
-      }
-      const locationRes = await getDeptsForLocation(locationId);
-      setDepartmentTree({
-        mode: "location",
-        location: locationRes?.data?.location || null,
-        locationDepartments: locationRes?.data?.location_departments || [],
-      });
-      setLoadingDepartments(false);
-      return;
-    }
-
-    setDepartmentTree(null);
-    setLoadingDepartments(false);
-  };
-
-  const handleSelectDepartment = async (department: any) => {
-    if (!department?._id) return;
-    setSelectedDepartmentId(department._id);
-    setSelectedDepartmentName(department?.dep_name || department?.department_name || "Department");
-    setSelectedStaff(null);
-    setLoadingStaffs(true);
-    const res = await getStaffsByDepartment(department._id);
-    if (res?.status === 200) {
-      setStaffOptions((res?.data || []).map(normalizeStaff));
-    } else {
-      setStaffOptions([]);
-    }
-    setLoadingStaffs(false);
-  };
+  }, [domainData, getMyStaffs, roleId, roleName]);
 
   const handleOpenAssignDialog = (activity: any) => {
     setActiveActivity(activity);
-    setAssignScope("my");
-    setSelectedDepartmentId(null);
-    setSelectedDepartmentName("");
     setSelectedStaff(null);
     setStaffSearch("");
-    setDepartmentTree(null);
     setAssignDialogOpen(true);
   };
 
   const handleCloseAssignDialog = () => {
     setAssignDialogOpen(false);
-    setSelectedDepartmentId(null);
-    setSelectedDepartmentName("");
     setSelectedStaff(null);
     setStaffSearch("");
     setStaffOptions([]);
@@ -407,12 +269,8 @@ const TaskDetails = () => {
 
   useEffect(() => {
     if (!assignDialogOpen) return;
-    if (assignScope === "my") {
-      loadMyStaffs();
-    } else {
-      loadDepartmentTree();
-    }
-  }, [assignDialogOpen, assignScope]);
+    loadMyStaffs();
+  }, [assignDialogOpen, loadMyStaffs]);
 
   const filteredStaffs = useMemo(() => {
     const term = staffSearch.trim().toLowerCase();
@@ -432,15 +290,15 @@ const TaskDetails = () => {
     }
     const res = await UpdateTaskActivity({
       activity_id: activeActivity._id,
-      assigned_to: selectedStaff._id,
+      forwarded_to: selectedStaff._id,
       is_status: false,
     });
     if (res?.status === 200) {
-      toast.success(res?.message || "Activity assigned successfully.");
+      toast.success(res?.message || "Activity reassigned successfully.");
       handleCloseAssignDialog();
       refetch();
     } else {
-      toast.error(res?.message || "Failed to assign activity.");
+      toast.error(res?.message || "Failed to reassign activity.");
     }
   };
 
@@ -755,9 +613,6 @@ const TaskDetails = () => {
                         <span className="rounded-md border border-slate-700/70 bg-slate-900/60 px-2 py-1">
                           Skill: {activity?.assigned_skill?.skill_name || "Not set"}
                         </span>
-                        <span className="rounded-md border border-slate-700/70 bg-slate-900/60 px-2 py-1">
-                          Staff: {activity?.assigned_to?.name || "Unassigned"}
-                        </span>
                       </div>
                       {activity?.is_done && activity?.completed_in && (
                         <p className="text-xs text-slate-400 mt-2">
@@ -771,7 +626,7 @@ const TaskDetails = () => {
                         taskId={params.taskid}
                         initiallyOpen={searchParams.get("comments") === "open" && searchParams.get("activityId") === String(activity._id)}
                       />
-                      {isProjectTask && isCreator && (
+                      {isHead && (
                         <motion.button
                           whileHover={{ scale: 1.02 }}
                           whileTap={{ scale: 0.98 }}
@@ -779,28 +634,28 @@ const TaskDetails = () => {
                           onClick={() => handleOpenAssignDialog(activity)}
                         >
                           <UserPlus size={12} />
-                          {activity?.assigned_to ? "Change Assignment" : "Assign"}
+                          Reassign
                         </motion.button>
                       )}
                       {activity?.is_done ? (
                         <motion.button
                           whileHover={{ scale: 1.02 }}
                           whileTap={{ scale: 0.98 }}
-                          className="p-2 px-4 rounded-lg border border-slate-700 hover:border-slate-500 bg-gradient-to-tr from-slate-900 to-slate-800 cursor-pointer text-xs font-medium flex gap-1 items-center"
+                          className="p-2 px-4 rounded-lg border border-red-600/60 hover:border-red-400 bg-gradient-to-tr from-red-950/60 to-red-900/40 text-red-100 cursor-pointer text-xs font-medium flex gap-1 items-center"
                           onClick={() => handleOpenStatusConfirm(activity, false)}
                         >
                           <CheckCircle2 size={12} />
-                          Mark as Not Completed
+                          Mark Not Completed
                         </motion.button>
                       ) : (
                         <motion.button
                           whileHover={{ scale: 1.02 }}
                           whileTap={{ scale: 0.98 }}
-                          className="p-2 px-4 rounded-lg border border-slate-700 hover:border-slate-500 bg-gradient-to-tr from-slate-900 to-slate-800 cursor-pointer text-xs font-medium flex gap-1 items-center"
+                          className="p-2 px-4 rounded-lg border border-emerald-600/60 hover:border-emerald-400 bg-gradient-to-tr from-emerald-950/60 to-emerald-900/40 text-emerald-100 cursor-pointer text-xs font-medium flex gap-1 items-center"
                           onClick={() => handleOpenStatusConfirm(activity, true)}
                         >
                           <CheckCircle size={12} />
-                          Mark as Completed
+                          Mark Completed
                         </motion.button>
                       )}
                       {isCreator && (
@@ -842,282 +697,51 @@ const TaskDetails = () => {
         </div>
       </div>
 
-      {/* Assign Activity Dialog */}
+      {/* Reassign Activity Dialog */}
       <Dialog
         open={assignDialogOpen}
         onOpenChange={(open) => (open ? setAssignDialogOpen(true) : handleCloseAssignDialog())}
       >
-        <DialogContent className="sm:max-w-[700px]">
+        <DialogContent className="sm:max-w-[520px]">
           <DialogHeader>
-            <DialogTitle>Assign Activity</DialogTitle>
+            <DialogTitle>Reassign Activity</DialogTitle>
             <DialogDescription>
-              Choose a department and staff member for {activeActivity?.activity || "this activity"}.
+              Choose a staff member reporting to you for {activeActivity?.activity || "this activity"}.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setAssignScope("my");
-                  setSelectedDepartmentId(null);
-                  setSelectedDepartmentName("");
-                  setStaffOptions([]);
-                  setSelectedStaff(null);
-                  setStaffSearch("");
-                }}
-                className={`text-xs px-3 py-2 rounded-lg border transition-colors ${
-                  assignScope === "my"
-                    ? "border-cyan-500/60 bg-cyan-500/10 text-cyan-200"
-                    : "border-slate-700 text-slate-300 hover:border-slate-500"
-                }`}
-              >
-                My Department
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setAssignScope("other");
-                  setSelectedDepartmentId(null);
-                  setSelectedDepartmentName("");
-                  setStaffOptions([]);
-                  setSelectedStaff(null);
-                  setStaffSearch("");
-                }}
-                className={`text-xs px-3 py-2 rounded-lg border transition-colors ${
-                  assignScope === "other"
-                    ? "border-cyan-500/60 bg-cyan-500/10 text-cyan-200"
-                    : "border-slate-700 text-slate-300 hover:border-slate-500"
-                }`}
-              >
-                Other Department
-              </button>
-            </div>
-
-            {assignScope === "other" && (
-              <div className="rounded-lg border border-slate-800/70 bg-slate-900/60 p-3">
-                <p className="text-xs text-slate-400 mb-2">Departments</p>
-                {loadingDepartments && (
-                  <div className="w-full flex items-center justify-center h-[12vh]">
-                    <LoaderSpin size={20} />
-                  </div>
-                )}
-                {!loadingDepartments && !departmentTree && (
-                  <p className="text-xs text-slate-500">No departments available.</p>
-                )}
-                {!loadingDepartments && departmentTree?.mode === "region" && (
-                  <div className="space-y-3">
-                    <div>
-                      <p className="text-[11px] uppercase text-slate-500 mb-2">Region Departments</p>
-                      <div className="flex flex-wrap gap-2">
-                        {departmentTree.regionDepartments?.map((dept: any) => (
-                          <button
-                            key={dept._id}
-                            type="button"
-                            onClick={() => handleSelectDepartment(dept)}
-                            className={`text-[11px] px-2 py-1 rounded-full border transition-colors ${
-                              selectedDepartmentId === dept._id
-                                ? "border-cyan-500/60 bg-cyan-500/10 text-cyan-200"
-                                : "border-slate-700 text-slate-300 hover:border-slate-500"
-                            }`}
-                          >
-                            {dept.dep_name}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <Accordion type="multiple" className="border-t border-slate-800/60">
-                      {departmentTree.areas?.map((areaNode: any) => (
-                        <AccordionItem key={areaNode.area?._id} value={areaNode.area?._id}>
-                          <AccordionTrigger className="text-slate-200">
-                            {areaNode.area?.area_name || "Area"}
-                          </AccordionTrigger>
-                          <AccordionContent>
-                            <div className="space-y-2">
-                              <p className="text-[11px] uppercase text-slate-500">Area Departments</p>
-                              <div className="flex flex-wrap gap-2">
-                                {areaNode.areaDepartments?.map((dept: any) => (
-                                  <button
-                                    key={dept._id}
-                                    type="button"
-                                    onClick={() => handleSelectDepartment(dept)}
-                                    className={`text-[11px] px-2 py-1 rounded-full border transition-colors ${
-                                      selectedDepartmentId === dept._id
-                                        ? "border-cyan-500/60 bg-cyan-500/10 text-cyan-200"
-                                        : "border-slate-700 text-slate-300 hover:border-slate-500"
-                                    }`}
-                                  >
-                                    {dept.dep_name}
-                                  </button>
-                                ))}
-                              </div>
-                              <Accordion type="multiple" className="border-l border-slate-800/60 pl-3">
-                                {areaNode.locations?.map((locationNode: any) => (
-                                  <AccordionItem
-                                    key={locationNode.location?._id}
-                                    value={locationNode.location?._id}
-                                  >
-                                    <AccordionTrigger className="text-slate-300">
-                                      {locationNode.location?.location_name || "Location"}
-                                    </AccordionTrigger>
-                                    <AccordionContent>
-                                      <div className="flex flex-wrap gap-2">
-                                        {locationNode.locationDepartments?.map((dept: any) => (
-                                          <button
-                                            key={dept._id}
-                                            type="button"
-                                            onClick={() => handleSelectDepartment(dept)}
-                                            className={`text-[11px] px-2 py-1 rounded-full border transition-colors ${
-                                              selectedDepartmentId === dept._id
-                                                ? "border-cyan-500/60 bg-cyan-500/10 text-cyan-200"
-                                                : "border-slate-700 text-slate-300 hover:border-slate-500"
-                                            }`}
-                                          >
-                                            {dept.dep_name}
-                                          </button>
-                                        ))}
-                                      </div>
-                                    </AccordionContent>
-                                  </AccordionItem>
-                                ))}
-                              </Accordion>
-                            </div>
-                          </AccordionContent>
-                        </AccordionItem>
-                      ))}
-                    </Accordion>
-                  </div>
-                )}
-
-                {!loadingDepartments && departmentTree?.mode === "area" && (
-                  <div className="space-y-3">
-                    <div>
-                      <p className="text-[11px] uppercase text-slate-500 mb-2">Area Departments</p>
-                      <div className="flex flex-wrap gap-2">
-                        {departmentTree.areaDepartments?.map((dept: any) => (
-                          <button
-                            key={dept._id}
-                            type="button"
-                            onClick={() => handleSelectDepartment(dept)}
-                            className={`text-[11px] px-2 py-1 rounded-full border transition-colors ${
-                              selectedDepartmentId === dept._id
-                                ? "border-cyan-500/60 bg-cyan-500/10 text-cyan-200"
-                                : "border-slate-700 text-slate-300 hover:border-slate-500"
-                            }`}
-                          >
-                            {dept.dep_name}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <Accordion type="multiple" className="border-t border-slate-800/60">
-                      {departmentTree.locations?.map((locationNode: any) => (
-                        <AccordionItem
-                          key={locationNode.location?._id}
-                          value={locationNode.location?._id}
-                        >
-                          <AccordionTrigger className="text-slate-200">
-                            {locationNode.location?.location_name || "Location"}
-                          </AccordionTrigger>
-                          <AccordionContent>
-                            <div className="flex flex-wrap gap-2">
-                              {locationNode.locationDepartments?.map((dept: any) => (
-                                <button
-                                  key={dept._id}
-                                  type="button"
-                                  onClick={() => handleSelectDepartment(dept)}
-                                  className={`text-[11px] px-2 py-1 rounded-full border transition-colors ${
-                                    selectedDepartmentId === dept._id
-                                      ? "border-cyan-500/60 bg-cyan-500/10 text-cyan-200"
-                                      : "border-slate-700 text-slate-300 hover:border-slate-500"
-                                  }`}
-                                >
-                                  {dept.dep_name}
-                                </button>
-                              ))}
-                            </div>
-                          </AccordionContent>
-                        </AccordionItem>
-                      ))}
-                    </Accordion>
-                  </div>
-                )}
-
-                {!loadingDepartments && departmentTree?.mode === "location" && (
+          <div className="rounded-lg border border-slate-800/70 bg-slate-900/60 p-3">
+            <Input
+              placeholder="Search staff..."
+              value={staffSearch}
+              onChange={(e) => setStaffSearch(e.target.value)}
+            />
+            <div className="mt-3 max-h-[280px] overflow-y-auto space-y-2">
+              {loadingStaffs && (
+                <div className="w-full flex items-center justify-center h-[10vh]">
+                  <LoaderSpin size={20} />
+                </div>
+              )}
+              {!loadingStaffs && filteredStaffs.length === 0 && (
+                <p className="text-xs text-slate-500">No matching staff found.</p>
+              )}
+              {filteredStaffs.map((staff: any) => (
+                <button
+                  key={staff._id}
+                  type="button"
+                  onClick={() => setSelectedStaff(staff)}
+                  className={`w-full text-left p-2 rounded-lg border flex items-center gap-2 transition-colors ${
+                    selectedStaff?._id === staff._id
+                      ? "border-cyan-500/60 bg-cyan-500/10"
+                      : "border-slate-800 hover:border-slate-600"
+                  }`}
+                >
+                  <Avatar src={staff?.avatar_url || "/avatar.png"} size={30} />
                   <div>
-                    <p className="text-[11px] uppercase text-slate-500 mb-2">Location Departments</p>
-                    <div className="flex flex-wrap gap-2">
-                      {departmentTree.locationDepartments?.map((dept: any) => (
-                        <button
-                          key={dept._id}
-                          type="button"
-                          onClick={() => handleSelectDepartment(dept)}
-                          className={`text-[11px] px-2 py-1 rounded-full border transition-colors ${
-                            selectedDepartmentId === dept._id
-                              ? "border-cyan-500/60 bg-cyan-500/10 text-cyan-200"
-                              : "border-slate-700 text-slate-300 hover:border-slate-500"
-                          }`}
-                        >
-                          {dept.dep_name}
-                        </button>
-                      ))}
-                    </div>
+                    <p className="text-xs text-slate-200">{staff.name}</p>
+                    <p className="text-[11px] text-slate-500">{staff.email}</p>
                   </div>
-                )}
-              </div>
-            )}
-
-            <div className="rounded-lg border border-slate-800/70 bg-slate-900/60 p-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <p className="text-xs text-slate-400">Selected Department</p>
-                  <p className="text-sm text-slate-200">
-                    {assignScope === "my"
-                      ? "My Department"
-                      : selectedDepartmentName || "Select a department"}
-                  </p>
-                </div>
-                <div className="text-xs text-slate-500">
-                  {assignScope === "other" && !selectedDepartmentId
-                    ? "Select a department to load staff"
-                    : ""}
-                </div>
-              </div>
-              <div className="mt-3">
-                <Input
-                  placeholder="Search staff..."
-                  value={staffSearch}
-                  onChange={(e) => setStaffSearch(e.target.value)}
-                />
-              </div>
-              <div className="mt-3 max-h-[240px] overflow-y-auto space-y-2">
-                {loadingStaffs && (
-                  <div className="w-full flex items-center justify-center h-[10vh]">
-                    <LoaderSpin size={20} />
-                  </div>
-                )}
-                {!loadingStaffs && filteredStaffs.length === 0 && (
-                  <p className="text-xs text-slate-500">No matching staff found.</p>
-                )}
-                {filteredStaffs.map((staff: any) => (
-                  <button
-                    key={staff._id}
-                    type="button"
-                    onClick={() => setSelectedStaff(staff)}
-                    className={`w-full text-left p-2 rounded-lg border flex items-center gap-2 transition-colors ${
-                      selectedStaff?._id === staff._id
-                        ? "border-cyan-500/60 bg-cyan-500/10"
-                        : "border-slate-800 hover:border-slate-600"
-                    }`}
-                  >
-                    <Avatar src={staff?.avatar_url || "/avatar.png"} size={30} />
-                    <div>
-                      <p className="text-xs text-slate-200">{staff.name}</p>
-                      <p className="text-[11px] text-slate-500">{staff.email}</p>
-                    </div>
-                  </button>
-                ))}
-              </div>
+                </button>
+              ))}
             </div>
           </div>
           <DialogFooter className="mt-2">
@@ -1125,7 +749,7 @@ const TaskDetails = () => {
               Cancel
             </Button>
             <Button onClick={handleAssignActivity} disabled={isUpdatingActivity || !selectedStaff?._id}>
-              {isUpdatingActivity ? "Assigning..." : "Assign"}
+              {isUpdatingActivity ? "Reassigning..." : "Reassign"}
             </Button>
           </DialogFooter>
         </DialogContent>

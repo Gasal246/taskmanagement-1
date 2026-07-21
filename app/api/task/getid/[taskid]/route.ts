@@ -36,7 +36,13 @@ export async function GET(req:NextRequest, context: {params: Promise<{taskid:str
                 return NextResponse.json({ message: "Forbidden" }, { status: 403 });
             }
             const assignedActivityQuery: any = isAssignedActivityScope
-                ? { task_id: taskid, assigned_to: userId }
+                ? {
+                    task_id: taskid,
+                    $or: [
+                        { assigned_to: userId },
+                        { forwarded_to: userId },
+                    ],
+                }
                 : null;
 
             if (isAssignedActivityScope) {

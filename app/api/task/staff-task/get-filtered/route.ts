@@ -59,7 +59,12 @@ export async function GET(req: NextRequest) {
     const [teams, headOfTasks, activityTaskIds] = await Promise.all([
       Team_Members.find({ user_id: userId }).select("team_id").lean(),
       Project_Teams.find({ team_head: userId }).select("_id").lean(),
-      Task_Activities.distinct("task_id", { assigned_to: userId }),
+      Task_Activities.distinct("task_id", {
+        $or: [
+          { assigned_to: userId },
+          { forwarded_to: userId },
+        ],
+      }),
     ]);
 
     const teamIds = [
@@ -107,7 +112,12 @@ export async function GET(req: NextRequest) {
       activityTaskIds.forEach((id: any) => matchMetadata.set(id.toString(), { nameMatched: true }));
     }
     if (staffId) {
-      const matchingActivities = await Task_Activities.find({ assigned_to: staffId }).select("task_id").lean();
+      const matchingActivities = await Task_Activities.find({
+        $or: [
+          { assigned_to: staffId },
+          { forwarded_to: staffId },
+        ],
+      }).select("task_id").lean();
       const activityTaskIds = matchingActivities.map((item: any) => item.task_id).filter(Boolean);
       query.$and = [...(query.$and || []), { $or: [{ assigned_to: staffId }, { _id: { $in: activityTaskIds } }] }];
       activityTaskIds.forEach((id: any) => {

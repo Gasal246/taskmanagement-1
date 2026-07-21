@@ -98,13 +98,19 @@ export async function notifyTaskActivityChange({
 
   const activityAssignees = await Task_Activities.find({
     task_id: taskId,
-    assigned_to: { $ne: null },
+    $or: [
+      { assigned_to: { $ne: null } },
+      { forwarded_to: { $ne: null } },
+    ],
   })
-    .select("assigned_to")
+    .select("assigned_to forwarded_to")
     .lean();
   activityAssignees.forEach((activity: any) => {
     if (activity?.assigned_to) {
       recipients.add(String(activity.assigned_to));
+    }
+    if (activity?.forwarded_to) {
+      recipients.add(String(activity.forwarded_to));
     }
   });
 

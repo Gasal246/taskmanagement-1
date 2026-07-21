@@ -24,7 +24,10 @@ export async function GET(req: NextRequest) {
     }
 
     const activities = await Task_Activities.find({
-      assigned_to: { $in: staffIds },
+      $or: [
+        { assigned_to: { $in: staffIds } },
+        { forwarded_to: { $in: staffIds } },
+      ],
       is_done: { $ne: true },
     })
       .populate({ path: "task_id", select: "task_name" })
@@ -32,15 +35,20 @@ export async function GET(req: NextRequest) {
 
     const grouped: Record<string, any[]> = {};
     for (const activity of activities) {
-      const staffId = activity?.assigned_to?.toString();
-      if (!staffId) continue;
-      if (!grouped[staffId]) grouped[staffId] = [];
-      grouped[staffId].push({
-        _id: activity?._id,
-        activity: activity?.activity,
-        task_id: activity?.task_id?._id,
-        task_name: activity?.task_id?.task_name,
-      });
+      const activityStaffIds = new Set(
+        [activity?.assigned_to, activity?.forwarded_to]
+          .map((id) => id?.toString())
+          .filter((id): id is string => Boolean(id && staffIds.includes(id)))
+      );
+      for (const staffId of activityStaffIds) {
+        if (!grouped[staffId]) grouped[staffId] = [];
+        grouped[staffId].push({
+          _id: activity?._id,
+          activity: activity?.activity,
+          task_id: activity?.task_id?._id,
+          task_name: activity?.task_id?.task_name,
+        });
+      }
     }
 
     return NextResponse.json({ status: 200, data: grouped }, { status: 200 });

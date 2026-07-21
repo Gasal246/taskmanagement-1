@@ -21,7 +21,8 @@ export async function authorizeActivityViewer(userId: string, activityId: string
   const activeUser = await Users.exists({ _id: userId, status: 1 });
   const isAdmin = Boolean(activeUser && adminAssignment);
   const isAssignedStaff =
-    Boolean(activeUser && staffAssignment) && String(activity.assigned_to || "") === String(userId);
+    Boolean(activeUser && staffAssignment) && [activity.assigned_to, activity.forwarded_to]
+      .some((assignedUserId) => String(assignedUserId || "") === String(userId));
 
   if (!isAdmin && !isAssignedStaff) {
     return { status: 403 as const, activity: null, task: null, isAdmin: false };
@@ -36,13 +37,16 @@ export async function getActivityViewerIds(task: any, activity: any) {
   }).select("user_id").lean();
   const ids = new Set(admins.map((row: any) => String(row.user_id || "")).filter(Boolean));
 
-  if (activity.assigned_to) {
-    const activeStaff = await BusinessStaffs.exists({
+  const activityStaffIds = [activity.assigned_to, activity.forwarded_to]
+    .map((userId) => String(userId || ""))
+    .filter(Boolean);
+  if (activityStaffIds.length) {
+    const activeStaff = await BusinessStaffs.find({
       business_id: task.business_id,
-      user_id: activity.assigned_to,
+      user_id: { $in: activityStaffIds },
       status: 1,
-    });
-    if (activeStaff) ids.add(String(activity.assigned_to));
+    }).select("user_id").lean();
+    activeStaff.forEach((staff: any) => ids.add(String(staff.user_id)));
   }
 
   const activeUsers = await Users.find({ _id: { $in: Array.from(ids) }, status: 1 })
