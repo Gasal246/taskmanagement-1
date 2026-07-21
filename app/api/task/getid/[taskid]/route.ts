@@ -68,10 +68,16 @@ export async function GET(req:NextRequest, context: {params: Promise<{taskid:str
             const activities = await Task_Activities.find(
                 isAssignedActivityScope ? assignedActivityQuery : {task_id: taskid}
             )
+                .populate({ path: "created_by", select: "name email avatar_url" })
                 .populate({ path: "assigned_to", select: "name email avatar_url" })
+                .populate({ path: "forwarded_to", select: "name email avatar_url" })
+                .populate({ path: "reassignment_history.actor_id", select: "name email avatar_url" })
+                .populate({ path: "reassignment_history.recipient_id", select: "name email avatar_url" })
+                .populate({ path: "reassignment_history.previous_recipient_id", select: "name email avatar_url" })
                 .populate({ path: "assigned_skill", select: "skill_name" });
             const activitiesWithUnread = await addUnreadCommentCounts(activities, userId);
             if(activities.length > 0 || isAssignedActivityScope) taskObj.activities = activitiesWithUnread;
+            taskObj.creator_details = await Users.findById(task.creator).select("name email avatar_url");
             if(task.is_project_task){
                 const assigned_teams = await Project_Teams.findById(task.assigned_teams).select("team_name");
                 const project_details = await Business_Project.findById(task.project_id).select("project_name");

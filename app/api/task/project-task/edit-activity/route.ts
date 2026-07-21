@@ -32,10 +32,6 @@ export async function PUT(req: NextRequest) {
         if (!body.activity_id) return NextResponse.json({ message: "Please Provide Activity_id" }, { status: 400 });
 
         if (Object.prototype.hasOwnProperty.call(body, "forwarded_to")) {
-            if (!body.forwarded_to) {
-                return NextResponse.json({ message: "Please select a staff member", status: 400 }, { status: 400 });
-            }
-
             const currentActivity = await Task_Activities.findById(body.activity_id);
             if (!currentActivity) {
                 return NextResponse.json({ message: "Activity not found", status: 404 }, { status: 404 });
@@ -52,6 +48,19 @@ export async function PUT(req: NextRequest) {
                 );
             }
 
+            const currentForwardedTo = currentActivity.forwarded_to
+                ? String(currentActivity.forwarded_to)
+                : "";
+            if (!body.forwarded_to) {
+                if (!currentForwardedTo) {
+                    return NextResponse.json({ message: "This activity has no reassignment to remove", status: 200 }, { status: 200 });
+                }
+                await Task_Activities.findByIdAndUpdate(body.activity_id, {
+                    $set: { forwarded_to: null }
+                });
+                return NextResponse.json({ message: "Activity reassignment removed", status: 200 }, { status: 200 });
+            }
+
             const roleName = getRoleNameFromRequest(req);
             const [subordinateIds, activeTarget] = await Promise.all([
                 getHeadStaffIds(actorId, roleName),
@@ -63,9 +72,21 @@ export async function PUT(req: NextRequest) {
                     { status: 403 }
                 );
             }
+            if (currentForwardedTo === String(body.forwarded_to)) {
+                return NextResponse.json({ message: "Activity is already reassigned to this staff member", status: 200 }, { status: 200 });
+            }
 
             await Task_Activities.findByIdAndUpdate(body.activity_id, {
-                $set: { forwarded_to: body.forwarded_to }
+                $set: { forwarded_to: body.forwarded_to },
+                $push: {
+                    reassignment_history: {
+                        action: "reassigned",
+                        actor_id: actor._id,
+                        recipient_id: body.forwarded_to,
+                        previous_recipient_id: currentActivity.forwarded_to || null,
+                        createdAt: new Date(),
+                    }
+                }
             });
 
             return NextResponse.json({ message: "Activity reassigned successfully", status: 200 }, { status: 200 });

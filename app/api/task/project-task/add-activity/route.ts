@@ -51,6 +51,7 @@ export async function POST(req: NextRequest) {
             activity: body.activity,
             description: body.description,
             is_done: false,
+            created_by: session?.user?.id || null,
             assigned_to: assignedTo || null,
             assigned_skill: body.assigned_skill || null
         });
