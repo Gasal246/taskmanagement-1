@@ -6,7 +6,11 @@ import Task_Activities from "@/models/task_activities.model";
 import Users from "@/models/users.model";
 import { NextRequest, NextResponse } from "next/server";
 import { notifyTaskActivityChange } from "@/app/api/helpers/task-activity-notifications";
-import { getHeadStaffIds, getRoleNameFromRequest } from "@/app/api/helpers/task-filter-scope";
+import {
+    getHierarchyReassignmentHeads,
+    getSelectedHeadDirectStaffIds,
+    resolveSelectedHeadContext,
+} from "@/app/api/helpers/head-reassignment-scope";
 
 connectDB();
 
@@ -47,6 +51,22 @@ export async function PUT(req: NextRequest) {
                     { status: 403 }
                 );
             }
+            const task: any = await Business_Tasks.findById(currentActivity.task_id)
+                .select("business_id")
+                .lean();
+            const headContext = task?.business_id
+                ? await resolveSelectedHeadContext(
+                    req,
+                    actorId,
+                    String(task.business_id)
+                )
+                : null;
+            if (!headContext) {
+                return NextResponse.json(
+                    { message: "An active HEAD role and selected domain are required", status: 403 },
+                    { status: 403 }
+                );
+            }
 
             const currentForwardedTo = currentActivity.forwarded_to
                 ? String(currentActivity.forwarded_to)
@@ -61,12 +81,16 @@ export async function PUT(req: NextRequest) {
                 return NextResponse.json({ message: "Activity reassignment removed", status: 200 }, { status: 200 });
             }
 
-            const roleName = getRoleNameFromRequest(req);
-            const [subordinateIds, activeTarget] = await Promise.all([
-                getHeadStaffIds(actorId, roleName),
+            const [subordinateIds, hierarchyHeads, activeTarget] = await Promise.all([
+                getSelectedHeadDirectStaffIds(headContext),
+                getHierarchyReassignmentHeads(headContext),
                 Users.exists({ _id: body.forwarded_to, status: 1 }),
             ]);
-            if (!activeTarget || !subordinateIds.includes(String(body.forwarded_to))) {
+            const hierarchyHeadIds = new Set(hierarchyHeads.map((head) => head._id));
+            const targetId = String(body.forwarded_to);
+            const isEligibleTarget =
+                subordinateIds.includes(targetId) || hierarchyHeadIds.has(targetId);
+            if (!activeTarget || !isEligibleTarget) {
                 return NextResponse.json(
                     { message: "The selected staff member is not in your reporting scope", status: 403 },
                     { status: 403 }

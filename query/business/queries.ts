@@ -50,6 +50,7 @@ import {
     GetAddedProjectDepartmentsFunc,
     getAllBusinessFunc,
     GetAllStaffsForStaff,
+    GetHierarchyHeadsForReassignment,
     GetAllTasks,
     getAreaCompleteDataFunc,
     getAreaDepartmentCompleteDataFunc,
@@ -1014,6 +1015,12 @@ export const useGetStaffBusinessDetails = () => {
 export const useGetAllStaffsForStaff = () => {
     return useMutation({
         mutationFn: (payload: { role_id: string; domain_id: string }) => GetAllStaffsForStaff(payload),
+    })
+}
+
+export const useGetHierarchyHeadsForReassignment = () => {
+    return useMutation({
+        mutationFn: () => GetHierarchyHeadsForReassignment(),
     })
 }
 

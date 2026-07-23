@@ -19,6 +19,7 @@ import "@/models/business_regions.model";
 import "@/models/business_areas.model";
 import "@/models/users.model";
 import { NextRequest, NextResponse } from "next/server";
+import { buildProjectSearchClause } from "@/app/api/helpers/project-search";
 
 connectDB();
 
@@ -40,6 +41,7 @@ export async function GET(req: NextRequest) {
         const area_id = searchParams.get("area_id");
         const startDate = searchParams.get("startDate");
         const endDate = searchParams.get("endDate");
+        const search = searchParams.get("search");
         const pageRaw = searchParams.get("page");
         const limitRaw = searchParams.get("limit");
 
@@ -276,6 +278,11 @@ export async function GET(req: NextRequest) {
             query.start_date = {};
             if (startDate) query.start_date.$gte = new Date(startDate);
             if (endDate) query.start_date.$lte = new Date(endDate);
+        }
+
+        const searchClause = await buildProjectSearchClause(search, business_id);
+        if (searchClause) {
+            query.$and = [...(query.$and || []), searchClause];
         }
 
         const [projects, total] = await Promise.all([

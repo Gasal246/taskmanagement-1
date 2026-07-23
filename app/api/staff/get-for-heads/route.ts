@@ -12,6 +12,7 @@ import Location_dep_staffs from "@/models/location_dep_staffs.model";
 import User_skills from "@/models/user_skills.model";
 import "@/models/users.model";
 import "@/models/business_skills.model";
+import { resolveSelectedHeadContext } from "@/app/api/helpers/head-reassignment-scope";
 
 connectDB();
 
@@ -33,6 +34,21 @@ export async function GET(req:NextRequest){
         const roleName = userRole?.role_id?.role_name;
         if (!roleName || !HEAD_ROLES.includes(roleName)) {
             return NextResponse.json({message:"Un-Authorized Access", status:403}, {status:403});
+        }
+        const selectedHeadContext = await resolveSelectedHeadContext(
+            req,
+            String(session?.user?.id || "")
+        );
+        if (
+            !selectedHeadContext ||
+            selectedHeadContext.roleId !== String(role_id) ||
+            selectedHeadContext.roleName !== roleName ||
+            selectedHeadContext.selectedDomainId !== String(domain_id)
+        ) {
+            return NextResponse.json(
+                {message:"The selected domain is not available for this HEAD", status:403},
+                {status:403}
+            );
         }
 
         const roleConfig: Record<string, {

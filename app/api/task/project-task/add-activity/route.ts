@@ -5,6 +5,9 @@ import Task_Activities from "@/models/task_activities.model";
 import Users from "@/models/users.model";
 import { NextRequest, NextResponse } from "next/server";
 import { notifyTaskActivityChange } from "@/app/api/helpers/task-activity-notifications";
+import AdminAssignBusiness from "@/models/admin_assign_business.model";
+import { resolveSelectedHeadContext } from "@/app/api/helpers/head-reassignment-scope";
+import { hasStaffTaskAccess } from "@/app/api/helpers/staff-task-access";
 
 connectDB();
 
@@ -22,27 +25,58 @@ export async function POST(req: NextRequest) {
         const session: any = await auth();
         if (!session) return new NextResponse("Un Authorized Access", { status: 401 });
 
-        const actor = await Users.findById(session?.user?.id).select("name");
+        const actor = await Users.findById(session?.user?.id).select("name status");
 
         const body: Body = await req.json();
         if (!body.task_id) return NextResponse.json({ message: "Please provide task_id" }, { status: 400 });
 
         const task: {
+            _id: any,
             assigned_to?: string | null,
+            assigned_teams?: string | null,
             is_project_task?: boolean,
             project_id?: string | null,
+            business_id?: string | null,
+            creator?: string | null,
         } | null = await Business_Tasks.findById(body.task_id)
-            .select("assigned_to is_project_task project_id")
+            .select("assigned_to assigned_teams is_project_task project_id business_id creator")
             .lean<{
+                _id: any,
                 assigned_to?: string | null,
+                assigned_teams?: string | null,
                 is_project_task?: boolean,
                 project_id?: string | null,
+                business_id?: string | null,
+                creator?: string | null,
             }>();
         if (!task) {
             return NextResponse.json({ message: "Task not found" }, { status: 404 });
         }
 
-        const assignedTo = body.assigned_to || (!task.is_project_task ? task.assigned_to : null);
+        const actorId = String(session?.user?.id || "");
+        const businessId = String(task.business_id || "");
+        const [adminAccess, headContext] = await Promise.all([
+            AdminAssignBusiness.exists({
+                user_id: actorId,
+                business_id: businessId,
+                status: 1,
+            }),
+            actor?.status === 1
+                ? resolveSelectedHeadContext(req, actorId, businessId)
+                : Promise.resolve(null),
+        ]);
+        const isCreator = String(task.creator || "") === actorId;
+        const headHasTaskAccess = headContext
+            ? await hasStaffTaskAccess(task, actorId)
+            : false;
+        if (!adminAccess && !isCreator && !headHasTaskAccess) {
+            return NextResponse.json(
+                { message: "You are not allowed to add activities to this task" },
+                { status: 403 }
+            );
+        }
+
+        const assignedTo = !task.is_project_task ? task.assigned_to : null;
         const projectId = body.project_id ?? task.project_id ?? null;
 
         const newActivity = new Task_Activities({

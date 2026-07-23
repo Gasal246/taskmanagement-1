@@ -1,8 +1,9 @@
 import connectDB from "@/lib/mongo";
-import Area_departments from "@/models/area_departments.model";
-import Business_departments from "@/models/business_departments.model";
+import Business_areas from "@/models/business_areas.model";
+import Business_locations from "@/models/business_locations.model";
 import Business_regions from "@/models/business_regions.model";
-import Location_departments from "@/models/location_departments.model";
+import "@/models/area_departments.model";
+import "@/models/location_departments.model";
 import '@/models/region_departments.model';
 import { NextRequest, NextResponse } from "next/server";
 
@@ -18,9 +19,17 @@ export async function GET (req: NextRequest){
             return NextResponse.json({message: "Business ID is required"}, {status: 400});
         }
         
-        const region_departments = await Business_regions.find({business_id: business_id}).populate("departments").lean();
-        const area_departments = await Area_departments.find({business_id: business_id}).populate("departments").lean();
-        const location_departments = await Location_departments.find({business_id: business_id}).populate("departments").lean();
+        const [region_departments, area_departments, location_departments] = await Promise.all([
+            Business_regions.find({business_id: business_id, status: 1})
+                .populate({path: "departments", match: {status: 1}})
+                .lean(),
+            Business_areas.find({business_id: business_id, status: 1})
+                .populate({path: "departments", match: {status: 1}})
+                .lean(),
+            Business_locations.find({business_id: business_id, status: 1})
+                .populate({path: "departments", match: {status: 1}})
+                .lean(),
+        ]);
 
         return NextResponse.json({region_departments, area_departments, location_departments}, {status: 200});
         

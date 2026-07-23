@@ -45,7 +45,7 @@ const ProjectDepartments = () => {
       ...(businessDepartmentsData?.region_departments || []).flatMap((r: any) => r.departments || []),
       ...(businessDepartmentsData?.area_departments || []).flatMap((a: any) => a.departments || []),
       ...(businessDepartmentsData?.location_departments || []).flatMap((l: any) => l.departments || []),
-    ]);
+    ].filter((department: any) => Number(department?.status) === 1));
   }, [businessDepartmentsData]);
 
   const addedDepartments = useMemo(() => project_depts?.data || [], [project_depts?.data]);

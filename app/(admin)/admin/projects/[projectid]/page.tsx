@@ -1294,12 +1294,12 @@ const ProjectView = () => {
       </div>
 
       <Dialog open={updateProjectDialog} onOpenChange={setUpdateProjectDialog}>
-        <DialogContent className="w-[calc(100vw-1.5rem)] max-w-none sm:max-w-2xl">
-          <DialogHeader>
+        <DialogContent className="w-[calc(100vw-1.5rem)] max-w-none sm:max-w-2xl max-h-[calc(100dvh-40px)] overflow-hidden flex flex-col">
+          <DialogHeader className="shrink-0">
             <DialogTitle>Update Project</DialogTitle>
             <DialogDescription>Updating project details.</DialogDescription>
           </DialogHeader>
-          <div>
+          <div className="flex-1 min-h-0 overflow-y-auto pr-2">
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
                 <FormField

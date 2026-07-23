@@ -1215,6 +1215,22 @@ export async function GetAllStaffsForStaff({ role_id, domain_id }: { role_id: st
     }
 }
 
+export async function GetHierarchyHeadsForReassignment(){
+    try{
+        const res = await axios.get("/api/staff/heads/reassignment-scope", {
+            withCredentials: true,
+        });
+        return res.data;
+    }catch(err:any){
+        console.log(err);
+        return {
+            data: [],
+            message: err?.response?.data?.message || "Failed to load hierarchy heads",
+            status: err?.response?.status || 500,
+        };
+    }
+}
+
 //Get Single Staff
 export async function GetSingleStaffbyId(user_id:string, role_id:string){
     try{

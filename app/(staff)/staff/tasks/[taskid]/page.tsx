@@ -10,6 +10,8 @@ import {
 } from "@/components/ui/breadcrumb";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
+  Building2,
+  Check,
   CheckCircle,
   CheckCircle2,
   Edit,
@@ -18,6 +20,7 @@ import {
   Navigation,
   PencilRuler,
   PlusCircle,
+  RefreshCw,
   Trash2,
   UserPlus,
 } from "lucide-react";
@@ -55,6 +58,7 @@ import {
   useDeleteBusinessTask,
   useDeleteTaskActivity,
   useGetAllStaffsForStaff,
+  useGetHierarchyHeadsForReassignment,
   useGetTaskById,
   useUpdateBusinessTask,
   useUpdateTaskActivity,
@@ -69,6 +73,7 @@ import { Avatar } from "antd";
 import Cookies from "js-cookie";
 import { getSession } from "next-auth/react";
 import ActivityCommentsSheet from "@/components/task/ActivityCommentsSheet";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const statusStyles: Record<string, string> = {
   Completed: "border-emerald-500/40 bg-emerald-500/15 text-emerald-200",
@@ -162,6 +167,10 @@ const TaskDetails = () => {
   const { mutateAsync: UpdateTask, isPending: isUpdatingTask } = useUpdateBusinessTask();
   const { mutateAsync: DeleteTask, isPending: isDeletingTask } = useDeleteBusinessTask();
   const { mutateAsync: getMyStaffs } = useGetAllStaffsForStaff();
+  const {
+    mutateAsync: getHierarchyHeads,
+    isPending: loadingHierarchyHeads,
+  } = useGetHierarchyHeadsForReassignment();
 
   const [roleId, setRoleId] = useState("");
   const [roleName, setRoleName] = useState("");
@@ -177,7 +186,11 @@ const TaskDetails = () => {
   const [editingActivity, setEditingActivity] = useState<any>(null);
 
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [assignTab, setAssignTab] = useState<"staffs" | "departments">("staffs");
   const [staffOptions, setStaffOptions] = useState<any[]>([]);
+  const [hierarchyHeadOptions, setHierarchyHeadOptions] = useState<any[]>([]);
+  const [hierarchyHeadsLoaded, setHierarchyHeadsLoaded] = useState(false);
+  const [hierarchyHeadsError, setHierarchyHeadsError] = useState("");
   const [selectedStaff, setSelectedStaff] = useState<any>(null);
   const [staffSearch, setStaffSearch] = useState("");
   const [loadingStaffs, setLoadingStaffs] = useState(false);
@@ -193,6 +206,7 @@ const TaskDetails = () => {
 
   const taskData = task?.data;
   const isHead = HEAD_ROLES.includes(roleName);
+  const canAddActivity = isCreator || isHead;
   const visibleActivities = Array.isArray(taskData?.activities) ? taskData.activities : [];
   const visibleActivityCount = visibleActivities.length;
   const visibleCompletedActivityCount = visibleActivities.filter((activity: any) => activity?.is_done).length;
@@ -273,6 +287,7 @@ const TaskDetails = () => {
 
   const handleOpenAssignDialog = (activity: any) => {
     setActiveActivity(activity);
+    setAssignTab("staffs");
     setSelectedStaff(null);
     setStaffSearch("");
     setAssignDialogOpen(true);
@@ -283,6 +298,28 @@ const TaskDetails = () => {
     setSelectedStaff(null);
     setStaffSearch("");
     setStaffOptions([]);
+  };
+
+  const loadHierarchyHeads = useCallback(async () => {
+    if (hierarchyHeadsLoaded || loadingHierarchyHeads) return;
+    setHierarchyHeadsError("");
+    const res = await getHierarchyHeads();
+    if (res?.status === 200) {
+      setHierarchyHeadOptions(Array.isArray(res?.data) ? res.data : []);
+      setHierarchyHeadsLoaded(true);
+      return;
+    }
+    setHierarchyHeadsError(res?.message || "Failed to load other department heads.");
+  }, [getHierarchyHeads, hierarchyHeadsLoaded, loadingHierarchyHeads]);
+
+  const handleAssignTabChange = (value: string) => {
+    const nextTab = value === "departments" ? "departments" : "staffs";
+    setAssignTab(nextTab);
+    setSelectedStaff(null);
+    setStaffSearch("");
+    if (nextTab === "departments" && !hierarchyHeadsLoaded) {
+      loadHierarchyHeads();
+    }
   };
 
   useEffect(() => {
@@ -299,6 +336,19 @@ const TaskDetails = () => {
       return `${name} ${email}`.toLowerCase().includes(term);
     });
   }, [staffOptions, staffSearch]);
+
+  const filteredHierarchyHeads = useMemo(() => {
+    const term = staffSearch.trim().toLowerCase();
+    if (!term) return hierarchyHeadOptions;
+    return hierarchyHeadOptions.filter((head) => {
+      const domainNames = Array.isArray(head?.domains)
+        ? head.domains.map((domain: any) => domain?.name || "").join(" ")
+        : "";
+      return `${head?.name || ""} ${head?.email || ""} ${domainNames}`
+        .toLowerCase()
+        .includes(term);
+    });
+  }, [hierarchyHeadOptions, staffSearch]);
 
   const historyEntries = useMemo(() => {
     if (!historyActivity?._id) return [];
@@ -684,7 +734,7 @@ const TaskDetails = () => {
           <h2 className="font-medium text-sm text-slate-300 flex items-center gap-1">
             <ListTodo size={16} /> Activities
           </h2>
-          {isCreator && (
+          {canAddActivity && (
             <motion.div
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
@@ -839,48 +889,166 @@ const TaskDetails = () => {
         open={assignDialogOpen}
         onOpenChange={(open) => (open ? setAssignDialogOpen(true) : handleCloseAssignDialog())}
       >
-        <DialogContent className="sm:max-w-[520px]">
+        <DialogContent className="overflow-hidden border-slate-800 bg-slate-950 sm:max-w-[680px]">
           <DialogHeader>
             <DialogTitle>Reassign Activity</DialogTitle>
             <DialogDescription>
-              Choose a staff member reporting to you for {activeActivity?.activity || "this activity"}.
+              Reassign {activeActivity?.activity || "this activity"} to one of your staffs
+              or another department HEAD.
             </DialogDescription>
           </DialogHeader>
-          <div className="rounded-lg border border-slate-800/70 bg-slate-900/60 p-3">
-            <Input
-              placeholder="Search staff..."
-              value={staffSearch}
-              onChange={(e) => setStaffSearch(e.target.value)}
-            />
-            <div className="mt-3 max-h-[280px] overflow-y-auto space-y-2">
-              {loadingStaffs && (
-                <div className="w-full flex items-center justify-center h-[10vh]">
-                  <LoaderSpin size={20} />
+          <Tabs value={assignTab} onValueChange={handleAssignTabChange}>
+            <TabsList className="grid h-auto w-full grid-cols-2 gap-2 bg-transparent p-0">
+              <TabsTrigger
+                value="staffs"
+                className="h-10 border border-slate-700 bg-slate-900/60 text-xs text-slate-300 data-[state=active]:border-cyan-500/60 data-[state=active]:bg-cyan-500/10 data-[state=active]:text-cyan-200"
+              >
+                <UserPlus className="mr-2 size-4" />
+                Your Staffs
+              </TabsTrigger>
+              <TabsTrigger
+                value="departments"
+                className="h-10 border border-slate-700 bg-slate-900/60 text-xs text-slate-300 data-[state=active]:border-cyan-500/60 data-[state=active]:bg-cyan-500/10 data-[state=active]:text-cyan-200"
+              >
+                <Building2 className="mr-2 size-4" />
+                Other Departments
+              </TabsTrigger>
+            </TabsList>
+
+            <div className="mt-3 rounded-xl border border-slate-800/70 bg-slate-900/60 p-3">
+              <Input
+                placeholder={
+                  assignTab === "departments"
+                    ? "Search by department or HEAD..."
+                    : "Search your staffs..."
+                }
+                value={staffSearch}
+                onChange={(event) => setStaffSearch(event.target.value)}
+                className="border-slate-700 bg-slate-950/70"
+              />
+
+              <TabsContent value="staffs" className="mt-3">
+                <div className="max-h-[340px] space-y-2 overflow-y-auto pr-1">
+                  {loadingStaffs && (
+                    <div className="flex h-[140px] w-full items-center justify-center">
+                      <LoaderSpin size={20} />
+                    </div>
+                  )}
+                  {!loadingStaffs && filteredStaffs.length === 0 && (
+                    <p className="py-8 text-center text-xs text-slate-500">
+                      No matching staff found.
+                    </p>
+                  )}
+                  {!loadingStaffs &&
+                    filteredStaffs.map((staff: any) => {
+                      const selected = selectedStaff?._id === staff._id;
+                      return (
+                        <button
+                          key={staff._id}
+                          type="button"
+                          aria-pressed={selected}
+                          onClick={() => setSelectedStaff(selected ? null : staff)}
+                          className={`flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors ${
+                            selected
+                              ? "border-cyan-500/60 bg-cyan-500/10"
+                              : "border-slate-800 bg-slate-950/30 hover:border-slate-600"
+                          }`}
+                        >
+                          <Avatar src={staff?.avatar_url || "/avatar.png"} size={34} />
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm text-slate-200">{staff.name}</p>
+                            <p className="truncate text-xs text-slate-500">{staff.email}</p>
+                          </div>
+                          <span
+                            className={`flex size-5 shrink-0 items-center justify-center rounded border ${
+                              selected
+                                ? "border-cyan-400 bg-cyan-500 text-slate-950"
+                                : "border-slate-600 bg-slate-950"
+                            }`}
+                          >
+                            {selected && <Check className="size-4" />}
+                          </span>
+                        </button>
+                      );
+                    })}
                 </div>
-              )}
-              {!loadingStaffs && filteredStaffs.length === 0 && (
-                <p className="text-xs text-slate-500">No matching staff found.</p>
-              )}
-              {filteredStaffs.map((staff: any) => (
-                <button
-                  key={staff._id}
-                  type="button"
-                  onClick={() => setSelectedStaff(staff)}
-                  className={`w-full text-left p-2 rounded-lg border flex items-center gap-2 transition-colors ${
-                    selectedStaff?._id === staff._id
-                      ? "border-cyan-500/60 bg-cyan-500/10"
-                      : "border-slate-800 hover:border-slate-600"
-                  }`}
-                >
-                  <Avatar src={staff?.avatar_url || "/avatar.png"} size={30} />
-                  <div>
-                    <p className="text-xs text-slate-200">{staff.name}</p>
-                    <p className="text-[11px] text-slate-500">{staff.email}</p>
-                  </div>
-                </button>
-              ))}
+              </TabsContent>
+
+              <TabsContent value="departments" className="mt-3">
+                <div className="max-h-[340px] space-y-2 overflow-y-auto pr-1">
+                  {loadingHierarchyHeads && (
+                    <div className="flex h-[140px] w-full items-center justify-center">
+                      <LoaderSpin size={20} />
+                    </div>
+                  )}
+                  {!loadingHierarchyHeads && hierarchyHeadsError && (
+                    <div className="flex min-h-[140px] flex-col items-center justify-center gap-3 text-center">
+                      <p className="text-xs text-red-300">{hierarchyHeadsError}</p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={loadHierarchyHeads}
+                        className="border-slate-700"
+                      >
+                        <RefreshCw className="mr-2 size-3.5" />
+                        Retry
+                      </Button>
+                    </div>
+                  )}
+                  {!loadingHierarchyHeads &&
+                    !hierarchyHeadsError &&
+                    hierarchyHeadsLoaded &&
+                    filteredHierarchyHeads.length === 0 && (
+                      <p className="py-8 text-center text-xs text-slate-500">
+                        No matching department HEAD found.
+                      </p>
+                    )}
+                  {!loadingHierarchyHeads &&
+                    !hierarchyHeadsError &&
+                    filteredHierarchyHeads.map((head: any) => {
+                      const selected = selectedStaff?._id === head._id;
+                      const domainNames = (head?.domains || [])
+                        .map((domain: any) => domain?.name)
+                        .filter(Boolean);
+                      return (
+                        <button
+                          key={head._id}
+                          type="button"
+                          aria-pressed={selected}
+                          onClick={() => setSelectedStaff(selected ? null : head)}
+                          className={`flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors ${
+                            selected
+                              ? "border-cyan-500/60 bg-cyan-500/10"
+                              : "border-slate-800 bg-slate-950/30 hover:border-slate-600"
+                          }`}
+                        >
+                          <Avatar src={head?.avatar_url || "/avatar.png"} size={36} />
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium text-slate-200">
+                              {head.name || "HEAD"}
+                            </p>
+                            <p className="truncate text-xs text-slate-500">{head.email}</p>
+                            <p className="mt-1 line-clamp-2 text-[11px] text-cyan-300/80">
+                              {domainNames.join(" | ") || "No domains"}
+                            </p>
+                          </div>
+                          <span
+                            className={`flex size-5 shrink-0 items-center justify-center rounded border ${
+                              selected
+                                ? "border-cyan-400 bg-cyan-500 text-slate-950"
+                                : "border-slate-600 bg-slate-950"
+                            }`}
+                          >
+                            {selected && <Check className="size-4" />}
+                          </span>
+                        </button>
+                      );
+                    })}
+                </div>
+              </TabsContent>
             </div>
-          </div>
+          </Tabs>
           <DialogFooter className="mt-2">
             <Button variant="ghost" onClick={handleCloseAssignDialog}>
               Cancel

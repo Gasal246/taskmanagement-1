@@ -22,7 +22,10 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const typeParam = searchParams.get("taskType");
-    const type = typeParam === "single" || typeParam === "project" ? typeParam : "all";
+    const type =
+      typeParam === "single" || typeParam === "project" || typeParam === "created"
+        ? typeParam
+        : "all";
     const startDate = searchParams.get("start_date");
     const endDate = searchParams.get("end_date");
     const pageRaw = searchParams.get("page");
@@ -81,6 +84,7 @@ export async function GET(req: NextRequest) {
       // Heads may inspect all assignments belonging to a subordinate in their own domain.
       if (type === "single") query.is_project_task = false;
       if (type === "project") query.is_project_task = true;
+      if (type === "created") query.creator = userId;
     } else if (type === "single") {
       query.is_project_task = false;
       query.$or = [
@@ -94,6 +98,8 @@ export async function GET(req: NextRequest) {
         { assigned_teams: { $in: teamIds } },
         { _id: { $in: activityTaskIds } },
       ];
+    } else if (type === "created") {
+      query.creator = userId;
     } else if (type === "all") {
       query.$or = [
         { assigned_to: userId },

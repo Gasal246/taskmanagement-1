@@ -26,7 +26,7 @@ import {
 const { RangePicker } = DatePicker;
 const PAGE_SIZE = 9;
 
-type TaskTab = "all" | "single" | "project";
+type TaskTab = "all" | "single" | "project" | "created";
 
 type RangeState = {
   start: string;
@@ -228,7 +228,7 @@ const StaffTasks = () => {
           <div>
             <p className="text-xs font-semibold text-slate-400">Task Filters</p>
             <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TaskTab)}>
-              <TabsList className="mt-2 bg-slate-900/70">
+              <TabsList className="mt-2 grid h-auto w-full grid-cols-2 gap-1 bg-slate-900/70 sm:grid-cols-4">
                 <TabsTrigger
                   className="text-slate-400 data-[state=active]:bg-slate-200/10 data-[state=active]:text-slate-100"
                   value="all"
@@ -246,6 +246,12 @@ const StaffTasks = () => {
                   value="project"
                 >
                   Project Tasks
+                </TabsTrigger>
+                <TabsTrigger
+                  className="text-slate-400 data-[state=active]:bg-slate-200/10 data-[state=active]:text-slate-100"
+                  value="created"
+                >
+                  Created By You
                 </TabsTrigger>
               </TabsList>
             </Tabs>

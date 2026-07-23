@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { DatePicker, Space } from 'antd';
 import { useRouter } from 'next/navigation';
-import { CalendarPlus, CheckCircle2, Clock3, Filter, PanelsTopLeft } from 'lucide-react';
+import { CalendarPlus, CheckCircle2, Clock3, Filter, PanelsTopLeft, Search } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import { RootState } from '@/redux/store';
 import { useGetAreasandDeptsForRegion, useGetBusinessClients, useGetBusinessRegions, useGetProjects } from '@/query/business/queries';
@@ -11,6 +11,7 @@ import LoaderSpin from '@/components/shared/LoaderSpin';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Input } from '@/components/ui/input';
 import {
   Pagination,
   PaginationContent,
@@ -50,6 +51,8 @@ const ProjectsPage = () => {
     endDate: '',
   });
   const [page, setPage] = useState(1);
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
 
   const { mutateAsync: getRegions } = useGetBusinessRegions();
   const { mutateAsync: getBusinessClients } = useGetBusinessClients();
@@ -91,7 +94,14 @@ const ProjectsPage = () => {
 
   useEffect(() => {
     setPage(1);
-  }, [tab, filters.type, filters.client_id, filters.region_id, filters.area_id, filters.startDate, filters.endDate]);
+  }, [tab, filters.type, filters.client_id, filters.region_id, filters.area_id, filters.startDate, filters.endDate, search]);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setSearch(searchInput.trim());
+    }, 350);
+    return () => window.clearTimeout(timeoutId);
+  }, [searchInput]);
 
   const queryParams = useMemo(() => {
     return {
@@ -103,10 +113,11 @@ const ProjectsPage = () => {
       area_id: filters.area_id || undefined,
       startDate: filters.startDate || undefined,
       endDate: filters.endDate || undefined,
+      search: search || undefined,
       page: String(page),
       limit: String(limit)
     };
-  }, [businessData?._id, filters.area_id, filters.client_id, filters.endDate, filters.region_id, filters.startDate, filters.type, page, tab]);
+  }, [businessData?._id, filters.area_id, filters.client_id, filters.endDate, filters.region_id, filters.startDate, filters.type, page, search, tab]);
 
   const { data: projectsResponse, isLoading } = useGetProjects(queryParams);
   const projects = projectsResponse?.data ?? [];
@@ -155,6 +166,8 @@ const ProjectsPage = () => {
   };
 
   const clearFilters = () => {
+    setSearchInput('');
+    setSearch('');
     setFilters({
       type: '',
       client_id: '',
@@ -239,7 +252,19 @@ const ProjectsPage = () => {
           </TabsList>
         </Tabs>
 
-        <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+        <div className="relative mt-4">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-500" />
+          <Input
+            type="search"
+            value={searchInput}
+            onChange={(event) => setSearchInput(event.target.value)}
+            placeholder="Search by project name, domain, or region..."
+            aria-label="Search projects by name, domain, or region"
+            className="border-slate-700 bg-slate-950/60 pl-9 text-sm"
+          />
+        </div>
+
+        <div className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
           <div className="space-y-1">
             <p className="text-[11px] text-slate-400">Project Domain</p>
             <Select
@@ -341,8 +366,9 @@ const ProjectsPage = () => {
           </div>
         </div>
 
-        {(filters.type || filters.client_id || filters.region_id || filters.area_id || filters.startDate || filters.endDate) && (
+        {(search || filters.type || filters.client_id || filters.region_id || filters.area_id || filters.startDate || filters.endDate) && (
           <div className="mt-4 flex flex-wrap gap-2 text-[11px] text-slate-300">
+            {search && <span className="rounded-full border border-slate-700 px-3 py-1">Search: {search}</span>}
             {filters.type && <span className="rounded-full border border-slate-700 px-3 py-1">Domain: {selectedDomainLabel}</span>}
             {filters.client_id && <span className="rounded-full border border-slate-700 px-3 py-1">Client: {selectedClientName}</span>}
             {filters.region_id && <span className="rounded-full border border-slate-700 px-3 py-1">Region: {selectedRegionName}</span>}

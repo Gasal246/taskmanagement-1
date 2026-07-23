@@ -6,12 +6,11 @@ import { NextRequest, NextResponse } from "next/server";
 import Users from "@/models/users.model";
 import Business_Project from "@/models/business_project.model";
 import Project_Teams from "@/models/project_team.model";
-import Team_Members from "@/models/team_members.model";
 import "@/models/business_skills.model";
 import AdminAssignBusiness from "@/models/admin_assign_business.model";
-import BusinessStaffs from "@/models/business_staffs.model";
 import { addUnreadCommentCounts } from "@/app/api/helpers/activity-comments";
 import { resolveSessionUserId } from "@/lib/utils";
+import { hasStaffTaskAccess } from "@/app/api/helpers/staff-task-access";
 connectDB();
 
 export async function GET(req:NextRequest, context: {params: Promise<{taskid:string}>}){
@@ -30,7 +29,7 @@ export async function GET(req:NextRequest, context: {params: Promise<{taskid:str
         if(task){
             const userId = resolveSessionUserId(session);
             const activeBusinessAccess = isAssignedActivityScope
-                ? await BusinessStaffs.exists({ user_id: userId, business_id: task.business_id, status: 1 })
+                ? await hasStaffTaskAccess(task, userId)
                 : await AdminAssignBusiness.exists({ user_id: userId, business_id: task.business_id, status: 1 });
             if (!activeBusinessAccess) {
                 return NextResponse.json({ message: "Forbidden" }, { status: 403 });
@@ -44,25 +43,6 @@ export async function GET(req:NextRequest, context: {params: Promise<{taskid:str
                     ],
                 }
                 : null;
-
-            if (isAssignedActivityScope) {
-                const isDirectAssignee = String(task.assigned_to || "") === String(userId);
-                const isCreator = String(task.creator || "") === String(userId);
-                const hasAssignedActivity = Boolean(await Task_Activities.exists(assignedActivityQuery));
-                let hasTeamAccess = false;
-
-                if (task.is_project_task && task.assigned_teams) {
-                    const [teamMembership, teamHead] = await Promise.all([
-                        Team_Members.exists({ user_id: userId, team_id: task.assigned_teams }),
-                        Project_Teams.exists({ _id: task.assigned_teams, team_head: userId }),
-                    ]);
-                    hasTeamAccess = Boolean(teamMembership || teamHead);
-                }
-
-                if (!isDirectAssignee && !isCreator && !hasTeamAccess && !hasAssignedActivity) {
-                    return NextResponse.json({ message: "Forbidden" }, { status: 403 });
-                }
-            }
 
             const taskObj = task.toObject();
             const activities = await Task_Activities.find(
