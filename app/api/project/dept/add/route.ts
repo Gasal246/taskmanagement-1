@@ -4,6 +4,7 @@ import Location_departments from "@/models/location_departments.model";
 import Project_Departments from "@/models/project_departments.model";
 import Region_departments from "@/models/region_departments.model";
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeProjectRequest } from "@/app/api/helpers/project-access";
 
 connectDB();
 
@@ -18,6 +19,8 @@ export async function POST(req: NextRequest){
     try{
 
         const body: Body = await req.json();
+        const authorization = await authorizeProjectRequest(body.project_id, "manage");
+        if (!authorization.ok) return authorization.response;
         const [regionDepartment, areaDepartment, locationDepartment] = await Promise.all([
             Region_departments.exists({_id: body.department_id, status: 1}),
             Area_departments.exists({_id: body.department_id, status: 1}),

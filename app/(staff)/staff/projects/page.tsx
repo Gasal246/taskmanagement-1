@@ -30,6 +30,8 @@ const statusTabs = [
   { value: 'completed', label: 'Complete' },
 ];
 
+const createdByYouTab = { value: 'created', label: 'Created By You' };
+
 const limit = 8;
 
 const StaffProjects = () => {
@@ -153,6 +155,7 @@ const StaffProjects = () => {
   const projects = projectsResponse?.data ?? [];
   const pagination = projectsResponse?.pagination ?? { page: 1, totalPages: 1, total: 0, limit };
   const totalPages = Math.max(1, pagination.totalPages || 1);
+  const visibleStatusTabs = canAdd ? [...statusTabs, createdByYouTab] : statusTabs;
 
   const pageItems = useMemo(() => {
     if (totalPages <= 1) return [];
@@ -275,8 +278,8 @@ const StaffProjects = () => {
         </div>
 
         <Tabs value={tab} onValueChange={setTab} className="mt-3">
-          <TabsList className="grid h-auto w-full grid-cols-2 gap-2 bg-slate-900/70 md:h-12 md:grid-cols-4">
-            {statusTabs.map((status) => (
+          <TabsList className={`grid h-auto w-full grid-cols-2 gap-2 bg-slate-900/70 md:h-12 ${canAdd ? 'md:grid-cols-5' : 'md:grid-cols-4'}`}>
+            {visibleStatusTabs.map((status) => (
               <TabsTrigger
                 key={status.value}
                 value={status.value}

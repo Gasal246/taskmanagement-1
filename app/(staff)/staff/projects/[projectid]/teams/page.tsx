@@ -13,7 +13,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useAddNewTeam, useGetAddedProjectDepartments, useGetProjectsbyIdForStaffs, useGetStaffsByDepartment, useGetTeamsForProjects, useRemoveProjectTeams, useUpdateTeam } from '@/query/business/queries';
 import LoaderSpin from '@/components/shared/LoaderSpin';
 import { Avatar } from 'antd';
-import { useSession } from 'next-auth/react';
 
 const ProjectTeams = () => {
   const router = useRouter();
@@ -22,7 +21,6 @@ const ProjectTeams = () => {
   const [addTeamDialog, setAddTeamDialog] = useState(false);
   const [editTeamDialog, setEditTeamDialog] = useState(false);
   const [currentEditingTeam, setCurrentEditingTeam] = useState<any | null>(null);
-  const { data: session }: any = useSession();
   const { data: project } = useGetProjectsbyIdForStaffs(params.projectid);
   const { data: project_depts } = useGetAddedProjectDepartments(params.projectid);
   const { data: teamsForProject, isPending: fetchingTeamsForProject, refetch: refetchTeamsForProject } = useGetTeamsForProjects(params.projectid);
@@ -40,21 +38,7 @@ const ProjectTeams = () => {
   const [searchQueryLead, setSearchQueryLead] = useState("");
   const [searchQueryMembers, setSearchQueryMembers] = useState("");
 
-  const currentUserId = session?.user?.id?.toString?.() ?? "";
-  const projectHeadIds = useMemo(() => {
-    const data = project?.data;
-    return Array.from(
-      new Set(
-        [
-          ...(Array.isArray(data?.project_heads) ? data.project_heads : []),
-          data?.project_head,
-        ]
-          .filter(Boolean)
-          .map((item: any) => item?._id?.toString?.() ?? item?.toString?.() ?? String(item))
-      )
-    );
-  }, [project?.data]);
-  const canManageTeams = currentUserId ? projectHeadIds.includes(currentUserId) : false;
+  const canManageTeams = Boolean(project?.data?.permissions?.canManage);
   const filteredProjectDepts = project_depts?.data || [];
 
   const teams = teamsForProject?.data ?? [];

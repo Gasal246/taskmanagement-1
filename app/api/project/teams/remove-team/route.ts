@@ -1,4 +1,3 @@
-import { auth } from "@/auth";
 import { notifyProjectAssignmentChange } from "@/app/api/helpers/project-assignment-notifications";
 import connectDB from "@/lib/mongo";
 import Business_Project from "@/models/business_project.model";
@@ -8,19 +7,22 @@ import Project_Teams from "@/models/project_team.model";
 import Project_Team_Members from "@/models/project_team_members.model";
 import Users from "@/models/users.model";
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeProjectRequest } from "@/app/api/helpers/project-access";
 
 connectDB();
 
 export async function DELETE(req:NextRequest){
     try{
 
-         const session: any = await auth();
-        if(!session) return NextResponse.json({message: "Un Authorized Access", status: 401}, { status: 401 });
-        
-        const username = await Users.findById(session?.user?.id).select("name");
-
         const {searchParams} = new URL(req.url);
         const team_id = searchParams.get("team_id");
+        const team = await Project_Teams.findById(team_id).select("project_id");
+        if (!team) {
+            return NextResponse.json({message:"Team not found", status:404}, {status:404});
+        }
+        const authorization = await authorizeProjectRequest(team.project_id.toString(), "manage");
+        if (!authorization.ok) return authorization.response;
+        const username = await Users.findById(authorization.userId).select("name");
 
         const isTaskAssigned = await Business_Tasks.find({is_project_task: true, assigned_teams: team_id});
 
@@ -40,7 +42,7 @@ export async function DELETE(req:NextRequest){
 
 
         const flow = new Flow_Log({
-            user_id: session?.user?.id,
+            user_id: authorization.userId,
             project_id: deleted?.project_id,
             Log: `Team (${deleted.team_name}) has been deleted by ${username?.name}`,
             description: "A Project team has been deleted"
@@ -52,7 +54,7 @@ export async function DELETE(req:NextRequest){
         if (deletedTeamHeadId) {
             await notifyProjectAssignmentChange({
                 recipientIds: [deletedTeamHeadId],
-                actorId: session?.user?.id,
+                actorId: authorization.userId,
                 projectId: deleted?.project_id?.toString?.() || "",
                 projectName: project?.project_name || "project",
                 role: "team-head",
@@ -72,7 +74,7 @@ export async function DELETE(req:NextRequest){
         if (removedMemberIds.length > 0) {
             await notifyProjectAssignmentChange({
                 recipientIds: removedMemberIds,
-                actorId: session?.user?.id,
+                actorId: authorization.userId,
                 projectId: deleted?.project_id?.toString?.() || "",
                 projectName: project?.project_name || "project",
                 role: "team-member",

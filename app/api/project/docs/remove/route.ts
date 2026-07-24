@@ -1,6 +1,7 @@
 import connectDB from "@/lib/mongo";
 import Project_Docs from "@/models/project_docs.model";
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeProjectRequest } from "@/app/api/helpers/project-access";
 
 connectDB();
 
@@ -15,6 +16,8 @@ export async function POST(req: NextRequest) {
     if (!doc) {
       return NextResponse.json({ error: "Document not found" }, { status: 404 });
     }
+    const authorization = await authorizeProjectRequest(doc.project_id.toString(), "manage");
+    if (!authorization.ok) return authorization.response;
 
     await Project_Docs.findByIdAndDelete(doc_id);
 

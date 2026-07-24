@@ -1,10 +1,10 @@
-import { auth } from "@/auth";
 import { notifyProjectAssignmentChange } from "@/app/api/helpers/project-assignment-notifications";
 import Business_Project from "@/models/business_project.model";
 import Flow_Log from "@/models/Flow_Log.model";
 import Users from "@/models/users.model";
 import mongoose from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeProjectRequest, isActiveStaffInProjectBusiness } from "@/app/api/helpers/project-access";
 
 type AssignmentConfig = {
     field: "account_managers" | "site_operational_heads";
@@ -23,12 +23,14 @@ const normalizeIds = (project: any, field: AssignmentConfig["field"]) =>
 
 export async function addProjectAssignment(req: NextRequest, config: AssignmentConfig) {
     try {
-        const session: any = await auth();
-        if (!session) return new NextResponse("Un Authorized Access", { status: 401 });
-
         const { project_id, user_id } = await req.json();
         if (!mongoose.Types.ObjectId.isValid(project_id) || !mongoose.Types.ObjectId.isValid(user_id)) {
             return NextResponse.json({ message: "Invalid project or user id" }, { status: 400 });
+        }
+        const authorization = await authorizeProjectRequest(project_id, "manage");
+        if (!authorization.ok) return authorization.response;
+        if (!(await isActiveStaffInProjectBusiness(authorization.access.project, user_id))) {
+            return NextResponse.json({ message: "Target must be an active staff member in this business" }, { status: 400 });
         }
 
         const project: any = await Business_Project.findById(project_id);
@@ -43,18 +45,18 @@ export async function addProjectAssignment(req: NextRequest, config: AssignmentC
         await project.save();
 
         const [actor, targetUser] = await Promise.all([
-            Users.findById(session?.user?.id).select("name"),
+            Users.findById(authorization.userId).select("name"),
             Users.findById(user_id).select("name"),
         ]);
         await new Flow_Log({
-            user_id: session?.user?.id,
+            user_id: authorization.userId,
             Log: `${config.singularLabel} Added by - ${actor?.name || "Unknown"}`,
             description: `${targetUser?.name || "User"} added as ${config.singularLabel.toLowerCase()}.`,
             project_id,
         }).save();
         await notifyProjectAssignmentChange({
             recipientIds: [String(user_id)],
-            actorId: session?.user?.id,
+            actorId: authorization.userId,
             projectId: String(project_id),
             projectName: project?.project_name || "project",
             role: config.notificationRole,
@@ -70,15 +72,14 @@ export async function addProjectAssignment(req: NextRequest, config: AssignmentC
 
 export async function removeProjectAssignment(req: NextRequest, config: AssignmentConfig) {
     try {
-        const session: any = await auth();
-        if (!session) return new NextResponse("Un Authorized Access", { status: 401 });
-
         const { searchParams } = new URL(req.url);
         const project_id = searchParams.get("project_id");
         const user_id = searchParams.get("user_id");
         if (!mongoose.Types.ObjectId.isValid(project_id || "") || !mongoose.Types.ObjectId.isValid(user_id || "")) {
             return NextResponse.json({ message: "Invalid project or user id" }, { status: 400 });
         }
+        const authorization = await authorizeProjectRequest(project_id!, "manage");
+        if (!authorization.ok) return authorization.response;
 
         const project: any = await Business_Project.findById(project_id);
         if (!project) return NextResponse.json({ message: "Project not found" }, { status: 404 });
@@ -87,18 +88,18 @@ export async function removeProjectAssignment(req: NextRequest, config: Assignme
         await project.save();
 
         const [actor, targetUser] = await Promise.all([
-            Users.findById(session?.user?.id).select("name"),
+            Users.findById(authorization.userId).select("name"),
             Users.findById(user_id).select("name"),
         ]);
         await new Flow_Log({
-            user_id: session?.user?.id,
+            user_id: authorization.userId,
             Log: `${config.singularLabel} Removed by - ${actor?.name || "Unknown"}`,
             description: `${targetUser?.name || "User"} removed from ${config.pluralLabel.toLowerCase()}.`,
             project_id,
         }).save();
         await notifyProjectAssignmentChange({
             recipientIds: [String(user_id)],
-            actorId: session?.user?.id,
+            actorId: authorization.userId,
             projectId: String(project_id),
             projectName: project?.project_name || "project",
             role: config.notificationRole,

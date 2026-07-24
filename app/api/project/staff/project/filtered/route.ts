@@ -266,6 +266,9 @@ export async function GET(req: NextRequest) {
                 case "completed":
                     query.status = "completed";
                     break;
+                case "created":
+                    query.creator = session?.user?.id;
+                    break;
             }
         }
 

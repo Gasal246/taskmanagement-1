@@ -1,4 +1,3 @@
-import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import Business_Project from "@/models/business_project.model";
 import Flow_Log from "@/models/Flow_Log.model";
@@ -7,6 +6,9 @@ import Project_Team_Members from "@/models/project_team_members.model";
 import Users from "@/models/users.model";
 import { NextRequest, NextResponse } from "next/server";
 import { notifyProjectAssignmentChange } from "@/app/api/helpers/project-assignment-notifications";
+import { authorizeProjectRequest } from "@/app/api/helpers/project-access";
+import { isActiveStaffInProjectBusiness } from "@/app/api/helpers/project-access";
+import ProjectDepartments from "@/models/project_departments.model";
 
 connectDB();
 
@@ -22,11 +24,24 @@ interface Body{
 export async function POST(req: NextRequest){
     try{
 
-         const session: any = await auth();
-        if(!session) return NextResponse.json({message: "Un Authorized Access", status: 401}, { status: 401 });
-
         const body:Body = await req.json();
-        const username = await Users.findById(session?.user?.id).select("name");
+        const authorization = await authorizeProjectRequest(body.project_id, "manage");
+        if (!authorization.ok) return authorization.response;
+        const linkedDepartment = await ProjectDepartments.exists({
+            _id: body.project_dept_id,
+            project_id: body.project_id,
+        });
+        if (!linkedDepartment) {
+            return NextResponse.json({message: "Team department is not linked to this project", status: 400}, {status: 400});
+        }
+        const targetIds = Array.from(new Set([body.team_lead_id, ...(body.team_member_ids || [])].filter(Boolean)));
+        const targetChecks = await Promise.all(
+            targetIds.map((targetId) => isActiveStaffInProjectBusiness(authorization.access.project, targetId))
+        );
+        if (targetChecks.some((eligible) => !eligible)) {
+            return NextResponse.json({message: "All team users must be active staff in this business", status: 400}, {status: 400});
+        }
+        const username = await Users.findById(authorization.userId).select("name");
         const project = await Business_Project.findById(body?.project_id).select("project_name");
 
         const project_team = new Project_Teams({
@@ -48,7 +63,7 @@ export async function POST(req: NextRequest){
         }
 
         const flows = new Flow_Log({
-            user_id: session?.user?.id,
+            user_id: authorization.userId,
             Log: `New Team (${body.team_name}) has been created by ${username.name}`,
             project_id: body.project_id,
             description: "New Team Created",
@@ -59,7 +74,7 @@ export async function POST(req: NextRequest){
         if (body.team_lead_id) {
             await notifyProjectAssignmentChange({
                 recipientIds: [body.team_lead_id],
-                actorId: session?.user?.id,
+                actorId: authorization.userId,
                 projectId: body.project_id,
                 projectName: project?.project_name || "project",
                 role: "team-head",
@@ -75,7 +90,7 @@ export async function POST(req: NextRequest){
         if (memberRecipientIds.length > 0) {
             await notifyProjectAssignmentChange({
                 recipientIds: memberRecipientIds,
-                actorId: session?.user?.id,
+                actorId: authorization.userId,
                 projectId: body.project_id,
                 projectName: project?.project_name || "project",
                 role: "team-member",

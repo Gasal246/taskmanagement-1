@@ -8,13 +8,14 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { toast } from 'sonner';
-import { useAddProjectDepartment, useGetAddedProjectDepartments, useGetBusinessDepartmentsByBusiness_id, useRemoveAddedProjectDepartment, useSelectActiveProjectDepartment } from '@/query/business/queries';
-import Cookies from "js-cookie";
+import { useAddProjectDepartment, useGetAddedProjectDepartments, useGetBusinessDepartmentsByBusiness_id, useGetProjectsbyIdForStaffs, useRemoveAddedProjectDepartment, useSelectActiveProjectDepartment } from '@/query/business/queries';
 
 const ProjectDepartments = () => {
   const router = useRouter();
   const params = useParams<{ projectid: string }>();
-  const [businessId, setBusinessId] = useState("");
+  const { data: project } = useGetProjectsbyIdForStaffs(params.projectid);
+  const businessId = project?.data?.business_id?.toString?.() ?? "";
+  const canManage = Boolean(project?.data?.permissions?.canManage);
   const [availableDepartments, setAvailableDepartments] = useState<any[]>([]);
   const [addDepartmentDialog, setAddDepartmentDialog] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -24,21 +25,6 @@ const ProjectDepartments = () => {
   const { mutateAsync: addProjectDept, isPending: addingProjectDept } = useAddProjectDepartment();
   const { mutateAsync: selectActiveDept } = useSelectActiveProjectDepartment();
   const { mutateAsync: removeProjDept, isPending: removingProjDept } = useRemoveAddedProjectDepartment();
-
-  useEffect(() => {
-    const domainCookies = Cookies.get("user_domain");
-    if (!domainCookies) {
-      setBusinessId("");
-      return;
-    }
-    try {
-      const domainJson = JSON.parse(domainCookies);
-      setBusinessId(domainJson?.business_id || "");
-    } catch (error) {
-      console.log("Invalid domain cookie", error);
-      setBusinessId("");
-    }
-  }, []);
 
   useEffect(() => {
     setAvailableDepartments([
@@ -127,15 +113,17 @@ const ProjectDepartments = () => {
           <div>
             <p className="text-[13px] font-semibold uppercase tracking-[0.35em] text-cyan-400/70">Project Departments</p>
           </div>
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            className='p-2.5 px-4 rounded-lg border border-slate-700 hover:border-cyan-500 bg-gradient-to-tr from-slate-900 to-slate-800 text-xs font-semibold flex gap-2 items-center'
-            onClick={() => setAddDepartmentDialog(true)}
-          >
-            <Plus size={14} />
-            Add Department
-          </motion.button>
+          {canManage && (
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className='p-2.5 px-4 rounded-lg border border-slate-700 hover:border-cyan-500 bg-gradient-to-tr from-slate-900 to-slate-800 text-xs font-semibold flex gap-2 items-center'
+              onClick={() => setAddDepartmentDialog(true)}
+            >
+              <Plus size={14} />
+              Add Department
+            </motion.button>
+          )}
         </div>
 
         <div className="mt-2 grid gap-3 md:grid-cols-3">
@@ -180,7 +168,7 @@ const ProjectDepartments = () => {
                     <p className="text-sm font-semibold text-slate-100">{dept.department_name}</p>
                     <p className="text-[11px] text-slate-400">Project department</p>
                   </div>
-                  <Popover>
+                  {canManage && <Popover>
                     <PopoverTrigger asChild>
                       <motion.button
                         whileHover={{ scale: 1.05 }}
@@ -204,11 +192,11 @@ const ProjectDepartments = () => {
                         </motion.button>
                       </div>
                     </PopoverContent>
-                  </Popover>
+                  </Popover>}
                 </div>
 
                 <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <motion.button
+                  {canManage && <motion.button
                     whileTap={{ scale: 0.98 }}
                     whileHover={{ scale: 1.02 }}
                     onClick={() => handleSelectDepartment(dept._id)}
@@ -219,7 +207,7 @@ const ProjectDepartments = () => {
                     }`}
                   >
                     {dept.is_active ? 'Active Department' : 'Mark Active'}
-                  </motion.button>
+                  </motion.button>}
                   {dept.is_active && (
                     <span className="flex items-center gap-1 text-[11px] text-emerald-200">
                       <CheckCircle size={12} />
@@ -238,7 +226,7 @@ const ProjectDepartments = () => {
       </div>
 
       <Dialog
-        open={addDepartmentDialog}
+        open={addDepartmentDialog && canManage}
         onOpenChange={(open) => {
           setAddDepartmentDialog(open);
           if (!open) {

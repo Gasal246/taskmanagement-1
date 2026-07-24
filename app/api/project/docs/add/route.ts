@@ -2,6 +2,9 @@ import connectDB from "@/lib/mongo";
 import Business_Project from "@/models/business_project.model";
 import Project_Docs from "@/models/project_docs.model";
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeProjectRequest } from "@/app/api/helpers/project-access";
+import ProjectTeams from "@/models/project_team.model";
+import ProjectTeamMembers from "@/models/project_team_members.model";
 
 connectDB();
 
@@ -11,11 +14,13 @@ export async function POST(req: NextRequest) {
     const formData: any = Object.fromEntries(formdata);
     const body = JSON.parse(formData?.body || "{}");
 
-    const { project_id, doc_name, doc_url, doc_type, storage_path, access_type = "public", access_to = [], created_by } = body;
+    const { project_id, doc_name, doc_url, doc_type, storage_path, access_type = "public", access_to = [] } = body;
 
     if (!project_id || !doc_name || !doc_url) {
       return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
     }
+    const authorization = await authorizeProjectRequest(project_id, "manage");
+    if (!authorization.ok) return authorization.response;
 
     const project = await Business_Project.findById(project_id);
     if (!project) {
@@ -33,8 +38,23 @@ export async function POST(req: NextRequest) {
 
     let accessList = Array.isArray(access_to) ? access_to : [];
     if (access_type === "private") {
-      if (created_by && !accessList.includes(created_by)) {
-        accessList.push(created_by);
+      const teams: any[] = await ProjectTeams.find({ project_id })
+        .select("_id team_head")
+        .lean();
+      const members: any[] = await ProjectTeamMembers.find({
+        project_team_id: { $in: teams.map((team: any) => team._id) },
+      })
+        .select("user_id")
+        .lean();
+      const allowedViewerIds = new Set([
+        ...teams.map((team: any) => team.team_head?.toString?.()).filter(Boolean),
+        ...members.map((member: any) => member.user_id?.toString?.()).filter(Boolean),
+      ]);
+      accessList = accessList
+        .map((value: any) => value?.toString?.() ?? String(value))
+        .filter((value: string) => allowedViewerIds.has(value));
+      if (!accessList.includes(authorization.userId)) {
+        accessList.push(authorization.userId);
       }
     } else {
       accessList = [];
@@ -48,7 +68,7 @@ export async function POST(req: NextRequest) {
       storage_path,
       access_type,
       access_to: accessList,
-      created_by: created_by || null,
+      created_by: authorization.userId,
       status: 1,
     });
     await newDoc.save();

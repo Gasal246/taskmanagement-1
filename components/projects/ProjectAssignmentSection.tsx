@@ -11,6 +11,7 @@ type AssignmentUser = {
 
 export default function ProjectAssignmentSection({
   title,
+  description,
   assignLabel,
   emptyLabel,
   users,
@@ -20,6 +21,7 @@ export default function ProjectAssignmentSection({
   onRemove,
 }: {
   title: string;
+  description?: string;
   assignLabel: string;
   emptyLabel: string;
   users: AssignmentUser[];
@@ -31,9 +33,14 @@ export default function ProjectAssignmentSection({
   return (
     <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg min-h-[20vh] mb-2 border border-slate-700/50">
       <div className="mb-2 flex items-center justify-between">
-        <h1 className="font-medium text-xs text-slate-300 flex items-center gap-1">
-          <Users size={14} /> {title}
-        </h1>
+        <div>
+          <h1 className="font-medium text-sm text-slate-200 flex items-center gap-2">
+            <Users size={15} className="text-cyan-300" /> {title}
+          </h1>
+          {description && (
+            <p className="mt-1 text-xs text-slate-400">{description}</p>
+          )}
+        </div>
         {canManage && (
           <motion.div
             whileHover={{ scale: 1.02 }}

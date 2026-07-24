@@ -1,9 +1,9 @@
-import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import Business_Project from "@/models/business_project.model";
 import { NextRequest, NextResponse } from "next/server";
 import Flow_Log from "@/models/Flow_Log.model";
 import Users from "@/models/users.model";
+import { authorizeProjectRequest } from "@/app/api/helpers/project-access";
 
 connectDB();
 
@@ -26,10 +26,9 @@ export async function PUT(req: NextRequest) {
         const body: Body = await req.json();
         if (!body.project_id) return NextResponse.json({ message: "Please Provide project_id" }, { status: 400 });
 
-        const session: any = await auth();
-        if (!session) return new NextResponse("Un Authorized Access", { status: 401 });
-
-        const user = await Users.findById(session?.user?.id).select("name");
+        const authorization = await authorizeProjectRequest(body.project_id, "manage");
+        if (!authorization.ok) return authorization.response;
+        const user = await Users.findById(authorization.userId).select("name");
 
         const updateData: Record<string, any> = {
             project_name: body.project_name,
@@ -59,7 +58,7 @@ export async function PUT(req: NextRequest) {
 
         if (body.status == "completed" && projectToUpdate.status != "completed") {
             const completedFlow = new Flow_Log({
-                user_id: session?.user?.id,
+                user_id: authorization.userId,
                 Log: `Project Marked as Completed by - ${user.name}`,
                 description: "Project Completed",
                 project_id: body.project_id
@@ -67,7 +66,7 @@ export async function PUT(req: NextRequest) {
             await completedFlow.save();
         } else {
             const updatedFlow = new Flow_Log({
-                user_id: session?.user?.id,
+                user_id: authorization.userId,
                 Log: `Project Edited by -${user.name}`,
                 description: "Project edited",
                 project_id: body.project_id

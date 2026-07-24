@@ -1,4 +1,3 @@
-import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import Business_Project from "@/models/business_project.model";
 import Business_Tasks from "@/models/business_tasks.model";
@@ -10,14 +9,12 @@ import Project_Teams from "@/models/project_team.model";
 import Users from "@/models/users.model";
 import { NextRequest, NextResponse } from "next/server";
 import mongoose from "mongoose";
+import { authorizeProjectRequest } from "@/app/api/helpers/project-access";
 
 connectDB();
 
 export async function DELETE(req: NextRequest) {
   try {
-    const session: any = await auth();
-    if (!session) return new NextResponse("Un Authorized Access", { status: 401 });
-
     const { searchParams } = new URL(req.url);
     const project_id = searchParams.get("project_id");
     if (!project_id) {
@@ -26,13 +23,15 @@ export async function DELETE(req: NextRequest) {
     if (!mongoose.Types.ObjectId.isValid(project_id)) {
       return NextResponse.json({ message: "Invalid project id", status: 400 }, { status: 400 });
     }
+    const authorization = await authorizeProjectRequest(project_id, "delete");
+    if (!authorization.ok) return authorization.response;
 
     const project = await Business_Project.findById(project_id);
     if (!project) {
       return NextResponse.json({ message: "Project not found", status: 404 }, { status: 404 });
     }
 
-    const user = await Users.findById(session?.user?.id).select("name");
+    const user = await Users.findById(authorization.userId).select("name");
 
     const teams = await Project_Teams.find({ project_id }).select("_id");
     const teamIds = teams.map((team) => team._id);
@@ -52,7 +51,7 @@ export async function DELETE(req: NextRequest) {
     await Business_Project.findByIdAndDelete(project_id);
 
     await Flow_Log.create({
-      user_id: session?.user?.id,
+      user_id: authorization.userId,
       Log: `Project Deleted by - ${user?.name || "Unknown"}`,
       description: "Project deleted",
     });
