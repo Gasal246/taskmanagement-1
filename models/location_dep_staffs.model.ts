@@ -10,7 +10,7 @@ export interface ILocation_dep_staffs extends Document {
 }
 
 const Location_dep_staffsSchema: Schema = new Schema({
-  user_id: { type: Schema.Types.ObjectId },
+  user_id: { type: Schema.Types.ObjectId, ref: "users" },
   location_dep_id: { type: Schema.Types.ObjectId, ref:"location_departments" },
   status: { type: Number },
 }, { timestamps: true });

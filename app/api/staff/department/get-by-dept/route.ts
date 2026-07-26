@@ -1,83 +1,181 @@
 import connectDB from "@/lib/mongo";
+import Area_dep_heads from "@/models/area_dep_heads.model";
 import Area_dep_staffs from "@/models/area_dep_staffs.model";
-import Area_departments from "@/models/area_departments.model";
+import Business_skills from "@/models/business_skills.model";
+import Location_dep_heads from "@/models/location_dep_heads.model";
 import Location_dep_staffs from "@/models/location_dep_staffs.model";
-import Location_departments from "@/models/location_departments.model";
+import Region_dep_heads from "@/models/region_dep_heads.model";
 import Region_dep_staffs from "@/models/region_dep_staffs.model";
-import Region_departments from "@/models/region_departments.model";
 import User_skills from "@/models/user_skills.model";
-import '@/models/business_skills.model';
-import '@/models/users.model';
+import Users from "@/models/users.model";
 import { NextRequest, NextResponse } from "next/server";
+import { PipelineStage, Types } from "mongoose";
 
-connectDB();
+type DepartmentRole = "head" | "staff";
+type UnionPipelineStage = Exclude<
+    PipelineStage,
+    PipelineStage.Merge | PipelineStage.Out
+>;
 
-export async function GET(req:NextRequest){
-    try{
+const assignmentPipeline = (
+    departmentField: string,
+    departmentId: Types.ObjectId,
+    departmentRole: DepartmentRole
+): UnionPipelineStage[] => [
+    { $match: { [departmentField]: departmentId } },
+    {
+        $addFields: {
+            department_id: `$${departmentField}`,
+            department_role: { $literal: departmentRole },
+            role_priority: departmentRole === "head" ? 0 : 1,
+        },
+    },
+];
+
+export async function GET(req: NextRequest) {
+    try {
         const { searchParams } = new URL(req.url);
-        const department_id = searchParams.get("department_id");
-        if(!department_id){
-            return NextResponse.json({message: "Department id is required", status: 400}, {status: 400} );
-        }
-        
-        const is_region = await Region_departments.findById(department_id).lean();
-        if(is_region){
-            const region_dept_staffs = await Region_dep_staffs.find({region_dep_id: department_id})
-                .populate({
-                    path: "user_id",
-                    select: "name status",
-                    match: { status: 1 }
-                })
-                .lean();
-            const activeStaffs = region_dept_staffs.filter((staff: any) => staff?.user_id);
-            for(const staff of activeStaffs){
-                const skills = await User_skills.find({user_id: staff.user_id._id}).populate("skill_id", "skill_name").lean();
-                staff.skills = skills;
-            }
+        const departmentId = searchParams.get("department_id");
 
-            return NextResponse.json({data: activeStaffs, status: 200}, {status:200});
+        if (!departmentId) {
+            return NextResponse.json(
+                { message: "Department id is required", status: 400 },
+                { status: 400 }
+            );
         }
 
-        const is_area = await Area_departments.findById(department_id).lean();
-        if(is_area){
-            const area_dept_staffs = await Area_dep_staffs.find({area_dep_id: department_id})
-                .populate({
-                    path: "user_id",
-                    select: "name status",
-                    match: { status: 1 }
-                })
-                .lean();
-            const activeStaffs = area_dept_staffs.filter((staff: any) => staff?.user_id);
-            for(const staff of activeStaffs){
-                const skills = await User_skills.find({user_id: staff.user_id._id}).populate("skill_id", "skill_name").lean();
-                staff.skills = skills;
-            }
-
-            return NextResponse.json({data: activeStaffs, status: 200}, {status:200});
+        if (!Types.ObjectId.isValid(departmentId)) {
+            return NextResponse.json(
+                { message: "Invalid department id", status: 400 },
+                { status: 400 }
+            );
         }
 
-        const is_location = await Location_departments.findById(department_id).lean();
-        if(is_location){
-            const location_dept_staffs = await Location_dep_staffs.find({location_dep_id: department_id})
-                .populate({
-                    path: "user_id",
-                    select: "name status",
-                    match: { status: 1 }
-                })
-                .lean();
-            const activeStaffs = location_dept_staffs.filter((staff: any) => staff?.user_id);
-            for(const staff of activeStaffs){
-                const skills = await User_skills.find({user_id: staff.user_id._id}).populate("skill_id", "skill_name").lean();
-                staff.skills = skills;
-            }
+        await connectDB();
 
-            return NextResponse.json({data: activeStaffs, status: 200}, {status:200});
-        }
+        const departmentObjectId = new Types.ObjectId(departmentId);
+        const departmentMembers = await Region_dep_staffs.aggregate([
+            ...assignmentPipeline("region_dep_id", departmentObjectId, "staff"),
+            {
+                $unionWith: {
+                    coll: Region_dep_heads.collection.name,
+                    pipeline: assignmentPipeline("reg_dep_id", departmentObjectId, "head"),
+                },
+            },
+            {
+                $unionWith: {
+                    coll: Area_dep_staffs.collection.name,
+                    pipeline: assignmentPipeline("area_dep_id", departmentObjectId, "staff"),
+                },
+            },
+            {
+                $unionWith: {
+                    coll: Area_dep_heads.collection.name,
+                    pipeline: assignmentPipeline("area_dep_id", departmentObjectId, "head"),
+                },
+            },
+            {
+                $unionWith: {
+                    coll: Location_dep_staffs.collection.name,
+                    pipeline: assignmentPipeline("location_dep_id", departmentObjectId, "staff"),
+                },
+            },
+            {
+                $unionWith: {
+                    coll: Location_dep_heads.collection.name,
+                    pipeline: assignmentPipeline("location_dep_id", departmentObjectId, "head"),
+                },
+            },
+            // Prefer the head assignment when a user is both a head and a staff member.
+            { $sort: { role_priority: 1 } },
+            {
+                $group: {
+                    _id: "$user_id",
+                    assignment: { $first: "$$ROOT" },
+                    department_roles: { $addToSet: "$department_role" },
+                },
+            },
+            {
+                $replaceWith: {
+                    $mergeObjects: [
+                        "$assignment",
+                        { department_roles: "$department_roles" },
+                    ],
+                },
+            },
+            {
+                $addFields: {
+                    is_department_head: { $in: ["head", "$department_roles"] },
+                },
+            },
+            {
+                $lookup: {
+                    from: Users.collection.name,
+                    let: { userId: "$user_id" },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $and: [
+                                        { $eq: ["$_id", "$$userId"] },
+                                        { $eq: ["$status", 1] },
+                                    ],
+                                },
+                            },
+                        },
+                        { $project: { name: 1, status: 1 } },
+                    ],
+                    as: "user_id",
+                },
+            },
+            { $unwind: "$user_id" },
+            {
+                $lookup: {
+                    from: User_skills.collection.name,
+                    let: { userId: "$user_id._id" },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: { $eq: ["$user_id", "$$userId"] },
+                            },
+                        },
+                        {
+                            $lookup: {
+                                from: Business_skills.collection.name,
+                                let: { skillId: "$skill_id" },
+                                pipeline: [
+                                    {
+                                        $match: {
+                                            $expr: { $eq: ["$_id", "$$skillId"] },
+                                        },
+                                    },
+                                    { $project: { skill_name: 1 } },
+                                ],
+                                as: "populated_skill",
+                            },
+                        },
+                        {
+                            $set: {
+                                skill_id: { $arrayElemAt: ["$populated_skill", 0] },
+                            },
+                        },
+                        { $project: { populated_skill: 0 } },
+                    ],
+                    as: "skills",
+                },
+            },
+            { $project: { role_priority: 0 } },
+        ]);
 
-        return NextResponse.json({data: [], status: 200}, {status:200});
-
-    }catch(err){
-        console.log("Error while getting dept by dept id: ", err);
-        return NextResponse.json({message: "Internal Server Error", status: 500}, {status: 500} );
+        return NextResponse.json(
+            { data: departmentMembers, status: 200 },
+            { status: 200 }
+        );
+    } catch (err) {
+        console.log("Error while getting department members: ", err);
+        return NextResponse.json(
+            { message: "Internal Server Error", status: 500 },
+            { status: 500 }
+        );
     }
 }

@@ -163,7 +163,7 @@ const ProjectTeams = () => {
   };
 
   const filteredStaffsForLead = departmentStaffs.filter(staff =>
-    staff?.user_id?.name.toLowerCase().includes(searchQueryLead.toLowerCase())
+    staff?.user_id?.name?.toLowerCase().includes(searchQueryLead.toLowerCase())
   );
 
   const filteredStaffsForMembers = departmentStaffs.filter(staff =>

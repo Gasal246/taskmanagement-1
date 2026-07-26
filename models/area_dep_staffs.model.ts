@@ -10,9 +10,9 @@ export interface IArea_dep_staffs extends Document {
 }
 
 const Area_dep_staffsSchema: Schema = new Schema({
-  user_id: { type: Schema.Types.ObjectId },
+  user_id: { type: Schema.Types.ObjectId, ref: "users" },
   status: { type: Number, enum: [0, 1], default: 1 },
-  area_dep_id: { type: Schema.Types.ObjectId },
+  area_dep_id: { type: Schema.Types.ObjectId, ref: "area_departments" },
 }, { timestamps: true });
 
 const Area_dep_staffs = mongoose.models?.area_dep_staffs || mongoose.model<IArea_dep_staffs>('area_dep_staffs', Area_dep_staffsSchema);
