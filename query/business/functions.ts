@@ -1,4 +1,11 @@
 import axios from 'axios';
+import type { StaffTaskQueryParams, StaffTasksResponse } from '@/types/staff-tasks';
+import type {
+    AdminTaskFilterOptionKind,
+    AdminTaskFilterOptionsResponse,
+    AdminTaskQueryParams,
+    AdminTasksResponse,
+} from '@/types/admin-tasks';
 
 export const addNewBusinessFunc = async (payload: any) => {
     try {
@@ -1152,22 +1159,52 @@ export async function GetUserDetails(role_id:string, org_id:string){
 }
 
 //Staff-Tasks
-export async function GetStaffTasksByFilter(queryParams: any) {
-    try{
-        const params = new URLSearchParams();
-        Object.entries(queryParams || {}).forEach(([key, value]) => {
-            if (value === undefined || value === null) return;
-            const stringValue = String(value);
-            if (!stringValue || stringValue === "undefined") return;
-            params.set(key, stringValue);
-        });
-        const queryString = params.toString();
-        const res = await axios.get(`/api/task/staff-task/get-filtered?${queryString}`);
-        return res.data;
-    }catch(err) {
-        console.log(err);
-        return { data: [], status: 500 };
-    }
+export async function GetStaffTasksByFilter(
+    queryParams: StaffTaskQueryParams,
+    signal?: AbortSignal
+): Promise<StaffTasksResponse> {
+    const params = new URLSearchParams();
+    Object.entries(queryParams).forEach(([key, value]) => {
+        if (value === undefined || value === null) return;
+        const stringValue = String(value);
+        if (!stringValue || stringValue === "undefined") return;
+        params.set(key, stringValue);
+    });
+    const queryString = params.toString();
+    const res = await axios.get<StaffTasksResponse>(
+        `/api/task/staff-task/get-filtered?${queryString}`,
+        { signal }
+    );
+    return res.data;
+}
+
+export async function GetAdminTaskOverview(
+    queryParams: AdminTaskQueryParams,
+    signal?: AbortSignal
+): Promise<AdminTasksResponse> {
+    const params = new URLSearchParams();
+    Object.entries(queryParams).forEach(([key, value]) => {
+        if (value === undefined || value === null || value === "") return;
+        params.set(key, String(value));
+    });
+    const res = await axios.get<AdminTasksResponse>(
+        `/api/task/admin-task/get-filtered?${params.toString()}`,
+        { signal }
+    );
+    return res.data;
+}
+
+export async function GetAdminTaskFilterOptions(
+    businessId: string,
+    kind: AdminTaskFilterOptionKind,
+    signal?: AbortSignal
+): Promise<AdminTaskFilterOptionsResponse> {
+    const params = new URLSearchParams({ business_id: businessId, kind });
+    const res = await axios.get<AdminTaskFilterOptionsResponse>(
+        `/api/task/admin-task/filter-options?${params.toString()}`,
+        { signal }
+    );
+    return res.data;
 }
 
 //Staff Projects

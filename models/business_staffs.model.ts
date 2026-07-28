@@ -15,6 +15,8 @@ const Business_staffsSchema: Schema = new Schema({
   status: { type: Number, default: 1, enum: [0, 1] }, // 0: blocked, 1: active
 }, { timestamps: true });
 
+Business_staffsSchema.index({ business_id: 1, status: 1, user_id: 1 });
+
 const Business_staffs = mongoose.models?.business_staffs || mongoose.model<IBusiness_staffs>('business_staffs', Business_staffsSchema);
 
 export default Business_staffs;

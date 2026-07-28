@@ -1,4 +1,6 @@
 import { IBusiness_Project } from "@/models/business_project.model";
+import type { StaffTaskQueryParams } from "@/types/staff-tasks";
+import type { AdminTaskFilterOptionKind, AdminTaskQueryParams } from "@/types/admin-tasks";
 import { 
     addAreaDepartmentFunc,
     addAreaDepartmentHeadFunc,
@@ -52,6 +54,8 @@ import {
     GetAllStaffsForStaff,
     GetHierarchyHeadsForReassignment,
     GetAllTasks,
+    GetAdminTaskFilterOptions,
+    GetAdminTaskOverview,
     getAreaCompleteDataFunc,
     getAreaDepartmentCompleteDataFunc,
     getAreaLocationsFunc,
@@ -986,11 +990,33 @@ export const useGetUserDetails = () => {
 
 
 //Get Staff-tasks by filter
-export const useGetAllStaffTasks = (queryParams: Record<string, string | undefined>) => {
+export const useGetAllStaffTasks = (queryParams: StaffTaskQueryParams) => {
     return useQuery({
         queryKey: ["tasks", queryParams],
-        queryFn: () => GetStaffTasksByFilter(queryParams),
-        enabled: !!queryParams
+        queryFn: ({ signal }) => GetStaffTasksByFilter(queryParams, signal),
+        staleTime: 30_000,
+    })
+}
+
+export const useGetAdminTaskOverview = (queryParams: AdminTaskQueryParams) => {
+    return useQuery({
+        queryKey: ["admin-task-overview", queryParams],
+        queryFn: ({ signal }) => GetAdminTaskOverview(queryParams, signal),
+        enabled: !!queryParams.business_id,
+        staleTime: 30_000,
+    })
+}
+
+export const useGetAdminTaskFilterOptions = (
+    businessId: string,
+    kind: AdminTaskFilterOptionKind,
+    enabled: boolean
+) => {
+    return useQuery({
+        queryKey: ["admin-task-filter-options", businessId, kind],
+        queryFn: ({ signal }) => GetAdminTaskFilterOptions(businessId, kind, signal),
+        enabled: enabled && !!businessId,
+        staleTime: 5 * 60_000,
     })
 }
 

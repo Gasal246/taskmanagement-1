@@ -1,18 +1,27 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarPlus, ListTodo, X } from "lucide-react";
+import { CalendarPlus, ListTodo, RefreshCw, X } from "lucide-react";
 import { DatePicker } from "antd";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSelector } from "react-redux";
 import { RootState } from "@/redux/store";
-import { useGetAllTasks } from "@/query/business/queries";
-import { useGetBusinessStaffsWithSkills } from "@/query/business/queries";
-import LoaderSpin from "@/components/shared/LoaderSpin";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  EMPTY_TASK_SUMMARY,
+  TaskGridSkeleton,
+  TaskOverviewCard,
+  TaskStatusSummaryBadges,
+} from "@/components/tasks/TaskOverview";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Pagination,
   PaginationContent,
@@ -22,189 +31,203 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import {
+  useGetAdminTaskFilterOptions,
+  useGetAdminTaskOverview,
+} from "@/query/business/queries";
+import type {
+  AdminTaskCard,
+  AdminTaskQueryParams,
+  AdminTaskTab,
+} from "@/types/admin-tasks";
+import type { StaffTaskStatusFilter } from "@/types/staff-tasks";
 
 const { RangePicker } = DatePicker;
 const PAGE_SIZE = 9;
 
-type TaskTab = "all" | "single" | "project" | "admin-created";
-
-type RangeState = {
-  start: string;
-  end: string;
-};
-
-const statusStyles: Record<string, string> = {
-  Completed: "border-emerald-500/40 bg-emerald-500/15 text-emerald-200",
-  "In Progress": "border-amber-500/40 bg-amber-500/15 text-amber-200",
-  "To Do": "border-rose-500/40 bg-rose-500/15 text-rose-200",
-  Cancelled: "border-slate-500/40 bg-slate-500/15 text-slate-200",
-};
-
-const getProgressValue = (completed: number, total: number) => {
-  if (!total || total <= 0) return 0;
-  const value = Math.round((completed / total) * 100);
-  return Math.min(100, Math.max(0, value));
-};
-
-const getProgressClass = (value: number) => {
-  if (value < 30) return "bg-red-500";
-  if (value < 50) return "bg-yellow-500";
-  if (value < 70) return "bg-blue-500";
-  return "bg-emerald-500";
-};
-
-const priorityStyles: Record<string, string> = {
-  high: "border-red-500/40 bg-red-500/10 text-red-200",
-  medium: "border-amber-500/40 bg-amber-500/10 text-amber-200",
-  normal: "border-sky-500/40 bg-sky-500/10 text-sky-200",
-};
-
-const getTaskSortTime = (task: any) => {
-  const dateValue = task?.updatedAt ?? task?.updated_at ?? task?.createdAt ?? task?.created_at;
-  const timestamp = dateValue ? new Date(dateValue).getTime() : 0;
-  return Number.isNaN(timestamp) ? 0 : timestamp;
-};
+type RangeState = { start: string; end: string };
 
 const TasksPage = () => {
   const router = useRouter();
   const { businessData } = useSelector((state: RootState) => state.user);
-  const [activeTab, setActiveTab] = useState<TaskTab>("all");
+  const businessId = businessData?._id || "";
+  const [activeTab, setActiveTab] = useState<AdminTaskTab>("all");
   const [rangeValue, setRangeValue] = useState<any>(null);
   const [draftRange, setDraftRange] = useState<RangeState>({ start: "", end: "" });
   const [appliedRange, setAppliedRange] = useState<RangeState>({ start: "", end: "" });
-  const [filters, setFilters] = useState<Record<string, string | undefined>>({});
   const [page, setPage] = useState(1);
   const [nameSearch, setNameSearch] = useState("");
   const [appliedNameSearch, setAppliedNameSearch] = useState("");
   const [showNameFilter, setShowNameFilter] = useState(false);
   const [showStaffFilter, setShowStaffFilter] = useState(false);
+  const [showAssignedByFilter, setShowAssignedByFilter] = useState(false);
+  const [showPeriodFilter, setShowPeriodFilter] = useState(false);
   const [staffSearch, setStaffSearch] = useState("");
   const [selectedStaffId, setSelectedStaffId] = useState("");
-  const [showAssignedByFilter, setShowAssignedByFilter] = useState(false);
   const [assignedBySearch, setAssignedBySearch] = useState("");
   const [selectedAssignedById, setSelectedAssignedById] = useState("");
-  const [headOptions, setHeadOptions] = useState<Array<{ id: string; label: string }>>([]);
-  const { data: staffResponse } = useGetBusinessStaffsWithSkills(businessData?._id || "");
-  const staffOptions = React.useMemo(() => (staffResponse?.data || []).map((staff: any) => {
-    const user = staff?.user_id || staff;
-    return { id: String(user?._id || ""), label: [user?.name, user?.email].filter(Boolean).join(" — ") };
-  }).filter((staff: any) => staff.id && staff.label), [staffResponse]);
+  const [selectedStatus, setSelectedStatus] = useState<StaffTaskStatusFilter>();
 
-  useEffect(() => {
-    if (!businessData?._id) return;
-    setFilters({
-      business_id: businessData._id,
+  const staffOptionQuery = useGetAdminTaskFilterOptions(
+    businessId,
+    "staff",
+    showStaffFilter
+  );
+  const headOptionQuery = useGetAdminTaskFilterOptions(
+    businessId,
+    "heads",
+    showAssignedByFilter
+  );
+  const staffOptions = useMemo(
+    () =>
+      (staffOptionQuery.data?.data || []).map((staff) => ({
+        id: staff.id,
+        label: [staff.name, staff.email].filter(Boolean).join(" — "),
+      })),
+    [staffOptionQuery.data]
+  );
+  const headOptions = useMemo(
+    () =>
+      (headOptionQuery.data?.data || []).map((head) => ({
+        id: head.id,
+        label: [head.name, head.email].filter(Boolean).join(" — "),
+      })),
+    [headOptionQuery.data]
+  );
+
+  const filters = useMemo<AdminTaskQueryParams>(
+    () => ({
+      business_id: businessId,
       type: activeTab,
       startDate: appliedRange.start || undefined,
       endDate: appliedRange.end || undefined,
       nameQuery: appliedNameSearch || undefined,
       staffId: selectedStaffId || undefined,
       assignedById: selectedAssignedById || undefined,
+      status: selectedStatus,
       page: String(page),
       limit: String(PAGE_SIZE),
-    });
-  }, [businessData?._id, activeTab, appliedRange, appliedNameSearch, selectedStaffId, selectedAssignedById, page]);
+    }),
+    [
+      activeTab,
+      appliedNameSearch,
+      appliedRange,
+      businessId,
+      page,
+      selectedAssignedById,
+      selectedStaffId,
+      selectedStatus,
+    ]
+  );
+
+  const {
+    data: tasks,
+    isLoading,
+    isFetching,
+    isError,
+    refetch,
+  } = useGetAdminTaskOverview(filters);
 
   useEffect(() => {
-    setPage(1);
-  }, [activeTab, appliedRange.start, appliedRange.end, appliedNameSearch, selectedStaffId, selectedAssignedById]);
-
-  useEffect(() => {
-    const timeout = window.setTimeout(() => setAppliedNameSearch(nameSearch.trim()), 350);
+    const timeout = window.setTimeout(() => {
+      setAppliedNameSearch(nameSearch.trim());
+      setPage(1);
+    }, 350);
     return () => window.clearTimeout(timeout);
   }, [nameSearch]);
 
   useEffect(() => {
-    if (!businessData?._id) return;
-    fetch(`/api/task/heads?business_id=${encodeURIComponent(businessData._id)}`)
-      .then((response) => response.json())
-      .then((response) => setHeadOptions((response?.data || []).map((head: any) => ({ id: String(head.id), label: [head.name, head.email].filter(Boolean).join(" — ") }))))
-      .catch(() => setHeadOptions([]));
-  }, [businessData?._id]);
-
-  const { data: tasks, isLoading } = useGetAllTasks(filters);
+    const now = new Date();
+    const nextUtcDay = Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate() + 1,
+      0,
+      0,
+      1
+    );
+    const timer = window.setTimeout(() => void refetch(), nextUtcDay - now.getTime());
+    return () => window.clearTimeout(timer);
+  }, [refetch, tasks?.statusAsOf]);
 
   const handleDateChange = (dates: any, dateStrings: [string, string]) => {
     setRangeValue(dates);
-    setDraftRange({
-      start: dateStrings?.[0] || "",
-      end: dateStrings?.[1] || "",
-    });
+    setDraftRange({ start: dateStrings?.[0] || "", end: dateStrings?.[1] || "" });
   };
 
-  const handleApplyFilters = () => {
-    setAppliedRange(draftRange);
-  };
-
-  const handleClearFilters = () => {
+  const clearPeriod = () => {
     setDraftRange({ start: "", end: "" });
     setAppliedRange({ start: "", end: "" });
     setRangeValue(null);
+    setPage(1);
   };
 
-  const selectedStaff = staffOptions.find((staff: any) => staff.id === selectedStaffId);
+  const selectedStaff = staffOptions.find((staff) => staff.id === selectedStaffId);
   const selectStaffFromLabel = (label: string) => {
     setStaffSearch(label);
-    const staff = staffOptions.find((option: any) => option.label === label);
+    const staff = staffOptions.find((option) => option.label === label);
     setSelectedStaffId(staff?.id || "");
+    setPage(1);
   };
+
   const selectedAssignedBy = headOptions.find((head) => head.id === selectedAssignedById);
   const selectAssignedByFromLabel = (label: string) => {
     setAssignedBySearch(label);
     const head = headOptions.find((option) => option.label === label);
     setSelectedAssignedById(head?.id || "");
+    setPage(1);
   };
 
   const taskList = tasks?.data ?? [];
-  const pagination = tasks?.pagination ?? { page: 1, totalPages: 1, total: 0, limit: PAGE_SIZE };
+  const summary = tasks?.summary ?? EMPTY_TASK_SUMMARY;
+  const pagination = tasks?.pagination ?? {
+    page: 1,
+    totalPages: 1,
+    total: 0,
+    limit: PAGE_SIZE,
+  };
   const totalPages = Math.max(1, pagination.totalPages || 1);
 
-  const pageItems = React.useMemo(() => {
+  useEffect(() => {
+    if (tasks && page > totalPages) setPage(totalPages);
+  }, [page, tasks, totalPages]);
+
+  const pageItems = useMemo(() => {
     if (totalPages <= 1) return [];
     if (totalPages <= 7) return Array.from({ length: totalPages }, (_, index) => index + 1);
-
     const items: Array<number | "ellipsis"> = [];
     const visiblePages = new Set([1, totalPages, page - 1, page, page + 1]);
-
     for (let current = 1; current <= totalPages; current += 1) {
-      if (current >= 1 && current <= totalPages && visiblePages.has(current)) {
-        items.push(current);
-      } else if (items[items.length - 1] !== "ellipsis") {
-        items.push("ellipsis");
-      }
+      if (visiblePages.has(current)) items.push(current);
+      else if (items[items.length - 1] !== "ellipsis") items.push("ellipsis");
     }
-
     return items;
   }, [page, totalPages]);
 
   return (
-    <div className="p-4 pb-20 space-y-3">
+    <div className="space-y-3 p-4 pb-20">
       <div className="rounded-xl border border-slate-800/70 bg-gradient-to-br from-slate-950/70 via-slate-900/50 to-slate-900/80 p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs uppercase tracking-widest text-slate-400">Business Tasks</p>
-            <h1 className="text-lg font-semibold text-slate-100 flex items-center gap-2">
+            <h1 className="flex items-center gap-2 text-lg font-semibold text-slate-100">
               <ListTodo size={18} /> Task Overview
             </h1>
-            <p className="text-xs text-slate-400 mt-1">
+            <p className="mt-1 text-xs text-slate-400">
               Track individual assignments and project workstreams across the business.
             </p>
           </div>
           <Button
-            className="flex items-center gap-2 bg-cyan-600/20 text-cyan-100 border border-cyan-700/50 hover:bg-cyan-500/20"
+            className="flex items-center gap-2 border border-cyan-700/50 bg-cyan-600/20 text-cyan-100 hover:bg-cyan-500/20"
             onClick={() => router.push("/admin/tasks/addtask")}
           >
             Add Task <CalendarPlus size={16} />
           </Button>
         </div>
         {appliedRange.start && appliedRange.end && (
-          <div className="mt-3 text-xs text-slate-400 flex flex-wrap items-center gap-2">
-            <span className="rounded-md border border-slate-700/60 bg-slate-900/60 px-2 py-1">
-              From {appliedRange.start}
-            </span>
-            <span className="rounded-md border border-slate-700/60 bg-slate-900/60 px-2 py-1">
-              To {appliedRange.end}
-            </span>
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-400">
+            <span className="rounded-md border border-slate-700/60 bg-slate-900/60 px-2 py-1">From {appliedRange.start}</span>
+            <span className="rounded-md border border-slate-700/60 bg-slate-900/60 px-2 py-1">To {appliedRange.end}</span>
           </div>
         )}
       </div>
@@ -213,252 +236,142 @@ const TasksPage = () => {
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-xs font-semibold text-slate-400">Task Filters</p>
-            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TaskTab)}>
-              <TabsList className="mt-2 bg-slate-900/70">
-                <TabsTrigger
-                  className="text-slate-400 data-[state=active]:bg-slate-200/10 data-[state=active]:text-slate-100"
-                  value="all"
-                >
-                  All Tasks
-                </TabsTrigger>
-                <TabsTrigger
-                  className="text-slate-400 data-[state=active]:bg-slate-200/10 data-[state=active]:text-slate-100"
-                  value="single"
-                >
-                  Individual Tasks
-                </TabsTrigger>
-                <TabsTrigger
-                  className="text-slate-400 data-[state=active]:bg-slate-200/10 data-[state=active]:text-slate-100"
-                  value="project"
-                >
-                  Project Tasks
-                </TabsTrigger>
-                <TabsTrigger
-                  className="text-slate-400 data-[state=active]:bg-slate-200/10 data-[state=active]:text-slate-100"
-                  value="admin-created"
-                >
-                  Admin Created
-                </TabsTrigger>
+            <Tabs
+              value={activeTab}
+              onValueChange={(value) => {
+                setActiveTab(value as AdminTaskTab);
+                setPage(1);
+              }}
+            >
+              <TabsList className="mt-2 grid h-auto w-full grid-cols-2 gap-1 bg-slate-900/70 sm:grid-cols-4">
+                <TabsTrigger className="text-slate-400 data-[state=active]:bg-slate-200/10 data-[state=active]:text-slate-100" value="all">All Tasks</TabsTrigger>
+                <TabsTrigger className="text-slate-400 data-[state=active]:bg-slate-200/10 data-[state=active]:text-slate-100" value="single">Individual Tasks</TabsTrigger>
+                <TabsTrigger className="text-slate-400 data-[state=active]:bg-slate-200/10 data-[state=active]:text-slate-100" value="project">Project Tasks</TabsTrigger>
+                <TabsTrigger className="text-slate-400 data-[state=active]:bg-slate-200/10 data-[state=active]:text-slate-100" value="admin-created">Admin Created</TabsTrigger>
               </TabsList>
             </Tabs>
           </div>
+
           <div className="flex flex-wrap items-end gap-2">
-            <Select onValueChange={(value) => {
-              if (value === "name") setShowNameFilter(true);
-              if (value === "staff") setShowStaffFilter(true);
-              if (value === "assigned-by") setShowAssignedByFilter(true);
-            }}>
-              <SelectTrigger className="w-[180px] border-slate-700 bg-slate-900 text-slate-200"><SelectValue placeholder="Add search filter" /></SelectTrigger>
+            <Select
+              value=""
+              onValueChange={(value) => {
+                if (value === "name") setShowNameFilter(true);
+                if (value === "staff") setShowStaffFilter(true);
+                if (value === "assigned-by") setShowAssignedByFilter(true);
+                if (value === "period") setShowPeriodFilter(true);
+              }}
+            >
+              <SelectTrigger className="w-[180px] border-slate-700 bg-slate-900 text-slate-200">
+                <SelectValue placeholder="Add search filter" />
+              </SelectTrigger>
               <SelectContent>
                 {!showNameFilter && <SelectItem value="name">By task or activity</SelectItem>}
                 {!showStaffFilter && <SelectItem value="staff">By staff</SelectItem>}
                 {!showAssignedByFilter && <SelectItem value="assigned-by">By assigned by</SelectItem>}
+                {!showPeriodFilter && <SelectItem value="period">Within period</SelectItem>}
               </SelectContent>
             </Select>
+
             {showNameFilter && (
               <div className="relative min-w-[230px]">
                 <Input value={nameSearch} onChange={(event) => setNameSearch(event.target.value)} placeholder="Task or activity name" className="border-slate-700 bg-slate-900 pr-9 text-slate-100" />
-                <button aria-label="Remove task or activity filter" onClick={() => { setShowNameFilter(false); setNameSearch(""); }} className="absolute right-2 top-2 text-slate-400 hover:text-slate-100"><X size={16} /></button>
+                <button type="button" aria-label="Remove task or activity filter" onClick={() => { setShowNameFilter(false); setNameSearch(""); setAppliedNameSearch(""); setPage(1); }} className="absolute right-2 top-2 text-slate-400 hover:text-slate-100"><X size={16} /></button>
               </div>
             )}
+
             {showStaffFilter && (
               <div className="relative min-w-[250px]">
-                <Input list="admin-task-staff-options" value={staffSearch} onChange={(event) => selectStaffFromLabel(event.target.value)} placeholder="Search staff" className="border-slate-700 bg-slate-900 pr-9 text-slate-100" />
-                <datalist id="admin-task-staff-options">{staffOptions.map((staff: any) => <option key={staff.id} value={staff.label} />)}</datalist>
-                <button aria-label="Remove staff filter" onClick={() => { setShowStaffFilter(false); setStaffSearch(""); setSelectedStaffId(""); }} className="absolute right-2 top-2 text-slate-400 hover:text-slate-100"><X size={16} /></button>
+                <Input list="admin-task-staff-options" value={staffSearch} onChange={(event) => selectStaffFromLabel(event.target.value)} placeholder={staffOptionQuery.isLoading ? "Loading staff..." : staffOptionQuery.isError ? "Staff unavailable" : "Search staff"} disabled={staffOptionQuery.isError} className="border-slate-700 bg-slate-900 pr-9 text-slate-100" />
+                <datalist id="admin-task-staff-options">{staffOptions.map((staff) => <option key={staff.id} value={staff.label} />)}</datalist>
+                <button type="button" aria-label="Remove staff filter" onClick={() => { setShowStaffFilter(false); setStaffSearch(""); setSelectedStaffId(""); setPage(1); }} className="absolute right-2 top-2 text-slate-400 hover:text-slate-100"><X size={16} /></button>
               </div>
             )}
+
             {showAssignedByFilter && (
               <div className="relative min-w-[250px]">
-                <Input list="admin-task-head-options" value={assignedBySearch} onChange={(event) => selectAssignedByFromLabel(event.target.value)} placeholder="Search assigned by head" className="border-slate-700 bg-slate-900 pr-9 text-slate-100" />
+                <Input list="admin-task-head-options" value={assignedBySearch} onChange={(event) => selectAssignedByFromLabel(event.target.value)} placeholder={headOptionQuery.isLoading ? "Loading heads..." : headOptionQuery.isError ? "Heads unavailable" : "Search assigned by head"} disabled={headOptionQuery.isError} className="border-slate-700 bg-slate-900 pr-9 text-slate-100" />
                 <datalist id="admin-task-head-options">{headOptions.map((head) => <option key={head.id} value={head.label} />)}</datalist>
-                <button aria-label="Remove assigned-by filter" onClick={() => { setShowAssignedByFilter(false); setAssignedBySearch(""); setSelectedAssignedById(""); }} className="absolute right-2 top-2 text-slate-400 hover:text-slate-100"><X size={16} /></button>
+                <button type="button" aria-label="Remove assigned-by filter" onClick={() => { setShowAssignedByFilter(false); setAssignedBySearch(""); setSelectedAssignedById(""); setPage(1); }} className="absolute right-2 top-2 text-slate-400 hover:text-slate-100"><X size={16} /></button>
               </div>
             )}
-            <div className="min-w-[240px]">
-              <p className="text-[11px] text-slate-400 mb-1">Within Period</p>
-              <RangePicker
-                onChange={handleDateChange}
-                value={rangeValue}
-                className="w-full text-slate-100"
-                style={{ backgroundColor: "#111827", border: "1px solid #1f2937" }}
-              />
-            </div>
-            <Button
-              size="sm"
-              className="h-9 bg-slate-100/10 text-slate-100 border border-slate-700/80 hover:bg-slate-100/20"
-              onClick={handleApplyFilters}
-            >
-              Apply
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-9 text-slate-400 hover:text-slate-200"
-              onClick={handleClearFilters}
-            >
-              Clear
-            </Button>
+
+            {showPeriodFilter && (
+              <div className="flex flex-wrap items-end gap-2 rounded-lg border border-slate-800/80 bg-slate-950/30 p-2">
+                <div className="min-w-[240px]">
+                  <div className="mb-1 flex items-center justify-between">
+                    <p className="text-[11px] text-slate-400">Within Period</p>
+                    <button type="button" aria-label="Remove period filter" onClick={() => { setShowPeriodFilter(false); clearPeriod(); }} className="text-slate-400 hover:text-slate-100"><X size={14} /></button>
+                  </div>
+                  <RangePicker onChange={handleDateChange} value={rangeValue} className="w-full text-slate-100" style={{ backgroundColor: "#111827", border: "1px solid #1f2937" }} />
+                </div>
+                <Button size="sm" disabled={!draftRange.start || !draftRange.end} className="h-9 border border-slate-700/80 bg-slate-100/10 text-slate-100 hover:bg-slate-100/20" onClick={() => { setAppliedRange(draftRange); setPage(1); }}>Apply</Button>
+                <Button variant="ghost" size="sm" className="h-9 text-slate-400 hover:text-slate-200" onClick={clearPeriod}>Clear</Button>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      <div className="rounded-xl border border-slate-800/70 bg-slate-900/40 p-4">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
+      <section className="rounded-xl border border-slate-800/70 bg-slate-900/40 p-4" aria-busy={isFetching}>
+        <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-200">
             <ListTodo size={16} /> Tasks
+            {isFetching && !isLoading && <RefreshCw size={13} className="animate-spin text-cyan-300" aria-label="Updating tasks" />}
           </h2>
-          <p className="text-xs text-slate-400">{pagination.total || 0} tasks</p>
+          <TaskStatusSummaryBadges summary={summary} selectedStatus={selectedStatus} isLoading={isLoading} onChange={(status) => { setSelectedStatus(status); setPage(1); }} />
         </div>
 
-        {isLoading && (
-          <div className="flex items-center justify-center w-full h-[15vh]">
-            <LoaderSpin size={20} title="Loading Tasks..." />
+        {isLoading && <TaskGridSkeleton />}
+
+        {isError && !isLoading && (
+          <div className="rounded-xl border border-rose-900/60 bg-rose-950/20 px-4 py-8 text-center">
+            <p className="text-sm font-medium text-rose-100">Tasks could not be loaded.</p>
+            <p className="mt-1 text-xs text-slate-400">Check your connection and try again.</p>
+            <Button size="sm" variant="outline" className="mt-4 border-rose-800/70 bg-rose-950/30 text-rose-100 hover:bg-rose-900/40" onClick={() => void refetch()}><RefreshCw size={14} className="mr-2" /> Retry</Button>
           </div>
         )}
 
-        {!isLoading && taskList.length === 0 && (
-          <p className="text-xs text-slate-500 italic">No tasks found.</p>
+        {!isLoading && !isError && taskList.length === 0 && (
+          <div className="rounded-xl border border-dashed border-slate-800 px-4 py-10 text-center">
+            <p className="text-sm text-slate-400">No tasks found.</p>
+            <p className="mt-1 text-xs text-slate-600">Try changing or clearing a filter.</p>
+          </div>
         )}
 
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {taskList.map((task: any) => {
-            const progress = getProgressValue(
-              Number(task.completed_activity || 0),
-              Number(task.activity_count || 0)
-            );
-            const priority = typeof task?.priority === "string" ? task.priority.toLowerCase() : "";
-            return (
-              <div
+        {!isLoading && !isError && taskList.length > 0 && (
+          <div className={`grid gap-3 transition-opacity md:grid-cols-2 xl:grid-cols-3 ${isFetching ? "opacity-70" : "opacity-100"}`}>
+            {taskList.map((task: AdminTaskCard) => (
+              <TaskOverviewCard
                 key={task._id}
-                className="cursor-pointer rounded-xl border border-slate-800/70 bg-gradient-to-br from-slate-950/70 to-slate-900/60 p-4 transition hover:border-cyan-700/40"
-                onClick={() => router.push(`/admin/tasks/${task._id}`)}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h3 className="text-base font-semibold text-slate-100">
-                      {task.task_name}
-                    </h3>
-                    <p className="text-xs text-slate-400 mt-1">
-                      {task.task_description || "No description added."}
-                    </p>
-                  </div>
-                  <div className="flex flex-col items-end gap-2">
-                    <span
-                      className={`text-[10px] uppercase tracking-wide px-2 py-1 rounded-md border ${
-                        statusStyles[task.status] ||
-                        "border-slate-600/40 bg-slate-700/30 text-slate-200"
-                      }`}
-                    >
-                      {task.status || "Unknown"}
-                    </span>
-                    {task.is_project_task && (
-                      <span className="text-[10px] uppercase tracking-wide px-2 py-1 rounded-md border border-indigo-500/40 bg-indigo-500/10 text-indigo-200">
-                        Project Based
-                      </span>
-                    )}
-                    {priority && (
-                      <span
-                        className={`text-[10px] uppercase tracking-wide px-2 py-1 rounded-md border ${
-                          priorityStyles[priority] ||
-                          "border-slate-600/40 bg-slate-700/30 text-slate-200"
-                        }`}
-                      >
-                        {priority} Priority
-                      </span>
-                    )}
-                  </div>
-                </div>
+                task={task}
+                href={`/admin/tasks/${task._id}`}
+                matchLabels={{
+                  name: appliedNameSearch,
+                  staff: selectedStaff?.label || staffSearch,
+                  assignedBy: selectedAssignedBy?.label || assignedBySearch,
+                }}
+              />
+            ))}
+          </div>
+        )}
 
-                <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-400">
-                  <span className="rounded-md bg-slate-900/60 border border-slate-800/60 px-2 py-1">
-                    Activities: {task.activity_count || 0}
-                  </span>
-                  <span className="rounded-md bg-slate-900/60 border border-slate-800/60 px-2 py-1">
-                    Completed: {task.completed_activity || 0}
-                  </span>
-                </div>
-
-                <div className="mt-3 space-y-1 text-xs text-slate-400">
-                  <p>Assigned by: <span className="text-slate-200">{task.assignment?.assignedBy?.name || "Unknown"}</span></p>
-                  <p>
-                    Assigned to: <span className="text-slate-200">{task.assignment?.assignedTo?.[0]?.name || "Unassigned"}</span>
-                    {(task.assignment?.assignedTo?.length || 0) > 1 && <span className="ml-1 text-cyan-300">+{task.assignment.assignedTo.length - 1} more</span>}
-                  </p>
-                </div>
-
-                {(task?.match?.nameMatched || task?.match?.staffTaskAssigned || task?.match?.staffActivityAssigned || task?.match?.assignedByMatched) && (
-                  <div className="mt-3 flex flex-wrap gap-1.5 text-[10px] text-cyan-100">
-                    {task.match.nameMatched && <span className="rounded border border-cyan-700/50 bg-cyan-950/40 px-2 py-1">Match: &quot;{appliedNameSearch}&quot; in task or activity name</span>}
-                    {task.match.staffTaskAssigned && <span className="rounded border border-cyan-700/50 bg-cyan-950/40 px-2 py-1">Match: &quot;{selectedStaff?.label || staffSearch}&quot; in task assignee</span>}
-                    {task.match.staffActivityAssigned && <span className="rounded border border-cyan-700/50 bg-cyan-950/40 px-2 py-1">Match: &quot;{selectedStaff?.label || staffSearch}&quot; in one activity assignee</span>}
-                    {task.match.assignedByMatched && <span className="rounded border border-cyan-700/50 bg-cyan-950/40 px-2 py-1">Match: &quot;{selectedAssignedBy?.label || assignedBySearch}&quot; in assigned by</span>}
-                  </div>
-                )}
-
-                <div className="mt-3 flex items-center gap-3">
-                  <div className="h-2 flex-1 rounded-full bg-slate-800/80">
-                    <div
-                      className={`h-2 rounded-full ${getProgressClass(progress)}`}
-                      style={{ width: `${progress}%` }}
-                    />
-                  </div>
-                  <span className="text-xs font-semibold text-slate-200 w-12 text-right">
-                    {progress}%
-                  </span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {totalPages > 1 && (
+        {!isLoading && !isError && totalPages > 1 && (
           <div className="mt-4 flex justify-end">
             <Pagination>
               <PaginationContent>
-                <PaginationItem>
-                  <PaginationPrevious
-                    href="#"
-                    onClick={(event) => {
-                      event.preventDefault();
-                      setPage((current) => Math.max(1, current - 1));
-                    }}
-                    className={page <= 1 ? "pointer-events-none opacity-50" : ""}
-                  />
-                </PaginationItem>
+                <PaginationItem><PaginationPrevious href="#" onClick={(event) => { event.preventDefault(); setPage((current) => Math.max(1, current - 1)); }} className={page <= 1 ? "pointer-events-none opacity-50" : ""} /></PaginationItem>
                 {pageItems.map((item, index) => (
                   <PaginationItem key={`${item}-${index}`}>
-                    {item === "ellipsis" ? (
-                      <PaginationEllipsis />
-                    ) : (
-                      <PaginationLink
-                        href="#"
-                        isActive={item === page}
-                        onClick={(event) => {
-                          event.preventDefault();
-                          setPage(item);
-                        }}
-                      >
-                        {item}
-                      </PaginationLink>
-                    )}
+                    {item === "ellipsis" ? <PaginationEllipsis /> : <PaginationLink href="#" isActive={item === page} onClick={(event) => { event.preventDefault(); setPage(item); }}>{item}</PaginationLink>}
                   </PaginationItem>
                 ))}
-                <PaginationItem>
-                  <PaginationNext
-                    href="#"
-                    onClick={(event) => {
-                      event.preventDefault();
-                      setPage((current) => Math.min(totalPages, current + 1));
-                    }}
-                    className={page >= totalPages ? "pointer-events-none opacity-50" : ""}
-                  />
-                </PaginationItem>
+                <PaginationItem><PaginationNext href="#" onClick={(event) => { event.preventDefault(); setPage((current) => Math.min(totalPages, current + 1)); }} className={page >= totalPages ? "pointer-events-none opacity-50" : ""} /></PaginationItem>
               </PaginationContent>
             </Pagination>
           </div>
         )}
-      </div>
+      </section>
     </div>
   );
 };

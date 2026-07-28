@@ -41,6 +41,10 @@ Business_TasksSchema.index({ business_id: 1, assigned_to: 1, updatedAt: -1 });
 Business_TasksSchema.index({ business_id: 1, assigned_teams: 1, updatedAt: -1 });
 Business_TasksSchema.index({ business_id: 1, creator: 1, updatedAt: -1 });
 Business_TasksSchema.index({ business_id: 1, start_date: 1, updatedAt: -1 });
+Business_TasksSchema.index({ assigned_to: 1, updatedAt: -1 });
+Business_TasksSchema.index({ assigned_teams: 1, updatedAt: -1 });
+Business_TasksSchema.index({ creator: 1, updatedAt: -1 });
+Business_TasksSchema.index({ is_project_task: 1, updatedAt: -1 });
 
 const Business_Tasks = mongoose.models?.business_tasks || mongoose.model<IBusiness_Tasks>('business_tasks', Business_TasksSchema);
 

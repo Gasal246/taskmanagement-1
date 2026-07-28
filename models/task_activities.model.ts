@@ -44,5 +44,9 @@ const Task_ActivitiesSchema: Schema = new Schema({
     completed_in: {type: Number, default: null},
 }, {timestamps:true})
 
+Task_ActivitiesSchema.index({ assigned_to: 1, task_id: 1 });
+Task_ActivitiesSchema.index({ forwarded_to: 1, task_id: 1 });
+Task_ActivitiesSchema.index({ task_id: 1, createdAt: 1 });
+
 const Task_Activities = mongoose.models?.task_activities || mongoose.model<ITask_Activities>("task_activities", Task_ActivitiesSchema);
 export default Task_Activities;
