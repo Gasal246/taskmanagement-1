@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -14,6 +14,7 @@ import {
   CheckCircle,
   CheckCircle2,
   Edit,
+  History,
   ListTodo,
   Navigation,
   PencilRuler,
@@ -31,6 +32,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import {
   Form,
   FormControl,
@@ -55,7 +63,7 @@ import {
   useUpdateTaskActivity,
 } from "@/query/business/queries";
 import { toast } from "sonner";
-import { formatDateTiny } from "@/lib/utils";
+import { formatDateTimeShort, formatDateTiny } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useSelector } from "react-redux";
 import { RootState } from "@/redux/store";
@@ -84,6 +92,12 @@ const getProgressClass = (value: number) => {
   if (value < 50) return "bg-yellow-500";
   if (value < 70) return "bg-blue-500";
   return "bg-emerald-500";
+};
+
+const resizeActivityTitle = (element: HTMLTextAreaElement | null) => {
+  if (!element) return;
+  element.style.height = "auto";
+  element.style.height = `${Math.min(element.scrollHeight, 160)}px`;
 };
 
 const priorityStyles: Record<string, string> = {
@@ -136,6 +150,8 @@ const TaskDetailPage = () => {
   const [selectedActivityId, setSelectedActivityId] = useState<string | null>(null);
   const [editingActivity, setEditingActivity] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [activitySearch, setActivitySearch] = useState("");
+  const [activityFilter, setActivityFilter] = useState<"pending" | "completed" | null>(null);
   const [filteredUsers, setFilteredUsers] = useState<any[]>([]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<any>(null);
@@ -144,6 +160,8 @@ const TaskDetailPage = () => {
   const [selectSkillDialogOpen, setSelectSkillDialogOpen] = useState(false);
   const [selectStaffDialogOpen, setSelectStaffDialogOpen] = useState(false);
   const [activeActivity, setActiveActivity] = useState<any>(null);
+  const [historySheetOpen, setHistorySheetOpen] = useState(false);
+  const [historyActivity, setHistoryActivity] = useState<any>(null);
   const [skills, setSkills] = useState<any[]>([]);
   const [skillSearch, setSkillSearch] = useState("");
   const [staffOptions, setStaffOptions] = useState<any[]>([]);
@@ -160,6 +178,52 @@ const TaskDetailPage = () => {
     Number(taskData?.completed_activity || 0),
     Number(taskData?.activity_count || 0)
   );
+
+  const historyEntries = useMemo(() => {
+    if (!historyActivity?._id) return [];
+
+    const entries = Array.isArray(historyActivity?.reassignment_history)
+      ? historyActivity.reassignment_history
+      : [];
+    const timelineEntries: any[] = entries
+      .filter((entry: any) => entry?.action === "reassigned")
+      .map((entry: any) => ({
+        ...entry,
+        event_type: "reassigned",
+        event_user: entry?.recipient_id,
+        event_order: 2,
+      }));
+
+    if (historyActivity?.assigned_to?._id) {
+      timelineEntries.push({
+        _id: `assigned-${historyActivity._id}`,
+        event_type: "assigned",
+        event_user: historyActivity.assigned_to,
+        event_order: 1,
+        createdAt: historyActivity.createdAt,
+      });
+    }
+
+    const createdBy = historyActivity?.created_by?._id
+      ? historyActivity.created_by
+      : taskData?.creator_details;
+    if (createdBy?._id) {
+      timelineEntries.push({
+        _id: `created-${historyActivity._id}`,
+        event_type: "created",
+        event_user: createdBy,
+        event_order: 0,
+        createdAt: historyActivity.createdAt,
+      });
+    }
+
+    return timelineEntries.sort((first: any, second: any) => {
+      const timeDifference =
+        new Date(second?.createdAt || 0).getTime() -
+        new Date(first?.createdAt || 0).getTime();
+      return timeDifference || Number(second?.event_order || 0) - Number(first?.event_order || 0);
+    });
+  }, [historyActivity, taskData?.creator_details]);
 
   // Activity form
   const activityForm = useForm<z.infer<typeof activitySchema>>({
@@ -296,6 +360,16 @@ const TaskDetailPage = () => {
     setStaffSearch("");
     setSkills([]);
     setStaffOptions([]);
+  };
+
+  const handleOpenHistory = (activity: any) => {
+    setHistoryActivity(activity);
+    setHistorySheetOpen(true);
+  };
+
+  const handleCloseHistory = () => {
+    setHistorySheetOpen(false);
+    setHistoryActivity(null);
   };
 
   const handleSelectSkill = (skill: any) => {
@@ -493,6 +567,121 @@ const TaskDetailPage = () => {
     return `${name} ${email}`.toLowerCase().includes(staffSearchTerm);
   });
   const priority = typeof taskData?.priority === "string" ? taskData.priority.toLowerCase() : "";
+  const activities = Array.isArray(taskData.activities) ? taskData.activities : [];
+  const normalizedActivitySearch = activitySearch.trim().toLowerCase();
+  const searchedActivities = activities
+    .filter((activity: any) => {
+      if (!normalizedActivitySearch) return true;
+      return [
+        activity?.activity,
+        activity?.description,
+        activity?.assigned_skill?.skill_name,
+        activity?.assigned_to?.name,
+      ].some((value) => String(value || "").toLowerCase().includes(normalizedActivitySearch));
+    })
+    .sort((a: any, b: any) => {
+      const aUpdatedAt = new Date(a?.updatedAt || a?.createdAt || 0).getTime();
+      const bUpdatedAt = new Date(b?.updatedAt || b?.createdAt || 0).getTime();
+      return bUpdatedAt - aUpdatedAt;
+    });
+  const pendingCount = activities.filter((activity: any) => !activity?.is_done).length;
+  const completedCount = activities.filter((activity: any) => activity?.is_done).length;
+  const pendingActivities = searchedActivities.filter((activity: any) => !activity?.is_done);
+  const completedActivities = searchedActivities.filter((activity: any) => activity?.is_done);
+
+  const renderActivityCard = (activity: any) => (
+    <div key={activity._id} className="w-full py-1">
+      <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg border border-slate-700 hover:border-cyan-800">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-base font-semibold text-slate-100">{activity.activity}</p>
+            <p className="text-xs text-slate-400">
+              {activity.description || "No description."}
+            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
+              <span className="rounded-md border border-slate-700/70 bg-slate-900/60 px-2 py-1">
+                Skill: {activity?.assigned_skill?.skill_name || "Not set"}
+              </span>
+              <span className="rounded-md border border-slate-700/70 bg-slate-900/60 px-2 py-1">
+                Staff: {activity?.assigned_to?.name || "Unassigned"}
+              </span>
+            </div>
+            {activity?.is_done && activity?.completed_in && (
+              <p className="text-xs text-slate-400 mt-2">
+                Completed In:{" "}
+                <span className="font-semibold">{formatDuration(activity.completed_in)}</span>
+              </p>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <ActivityCommentsSheet
+              activity={activity}
+              taskId={params.taskid}
+              initiallyOpen={
+                searchParams.get("comments") === "open" &&
+                searchParams.get("activityId") === String(activity._id)
+              }
+            />
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className="p-2 px-3 rounded-lg border border-slate-700 hover:border-slate-500 bg-gradient-to-tr from-slate-900 to-slate-800 cursor-pointer text-xs font-medium flex gap-1 items-center"
+              onClick={() => handleOpenHistory(activity)}
+            >
+              <History size={12} />
+              History
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className="p-2 px-4 rounded-lg border border-slate-700 hover:border-slate-500 bg-gradient-to-tr from-slate-900 to-slate-800 cursor-pointer text-xs font-medium flex gap-1 items-center"
+              onClick={() => handleOpenAssignDialog(activity)}
+            >
+              <UserPlus size={12} />
+              {activity?.assigned_to ? "Change Assignment" : "Assign"}
+            </motion.button>
+            {activity?.is_done ? (
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="p-2 px-4 rounded-lg border border-slate-700 hover:border-slate-500 bg-gradient-to-tr from-slate-900 to-slate-800 cursor-pointer text-xs font-medium flex gap-1 items-center"
+                onClick={() => handleOpenStatusConfirm(activity, false)}
+              >
+                <CheckCircle2 size={12} />
+                Mark as Not Completed
+              </motion.button>
+            ) : (
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="p-2 px-4 rounded-lg border border-slate-700 hover:border-slate-500 bg-gradient-to-tr from-slate-900 to-slate-800 cursor-pointer text-xs font-medium flex gap-1 items-center"
+                onClick={() => handleOpenStatusConfirm(activity, true)}
+              >
+                <CheckCircle size={12} />
+                Mark as Completed
+              </motion.button>
+            )}
+            <motion.div
+              whileHover={{ scale: 1.04 }}
+              whileTap={{ scale: 0.95 }}
+              className="p-1 rounded-full hover:bg-slate-800 cursor-pointer flex items-center"
+              onClick={() => handleEditActivity(activity)}
+            >
+              <PencilRuler size={14} />
+            </motion.div>
+            <motion.div
+              whileHover={{ scale: 1.04 }}
+              whileTap={{ scale: 0.95 }}
+              className="p-1 rounded-full hover:bg-slate-800 cursor-pointer flex items-center"
+              onClick={() => handleDeleteActivity(activity._id)}
+            >
+              <Trash2 size={14} className="text-red-500" />
+            </motion.div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="p-5 overflow-y-scroll pb-20 min-h-screen space-y-4">
@@ -645,92 +834,83 @@ const TaskDetailPage = () => {
           </motion.div>
         </div>
 
-        <div className="flex flex-wrap">
-          {taskData.activities?.length > 0 ? (
-            taskData.activities.map((activity: any) => (
-              <div key={activity._id} className="w-full p-1">
-                <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg border border-slate-700 hover:border-cyan-800">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm text-slate-200">{activity.activity}</p>
-                      <p className="text-xs text-slate-400">
-                        {activity.description || "No description."}
-                      </p>
-                      <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
-                        <span className="rounded-md border border-slate-700/70 bg-slate-900/60 px-2 py-1">
-                          Skill: {activity?.assigned_skill?.skill_name || "Not set"}
-                        </span>
-                        <span className="rounded-md border border-slate-700/70 bg-slate-900/60 px-2 py-1">
-                          Staff: {activity?.assigned_to?.name || "Unassigned"}
-                        </span>
-                      </div>
-                      {activity?.is_done && activity?.completed_in && (
-                        <p className="text-xs text-slate-400 mt-2">
-                          Completed In: <span className="font-semibold">{formatDuration(activity.completed_in)}</span>
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <ActivityCommentsSheet
-                        activity={activity}
-                        taskId={params.taskid}
-                        initiallyOpen={searchParams.get("comments") === "open" && searchParams.get("activityId") === String(activity._id)}
-                      />
-                      <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        className="p-2 px-4 rounded-lg border border-slate-700 hover:border-slate-500 bg-gradient-to-tr from-slate-900 to-slate-800 cursor-pointer text-xs font-medium flex gap-1 items-center"
-                        onClick={() => handleOpenAssignDialog(activity)}
-                      >
-                        <UserPlus size={12} />
-                        {activity?.assigned_to ? "Change Assignment" : "Assign"}
-                      </motion.button>
-                      {activity?.is_done ? (
-                        <motion.button
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                          className="p-2 px-4 rounded-lg border border-slate-700 hover:border-slate-500 bg-gradient-to-tr from-slate-900 to-slate-800 cursor-pointer text-xs font-medium flex gap-1 items-center"
-                          onClick={() => handleOpenStatusConfirm(activity, false)}
-                        >
-                          <CheckCircle2 size={12} />
-                          Mark as Not Completed
-                        </motion.button>
-                      ) : (
-                        <motion.button
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                          className="p-2 px-4 rounded-lg border border-slate-700 hover:border-slate-500 bg-gradient-to-tr from-slate-900 to-slate-800 cursor-pointer text-xs font-medium flex gap-1 items-center"
-                          onClick={() => handleOpenStatusConfirm(activity, true)}
-                        >
-                          <CheckCircle size={12} />
-                          Mark as Completed
-                        </motion.button>
-                      )}
-                      <motion.div
-                        whileHover={{ scale: 1.04 }}
-                        whileTap={{ scale: 0.95 }}
-                        className="p-1 rounded-full hover:bg-slate-800 cursor-pointer flex items-center"
-                        onClick={() => handleEditActivity(activity)}
-                      >
-                        <PencilRuler size={14} />
-                      </motion.div>
-                      <motion.div
-                        whileHover={{ scale: 1.04 }}
-                        whileTap={{ scale: 0.95 }}
-                        className="p-1 rounded-full hover:bg-slate-800 cursor-pointer flex items-center"
-                        onClick={() => handleDeleteActivity(activity._id)}
-                      >
-                        <Trash2 size={14} className="text-red-500" />
-                      </motion.div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))
-          ) : (
-            <p className="text-xs text-slate-400">No activities</p>
-          )}
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="relative w-full sm:max-w-xs">
+            <Search
+              size={14}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"
+            />
+            <Input
+              value={activitySearch}
+              onChange={(event) => setActivitySearch(event.target.value)}
+              placeholder="Search activities..."
+              aria-label="Search activities"
+              className="h-9 border-slate-700 bg-slate-950/60 pl-9 text-xs"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              aria-pressed={activityFilter === "pending"}
+              onClick={() =>
+                setActivityFilter((current) => (current === "pending" ? null : "pending"))
+              }
+              className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                activityFilter === "pending"
+                  ? "border-amber-500/60 bg-amber-500/15 text-amber-200"
+                  : "border-slate-700 bg-slate-900/60 text-slate-300 hover:border-amber-500/50"
+              }`}
+            >
+              Pending <span className="ml-1 font-semibold">{pendingCount}</span>
+            </button>
+            <button
+              type="button"
+              aria-pressed={activityFilter === "completed"}
+              onClick={() =>
+                setActivityFilter((current) => (current === "completed" ? null : "completed"))
+              }
+              className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                activityFilter === "completed"
+                  ? "border-emerald-500/60 bg-emerald-500/15 text-emerald-200"
+                  : "border-slate-700 bg-slate-900/60 text-slate-300 hover:border-emerald-500/50"
+              }`}
+            >
+              Completed <span className="ml-1 font-semibold">{completedCount}</span>
+            </button>
+          </div>
         </div>
+
+        {activities.length > 0 ? (
+          <div className="space-y-5">
+            {activityFilter !== "completed" && (
+              <section>
+                <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-300">
+                  Pending
+                </h3>
+                {pendingActivities.length > 0 ? (
+                  pendingActivities.map(renderActivityCard)
+                ) : (
+                  <p className="py-2 text-xs text-slate-500">No pending activities found.</p>
+                )}
+              </section>
+            )}
+
+            {activityFilter !== "pending" && (
+              <section>
+                <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-emerald-300">
+                  Completed
+                </h3>
+                {completedActivities.length > 0 ? (
+                  completedActivities.map(renderActivityCard)
+                ) : (
+                  <p className="py-2 text-xs text-slate-500">No completed activities found.</p>
+                )}
+              </section>
+            )}
+          </div>
+        ) : (
+          <p className="text-xs text-slate-400">No activities</p>
+        )}
       </div>
 
       {/* Assign Activity Dialog */}
@@ -892,49 +1072,206 @@ const TaskDetailPage = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Add Activity Dialog */}
-      <Dialog open={addActivityDialog} onOpenChange={setAddActivityDialog}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Add Activity</DialogTitle>
-            <DialogDescription>Add a new activity to the task.</DialogDescription>
-          </DialogHeader>
+      {/* Reassignment History Sheet */}
+      <Sheet
+        open={historySheetOpen}
+        onOpenChange={(open) => (open ? setHistorySheetOpen(true) : handleCloseHistory())}
+      >
+        <SheetContent className="flex w-full flex-col overflow-hidden border-slate-800 bg-slate-950 p-0 [&>button:first-child]:z-20 [&>button:first-child]:bg-slate-800/80 [&>button:first-child]:text-slate-300 sm:max-w-[620px]">
+          <SheetHeader className="shrink-0 border-b border-slate-800 bg-gradient-to-br from-slate-950 via-slate-950 to-cyan-950/30 px-6 py-5 pr-16 text-left">
+            <div className="flex items-center gap-3">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-cyan-500/30 bg-cyan-500/10 text-cyan-300">
+                <History className="size-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <SheetTitle className="m-0 text-base text-slate-100">
+                    Reassignment History
+                  </SheetTitle>
+                  <span className="rounded-full border border-slate-700 bg-slate-900/80 px-2 py-0.5 text-[10px] font-medium text-slate-400">
+                    {historyEntries.length} {historyEntries.length === 1 ? "entry" : "entries"}
+                  </span>
+                </div>
+                <SheetDescription className="mt-1 truncate text-xs text-slate-400">
+                  {historyActivity?.activity || "Activity"}
+                </SheetDescription>
+              </div>
+            </div>
+          </SheetHeader>
+
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6">
+            {historyEntries.length === 0 ? (
+              <div className="flex min-h-52 flex-col items-center justify-center rounded-xl border border-dashed border-slate-800 bg-slate-900/30 px-6 text-center">
+                <History className="mb-3 size-8 text-slate-700" />
+                <p className="text-sm font-medium text-slate-300">No reassignment history</p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Staff reassignments will appear here.
+                </p>
+              </div>
+            ) : (
+              <div className="relative">
+                <span
+                  className="absolute bottom-8 left-[11px] top-7 border-l-2 border-dashed border-cyan-700/50 sm:left-[13px]"
+                  aria-hidden="true"
+                />
+                {historyEntries.map((entry: any, index: number) => {
+                  const user = entry?.event_user;
+                  const eventType = entry?.event_type || "reassigned";
+                  const eventLabel =
+                    eventType === "created"
+                      ? "Created by"
+                      : eventType === "assigned"
+                        ? "Assigned to"
+                        : "Reassigned to";
+                  const markerClass =
+                    eventType === "created"
+                      ? "bg-amber-400"
+                      : eventType === "assigned"
+                        ? "bg-cyan-500"
+                        : "bg-emerald-400";
+                  const date = entry?.createdAt ? new Date(entry.createdAt) : null;
+                  const formattedDate =
+                    date && !Number.isNaN(date.getTime())
+                      ? date.toLocaleDateString("en-GB", {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                        })
+                      : "Date unavailable";
+
+                  return (
+                    <section
+                      key={entry?._id || `${entry?.createdAt}-${user?._id}-${index}`}
+                      className="relative pb-10 pl-9 last:pb-0 sm:pl-11"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="h-px min-w-4 flex-1 border-t border-dashed border-cyan-700/60" />
+                        <p className="shrink-0 text-[11px] font-medium text-cyan-300 sm:text-xs">
+                          {eventLabel} <span className="text-slate-400">{formattedDate}</span>
+                        </p>
+                        <span className="h-px min-w-4 flex-1 border-t border-dashed border-cyan-700/60" />
+                      </div>
+
+                      <span
+                        className={`absolute left-[4px] top-[66px] size-4 rounded-full border-2 border-slate-950 shadow-[0_0_0_3px_rgba(15,23,42,1)] sm:left-[6px] ${markerClass}`}
+                        aria-hidden="true"
+                      />
+
+                      <div className="mt-5 flex items-center gap-3 rounded-xl border border-cyan-800/60 bg-gradient-to-br from-cyan-950/60 via-slate-900/80 to-slate-950 p-3.5 shadow-sm shadow-black/20 transition-colors hover:border-cyan-700 sm:p-4">
+                        <Avatar src={user?.avatar_url || "/avatar.png"} size={44} />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium text-slate-100">
+                            {user?.name || "Unknown staff"}
+                          </p>
+                          <p className="truncate text-xs text-slate-400">
+                            {user?.email || "Email unavailable"}
+                          </p>
+                        </div>
+                        <time
+                          className="hidden shrink-0 rounded-md border border-slate-700/70 bg-slate-950/60 px-2 py-1 text-[10px] text-slate-500 sm:block"
+                          title={formatDateTimeShort(String(entry?.createdAt || ""))}
+                        >
+                          {date && !Number.isNaN(date.getTime())
+                            ? date.toLocaleTimeString("en-US", {
+                                hour: "numeric",
+                                minute: "2-digit",
+                              })
+                            : ""}
+                        </time>
+                      </div>
+                    </section>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Add Activity Sheet */}
+      <Sheet open={addActivityDialog} onOpenChange={setAddActivityDialog}>
+        <SheetContent className="flex w-full flex-col overflow-hidden border-slate-800 bg-slate-950 p-0 [&>button:first-child]:z-20 [&>button:first-child]:bg-slate-800/80 [&>button:first-child]:text-slate-300 sm:max-w-[520px]">
+          <SheetHeader className="shrink-0 border-b border-slate-800 bg-gradient-to-br from-slate-950 via-slate-950 to-cyan-950/30 px-6 py-5 pr-16 text-left">
+            <div className="flex items-center gap-3">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-cyan-500/30 bg-cyan-500/10 text-cyan-300">
+                <PlusCircle className="size-5" />
+              </div>
+              <div>
+                <SheetTitle className="m-0 text-base text-slate-100">Add Activity</SheetTitle>
+                <SheetDescription className="mt-1 text-xs text-slate-400">
+                  Add a new activity to this task.
+                </SheetDescription>
+              </div>
+            </div>
+          </SheetHeader>
           <Form {...activityForm}>
-            <form onSubmit={activityForm.handleSubmit(onActivitySubmit)} className="space-y-3">
-              <FormField
-                control={activityForm.control}
-                name="activity_name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs text-slate-300 font-semibold">
-                      Activity Name
-                    </FormLabel>
-                    <FormControl className="border-slate-600 focus:border-slate-400">
-                      <Input placeholder="Activity name" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={activityForm.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs text-slate-300 font-semibold">Description</FormLabel>
-                    <FormControl className="border-slate-600 focus:border-slate-400">
-                      <Input placeholder="Activity description" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <div className="w-full flex items-center justify-end">
+            <form
+              onSubmit={activityForm.handleSubmit(onActivitySubmit)}
+              className="flex min-h-0 flex-1 flex-col"
+            >
+              <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-hidden px-6 py-6">
+                <FormField
+                  control={activityForm.control}
+                  name="activity_name"
+                  render={({ field }) => (
+                    <FormItem className="shrink-0">
+                      <FormLabel className="sr-only">Activity title</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          rows={1}
+                          placeholder="Untitled"
+                          {...field}
+                          ref={(element) => {
+                            field.ref(element);
+                            resizeActivityTitle(element);
+                          }}
+                          className="max-h-40 min-h-10 resize-none overflow-x-hidden rounded-none border-0 bg-transparent px-0 py-1 text-2xl font-bold leading-tight text-slate-100 shadow-none placeholder:font-bold placeholder:text-slate-500 focus-visible:ring-0"
+                          onChange={(event) => {
+                            field.onChange(event);
+                            resizeActivityTitle(event.currentTarget);
+                          }}
+                          onFocus={(event) => event.currentTarget.select()}
+                          onClick={(event) => event.currentTarget.select()}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={activityForm.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem className="flex min-h-0 flex-1 flex-col">
+                      <FormLabel className="text-xs font-semibold text-slate-300">
+                        Description
+                      </FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Write the activity description..."
+                          className="min-h-0 flex-1 resize-none border-slate-700 bg-slate-900/40 p-4 leading-relaxed text-slate-200 focus-visible:border-cyan-600 focus-visible:ring-cyan-700/40"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <div className="flex shrink-0 items-center justify-end gap-2 border-t border-slate-800 bg-slate-950/95 px-6 py-4">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setAddActivityDialog(false)}
+                  disabled={isAddingActivity}
+                >
+                  Cancel
+                </Button>
                 <motion.button
                   type="submit"
                   whileTap={{ scale: 0.98 }}
                   whileHover={{ scale: 1.02 }}
-                  className="bg-gradient-to-tr from-cyan-950/60 to-cyan-900/60 p-2 px-4 rounded-lg border border-cyan-700 hover:border-cyan-400 text-sm font-semibold"
+                  className="rounded-lg border border-cyan-700 bg-gradient-to-tr from-cyan-950/60 to-cyan-900/60 px-4 py-2 text-sm font-semibold text-cyan-100 hover:border-cyan-400"
                   disabled={isAddingActivity}
                 >
                   {isAddingActivity ? "Adding..." : "Add Activity"}
@@ -942,52 +1279,93 @@ const TaskDetailPage = () => {
               </div>
             </form>
           </Form>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
 
-      {/* Edit Activity Dialog */}
-      <Dialog open={editActivityDialog} onOpenChange={setEditActivityDialog}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Edit Activity</DialogTitle>
-            <DialogDescription>Edit the activity details.</DialogDescription>
-          </DialogHeader>
+      {/* Edit Activity Sheet */}
+      <Sheet open={editActivityDialog} onOpenChange={setEditActivityDialog}>
+        <SheetContent className="flex w-full flex-col overflow-hidden border-slate-800 bg-slate-950 p-0 [&>button:first-child]:z-20 [&>button:first-child]:bg-slate-800/80 [&>button:first-child]:text-slate-300 sm:max-w-[520px]">
+          <SheetHeader className="shrink-0 border-b border-slate-800 bg-gradient-to-br from-slate-950 via-slate-950 to-cyan-950/30 px-6 py-5 pr-16 text-left">
+            <div className="flex items-center gap-3">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-cyan-500/30 bg-cyan-500/10 text-cyan-300">
+                <PencilRuler className="size-5" />
+              </div>
+              <div>
+                <SheetTitle className="m-0 text-base text-slate-100">Edit Activity</SheetTitle>
+                <SheetDescription className="mt-1 text-xs text-slate-400">
+                  Update the activity details.
+                </SheetDescription>
+              </div>
+            </div>
+          </SheetHeader>
           <Form {...activityForm}>
-            <form onSubmit={activityForm.handleSubmit(onActivitySubmit)} className="space-y-3">
-              <FormField
-                control={activityForm.control}
-                name="activity_name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs text-slate-300 font-semibold">
-                      Activity Name
-                    </FormLabel>
-                    <FormControl className="border-slate-600 focus:border-slate-400">
-                      <Input placeholder="Activity name" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={activityForm.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs text-slate-300 font-semibold">Description</FormLabel>
-                    <FormControl className="border-slate-600 focus:border-slate-400">
-                      <Input placeholder="Activity description" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <div className="w-full flex items-center justify-end">
+            <form
+              onSubmit={activityForm.handleSubmit(onActivitySubmit)}
+              className="flex min-h-0 flex-1 flex-col"
+            >
+              <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-hidden px-6 py-6">
+                <FormField
+                  control={activityForm.control}
+                  name="activity_name"
+                  render={({ field }) => (
+                    <FormItem className="shrink-0">
+                      <FormLabel className="sr-only">Activity title</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          rows={1}
+                          placeholder="Untitled"
+                          {...field}
+                          ref={(element) => {
+                            field.ref(element);
+                            resizeActivityTitle(element);
+                          }}
+                          className="max-h-40 min-h-10 resize-none overflow-x-hidden rounded-none border-0 bg-transparent px-0 py-1 text-2xl font-bold leading-tight text-slate-100 shadow-none placeholder:font-bold placeholder:text-slate-500 focus-visible:ring-0"
+                          onChange={(event) => {
+                            field.onChange(event);
+                            resizeActivityTitle(event.currentTarget);
+                          }}
+                          onFocus={(event) => event.currentTarget.select()}
+                          onClick={(event) => event.currentTarget.select()}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={activityForm.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem className="flex min-h-0 flex-1 flex-col">
+                      <FormLabel className="text-xs font-semibold text-slate-300">
+                        Description
+                      </FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Write the activity description..."
+                          className="min-h-0 flex-1 resize-none border-slate-700 bg-slate-900/40 p-4 leading-relaxed text-slate-200 focus-visible:border-cyan-600 focus-visible:ring-cyan-700/40"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <div className="flex shrink-0 items-center justify-end gap-2 border-t border-slate-800 bg-slate-950/95 px-6 py-4">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setEditActivityDialog(false)}
+                  disabled={isUpdatingActivity}
+                >
+                  Cancel
+                </Button>
                 <motion.button
                   type="submit"
                   whileTap={{ scale: 0.98 }}
                   whileHover={{ scale: 1.02 }}
-                  className="bg-gradient-to-tr from-cyan-950/60 to-cyan-900/60 p-2 px-4 rounded-lg border border-cyan-700 hover:border-cyan-400 text-sm font-semibold"
+                  className="rounded-lg border border-cyan-700 bg-gradient-to-tr from-cyan-950/60 to-cyan-900/60 px-4 py-2 text-sm font-semibold text-cyan-100 hover:border-cyan-400"
                   disabled={isUpdatingActivity}
                 >
                   {isUpdatingActivity ? "Updating..." : "Update Activity"}
@@ -995,8 +1373,8 @@ const TaskDetailPage = () => {
               </div>
             </form>
           </Form>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
 
       {/* Edit Task Dialog */}
       <Dialog open={editTaskDialog} onOpenChange={setEditTaskDialog}>

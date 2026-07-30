@@ -1178,6 +1178,27 @@ export async function GetStaffTasksByFilter(
     return res.data;
 }
 
+export type HierarchyItemType =
+    | 'region'
+    | 'area'
+    | 'location'
+    | 'region_department'
+    | 'area_department'
+    | 'location_department';
+
+export async function updateHierarchyItemFunc(payload: {
+    id: string;
+    name: string;
+    entity_type: HierarchyItemType;
+}) {
+    try {
+        const res = await axios.post('/api/business/hierarchy/edit', payload);
+        return res.data;
+    } catch (error: any) {
+        return error?.response?.data || { error: 'Failed to update item.' };
+    }
+}
+
 export async function GetAdminTaskOverview(
     queryParams: AdminTaskQueryParams,
     signal?: AbortSignal

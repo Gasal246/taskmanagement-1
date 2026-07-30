@@ -11,7 +11,10 @@ export async function GET ( req: NextRequest ) {
         if (!business_id) {
             return NextResponse.json({ error: "Business ID is required" }, { status: 400 });
         }
-        const clients = await Business_clients.find({ business_id, status: 1 });
+        const clients = await Business_clients.find(
+            { business_id, status: 1 },
+            { _id: 1, client_name: 1 }
+        ).sort({ client_name: 1 }).lean();
         return NextResponse.json({ data: clients, status: 200 });
     } catch (error) {
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });

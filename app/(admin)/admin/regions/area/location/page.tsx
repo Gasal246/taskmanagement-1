@@ -13,14 +13,15 @@ import { EllipsisVertical } from 'lucide-react';
 import { Eye } from 'lucide-react';
 import { Trash2 } from 'lucide-react';
 import LoaderSpin from '@/components/shared/LoaderSpin';
-import { useAddLocationDepartment, useAddLocationStaff, useAddLoctionHead, useGetLocationCompleteData, useRemoveLocationHead, useRemoveLocationStaff } from '@/query/business/queries';
+import { useAddLocationDepartment, useAddLocationStaff, useAddLoctionHead, useGetLocationCompleteData, useRemoveBusinessLocation, useRemoveLocationHead, useRemoveLocationStaff } from '@/query/business/queries';
 import { useGetBusinessStaffs } from '@/query/user/queries';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectTrigger, SelectValue, SelectItem } from '@/components/ui/select';
 import { DEPARTMENT_TYPES } from '@/lib/constants';
-import { loadAdminBusinessStaff, loadDepartmentData } from '@/redux/slices/application';
+import { loadAdminBusinessStaff, loadDepartmentData, loadLocationData } from '@/redux/slices/application';
+import HierarchyItemActions from '@/components/admin/HierarchyItemActions';
 
 const LocationPage = () => {
   const router = useRouter();
@@ -34,6 +35,7 @@ const LocationPage = () => {
   const { mutateAsync: removeLocationHead } = useRemoveLocationHead();
   const { mutateAsync: addLocationStaff, isPending: addingStaff } = useAddLocationStaff();
   const { mutateAsync: removeLocationStaff } = useRemoveLocationStaff();
+  const { mutateAsync: removeLocation } = useRemoveBusinessLocation();
 
   const [heads, setHeads] = useState<any>([]);
   const [staffs, setStaffs] = useState<any>([]);
@@ -156,6 +158,16 @@ const LocationPage = () => {
     }
   }
 
+  const handleRemoveLocation = async () => {
+    const res = await removeLocation(locationData?._id);
+    if (res?.status === 200) {
+      toast.success(res?.message || "Location removed successfully.");
+      router.push('/admin/regions/area');
+    } else {
+      toast.error(res?.error || "Failed to remove location.");
+    }
+  }
+
   // department
   const [addDepDialog, setAddDepDialog] = useState<boolean>(false);
   const [depName, setDepName] = useState<string>("");
@@ -204,7 +216,7 @@ const LocationPage = () => {
         </BreadcrumbList>
       </Breadcrumb>
 
-      <div className="bg-gradient-to-tr from-slate-950/50 to-slate-950/70 rounded-lg p-3 my-2">
+      <div className="bg-gradient-to-tr from-slate-950/50 to-slate-950/70 rounded-lg p-3 my-2 relative">
         <div className='flex items-center gap-2 w-full lg:w-1/2'>
           <Building size={24} />
           <div>
@@ -212,6 +224,14 @@ const LocationPage = () => {
           </div>
         </div>
         <p className='text-xs mt-1 pl-1 font-medium text-slate-400 lg:w-1/2 capitalize flex items-center gap-1'><InfoIcon size={14} /> Manage the location heads, staffs, departments and co-departments of {locationData?.location_name}.</p>
+        <HierarchyItemActions
+          id={locationData?._id}
+          name={locationData?.location_name}
+          itemLabel="Location"
+          entityType="location"
+          onDelete={handleRemoveLocation}
+          onUpdated={(item) => dispatch(loadLocationData(item))}
+        />
       </div>
 
       {/* Location Heads */}

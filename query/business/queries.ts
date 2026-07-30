@@ -119,6 +119,7 @@ import {
     removeBusinessRegionFunc,
     removeBusinessSkillFunc,
     updateBusinessSkillFunc,
+    updateHierarchyItemFunc,
     removeDepartmentAreaFunc,
     removeDepartmentHeadFunc,
     removeDepartmentRegionFunc,
@@ -995,6 +996,12 @@ export const useGetAllStaffTasks = (queryParams: StaffTaskQueryParams) => {
         queryKey: ["tasks", queryParams],
         queryFn: ({ signal }) => GetStaffTasksByFilter(queryParams, signal),
         staleTime: 30_000,
+    })
+}
+
+export const useUpdateHierarchyItem = () => {
+    return useMutation({
+        mutationFn: updateHierarchyItemFunc
     })
 }
 

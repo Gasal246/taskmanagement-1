@@ -8,7 +8,7 @@ import { Check, CircleCheckBig, Earth, EllipsisVertical, Eye, InfoIcon, Plus, Tr
 import { motion } from 'framer-motion';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from '@/components/ui/input';
-import { useAddRegionArea, useAddRegionDepartment, useAddRegionHead, useAddRegionStaff, useGetRegionComplete, useRemoveRegionArea, useRemoveRegionDepartment, useRemoveRegionHead, useRemoveRegionStaff } from '@/query/business/queries';
+import { useAddRegionArea, useAddRegionDepartment, useAddRegionHead, useAddRegionStaff, useGetRegionComplete, useRemoveBusinessRegion, useRemoveRegionArea, useRemoveRegionDepartment, useRemoveRegionHead, useRemoveRegionStaff } from '@/query/business/queries';
 import { useGetBusinessStaffs } from '@/query/user/queries';
 import { toast } from 'sonner';
 import { Avatar, Popconfirm } from 'antd';
@@ -17,7 +17,8 @@ import LoaderSpin from '@/components/shared/LoaderSpin';
 import { DEPARTMENT_TYPES } from '@/lib/constants';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, } from "@/components/ui/select";
 import { AppDispatch } from '@/redux/store';
-import { loadAdminBusinessStaff, loadAreaData, loadDepartmentData } from '@/redux/slices/application';
+import { loadAdminBusinessStaff, loadAreaData, loadDepartmentData, loadRegionData } from '@/redux/slices/application';
+import HierarchyItemActions from '@/components/admin/HierarchyItemActions';
 
 const RegionPage = () => {
     const router = useRouter();
@@ -25,6 +26,7 @@ const RegionPage = () => {
     const { regionData } = useSelector((state: RootState) => state.application);
 
     const { mutateAsync: removeArea } = useRemoveRegionArea();
+    const { mutateAsync: removeRegion } = useRemoveBusinessRegion();
     const { mutateAsync: addArea, isPending: addingArea } = useAddRegionArea();
     
     const [areas, setAreas] = useState<any[]>([]);
@@ -88,6 +90,16 @@ const RegionPage = () => {
         const res = await removeArea(id);
         if(res?.status === 200) {
             fetchRegionData();
+        }
+    }
+
+    const handleRemoveRegion = async () => {
+        const res = await removeRegion(regionData?._id);
+        if(res?.status === 200) {
+            toast.success(res?.message || "Region removed successfully.");
+            router.push('/admin/regions');
+        } else {
+            toast.error(res?.error || "Failed to remove region.");
         }
     }
 
@@ -235,9 +247,17 @@ const RegionPage = () => {
                 </BreadcrumbList>
             </Breadcrumb>
             
-            <div className="bg-gradient-to-tr from-slate-950/70 to-slate-800/70 p-3 px-4 rounded-lg mt-2 ">
+            <div className="bg-gradient-to-tr from-slate-950/70 to-slate-800/70 p-3 px-4 rounded-lg mt-2 relative">
                 <h1 className="text-md font-medium text-slate-200 flex items-center gap-1"><Earth size={20} /> {regionData?.region_name}</h1>
                 <p className="text-xs font-medium text-slate-400 pl-5">Manage the departments, areas and staffs of this region</p>
+                <HierarchyItemActions
+                    id={regionData?._id}
+                    name={regionData?.region_name}
+                    itemLabel="Region"
+                    entityType="region"
+                    onDelete={handleRemoveRegion}
+                    onUpdated={(item) => dispatch(loadRegionData(item))}
+                />
             </div>
 
             <div className="bg-gradient-to-tr from-slate-950/60 to-slate-800/60 p-2 px-4 rounded-lg mt-2 min-h-[20vh] border border-slate-700">

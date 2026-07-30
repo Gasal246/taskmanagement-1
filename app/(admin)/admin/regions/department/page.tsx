@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import LoaderSpin from '@/components/shared/LoaderSpin';
 import { useRouter } from 'next/navigation';
 import { loadAdminBusinessStaff, loadAreaData, loadDepartmentData } from '@/redux/slices/application';
+import HierarchyItemActions from '@/components/admin/HierarchyItemActions';
 
 const RegionDepartmentPage = () => {
     const router = useRouter();
@@ -212,32 +213,14 @@ const RegionDepartmentPage = () => {
                     </div>
                 </div>
                 <p className='text-xs mt-1 pl-1 font-medium text-slate-400 lg:w-1/2 capitalize flex items-center gap-1'><InfoIcon size={14} /> This is a {departmentData?.type} department {departmentData?.type === 'sales' ? ', you are able to manage the staffs and subdepartments, and also can see the projects.' : ', you are able to manage the staffs and subdepartments, no projects shown for this department.'}</p>
-                <Popover>
-                    <PopoverTrigger asChild>
-                        <motion.div
-                            whileTap={{ scale: 0.98 }}
-                            whileHover={{ scale: 1.02 }}
-                            className='absolute right-3 top-2 hover:bg-slate-700/50 p-1 rounded-full cursor-pointer'
-                        >
-                            <EllipsisVertical size={20} />
-                        </motion.div>
-                    </PopoverTrigger>
-                    <PopoverContent className='w-[100px] p-0 border border-slate-800 rounded-lg overflow-hidden'>
-                        <div className='flex flex-col items-start gap-1 bg-black rounded-lg'>
-                            <div className='w-full p-0.5 space-y-1'>
-                                <Popconfirm title={`Deleting Department ?`} description={`Deleting department will cause loss of data inside the department, and also will remove the department from the region.`} okText="Delete Anyway" cancelText="Cancel" onConfirm={() => { handleRemoveDepartment(departmentData?._id) }}>
-                                    <motion.div
-                                        whileTap={{ scale: 0.98 }}
-                                        whileHover={{ scale: 1.02 }}
-                                        className='bg-slate-800/50 w-full p-1 py-2 text-red-500 cursor-pointer hover:text-red-700 flex items-center justify-center gap-1 border border-dashed border-slate-700 rounded-lg'>
-                                        <Trash2 size={14} />
-                                        <h1 className='text-xs font-semibold'>Delete</h1>
-                                    </motion.div>
-                                </Popconfirm>
-                            </div>
-                        </div>
-                    </PopoverContent>
-                </Popover>
+                <HierarchyItemActions
+                    id={departmentData?._id}
+                    name={departmentData?.dep_name}
+                    itemLabel="Department"
+                    entityType="region_department"
+                    onDelete={() => handleRemoveDepartment(departmentData?._id)}
+                    onUpdated={(item) => dispatch(loadDepartmentData(item))}
+                />
             </div>
 
             {/* Department Heads */}

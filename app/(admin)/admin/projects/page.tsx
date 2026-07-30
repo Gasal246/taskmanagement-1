@@ -1,7 +1,7 @@
 "use client"
 import React, { useEffect, useMemo, useState } from 'react'
 import { DatePicker, Space } from 'antd';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { CalendarPlus, CheckCircle2, Clock3, Filter, PanelsTopLeft, Search } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import { RootState } from '@/redux/store';
@@ -35,6 +35,8 @@ const limit = 8;
 
 const ProjectsPage = () => {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const clientIdFromUrl = searchParams.get('client_id')?.trim() ?? '';
   const { businessData } = useSelector((state: RootState) => state.user);
 
   const [businessClients, setBusinessClients] = useState<any[]>([]);
@@ -44,7 +46,7 @@ const ProjectsPage = () => {
   const [tab, setTab] = useState('all');
   const [filters, setFilters] = useState({
     type: '',
-    client_id: '',
+    client_id: clientIdFromUrl,
     region_id: '',
     area_id: '',
     startDate: '',
@@ -57,6 +59,13 @@ const ProjectsPage = () => {
   const { mutateAsync: getRegions } = useGetBusinessRegions();
   const { mutateAsync: getBusinessClients } = useGetBusinessClients();
   const { mutateAsync: getAreasForRegion, isPending: loadingAreas } = useGetAreasandDeptsForRegion();
+
+  useEffect(() => {
+    setFilters((previousFilters) => {
+      if (previousFilters.client_id === clientIdFromUrl) return previousFilters;
+      return { ...previousFilters, client_id: clientIdFromUrl };
+    });
+  }, [clientIdFromUrl]);
 
   useEffect(() => {
     if (!businessData?._id) return;
@@ -176,6 +185,21 @@ const ProjectsPage = () => {
       startDate: '',
       endDate: '',
     });
+    router.replace('/admin/projects', { scroll: false });
+  };
+
+  const handleClientFilterChange = (value: string) => {
+    const clientId = value === 'all' ? '' : value;
+    setFilters((previousFilters) => ({ ...previousFilters, client_id: clientId }));
+
+    const nextSearchParams = new URLSearchParams(searchParams.toString());
+    if (clientId) {
+      nextSearchParams.set('client_id', clientId);
+    } else {
+      nextSearchParams.delete('client_id');
+    }
+    const queryString = nextSearchParams.toString();
+    router.replace(queryString ? `/admin/projects?${queryString}` : '/admin/projects', { scroll: false });
   };
 
   const formatDate = (value?: string) => {
@@ -289,7 +313,7 @@ const ProjectsPage = () => {
             <p className="text-[11px] text-slate-400">Client</p>
             <Select
               value={filters.client_id || "all"}
-              onValueChange={(value) => setFilters((prev) => ({ ...prev, client_id: value === "all" ? "" : value }))}
+              onValueChange={handleClientFilterChange}
             >
               <SelectTrigger className="text-xs">
                 <SelectValue placeholder="All clients" />

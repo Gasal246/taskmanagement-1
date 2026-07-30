@@ -1,7 +1,7 @@
 "use client"
 import React, { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Building2, Check, MoveRight, PencilRuler, Plus, Trash2 } from 'lucide-react';
+import { Building2, Check, FolderKanban, MoveRight, PencilRuler, Plus, Search, Trash2 } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import { RootState } from '@/redux/store';
 import { motion } from 'framer-motion';
@@ -15,6 +15,7 @@ import { formatDateTiny } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, } from "@/components/ui/select"
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const client_categories = [
   { value: 'government', label: 'Government' },
@@ -38,6 +39,35 @@ const client_business_types = [
   { value: 'non-profit', label: 'Non-Profit' },
   { value: 'private', label: 'Private' },
 ];
+
+const ClientDetailsSkeleton = () => (
+  <div className="space-y-5" aria-label="Loading client information" aria-busy="true">
+    {[3, 3].map((rowCount, sectionIndex) => (
+      <div className="space-y-2" key={sectionIndex}>
+        <Skeleton className="h-3 w-28 bg-slate-800" />
+        {Array.from({ length: rowCount }).map((_, rowIndex) => (
+          <div className="flex items-center justify-between rounded-lg border border-slate-800 p-3" key={rowIndex}>
+            <Skeleton className="h-4 w-32 bg-slate-800" />
+            <Skeleton className="h-3 w-24 bg-slate-800" />
+          </div>
+        ))}
+      </div>
+    ))}
+    {[2, 2, 2].map((cardCount, sectionIndex) => (
+      <div className="space-y-2" key={`cards-${sectionIndex}`}>
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-3 w-24 bg-slate-800" />
+          <Skeleton className="h-6 w-20 rounded-full bg-slate-800" />
+        </div>
+        <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
+          {Array.from({ length: cardCount }).map((_, cardIndex) => (
+            <Skeleton className="h-12 w-full bg-slate-800" key={cardIndex} />
+          ))}
+        </div>
+      </div>
+    ))}
+  </div>
+);
 
 const ClientsPage = () => {
   const router = useRouter();
@@ -63,6 +93,8 @@ const ClientsPage = () => {
   const [taxVatNumber, setTaxVatNumber] = React.useState('');
   const [companyAddress, setCompanyAddress] = React.useState('');
   const [billingAddress, setBillingAddress] = React.useState('');
+  const [clientSearch, setClientSearch] = React.useState('');
+  const activeClientIdRef = React.useRef<string | null>(null);
 
   const { mutateAsync: getRegions } = useGetBusinessRegions();
   const { mutateAsync: getAreas } = useGetRegionAreas();
@@ -114,12 +146,14 @@ const ClientsPage = () => {
   }, [businessData]);
 
   const closeSheet = () => {
+    activeClientIdRef.current = null;
     setIsSheetOpen(false);
     setIsDeleteDialogOpen(false);
     setClientData(null);
     setClientRegions([]);
     setClientAreas([]);
     setClientContacts([]);
+    setBusinessAreas([]);
     setOpenAddRegionOrAreaDialog(false);
     setAddContactDialog(false);
     setCategory('');
@@ -213,18 +247,38 @@ const ClientsPage = () => {
       handleFetchCompleteData(res?.data?.client_id);
     }
   }
-  const handleFetchCompleteData = async (client_id: string) => {
-    const res = await getBusinessClientCompleteDataById(client_id);
-    console.log("Client : ", res);
-    if (res?.status == 200) {
-      setClientData({ client_name: res?.data?.client_name, id: res?.data?.id, category: res?.data?.category, industry: res?.data?.industry, business_type: res?.data?.business_type, short_name: res?.data?.short_name, tax_number: res?.data?.tax_number, company_address: res?.data?.company_address, billing_address: res?.data?.billing_address });
-      setClientRegions(res?.data?.regions);
-      if(res?.data?.regions?.length > 0) {
-        handleFetchBusinessAreas(res?.data?.regions?.map((region: any) => region?.region_id)); // fetching business areas of client regions.
+  const handleFetchCompleteData = async (client_id: string, selectedClientName?: string) => {
+    activeClientIdRef.current = client_id;
+    if (selectedClientName) {
+      setClientData({ id: client_id, client_name: selectedClientName });
+      setClientRegions([]);
+      setClientAreas([]);
+      setClientContacts([]);
+      setBusinessAreas([]);
+    }
+    setIsSheetOpen(true);
+
+    try {
+      const res = await getBusinessClientCompleteDataById(client_id);
+      if (activeClientIdRef.current !== client_id) return;
+
+      if (res?.status == 200 && res?.data) {
+        setClientData({ client_name: res.data.client_name, id: res.data.id, category: res.data.category, industry: res.data.industry, business_type: res.data.business_type, short_name: res.data.short_name, tax_number: res.data.tax_number, company_address: res.data.company_address, billing_address: res.data.billing_address, created_at: res.data.createdAt });
+        setClientRegions(res.data.regions ?? []);
+        if (res.data.regions?.length > 0) {
+          handleFetchBusinessAreas(res.data.regions.map((region: any) => region?.region_id)); // fetching business areas of client regions.
+        } else {
+          setBusinessAreas([]);
+        }
+        setClientAreas(res.data.areas ?? []);
+        setClientContacts(res.data.contacts ?? []);
+      } else {
+        toast.error('Failed to load client information.');
       }
-      setClientAreas(res?.data?.areas);
-      setClientContacts(res?.data?.contacts);
-      setIsSheetOpen(true);
+    } catch {
+      if (activeClientIdRef.current === client_id) {
+        toast.error('Failed to load client information.');
+      }
     }
   }
 
@@ -355,18 +409,40 @@ const ClientsPage = () => {
     }
   }
 
+  const handleViewClientProjects = () => {
+    if (!clientData?.id) {
+      return toast.error('Client ID is missing.');
+    }
+    router.push(`/admin/projects?client_id=${encodeURIComponent(clientData.id)}`);
+  }
+
+  const normalizedClientSearch = clientSearch.trim().toLowerCase();
+  const filteredBusinessClients = businessClients.filter((client: any) =>
+    (client?.client_name ?? '').toLowerCase().includes(normalizedClientSearch)
+  );
+
   return (
     <div className='p-4 pb-10'>
-      <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg mb-2">
+      <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg mb-2 flex items-center justify-between gap-3">
         <h1 className='font-medium text-md text-slate-300 flex items-center gap-1'> <Building2 size={16} /> Business Clients</h1>
+        <motion.div onClick={() => setIsAddClientDialogOpen(true)} whileTap={{ scale: 0.98 }} whileHover={{ scale: 1.02 }} className='bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-2 px-3 rounded-lg border border-slate-700 hover:border-cyan-600 cursor-pointer flex items-center gap-1 justify-center shrink-0'>
+          <Plus size={14} strokeWidth={2} className='text-slate-400 group-hover:text-cyan-600' />
+          <h1 className='font-medium text-xs text-slate-300 flex items-center gap-1'>Add Client</h1>
+        </motion.div>
       </div>
       <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg min-h-[40vh]">
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center">
           <h1 className='font-medium text-sm text-slate-300 flex items-center gap-1'> <Building2 size={14} /> Clients List</h1>
-          <motion.div onClick={() => setIsAddClientDialogOpen(true)} whileTap={{ scale: 0.98 }} whileHover={{ scale: 1.02 }} className='bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-2 px-3 rounded-lg border border-slate-700 hover:border-cyan-600 cursor-pointer flex items-center gap-1 justify-center'>
-            <Plus size={14} strokeWidth={2} className='text-slate-400 group-hover:text-cyan-600' />
-            <h1 className='font-medium text-xs text-slate-300 flex items-center gap-1'>Add Client</h1>
-          </motion.div>
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={14} aria-hidden="true" />
+            <Input
+              aria-label="Search clients"
+              className="h-9 border-slate-700 bg-slate-950/40 pl-9 text-sm"
+              placeholder="Search clients by name"
+              value={clientSearch}
+              onChange={(event) => setClientSearch(event.target.value)}
+            />
+          </div>
         </div>
         <div className="flex flex-wrap">
           {!loadingBusinessClients && businessClients?.length === 0 && (
@@ -379,12 +455,17 @@ const ClientsPage = () => {
               <LoaderSpin size={20} title="Loading Clients..." />
             </div>
           )}
-          {businessClients?.map((client: any) => <div className="w-full lg:w-4/12 p-1" key={client?._id}>
+          {!loadingBusinessClients && businessClients.length > 0 && filteredBusinessClients.length === 0 && (
+            <div className="flex items-center justify-center w-full h-[15vh]">
+              <h1 className="text-xs text-slate-400">No clients match your search.</h1>
+            </div>
+          )}
+          {filteredBusinessClients.map((client: any) => <div className="w-full lg:w-4/12 p-1" key={client?._id}>
             <motion.div
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 p-2 px-3 rounded-lg border-slate-700 border select-none hover:border-cyan-700 cursor-pointer group flex items-center gap-1 justify-between"
-              onClick={() => handleFetchCompleteData(client?._id)}
+              onClick={() => handleFetchCompleteData(client?._id, client?.client_name)}
             >
               <h1 className='font-medium text-sm text-slate-300 flex items-center gap-1'>
                 {client?.client_name}
@@ -404,22 +485,24 @@ const ClientsPage = () => {
       </div>
 
       {/* COMPLETE BUSINESS CLIENT PREVIEW */}
-      <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+      <Sheet open={isSheetOpen} onOpenChange={(open) => open ? setIsSheetOpen(true) : closeSheet()}>
         <SheetContent className='min-w-full lg:min-w-[600px] border-cyan-900 px-2'>
           <SheetHeader className='p-2'>
             <SheetTitle>
               <div>
                 <h1 className='font-medium text-xl text-slate-300'>{clientData?.client_name}</h1>
-                <h1 className='font-medium text-sm text-slate-400 flex items-center gap-1'>{clientData?.short_name}</h1>
+                {loadingClientComplete ? <Skeleton className="mt-2 h-3 w-24 bg-slate-800" /> : <h1 className='font-medium text-sm text-slate-400 flex items-center gap-1'>{clientData?.short_name}</h1>}
               </div>
             </SheetTitle>
-            <SheetDescription>Client Since <span className='text-cyan-700'>{formatDateTiny(clientData?.created_at)}</span>, you can also make changes to client data or delete it in this preview.</SheetDescription>
+            {loadingClientComplete ? (
+              <div aria-hidden="true"><Skeleton className="h-3 w-full max-w-md bg-slate-800" /></div>
+            ) : (
+              <SheetDescription>Client Since <span className='text-cyan-700'>{formatDateTiny(clientData?.created_at)}</span>, you can also make changes to client data or delete it in this preview.</SheetDescription>
+            )}
           </SheetHeader>
 
           <div className='p-4 w-full h-[calc(100vh-200px)] overflow-y-scroll border-2 border-dashed rounded-lg border-slate-800'>
-            {loadingClientComplete && <div className="w-full h-[50vh] flex items-center justify-center">
-              <LoaderSpin size={50} title="Loading Client Data.." />
-            </div>}
+            {loadingClientComplete && <ClientDetailsSkeleton />}
 
             {!loadingClientComplete && <div className='mb-4 space-y-2'>
               <h1 className='font-medium text-xs text-slate-400 flex items-center gap-1'>Client Details</h1>
@@ -453,7 +536,7 @@ const ClientsPage = () => {
               </div>
             </div>}
 
-            <div className="mb-5">
+            {!loadingClientComplete && <div className="mb-5">
               <div className='flex items-center gap-1'>
                 <h1 className='font-medium text-xs text-slate-400 flex items-center gap-1 pl-1'>Client Regions</h1>
                 <motion.div whileTap={{ scale: 0.98 }} whileHover={{ scale: 1.02 }} className='hover:bg-slate-700/50 bg-slate-800/40 p-1 px-3 rounded-full cursor-pointer flex items-center gap-1 justify-center' onClick={handleClickAddClientRegion}>
@@ -477,9 +560,9 @@ const ClientsPage = () => {
                   </div>
                 </div>)}
               </div>}
-            </div>
+            </div>}
 
-            <div className="mb-5">
+            {!loadingClientComplete && <div className="mb-5">
               <div className='flex items-center gap-1'>
                 <h1 className='font-medium text-xs text-slate-400 flex items-center gap-1 pl-1'>Client Areas</h1>
                 <motion.div whileTap={{ scale: 0.98 }} whileHover={{ scale: 1.02 }} className='hover:bg-slate-700/50 bg-slate-800/40 p-1 px-3 rounded-full cursor-pointer flex items-center gap-1 justify-center' onClick={handleClickAddClientArea}>
@@ -489,9 +572,6 @@ const ClientsPage = () => {
               </div>
               {!loadingClientComplete && client_areas?.length === 0 && <div className="py-3 flex items-center justify-center">
                 <h1 className='font-medium text-xs text-slate-400 flex items-center gap-1 pl-1 text-center'>No Areas Added.</h1>
-              </div>}
-              {loadingClientComplete && <div className="w-full h-[50vh] flex items-center justify-center">
-                <LoaderSpin size={50} title="Loading Client Areas..." />
               </div>}
               {!loadingClientComplete && client_areas?.length > 0 && <div className="flex flex-wrap">
                 {client_areas?.map((area: any) => <div className="w-full lg:w-1/2 p-1" key={area?._id}>
@@ -506,9 +586,9 @@ const ClientsPage = () => {
                   </div>
                 </div>)}
               </div>}
-            </div>
+            </div>}
 
-            <div className="mb-10">
+            {!loadingClientComplete && <div className="mb-10">
               <div className='flex items-center gap-1'>
                 <h1 className='font-medium text-xs text-slate-400 flex items-center gap-1 pl-1'>Client Contacts</h1>
                 <motion.div whileTap={{ scale: 0.98 }} whileHover={{ scale: 1.02 }} className='hover:bg-slate-700/50 bg-slate-800/40 p-1 px-3 rounded-full cursor-pointer flex items-center gap-1 justify-center' onClick={handleClickAddClientContact}>
@@ -537,11 +617,19 @@ const ClientsPage = () => {
                   </div>
                 </div>)}
               </div>}
-            </div>
+            </div>}
 
           </div>
 
-          <SheetFooter className='absolute bottom-0 left-0 right-0 p-4'>
+          {!loadingClientComplete && <SheetFooter className='absolute bottom-0 left-0 right-0 p-4'>
+          <motion.div
+                whileTap={{ scale: 0.98 }}
+                className='w-full flex items-center gap-1 cursor-pointer bg-gradient-to-br from-cyan-900/50 hover:from-cyan-800/50 to-slate-900/50 hover:to-slate-700/50 p-2 px-3 rounded-lg justify-center group'
+                onClick={handleViewClientProjects}
+                >
+                <FolderKanban size={14} strokeWidth={2} className='text-slate-400 group-hover:text-white' />
+                <h1 className='font-medium text-sm text-slate-400 flex items-center gap-1 group-hover:text-white'>Projects Attached</h1>
+              </motion.div>
           <motion.div
                 whileTap={{ scale: 0.98 }}
                 className='w-full flex items-center gap-1 cursor-pointer bg-gradient-to-br from-red-800/50 hover:from-red-600/50 to-red-900/50 hover:to-red-500/50 p-2 px-3 rounded-lg  justify-center group'
@@ -560,7 +648,7 @@ const ClientsPage = () => {
                 {!updatingClient && <h1 className='font-medium text-sm text-slate-400 flex items-center gap-1 group-hover:text-white'>Update Client</h1>}
                 {updatingClient && <LoaderSpin size={22} />}
               </motion.div>
-          </SheetFooter>
+          </SheetFooter>}
         </SheetContent>
       </Sheet>
 

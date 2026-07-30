@@ -14,7 +14,7 @@ import { Eye } from 'lucide-react';
 import { Trash2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from 'sonner';
-import { useAddAreaDepartment, useAddAreaHead, useAddAreaStaff, useAddBusinessLocation, useGetAreaCompleteData, useRemoveAreaHead, useRemoveAreaStaff } from '@/query/business/queries';
+import { useAddAreaDepartment, useAddAreaHead, useAddAreaStaff, useAddBusinessLocation, useGetAreaCompleteData, useRemoveAreaHead, useRemoveAreaStaff, useRemoveRegionArea } from '@/query/business/queries';
 import { useGetBusinessStaffs } from '@/query/user/queries';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -23,11 +23,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DEPARTMENT_TYPES } from '@/lib/constants';
 import { useDispatch } from 'react-redux';
 import { AppDispatch } from '@/redux/store';
-import { loadAdminBusinessStaff, loadDepartmentData, loadLocationData } from '@/redux/slices/application';
+import { loadAdminBusinessStaff, loadAreaData, loadDepartmentData, loadLocationData } from '@/redux/slices/application';
+import HierarchyItemActions from '@/components/admin/HierarchyItemActions';
 
 const RegionAreaPage = () => {
     const router = useRouter();
     const dispatch = useDispatch<AppDispatch>();
+    const { mutateAsync: removeArea } = useRemoveRegionArea();
     const { businessData } = useSelector((state: RootState) => state.user)
     const { regionData, areaData } = useSelector((state: RootState) => state.application);
 
@@ -172,6 +174,16 @@ const RegionAreaPage = () => {
         }
     }
 
+    const handleRemoveArea = async () => {
+        const res = await removeArea(areaData?._id);
+        if(res?.status === 200) {
+            toast.success(res?.message || "Area removed successfully.");
+            router.push('/admin/regions/view-region');
+        } else {
+            toast.error(res?.error || "Failed to remove area.");
+        }
+    }
+
     const [addDepDialog, setAddDepDialog] = useState<boolean>(false);
     const [depName, setDepName] = useState<string>("");
     const [depType, setDepType] = useState<string>("");
@@ -231,7 +243,7 @@ const RegionAreaPage = () => {
                 </BreadcrumbList>
             </Breadcrumb>
 
-            <div className="bg-gradient-to-tr from-slate-950/50 to-slate-950/70 rounded-lg p-3 my-2">
+            <div className="bg-gradient-to-tr from-slate-950/50 to-slate-950/70 rounded-lg p-3 my-2 relative">
                 <div className='flex items-center gap-2 w-full lg:w-1/2'>
                     <School2 size={24} />
                     <div>
@@ -239,6 +251,14 @@ const RegionAreaPage = () => {
                     </div>
                 </div>
                 <p className='text-xs mt-1 pl-1 font-medium text-slate-400 lg:w-1/2 capitalize flex items-center gap-1'><InfoIcon size={14} /> Manage the area heads, staffs, departments and sub-departments of {areaData?.area_name}&apos;s sub-locations.</p>
+                <HierarchyItemActions
+                    id={areaData?._id}
+                    name={areaData?.area_name}
+                    itemLabel="Area"
+                    entityType="area"
+                    onDelete={handleRemoveArea}
+                    onUpdated={(item) => dispatch(loadAreaData(item))}
+                />
             </div>
 
             {/* Area Heads */}

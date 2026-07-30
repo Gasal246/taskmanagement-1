@@ -89,6 +89,7 @@ export async function GET ( req: NextRequest ) {
                     tax_number: 1,
                     company_address: 1,
                     billing_address: 1,
+                    createdAt: 1,
                     regions: 1,
                     areas: 1,
                     contacts: 1

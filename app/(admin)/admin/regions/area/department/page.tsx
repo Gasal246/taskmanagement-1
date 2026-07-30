@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator, } from "@/components/ui/breadcrumb";
 import { useRouter } from 'next/navigation';
-import { Check, ChevronLeft, CircleCheckBig, Eye, InfoIcon, PencilRuler, Plus, School2 } from 'lucide-react';
+import { Check, ChevronLeft, CircleCheckBig, Eye, InfoIcon, Plus, School2 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { motion } from "framer-motion";
 import { Trash2 } from "lucide-react";
@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from '@/components/ui/input';
 import { loadAdminBusinessStaff, loadDepartmentData, loadLocationData } from '@/redux/slices/application';
+import HierarchyItemActions from '@/components/admin/HierarchyItemActions';
 
 const AreaDepartmentPage = () => {
     const router = useRouter();
@@ -290,39 +291,14 @@ const AreaDepartmentPage = () => {
                         </div>
                     </div>
                 </div>
-                <Popover>
-                    <PopoverTrigger asChild>
-                        <motion.div
-                            whileTap={{ scale: 0.98 }}
-                            whileHover={{ scale: 1.02 }}
-                            className='absolute right-3 top-2 hover:bg-slate-700/50 p-1 rounded-full cursor-pointer'
-                        >
-                            <EllipsisVertical size={20} />
-                        </motion.div>
-                    </PopoverTrigger>
-                    <PopoverContent className='w-[100px] p-0 border border-slate-800 rounded-lg overflow-hidden'>
-                        <div className='flex flex-col items-start gap-1 bg-black rounded-lg'>
-                            <div className='w-full p-0.5 space-y-1'>
-                                <motion.div
-                                    whileTap={{ scale: 0.98 }}
-                                    whileHover={{ scale: 1.02 }}
-                                    className='bg-slate-800/50 w-full p-1 py-2 text-purple-500 cursor-pointer hover:text-purple-700 flex items-center justify-center gap-1 border border-dashed border-slate-700 rounded-lg'>
-                                    <PencilRuler size={12} />
-                                    <h1 className='text-xs font-semibold'>Update</h1>
-                                </motion.div>
-                                <Popconfirm title={`Deleting Department ?`} description={`Deleting department will cause loss of data inside the department, and also will remove the department from the region.`} okText="Delete Anyway" cancelText="Cancel" onConfirm={handleRemoveDepartment}>
-                                    <motion.div
-                                        whileTap={{ scale: 0.98 }}
-                                        whileHover={{ scale: 1.02 }}
-                                        className='bg-slate-800/50 w-full p-1 py-2 text-red-500 cursor-pointer hover:text-red-700 flex items-center justify-center gap-1 border border-dashed border-slate-700 rounded-lg'>
-                                        <Trash2 size={14} />
-                                        <h1 className='text-xs font-semibold'>Delete</h1>
-                                    </motion.div>
-                                </Popconfirm>
-                            </div>
-                        </div>
-                    </PopoverContent>
-                </Popover>
+                <HierarchyItemActions
+                    id={departmentData?._id}
+                    name={departmentData?.dep_name}
+                    itemLabel="Sub Department"
+                    entityType={isLocationDepartment ? "location_department" : "area_department"}
+                    onDelete={handleRemoveDepartment}
+                    onUpdated={(item) => dispatch(loadDepartmentData(item))}
+                />
             </div>
 
             {/* Department Heads */}
