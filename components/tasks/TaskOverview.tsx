@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Clock3 } from "lucide-react";
+import { Clock3, MessageCircle } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
 import type {
@@ -247,6 +247,11 @@ export function TaskOverviewCard({
       <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-400">
         <span className="rounded-md border border-slate-800/60 bg-slate-900/60 px-2 py-1">Activities: {task.activity_count}</span>
         <span className="rounded-md border border-slate-800/60 bg-slate-900/60 px-2 py-1">Completed: {task.completed_activity}</span>
+        {(task.comment_count ?? 0) > 0 && (
+          <span className="inline-flex items-center gap-1 rounded-md border border-slate-800/60 bg-slate-900/60 px-2 py-1">
+            <MessageCircle size={12} aria-hidden="true" /> Comments: {task.comment_count}
+          </span>
+        )}
       </div>
 
       <div className="mt-3 space-y-1 text-xs text-slate-400">

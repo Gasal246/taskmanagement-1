@@ -31,6 +31,7 @@ export type StaffTaskCard = {
   priority: string | null;
   activity_count: number;
   completed_activity: number;
+  comment_count?: number;
   progress: number;
   status: StaffTaskDisplayStatus;
   pending_since: string | null;

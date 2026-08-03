@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import Business_Tasks from "@/models/business_tasks.model";
+import ActivityComments from "@/models/activity_comments.model";
 import Project_Teams from "@/models/project_team.model";
 import Task_Activities from "@/models/task_activities.model";
 import Team_Members from "@/models/team_members.model";
@@ -231,7 +232,67 @@ export async function GET(req: NextRequest) {
       },
     ]);
 
-    const tasksWithAssignments = await addTaskAssignmentSummaries(result?.data || []);
+    const taskRows = result?.data || [];
+    const taskIds = taskRows.map((task: any) => task._id);
+    const [tasksWithAssignments, visibleActivityStats] = await Promise.all([
+      addTaskAssignmentSummaries(taskRows),
+      taskIds.length
+        ? Task_Activities.aggregate([
+            {
+              $match: {
+                task_id: { $in: taskIds },
+                $or: [
+                  { assigned_to: userObjectId },
+                  { forwarded_to: userObjectId },
+                ],
+              },
+            },
+            {
+              $lookup: {
+                from: ActivityComments.collection.name,
+                let: { activityId: "$_id" },
+                pipeline: [
+                  {
+                    $match: {
+                      deleted_at: null,
+                      $expr: { $eq: ["$activity_id", "$$activityId"] },
+                    },
+                  },
+                  { $count: "total" },
+                ],
+                as: "comment_stats",
+              },
+            },
+            {
+              $group: {
+                _id: "$task_id",
+                total: { $sum: 1 },
+                completed: {
+                  $sum: { $cond: [{ $eq: ["$is_done", true] }, 1, 0] },
+                },
+                comments: {
+                  $sum: {
+                    $ifNull: [
+                      { $arrayElemAt: ["$comment_stats.total", 0] },
+                      0,
+                    ],
+                  },
+                },
+              },
+            },
+          ])
+        : Promise.resolve([]),
+    ]);
+    const visibleActivityStatsByTask = new Map(
+      visibleActivityStats.map((stats: any) => [
+        stats._id.toString(),
+        {
+          total: Number(stats.total || 0),
+          completed: Number(stats.completed || 0),
+          comments: Number(stats.comments || 0),
+        },
+      ])
+    );
     const nameActivitySet = new Set(nameActivityIds.map((id) => id.toString()));
     const staffActivitySet = new Set(staffActivityIds.map((id) => id.toString()));
     const summary = normalizeTaskSummary(result?.summary || []);
@@ -242,6 +303,20 @@ export async function GET(req: NextRequest) {
         data: tasksWithAssignments.map((task: any) => {
           const taskId = task._id.toString();
           const firstAssignee = task.assignment?.assignedTo?.[0] || null;
+          const visibleStats = visibleActivityStatsByTask.get(taskId) || {
+            total: 0,
+            completed: 0,
+            comments: 0,
+          };
+          const progress = visibleStats.total
+            ? Math.min(
+                100,
+                Math.max(
+                  0,
+                  Math.round((visibleStats.completed / visibleStats.total) * 100)
+                )
+              )
+            : 0;
           return {
             _id: taskId,
             task_name: task.task_name || "",
@@ -249,9 +324,10 @@ export async function GET(req: NextRequest) {
             end_date: task.end_date || null,
             is_project_task: Boolean(task.is_project_task),
             priority: task.priority || null,
-            activity_count: Number(task.activity_count || 0),
-            completed_activity: Number(task.completed_activity || 0),
-            progress: Number(task.progress || 0),
+            activity_count: visibleStats.total,
+            completed_activity: visibleStats.completed,
+            comment_count: visibleStats.comments,
+            progress,
             status: task.status,
             pending_since: task.pending_since || null,
             assignment: {

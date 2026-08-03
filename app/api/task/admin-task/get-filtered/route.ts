@@ -13,6 +13,7 @@ import {
 } from "@/app/api/helpers/task-filter-scope";
 import { resolveActiveBusinessIdForUser } from "@/app/api/helpers/resolve-user-business";
 import connectDB from "@/lib/mongo";
+import ActivityComments from "@/models/activity_comments.model";
 import Business_staffs from "@/models/business_staffs.model";
 import Business_Tasks from "@/models/business_tasks.model";
 import Task_Activities from "@/models/task_activities.model";
@@ -187,7 +188,28 @@ export async function GET(req: NextRequest) {
       },
     ]);
 
-    const tasksWithAssignments = await addTaskAssignmentSummaries(result?.data || []);
+    const taskRows = result?.data || [];
+    const taskIds = taskRows.map((task: any) => task._id);
+    const [tasksWithAssignments, commentCounts] = await Promise.all([
+      addTaskAssignmentSummaries(taskRows),
+      taskIds.length
+        ? ActivityComments.aggregate([
+            {
+              $match: {
+                task_id: { $in: taskIds },
+                deleted_at: null,
+              },
+            },
+            { $group: { _id: "$task_id", count: { $sum: 1 } } },
+          ])
+        : Promise.resolve([]),
+    ]);
+    const commentCountByTask = new Map(
+      commentCounts.map((row: any) => [
+        row._id.toString(),
+        Number(row.count || 0),
+      ])
+    );
     const nameActivitySet = new Set(nameActivityIds.map((id) => id.toString()));
     const staffActivitySet = new Set(staffActivityIds.map((id) => id.toString()));
     const total = result?.pagination?.[0]?.total || 0;
@@ -205,6 +227,7 @@ export async function GET(req: NextRequest) {
           priority: task.priority || null,
           activity_count: Number(task.activity_count || 0),
           completed_activity: Number(task.completed_activity || 0),
+          comment_count: commentCountByTask.get(taskId) || 0,
           progress: Number(task.progress || 0),
           status: task.status,
           pending_since: task.pending_since || null,
