@@ -1,11 +1,19 @@
 "use client"
 
-import { ArrowRight, BriefcaseBusiness, CheckCircle2, Clock3, Contact, FolderKanban, Globe2, LandPlot, MapPin, Users2 } from "lucide-react";
+import { ArrowRight, BriefcaseBusiness, CheckCircle2, Clock3, Contact, FolderKanban, Globe2, LandPlot, ListTodo, MapPin, Users2 } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useGetUserDetails } from "@/query/business/queries";
+import { useGetAllStaffTasks, useGetUserDetails } from "@/query/business/queries";
 import Cookies from "js-cookie";
 import { toast } from "sonner";
+import { EMPTY_TASK_SUMMARY } from "@/components/tasks/TaskOverview";
+import type { StaffTaskQueryParams } from "@/types/staff-tasks";
+
+const DASHBOARD_TASK_FILTERS: StaffTaskQueryParams = {
+  taskType: "all",
+  page: "1",
+  limit: "1",
+};
 
 type DashboardProject = {
   _id: string;
@@ -103,6 +111,8 @@ const getProjectStatus = (project: DashboardProject) => {
 const StaffHome = () => {
   const router = useRouter();
   const { mutateAsync: getUserData } = useGetUserDetails();
+  const { data: taskOverview, isLoading: taskSummaryLoading } =
+    useGetAllStaffTasks(DASHBOARD_TASK_FILTERS);
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -175,19 +185,36 @@ const StaffHome = () => {
   const userName = userData?.user_name?.name || "Staff";
   const currentRole = formatRoleLabel(userData?.role);
   const headRole = isHeadRole(userData?.role);
+  const taskSummary = taskOverview?.summary ?? EMPTY_TASK_SUMMARY;
+  const activeTaskCount =
+    taskSummary.toDo + taskSummary.pending + taskSummary.inProgress;
 
   const stats = useMemo(() => {
     const cards = [
       {
+        label: "To Do Tasks",
+        value: taskSummary.toDo,
+        description: "Assignments ready to be started.",
+        icon: ListTodo,
+        accent: "from-rose-500/20 to-rose-500/5 text-rose-100 border-rose-500/20",
+      },
+      {
         label: "Pending Tasks",
-        value: dashboard?.pendingTasks ?? 0,
-        description: "Assignments that still need attention.",
+        value: taskSummary.pending,
+        description: "Overdue assignments that need attention.",
         icon: Clock3,
+        accent: "from-orange-500/20 to-rose-500/5 text-orange-100 border-orange-500/20",
+      },
+      {
+        label: "In Progress Tasks",
+        value: taskSummary.inProgress,
+        description: "Assignments with work already underway.",
+        icon: BriefcaseBusiness,
         accent: "from-amber-500/20 to-amber-500/5 text-amber-100 border-amber-500/20",
       },
       {
         label: "Completed Tasks",
-        value: dashboard?.completedTasks ?? 0,
+        value: taskSummary.completed,
         description: "Work you have already closed out.",
         icon: CheckCircle2,
         accent: "from-emerald-500/20 to-emerald-500/5 text-emerald-100 border-emerald-500/20",
@@ -205,7 +232,7 @@ const StaffHome = () => {
     }
 
     return cards;
-  }, [dashboard?.completedTasks, dashboard?.pendingTasks, dashboard?.staffCount, headRole]);
+  }, [dashboard?.staffCount, headRole, taskSummary]);
 
   const quickLinks = useMemo(() => {
     const links = [
@@ -269,7 +296,7 @@ const StaffHome = () => {
                 Projects: {dashboard?.projectCount ?? 0}
               </span>
               <span className="rounded-full border border-slate-700/80 bg-slate-950/40 px-3 py-1 text-[11px] text-slate-300">
-                Focus: {(dashboard?.pendingTasks ?? 0) > 0 ? "Active workload" : "On track"}
+                Focus: {activeTaskCount > 0 ? "Active workload" : "On track"}
               </span>
             </div>
           </div>
@@ -291,7 +318,7 @@ const StaffHome = () => {
         </div>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {stats.map((card) => {
           const Icon = card.icon;
           return (
@@ -302,7 +329,9 @@ const StaffHome = () => {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-xs uppercase tracking-wide text-slate-300/80">{card.label}</p>
-                  <h2 className="mt-2 text-3xl font-semibold text-white">{card.value}</h2>
+                  <h2 className="mt-2 text-3xl font-semibold text-white">
+                    {taskSummaryLoading && card.label !== "Your Staffs" ? "—" : card.value}
+                  </h2>
                   <p className="mt-2 text-xs text-slate-300">{card.description}</p>
                 </div>
                 <div className="rounded-xl border border-white/10 bg-white/5 p-3">
