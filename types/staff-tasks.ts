@@ -26,6 +26,7 @@ export type StaffTaskCard = {
   _id: string;
   task_name: string;
   task_description: string;
+  created_at?: string | null;
   end_date: string | null;
   is_project_task: boolean;
   priority: string | null;

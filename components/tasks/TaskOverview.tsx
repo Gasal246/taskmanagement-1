@@ -32,44 +32,57 @@ const summaryOptions: Array<{
   className: string;
   activeClassName: string;
 }> = [
-  {
-    filter: "todo",
-    key: "toDo",
-    label: "To Do",
-    className: "border-rose-500/30 bg-rose-500/10 text-rose-200 hover:bg-rose-500/15",
-    activeClassName: "border-rose-400 bg-rose-500/25 ring-1 ring-rose-400/40",
-  },
-  {
-    filter: "pending",
-    key: "pending",
-    label: "Pending",
-    className:
-      "border-orange-500/30 bg-gradient-to-r from-orange-500/10 to-rose-500/10 text-orange-100 hover:from-orange-500/20 hover:to-rose-500/20",
-    activeClassName:
-      "border-orange-400 from-orange-500/25 to-rose-500/25 ring-1 ring-orange-400/40",
-  },
-  {
-    filter: "in_progress",
-    key: "inProgress",
-    label: "In Progress",
-    className: "border-amber-500/30 bg-amber-500/10 text-amber-200 hover:bg-amber-500/15",
-    activeClassName: "border-amber-400 bg-amber-500/25 ring-1 ring-amber-400/40",
-  },
-  {
-    filter: "completed",
-    key: "completed",
-    label: "Completed",
-    className:
-      "border-emerald-500/30 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/15",
-    activeClassName: "border-emerald-400 bg-emerald-500/25 ring-1 ring-emerald-400/40",
-  },
-];
+    {
+      filter: "todo",
+      key: "toDo",
+      label: "To Do",
+      className: "border-rose-500/30 bg-rose-500/10 text-rose-200 hover:bg-rose-500/15",
+      activeClassName: "border-rose-400 bg-rose-500/25 ring-1 ring-rose-400/40",
+    },
+    {
+      filter: "pending",
+      key: "pending",
+      label: "Pending",
+      className:
+        "border-orange-500/30 bg-gradient-to-r from-orange-500/10 to-rose-500/10 text-orange-100 hover:from-orange-500/20 hover:to-rose-500/20",
+      activeClassName:
+        "border-orange-400 from-orange-500/25 to-rose-500/25 ring-1 ring-orange-400/40",
+    },
+    {
+      filter: "in_progress",
+      key: "inProgress",
+      label: "In Progress",
+      className: "border-amber-500/30 bg-amber-500/10 text-amber-200 hover:bg-amber-500/15",
+      activeClassName: "border-amber-400 bg-amber-500/25 ring-1 ring-amber-400/40",
+    },
+    {
+      filter: "completed",
+      key: "completed",
+      label: "Completed",
+      className:
+        "border-emerald-500/30 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/15",
+      activeClassName: "border-emerald-400 bg-emerald-500/25 ring-1 ring-emerald-400/40",
+    },
+  ];
 
 const getProgressClass = (value: number) => {
   if (value < 30) return "from-rose-500 via-red-500 to-orange-400 shadow-rose-500/30";
   if (value < 50) return "from-orange-500 via-amber-500 to-yellow-300 shadow-amber-500/30";
   if (value < 70) return "from-sky-500 via-cyan-400 to-blue-400 shadow-cyan-500/30";
   return "from-cyan-400 via-teal-400 to-emerald-400 shadow-emerald-500/30";
+};
+
+const formatTaskCardDate = (value?: string | null) => {
+  if (!value) return null;
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(date);
 };
 
 export const EMPTY_TASK_SUMMARY: StaffTaskSummary = {
@@ -126,25 +139,25 @@ export function TaskStatusSummaryBadges({
     <div className="flex flex-wrap gap-2" role="group" aria-label="Filter tasks by status">
       {isLoading
         ? Array.from({ length: 4 }, (_, index) => (
-            <Skeleton key={index} className="h-8 w-24 rounded-lg bg-slate-800" />
-          ))
+          <Skeleton key={index} className="h-8 w-24 rounded-lg bg-slate-800" />
+        ))
         : summaryOptions.map((option) => {
-            const isActive = selectedStatus === option.filter;
-            return (
-              <button
-                key={option.filter}
-                type="button"
-                aria-pressed={isActive}
-                onClick={() => onChange(isActive ? undefined : option.filter)}
-                className={`rounded-lg border px-2.5 py-1.5 text-[11px] font-medium transition-all ${option.className} ${isActive ? option.activeClassName : ""}`}
-              >
-                {option.label}
-                <span className="ml-1.5 rounded-md bg-slate-950/40 px-1.5 py-0.5 font-semibold">
-                  {summary[option.key]}
-                </span>
-              </button>
-            );
-          })}
+          const isActive = selectedStatus === option.filter;
+          return (
+            <button
+              key={option.filter}
+              type="button"
+              aria-pressed={isActive}
+              onClick={() => onChange(isActive ? undefined : option.filter)}
+              className={`rounded-lg border px-2.5 py-1.5 text-[11px] font-medium transition-all ${option.className} ${isActive ? option.activeClassName : ""}`}
+            >
+              {option.label}
+              <span className="ml-1.5 rounded-md bg-slate-950/40 px-1.5 py-0.5 font-semibold">
+                {summary[option.key]}
+              </span>
+            </button>
+          );
+        })}
     </div>
   );
 }
@@ -194,7 +207,8 @@ export function TaskOverviewCard({
   const shouldReduceMotion = useReducedMotion();
   const progress = Math.min(100, Math.max(0, task.progress));
   const priority = task.priority?.toLowerCase() || "";
-  const endDateLabel = task.end_date ? new Date(task.end_date).toLocaleDateString() : null;
+  const createdDateLabel = formatTaskCardDate(task.created_at);
+  const endDateLabel = formatTaskCardDate(task.end_date);
 
   const openTask = () => router.push(href);
 
@@ -220,7 +234,6 @@ export function TaskOverviewCard({
           >
             {task.task_description || "No description added."}
           </p>
-          {endDateLabel && <p className="mt-2 text-[11px] text-slate-500">Due: {endDateLabel}</p>}
           {task.status === "Pending" && task.pending_since && (
             <p className="mt-1 inline-flex items-center gap-1 rounded-md border border-orange-500/30 bg-gradient-to-r from-orange-500/15 to-rose-500/15 px-2 py-1 text-[11px] font-medium text-orange-100">
               <Clock3 size={12} /> Pending since {formatPendingAge(task.pending_since)}
@@ -244,6 +257,7 @@ export function TaskOverviewCard({
         </div>
       </div>
 
+
       <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-400">
         <span className="rounded-md border border-slate-800/60 bg-slate-900/60 px-2 py-1">Activities: {task.activity_count}</span>
         <span className="rounded-md border border-slate-800/60 bg-slate-900/60 px-2 py-1">Completed: {task.completed_activity}</span>
@@ -254,6 +268,12 @@ export function TaskOverviewCard({
         )}
       </div>
 
+      {(createdDateLabel || endDateLabel) && (
+        <div className="mt-2 flex items-center gap-4 text-[11px] text-slate-500">
+          {createdDateLabel && <p className="whitespace-nowrap">Created: {createdDateLabel}</p>}
+          {endDateLabel && <p className="whitespace-nowrap">Due: {endDateLabel}</p>}
+        </div>
+      )}
       <div className="mt-3 space-y-1 text-xs text-slate-400">
         <p>Assigned by: <span className="text-slate-200">{task.assignment.assignedByName || "Unknown"}</span></p>
         <p>
@@ -261,6 +281,7 @@ export function TaskOverviewCard({
           {task.assignment.assignedToCount > 1 && <span className="ml-1 text-cyan-300">+{task.assignment.assignedToCount - 1} more</span>}
         </p>
       </div>
+
 
       {(task.match.nameMatched || task.match.staffTaskAssigned || task.match.staffActivityAssigned || task.match.assignedByMatched) && (
         <div className="mt-3 flex flex-wrap gap-1.5 text-[10px] text-cyan-100">

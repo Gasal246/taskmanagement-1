@@ -192,6 +192,55 @@ export async function GET(req: NextRequest) {
 
     const [result] = await Business_Tasks.aggregate([
       { $match: query },
+      {
+        $lookup: {
+          from: Task_Activities.collection.name,
+          let: { taskId: "$_id" },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ["$task_id", "$$taskId"] },
+                    {
+                      $or: [
+                        { $eq: ["$assigned_to", userObjectId] },
+                        { $eq: ["$forwarded_to", userObjectId] },
+                      ],
+                    },
+                  ],
+                },
+              },
+            },
+            {
+              $group: {
+                _id: null,
+                total: { $sum: 1 },
+                completed: {
+                  $sum: { $cond: [{ $eq: ["$is_done", true] }, 1, 0] },
+                },
+              },
+            },
+          ],
+          as: "__visibleActivityStats",
+        },
+      },
+      {
+        $set: {
+          activity_count: {
+            $ifNull: [
+              { $arrayElemAt: ["$__visibleActivityStats.total", 0] },
+              0,
+            ],
+          },
+          completed_activity: {
+            $ifNull: [
+              { $arrayElemAt: ["$__visibleActivityStats.completed", 0] },
+              0,
+            ],
+          },
+        },
+      },
       ...getTaskStatusAggregationStages(todayStartUtc),
       {
         $facet: {
@@ -209,6 +258,7 @@ export async function GET(req: NextRequest) {
               $project: {
                 task_name: 1,
                 task_description: 1,
+                createdAt: 1,
                 end_date: 1,
                 is_project_task: 1,
                 priority: 1,
@@ -234,7 +284,7 @@ export async function GET(req: NextRequest) {
 
     const taskRows = result?.data || [];
     const taskIds = taskRows.map((task: any) => task._id);
-    const [tasksWithAssignments, visibleActivityStats] = await Promise.all([
+    const [tasksWithAssignments, visibleActivityCommentStats] = await Promise.all([
       addTaskAssignmentSummaries(taskRows),
       taskIds.length
         ? Task_Activities.aggregate([
@@ -266,10 +316,6 @@ export async function GET(req: NextRequest) {
             {
               $group: {
                 _id: "$task_id",
-                total: { $sum: 1 },
-                completed: {
-                  $sum: { $cond: [{ $eq: ["$is_done", true] }, 1, 0] },
-                },
                 comments: {
                   $sum: {
                     $ifNull: [
@@ -283,14 +329,10 @@ export async function GET(req: NextRequest) {
           ])
         : Promise.resolve([]),
     ]);
-    const visibleActivityStatsByTask = new Map(
-      visibleActivityStats.map((stats: any) => [
+    const visibleActivityCommentsByTask = new Map(
+      visibleActivityCommentStats.map((stats: any) => [
         stats._id.toString(),
-        {
-          total: Number(stats.total || 0),
-          completed: Number(stats.completed || 0),
-          comments: Number(stats.comments || 0),
-        },
+        Number(stats.comments || 0),
       ])
     );
     const nameActivitySet = new Set(nameActivityIds.map((id) => id.toString()));
@@ -303,31 +345,18 @@ export async function GET(req: NextRequest) {
         data: tasksWithAssignments.map((task: any) => {
           const taskId = task._id.toString();
           const firstAssignee = task.assignment?.assignedTo?.[0] || null;
-          const visibleStats = visibleActivityStatsByTask.get(taskId) || {
-            total: 0,
-            completed: 0,
-            comments: 0,
-          };
-          const progress = visibleStats.total
-            ? Math.min(
-                100,
-                Math.max(
-                  0,
-                  Math.round((visibleStats.completed / visibleStats.total) * 100)
-                )
-              )
-            : 0;
           return {
             _id: taskId,
             task_name: task.task_name || "",
             task_description: task.task_description || "",
+            created_at: task.createdAt || null,
             end_date: task.end_date || null,
             is_project_task: Boolean(task.is_project_task),
             priority: task.priority || null,
-            activity_count: visibleStats.total,
-            completed_activity: visibleStats.completed,
-            comment_count: visibleStats.comments,
-            progress,
+            activity_count: Number(task.activity_count || 0),
+            completed_activity: Number(task.completed_activity || 0),
+            comment_count: visibleActivityCommentsByTask.get(taskId) || 0,
+            progress: Number(task.progress || 0),
             status: task.status,
             pending_since: task.pending_since || null,
             assignment: {
