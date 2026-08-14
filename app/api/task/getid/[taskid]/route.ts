@@ -11,6 +11,7 @@ import AdminAssignBusiness from "@/models/admin_assign_business.model";
 import { addUnreadCommentCounts } from "@/app/api/helpers/activity-comments";
 import { resolveSessionUserId } from "@/lib/utils";
 import { hasStaffTaskAccess } from "@/app/api/helpers/staff-task-access";
+import { canManageProjectTaskActivities, normalizeProjectTaskTeamIds } from "@/app/api/helpers/project-task-teams";
 connectDB();
 
 export async function GET(req:NextRequest, context: {params: Promise<{taskid:string}>}){
@@ -34,7 +35,11 @@ export async function GET(req:NextRequest, context: {params: Promise<{taskid:str
             if (!activeBusinessAccess) {
                 return NextResponse.json({ message: "Forbidden" }, { status: 403 });
             }
-            const assignedActivityQuery: any = isAssignedActivityScope
+            const canManageActivities = task.is_project_task
+                ? await canManageProjectTaskActivities(task, userId)
+                : Boolean(activeBusinessAccess);
+            const restrictActivities = isAssignedActivityScope && !canManageActivities;
+            const assignedActivityQuery: any = restrictActivities
                 ? {
                     task_id: taskid,
                     $or: [
@@ -46,7 +51,7 @@ export async function GET(req:NextRequest, context: {params: Promise<{taskid:str
 
             const taskObj = task.toObject();
             const activities = await Task_Activities.find(
-                isAssignedActivityScope ? assignedActivityQuery : {task_id: taskid}
+                restrictActivities ? assignedActivityQuery : {task_id: taskid}
             )
                 .populate({ path: "created_by", select: "name email avatar_url" })
                 .populate({ path: "assigned_to", select: "name email avatar_url" })
@@ -58,10 +63,17 @@ export async function GET(req:NextRequest, context: {params: Promise<{taskid:str
             const activitiesWithUnread = await addUnreadCommentCounts(activities, userId);
             if(activities.length > 0 || isAssignedActivityScope) taskObj.activities = activitiesWithUnread;
             taskObj.creator_details = await Users.findById(task.creator).select("name email avatar_url");
+            taskObj.permissions = {
+                canManageActivities,
+                canAssignActivities: canManageActivities,
+            };
             if(task.is_project_task){
-                const assigned_teams = await Project_Teams.findById(task.assigned_teams).select("team_name");
+                const teamIds = normalizeProjectTaskTeamIds(task.assigned_teams);
+                const assigned_teams = await Project_Teams.find({ _id: { $in: teamIds } })
+                    .select("team_name team_head")
+                    .populate({ path: "team_head", select: "name email avatar_url" });
                 const project_details = await Business_Project.findById(task.project_id).select("project_name");
-                taskObj.assigned_team = assigned_teams;
+                taskObj.assigned_teams = assigned_teams;
                 taskObj.project_details = project_details;
             } else {
                 const assigned_user= await Users.findById(task.assigned_to).select("name");

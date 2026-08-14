@@ -24,9 +24,9 @@ export async function DELETE(req:NextRequest){
         if (!authorization.ok) return authorization.response;
         const username = await Users.findById(authorization.userId).select("name");
 
-        const isTaskAssigned = await Business_Tasks.find({is_project_task: true, assigned_teams: team_id});
+        const isTaskAssigned = await Business_Tasks.exists({is_project_task: true, assigned_teams: team_id});
 
-        if(isTaskAssigned.length > 0){
+        if(isTaskAssigned){
             return NextResponse.json({message: "This team cannot be deleted because there are tasks currently assigned to it.", status: 400}, {status: 400});
         }
 

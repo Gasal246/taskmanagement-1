@@ -19,7 +19,7 @@ export async function GET(req:NextRequest){
         if (!authorization.ok) return authorization.response;
 
         let teamQuery: any = { project_id: project_id };
-        if (!authorization.access.canManage) {
+        if (!authorization.access.canViewAllTeams) {
             const memberships = await Project_Team_Members.find({ user_id: authorization.userId })
                 .select("project_team_id")
                 .lean();

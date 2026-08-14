@@ -9,6 +9,7 @@ export type ProjectSection =
   | "flow"
   | "operations"
   | "teams"
+  | "tasks"
   | "departments"
   | "docs";
 

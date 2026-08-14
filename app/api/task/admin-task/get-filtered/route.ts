@@ -116,7 +116,9 @@ export async function GET(req: NextRequest) {
         ? Task_Activities.find({ activity: nameRegex }).select("task_id").lean()
         : Promise.resolve([]),
       staffObjectId
-        ? Task_Activities.find({ assigned_to: staffObjectId }).select("task_id").lean()
+        ? Task_Activities.find({
+            $or: [{ assigned_to: staffObjectId }, { forwarded_to: staffObjectId }],
+          }).select("task_id").lean()
         : Promise.resolve([]),
     ]);
     const nameActivityIds = nameActivityMatches

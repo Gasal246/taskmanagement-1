@@ -9,6 +9,7 @@ import type {
   StaffTaskStatusFilter,
   StaffTaskSummary,
 } from "@/types/staff-tasks";
+import type { ReactNode } from "react";
 
 const statusStyles: Record<string, string> = {
   Completed: "border-emerald-500/40 bg-emerald-500/15 text-emerald-200",
@@ -198,10 +199,14 @@ export function TaskOverviewCard({
   task,
   href,
   matchLabels,
+  hideProjectBadge = false,
+  supplementalContent,
 }: {
   task: StaffTaskCard;
   href: string;
   matchLabels?: { name?: string; staff?: string; assignedBy?: string };
+  hideProjectBadge?: boolean;
+  supplementalContent?: ReactNode;
 }) {
   const router = useRouter();
   const shouldReduceMotion = useReducedMotion();
@@ -244,7 +249,7 @@ export function TaskOverviewCard({
           <span className={`rounded-md border px-2 py-1 text-[10px] uppercase tracking-wide ${statusStyles[task.status] || "border-slate-600/40 bg-slate-700/30 text-slate-200"}`}>
             {task.status}
           </span>
-          {task.is_project_task && (
+          {task.is_project_task && !hideProjectBadge && (
             <span className="rounded-md border border-indigo-500/40 bg-indigo-500/10 px-2 py-1 text-[10px] uppercase tracking-wide text-indigo-200">
               Project Based
             </span>
@@ -281,6 +286,7 @@ export function TaskOverviewCard({
           {task.assignment.assignedToCount > 1 && <span className="ml-1 text-cyan-300">+{task.assignment.assignedToCount - 1} more</span>}
         </p>
       </div>
+      {supplementalContent}
 
 
       {(task.match.nameMatched || task.match.staffTaskAssigned || task.match.staffActivityAssigned || task.match.assignedByMatched) && (

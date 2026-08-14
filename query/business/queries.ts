@@ -95,7 +95,6 @@ import {
     GetStaffsByDepartment,
     GetStaffTasksByFilter,
     GetTaskByIdFunc,
-    getTeamByProject,
     GetTeamsForProjectsFunc,
     GetUserDetails,
     postNewProjectFunc,
@@ -848,15 +847,6 @@ export const useRemoveAddedProjectDepartment = () => {
 export const useAddNewTeam = () => {
     return useMutation({
         mutationFn: (payload: any) => addNewTeamFunc(payload),
-    })
-}
-
-//Get Teams
-export const useGetTeamsByProject = (business_id: string, project_id?: string) => {
-    return useQuery({
-        queryKey: ["teams", business_id, project_id],
-        queryFn: ()=> getTeamByProject(business_id!, project_id),
-        enabled: !!business_id,
     })
 }
 

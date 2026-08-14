@@ -9,9 +9,9 @@ export async function addTaskAssignmentSummaries(tasks: any[]) {
   const taskIds = tasks.map((task) => task._id).filter(Boolean);
   const activities = await Task_Activities.find({
     task_id: { $in: taskIds },
-    assigned_to: { $ne: null },
+    $or: [{ assigned_to: { $ne: null } }, { forwarded_to: { $ne: null } }],
   })
-    .select("task_id assigned_to createdAt")
+    .select("task_id assigned_to forwarded_to createdAt")
     .sort({ createdAt: 1 })
     .lean();
 
@@ -23,7 +23,7 @@ export async function addTaskAssignmentSummaries(tasks: any[]) {
   }
   for (const activity of activities) {
     const taskId = activity.task_id?.toString();
-    const userId = activity.assigned_to?.toString();
+    const userId = (activity.forwarded_to || activity.assigned_to)?.toString();
     if (!taskId || !userId) continue;
     const ids = activityAssignees.get(taskId) || [];
     if (!ids.includes(userId)) ids.push(userId);

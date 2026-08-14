@@ -1,7 +1,7 @@
 import connectDB from "@/lib/mongo";
 import Business_Tasks from "@/models/business_tasks.model";
 import Project_Teams from "@/models/project_team.model";
-import Team_Members from "@/models/team_members.model";
+import ProjectTeamMembers from "@/models/project_team_members.model";
 import Task_Activities from "@/models/task_activities.model";
 import { auth } from "@/auth";
 import { resolveActiveBusinessIdForUser } from "@/app/api/helpers/resolve-user-business";
@@ -85,10 +85,10 @@ export async function GET(req:NextRequest){
         }
 
         if (user_id) {
-            const teamMembers = await Team_Members.find({ user_id }).select("team_id").lean();
+            const teamMembers = await ProjectTeamMembers.find({ user_id }).select("project_team_id").lean();
             const headTeams = await Project_Teams.find({ team_head: user_id }).select("_id").lean();
             const teamIds = [
-                ...teamMembers.map((item:any) => item?.team_id).filter(Boolean),
+                ...teamMembers.map((item:any) => item?.project_team_id).filter(Boolean),
                 ...headTeams.map((item:any) => item?._id).filter(Boolean),
             ];
 
@@ -121,7 +121,9 @@ export async function GET(req:NextRequest){
             activityTaskIds.forEach((id: any) => matchMetadata.set(id.toString(), { nameMatched: true }));
         }
         if (staffId) {
-            const matchingActivities = await Task_Activities.find({ assigned_to: staffId }).select("task_id").lean();
+            const matchingActivities = await Task_Activities.find({
+                $or: [{ assigned_to: staffId }, { forwarded_to: staffId }],
+            }).select("task_id").lean();
             const activityTaskIds = matchingActivities.map((item: any) => item.task_id).filter(Boolean);
             query.$and = [...(query.$and || []), { $or: [{ assigned_to: staffId }, { _id: { $in: activityTaskIds } }] }];
             activityTaskIds.forEach((id: any) => {

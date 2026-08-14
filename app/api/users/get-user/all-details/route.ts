@@ -20,7 +20,6 @@ import Project_Teams from "@/models/project_team.model";
 import Region_departments from "@/models/region_departments.model";
 import Region_dep_staffs from "@/models/region_dep_staffs.model";
 import Region_staffs from "@/models/region_staffs.model";
-import Team_Members from "@/models/team_members.model";
 import "@/models/roles.model"
 import "@/models/business_clients.model";
 import { NextRequest, NextResponse } from "next/server";
@@ -206,13 +205,13 @@ async function getHeadStaffCount(roleName: string, orgId?: string | null) {
 
 async function getTaskCounts(userId: string) {
   const [teamMemberships, headedTeams] = await Promise.all([
-    Team_Members.find({ user_id: userId }).select("team_id").lean(),
+    Project_Team_Members.find({ user_id: userId }).select("project_team_id").lean(),
     Project_Teams.find({ team_head: userId }).select("_id").lean(),
   ]);
 
   const teamIds = [
     ...new Set([
-      ...teamMemberships.map((team: any) => String(team?.team_id)),
+      ...teamMemberships.map((team: any) => String(team?.project_team_id)),
       ...headedTeams.map((team: any) => String(team?._id)),
     ].filter(Boolean)),
   ];

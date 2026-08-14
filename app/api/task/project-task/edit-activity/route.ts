@@ -11,6 +11,10 @@ import {
     getSelectedHeadDirectStaffIds,
     resolveSelectedHeadContext,
 } from "@/app/api/helpers/head-reassignment-scope";
+import {
+    canManageProjectTaskActivities,
+    getProjectTaskCandidateIds,
+} from "@/app/api/helpers/project-task-teams";
 
 connectDB();
 
@@ -42,6 +46,44 @@ export async function PUT(req: NextRequest) {
             }
 
             const actorId = String(session?.user?.id || "");
+            const task: any = await Business_Tasks.findById(currentActivity.task_id)
+                .select("business_id project_id creator is_project_task assigned_teams")
+                .lean();
+            if (task?.is_project_task) {
+                if (!(await canManageProjectTaskActivities(task, actorId))) {
+                    return NextResponse.json(
+                        { message: "Only the task creator or a project manager can reassign this activity", status: 403 },
+                        { status: 403 }
+                    );
+                }
+                if (!body.forwarded_to) {
+                    await Task_Activities.findByIdAndUpdate(body.activity_id, { $set: { forwarded_to: null } });
+                    return NextResponse.json({ message: "Activity reassignment removed", status: 200 }, { status: 200 });
+                }
+                const candidates = await getProjectTaskCandidateIds(task);
+                if (!candidates.includes(String(body.forwarded_to))) {
+                    return NextResponse.json(
+                        { message: "Activities can only be reassigned to active heads or members of the selected teams", status: 403 },
+                        { status: 403 }
+                    );
+                }
+                if (String(currentActivity.forwarded_to || "") === String(body.forwarded_to)) {
+                    return NextResponse.json({ message: "Activity is already reassigned to this staff member", status: 200 }, { status: 200 });
+                }
+                await Task_Activities.findByIdAndUpdate(body.activity_id, {
+                    $set: { forwarded_to: body.forwarded_to },
+                    $push: {
+                        reassignment_history: {
+                            action: "reassigned",
+                            actor_id: actor._id,
+                            recipient_id: body.forwarded_to,
+                            previous_recipient_id: currentActivity.forwarded_to || null,
+                            createdAt: new Date(),
+                        }
+                    }
+                });
+                return NextResponse.json({ message: "Activity reassigned successfully", status: 200 }, { status: 200 });
+            }
             if (actor?.status !== 1) {
                 return NextResponse.json({ message: "An active HEAD role is required", status: 403 }, { status: 403 });
             }
@@ -51,9 +93,6 @@ export async function PUT(req: NextRequest) {
                     { status: 403 }
                 );
             }
-            const task: any = await Business_Tasks.findById(currentActivity.task_id)
-                .select("business_id")
-                .lean();
             const headContext = task?.business_id
                 ? await resolveSelectedHeadContext(
                     req,
@@ -120,6 +159,21 @@ export async function PUT(req: NextRequest) {
             const currentActivity = await Task_Activities.findById(body.activity_id);
             if (!currentActivity) {
                 return NextResponse.json({ message: "Activity not found", status: 404 }, { status: 404 });
+            }
+            const task: any = await Business_Tasks.findById(currentActivity.task_id)
+                .select("business_id project_id creator is_project_task assigned_teams")
+                .lean();
+            if (task?.is_project_task) {
+                const actorId = String(session?.user?.id || "");
+                const isActivityParticipant =
+                    String(currentActivity.assigned_to || "") === actorId ||
+                    String(currentActivity.forwarded_to || "") === actorId;
+                if (!isActivityParticipant && !(await canManageProjectTaskActivities(task, actorId))) {
+                    return NextResponse.json(
+                        { message: "You cannot change this activity status", status: 403 },
+                        { status: 403 }
+                    );
+                }
             }
 
             const changeStatus = await Task_Activities.findByIdAndUpdate(body.activity_id, {
@@ -194,6 +248,34 @@ export async function PUT(req: NextRequest) {
 
             if (!Object.keys(updateFields).length) {
                 return NextResponse.json({ message: "No updates provided", status: 400 }, { status: 400 });
+            }
+
+            const currentActivity: any = await Task_Activities.findById(body.activity_id)
+                .select("task_id")
+                .lean();
+            if (!currentActivity) {
+                return NextResponse.json({ message: "Activity not found", status: 404 }, { status: 404 });
+            }
+            const task: any = await Business_Tasks.findById(currentActivity.task_id)
+                .select("business_id project_id creator is_project_task assigned_teams")
+                .lean();
+            if (task?.is_project_task) {
+                const actorId = String(session?.user?.id || "");
+                if (!(await canManageProjectTaskActivities(task, actorId))) {
+                    return NextResponse.json(
+                        { message: "Only the task creator or a project manager can edit or assign this activity", status: 403 },
+                        { status: 403 }
+                    );
+                }
+                if (Object.prototype.hasOwnProperty.call(body, "assigned_to") && body.assigned_to) {
+                    const candidates = await getProjectTaskCandidateIds(task);
+                    if (!candidates.includes(String(body.assigned_to))) {
+                        return NextResponse.json(
+                            { message: "Activities can only be assigned to active heads or members of the selected teams", status: 403 },
+                            { status: 403 }
+                        );
+                    }
+                }
             }
 
             await Task_Activities.findByIdAndUpdate(body.activity_id, {

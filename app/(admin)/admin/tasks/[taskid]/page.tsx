@@ -73,6 +73,8 @@ import LoaderSpin from "@/components/shared/LoaderSpin";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "antd";
 import ActivityCommentsSheet from "@/components/task/ActivityCommentsSheet";
+import axios from "axios";
+import ProjectTaskHeaderSummary from "@/components/tasks/ProjectTaskHeaderSummary";
 
 const statusStyles: Record<string, string> = {
   Completed: "border-emerald-500/40 bg-emerald-500/15 text-emerald-200",
@@ -297,18 +299,26 @@ const TaskDetailPage = () => {
   useEffect(() => {
     if (!selectStaffDialogOpen || !selectedSkill?._id || !businessData?._id) return;
     const fetchStaffs = async () => {
-      const res = await getStaffsBySkill({
-        business_id: businessData._id,
-        skill_id: selectedSkill._id,
-      });
+      const res = isProjectTask
+        ? (await axios.get(`/api/task/${params.taskid}/assignment-candidates`, {
+            params: { skill_id: selectedSkill._id },
+          })).data
+        : await getStaffsBySkill({
+            business_id: businessData._id,
+            skill_id: selectedSkill._id,
+          });
       if (res?.status === 200) {
-        setStaffOptions(res?.data || []);
+        setStaffOptions(
+          isProjectTask
+            ? (res?.data || []).map((person: any) => ({ user_id: { _id: person.id, ...person } }))
+            : res?.data || []
+        );
       } else {
         setStaffOptions([]);
       }
     };
     fetchStaffs();
-  }, [selectStaffDialogOpen, selectedSkill?._id, businessData?._id, getStaffsBySkill]);
+  }, [selectStaffDialogOpen, selectedSkill?._id, businessData?._id, getStaffsBySkill, isProjectTask, params.taskid]);
 
   const handleAddActivity = () => {
     activityForm.reset();
@@ -443,9 +453,7 @@ const TaskDetailPage = () => {
   };
 
   const onTaskSubmit = async (values: z.infer<typeof taskSchema>) => {
-    const assignedTo = taskData?.is_project_task
-      ? taskData?.assigned_teams || taskData?.assigned_team?._id || null
-      : selectedUser?.user_id?._id || taskData?.assigned_to || null;
+    const assignedTo = selectedUser?.user_id?._id || taskData?.assigned_to || null;
     const updateData = {
       task_id: params.taskid,
       task_name: values.task_name,
@@ -454,7 +462,7 @@ const TaskDetailPage = () => {
       comments: values.comments || undefined,
       status: values.status,
       is_project_task: taskData?.is_project_task,
-      assigned_to: assignedTo,
+      ...(!taskData?.is_project_task ? { assigned_to: assignedTo } : {}),
     };
     const res = await UpdateTask(updateData);
     if (res?.status == 200) {
@@ -496,7 +504,7 @@ const TaskDetailPage = () => {
 
   const handleNavigateToProject = () => {
     if (taskData?.project_id) {
-      router.push(`/admin/projects/${taskData.project_id}`);
+      router.push(`/admin/projects/${taskData.project_id}?section=tasks`);
     }
   };
 
@@ -768,42 +776,46 @@ const TaskDetailPage = () => {
           </div>
         </div>
 
-        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-lg border border-slate-800/70 bg-slate-900/60 p-3">
-            <p className="text-[11px] uppercase tracking-wide text-slate-500">Activities</p>
-            <p className="text-base font-semibold text-slate-100 mt-1">
-              {taskData.activity_count || 0}
-            </p>
-            <p className="text-xs text-slate-400">
-              Completed {taskData.completed_activity || 0}
-            </p>
-          </div>
-          <div className="rounded-lg border border-slate-800/70 bg-slate-900/60 p-3">
-            <p className="text-[11px] uppercase tracking-wide text-slate-500">Assigned</p>
-            <p className="text-sm font-semibold text-slate-100 mt-1">
-              {taskData.is_project_task
-                ? taskData.assigned_team?.team_name || "Not assigned"
-                : taskData.assigned_user?.name || "Not assigned"}
-            </p>
-            {taskData.is_project_task && (
-              <p className="text-xs text-slate-400">
-                {taskData.project_details?.project_name || "Project"}
+        {isProjectTask ? (
+          <ProjectTaskHeaderSummary
+            activityCount={Number(taskData.activity_count || 0)}
+            completedActivityCount={Number(taskData.completed_activity || 0)}
+            teams={Array.isArray(taskData.assigned_teams) ? taskData.assigned_teams : []}
+            projectName={taskData.project_details?.project_name}
+            startDate={taskData.start_date}
+            endDate={taskData.end_date}
+          />
+        ) : (
+          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-lg border border-slate-800/70 bg-slate-900/60 p-3">
+              <p className="text-[11px] uppercase tracking-wide text-slate-500">Activities</p>
+              <p className="text-base font-semibold text-slate-100 mt-1">
+                {taskData.activity_count || 0}
               </p>
-            )}
+              <p className="text-xs text-slate-400">
+                Completed {taskData.completed_activity || 0}
+              </p>
+            </div>
+            <div className="rounded-lg border border-slate-800/70 bg-slate-900/60 p-3">
+              <p className="text-[11px] uppercase tracking-wide text-slate-500">Assigned</p>
+              <p className="text-sm font-semibold text-slate-100 mt-1">
+                {taskData.assigned_user?.name || "Not assigned"}
+              </p>
+            </div>
+            <div className="rounded-lg border border-slate-800/70 bg-slate-900/60 p-3">
+              <p className="text-[11px] uppercase tracking-wide text-slate-500">Start Date</p>
+              <p className="text-sm font-semibold text-slate-100 mt-1">
+                {formatDateTiny(taskData.start_date) || "N/A"}
+              </p>
+            </div>
+            <div className="rounded-lg border border-slate-800/70 bg-slate-900/60 p-3">
+              <p className="text-[11px] uppercase tracking-wide text-slate-500">End Date</p>
+              <p className="text-sm font-semibold text-slate-100 mt-1">
+                {formatDateTiny(taskData.end_date) || "N/A"}
+              </p>
+            </div>
           </div>
-          <div className="rounded-lg border border-slate-800/70 bg-slate-900/60 p-3">
-            <p className="text-[11px] uppercase tracking-wide text-slate-500">Start Date</p>
-            <p className="text-sm font-semibold text-slate-100 mt-1">
-              {formatDateTiny(taskData.start_date) || "N/A"}
-            </p>
-          </div>
-          <div className="rounded-lg border border-slate-800/70 bg-slate-900/60 p-3">
-            <p className="text-[11px] uppercase tracking-wide text-slate-500">End Date</p>
-            <p className="text-sm font-semibold text-slate-100 mt-1">
-              {formatDateTiny(taskData.end_date) || "N/A"}
-            </p>
-          </div>
-        </div>
+        )}
 
         <div className="mt-4 flex items-center gap-3">
           <div className="h-2 flex-1 rounded-full bg-slate-800/80">

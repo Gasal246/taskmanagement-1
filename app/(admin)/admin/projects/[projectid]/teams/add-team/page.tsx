@@ -6,7 +6,7 @@ type AddTeamPageProps = {
 
 const AddTeamPage = async ({ params }: AddTeamPageProps) => {
   const { projectid } = await params;
-  redirect(`/admin/projects/${projectid}/teams`);
+  redirect(`/admin/projects/${projectid}?section=teams`);
 };
 
 export default AddTeamPage;

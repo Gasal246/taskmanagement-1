@@ -4,7 +4,7 @@ import Business_Tasks from "@/models/business_tasks.model";
 import ActivityComments from "@/models/activity_comments.model";
 import Project_Teams from "@/models/project_team.model";
 import Task_Activities from "@/models/task_activities.model";
-import Team_Members from "@/models/team_members.model";
+import ProjectTeamMembers from "@/models/project_team_members.model";
 import { NextRequest, NextResponse } from "next/server";
 import {
   escapeRegex,
@@ -88,7 +88,7 @@ export async function GET(req: NextRequest) {
     const roleName = getRoleNameFromRequest(req);
     const userObjectId = toObjectId(userId);
     const [teams, headedTeams, accessibleActivityTaskIds, headStaffIds] = await Promise.all([
-      Team_Members.find({ user_id: userId }).select("team_id").lean(),
+      ProjectTeamMembers.find({ user_id: userId }).select("project_team_id").lean(),
       Project_Teams.find({ team_head: userId }).select("_id").lean(),
       Task_Activities.distinct("task_id", {
         $or: [{ assigned_to: userId }, { forwarded_to: userId }],
@@ -107,7 +107,7 @@ export async function GET(req: NextRequest) {
     }
 
     const teamIds = [
-      ...teams.map((team: any) => team.team_id).filter(Boolean),
+      ...teams.map((team: any) => team.project_team_id).filter(Boolean),
       ...headedTeams.map((team: any) => team._id).filter(Boolean),
     ].map(toObjectId);
     const activityTaskIds = accessibleActivityTaskIds.filter(Boolean).map(toObjectId);

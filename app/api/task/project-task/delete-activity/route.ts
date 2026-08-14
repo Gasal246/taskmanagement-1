@@ -8,6 +8,7 @@ import { notifyTaskActivityChange } from "@/app/api/helpers/task-activity-notifi
 import ActivityComments from "@/models/activity_comments.model";
 import ActivityCommentReads from "@/models/activity_comment_reads.model";
 import { deleteActivityCommentAttachments } from "@/app/api/helpers/activity-comment-attachments";
+import { canManageProjectTaskActivities } from "@/app/api/helpers/project-task-teams";
 
 connectDB();
 
@@ -25,6 +26,15 @@ export async function DELETE(req:NextRequest){
         const activityToDelete = await Task_Activities.findById(activity_id);
         if (!activityToDelete) {
             return NextResponse.json({message: "Activity not found"}, {status:404});
+        }
+        const owningTask: any = await Business_Tasks.findById(activityToDelete.task_id)
+            .select("business_id project_id creator is_project_task assigned_teams")
+            .lean();
+        if (
+            owningTask?.is_project_task &&
+            !(await canManageProjectTaskActivities(owningTask, String(session.user.id)))
+        ) {
+            return NextResponse.json({ message: "You cannot delete this activity" }, { status: 403 });
         }
 
         const comments = await ActivityComments.find({ activity_id })

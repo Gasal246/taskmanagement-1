@@ -42,7 +42,6 @@ import {
   useGetLocationsandDeptsForArea,
   useGetDeptsforLoation,
   useGetStaffsByDepartment,
-  useGetBusinessSkills,
 } from "@/query/business/queries";
 
 const resolveDomainId = (roleName: string, domainData: any) => {
@@ -93,8 +92,7 @@ const formSchema = z.object({
 
 const steps = [
   { id: 1, title: "Departments", description: "Choose where the staff belongs." },
-  { id: 2, title: "Skills", description: "Filter by skills (optional)." },
-  { id: 3, title: "Staff", description: "Pick the staff member." },
+  { id: 2, title: "Staff", description: "Pick the staff member." },
 ];
 
 const AddTask = () => {
@@ -105,12 +103,10 @@ const AddTask = () => {
   const { mutateAsync: getAreasAndDeptsForRegion } = useGetAreasandDeptsForRegion();
   const { mutateAsync: getLocationsAndDeptsForArea } = useGetLocationsandDeptsForArea();
   const { mutateAsync: getDeptsForLocation } = useGetDeptsforLoation();
-  const { mutateAsync: getBusinessSkills } = useGetBusinessSkills();
 
   const [roleId, setRoleId] = useState("");
   const [roleName, setRoleName] = useState("");
   const [domainData, setDomainData] = useState<any>(null);
-  const [businessId, setBusinessId] = useState("");
 
   const [step, setStep] = useState(1);
   const [assignScope, setAssignScope] = useState<"my" | "other">("my");
@@ -123,11 +119,6 @@ const AddTask = () => {
   const [staffSearch, setStaffSearch] = useState("");
   const [selectedStaff, setSelectedStaff] = useState<any>(null);
   const [loadingDeptStaffs, setLoadingDeptStaffs] = useState(false);
-
-  const [skills, setSkills] = useState<any[]>([]);
-  const [skillSearch, setSkillSearch] = useState("");
-  const [selectedSkillIds, setSelectedSkillIds] = useState<string[]>([]);
-  const [loadingSkills, setLoadingSkills] = useState(false);
 
   const [activityMap, setActivityMap] = useState<Record<string, any[]>>({});
   const [loadingActivities, setLoadingActivities] = useState(false);
@@ -170,7 +161,6 @@ const AddTask = () => {
       setRoleId(roleJson?._id || "");
       setRoleName(roleJson?.role_name || "");
       setDomainData(domainJson);
-      setBusinessId(domainJson?.business_id || "");
       form.setValue("business_id", domainJson?.business_id || "");
     } catch (error) {
       toast.error("Invalid cookies");
@@ -327,21 +317,6 @@ const AddTask = () => {
   }, [assignScope, domainData, form, loadDepartmentTree, loadMyStaffs, roleId, roleName]);
 
   useEffect(() => {
-    if (step !== 2 || !businessId) return;
-    const loadSkills = async () => {
-      setLoadingSkills(true);
-      const res = await getBusinessSkills(businessId);
-      if (res?.status === 200) {
-        setSkills(res?.data || []);
-      } else {
-        setSkills([]);
-      }
-      setLoadingSkills(false);
-    };
-    loadSkills();
-  }, [step, businessId, getBusinessSkills]);
-
-  useEffect(() => {
     const loadActivities = async () => {
       const ids = staffOptions.map((staff) => staff._id).filter(Boolean);
       if (ids.length === 0) {
@@ -382,37 +357,15 @@ const AddTask = () => {
     setLoadingDeptStaffs(false);
   };
 
-  const filteredSkills = useMemo(() => {
-    const term = skillSearch.trim().toLowerCase();
-    if (!term) return skills;
-    return skills.filter((skill: any) =>
-      (skill?.skill_name || "").toLowerCase().includes(term)
-    );
-  }, [skills, skillSearch]);
-
-  const selectedSkillSet = useMemo(() => new Set(selectedSkillIds), [selectedSkillIds]);
-
   const visibleStaffs = useMemo(() => {
     const term = staffSearch.trim().toLowerCase();
-    let base = staffOptions;
-
-    if (selectedSkillIds.length > 0) {
-      base = base.filter((staff) => {
-        const skillIds = (staff?.skills || [])
-          .map((skill: any) => skill?.skill_id?._id || skill?.skill_id)
-          .filter(Boolean)
-          .map((id: any) => id.toString());
-        return skillIds.some((id: string) => selectedSkillSet.has(id));
-      });
-    }
-
-    if (!term) return base;
-    return base.filter((staff) => {
+    if (!term) return staffOptions;
+    return staffOptions.filter((staff) => {
       const name = staff?.name || "";
       const email = staff?.email || "";
       return `${name} ${email}`.toLowerCase().includes(term);
     });
-  }, [staffOptions, staffSearch, selectedSkillIds, selectedSkillSet]);
+  }, [staffOptions, staffSearch]);
 
   const handleStaffSelect = (staff: any) => {
     setSelectedStaff(staff);
@@ -464,6 +417,13 @@ const AddTask = () => {
   };
 
   const canContinueFromStep1 = assignScope === "my" || Boolean(selectedDepartmentId);
+  const currentDepartmentName =
+    domainData?.dept_name ||
+    domainData?.department_name ||
+    domainData?.region_name ||
+    domainData?.area_name ||
+    domainData?.location_name ||
+    "Current Department";
 
   return (
     <div className="p-4 pb-20 space-y-4">
@@ -721,7 +681,7 @@ const AddTask = () => {
                           : "border-slate-700 text-slate-300 hover:border-slate-500"
                       }`}
                     >
-                      My Department
+                      {currentDepartmentName}
                     </button>
                     <button
                       type="button"
@@ -913,7 +873,7 @@ const AddTask = () => {
                   <div className="rounded-lg border border-slate-800/70 bg-slate-900/60 p-3">
                     <p className="text-xs text-slate-400">Selected Department</p>
                     <p className="text-sm text-slate-200 mt-1">
-                      {assignScope === "my" ? "My Department" : selectedDepartmentName || "Select a department"}
+                      {assignScope === "my" ? currentDepartmentName : selectedDepartmentName || "Select a department"}
                     </p>
                   </div>
                 </div>
@@ -922,84 +882,10 @@ const AddTask = () => {
               {step === 2 && (
                 <div className="space-y-4">
                   <div className="rounded-lg border border-slate-800/70 bg-slate-900/60 p-3">
-                    <p className="text-xs text-slate-400 mb-2">Search Skills</p>
-                    <Input
-                      placeholder="Search skills..."
-                      value={skillSearch}
-                      onChange={(e) => setSkillSearch(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="rounded-lg border border-slate-800/70 bg-slate-900/60 p-3">
-                    <p className="text-xs text-slate-400 mb-2">Selected Skills</p>
-                    {selectedSkillIds.length === 0 && (
-                      <p className="text-xs text-slate-500">No skills selected.</p>
-                    )}
-                    <div className="flex flex-wrap gap-2">
-                      {selectedSkillIds.map((skillId) => {
-                        const skill = skills.find((item: any) => item?._id === skillId);
-                        return (
-                          <button
-                            key={skillId}
-                            type="button"
-                            onClick={() =>
-                              setSelectedSkillIds((prev) => prev.filter((id) => id !== skillId))
-                            }
-                            className="text-[10px] px-2 py-1 rounded-full border border-slate-700 text-slate-200 hover:border-rose-500/60 hover:text-rose-300"
-                          >
-                            {skill?.skill_name || "Skill"} x
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="rounded-lg border border-slate-800/70 bg-slate-900/60 p-3 max-h-[240px] overflow-y-auto">
-                    {loadingSkills && (
-                      <p className="text-xs text-slate-400">Loading skills...</p>
-                    )}
-                    {!loadingSkills && filteredSkills.length === 0 && (
-                      <p className="text-xs text-slate-500">No skills found.</p>
-                    )}
-                    {!loadingSkills && filteredSkills.map((skill: any) => {
-                      const isSelected = selectedSkillIds.includes(skill?._id);
-                      return (
-                        <button
-                          key={skill?._id}
-                          type="button"
-                          onClick={() => {
-                            setSelectedSkillIds((prev) =>
-                              isSelected
-                                ? prev.filter((id) => id !== skill?._id)
-                                : [...prev, skill?._id]
-                            );
-                          }}
-                          className={`w-full text-left text-xs px-3 py-2 rounded-lg border mb-2 transition-colors ${
-                            isSelected
-                              ? "border-cyan-500/60 bg-cyan-500/10 text-cyan-200"
-                              : "border-slate-800 bg-slate-950/40 text-slate-300 hover:border-slate-600"
-                          }`}
-                        >
-                          {skill?.skill_name}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {step === 3 && (
-                <div className="space-y-4">
-                  <div className="rounded-lg border border-slate-800/70 bg-slate-900/60 p-3">
                     <p className="text-xs text-slate-400">Selected Department</p>
                     <p className="text-sm text-slate-200 mt-1">
-                      {assignScope === "my" ? "My Department" : selectedDepartmentName || "Select a department"}
+                      {assignScope === "my" ? currentDepartmentName : selectedDepartmentName || "Select a department"}
                     </p>
-                    {selectedSkillIds.length > 0 && (
-                      <p className="text-[11px] text-slate-500 mt-2">
-                        Filtering by {selectedSkillIds.length} skill{selectedSkillIds.length > 1 ? "s" : ""}.
-                      </p>
-                    )}
                   </div>
 
                   <div className="rounded-lg border border-slate-800/70 bg-slate-900/60 p-3">
@@ -1109,11 +995,11 @@ const AddTask = () => {
                 >
                   Back
                 </Button>
-                {step < 3 ? (
+                {step < 2 ? (
                   <Button
                     type="button"
                     className="bg-cyan-600 hover:bg-cyan-500 text-slate-950"
-                    onClick={() => setStep((prev) => Math.min(3, prev + 1))}
+                    onClick={() => setStep((prev) => Math.min(2, prev + 1))}
                     disabled={step === 1 && !canContinueFromStep1}
                   >
                     Continue

@@ -3,7 +3,7 @@ import mongoose, { ObjectId, Schema } from "mongoose";
 interface IBusiness_Tasks extends Document {
     _id: ObjectId,
     project_id: ObjectId | null,
-    assigned_teams: ObjectId | null,
+    assigned_teams: ObjectId[],
     assigned_to: ObjectId | null,
     business_id: ObjectId | null,
     creator: ObjectId,
@@ -21,7 +21,7 @@ interface IBusiness_Tasks extends Document {
 
 const Business_TasksSchema:Schema = new Schema({
     project_id: {type: Schema.Types.ObjectId, ref:"business_project"},
-    assigned_teams: {type: Schema.Types.ObjectId, ref: "project_teams", required: false},
+    assigned_teams: [{type: Schema.Types.ObjectId, ref: "project_teams"}],
     assigned_to: {type: Schema.Types.ObjectId, ref:"users"},
     business_id: {type: Schema.Types.ObjectId, ref: "businesses", required: true},
     creator: {type: Schema.Types.ObjectId, ref: "users"},

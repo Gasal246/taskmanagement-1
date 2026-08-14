@@ -78,7 +78,7 @@ export async function notifyTaskActivityChange({
     task_name?: string;
     is_project_task?: boolean;
     assigned_to?: string | null;
-    assigned_teams?: string | null;
+    assigned_teams?: string[] | string | null;
     creator?: string | null;
   } | null = await Business_Tasks.findById(taskId)
     .select("task_name is_project_task assigned_to assigned_teams creator")
@@ -86,7 +86,7 @@ export async function notifyTaskActivityChange({
       task_name?: string;
       is_project_task?: boolean;
       assigned_to?: string | null;
-      assigned_teams?: string | null;
+      assigned_teams?: string[] | string | null;
       creator?: string | null;
     }>();
   if (!task) return;
@@ -115,13 +115,18 @@ export async function notifyTaskActivityChange({
   });
 
   if (task.is_project_task && task.assigned_teams) {
-    const team: { team_head?: string | null } | null = await Project_Teams.findById(task.assigned_teams)
+    const teamIds = (Array.isArray(task.assigned_teams) ? task.assigned_teams : [task.assigned_teams])
+      .map(String)
+      .filter(Boolean);
+    const teams: Array<{ team_head?: string | null }> = await Project_Teams.find({ _id: { $in: teamIds } })
       .select("team_head")
-      .lean<{ team_head?: string | null }>();
-    if (team?.team_head) recipients.add(String(team.team_head));
+      .lean<Array<{ team_head?: string | null }>>();
+    teams.forEach((team) => {
+      if (team?.team_head) recipients.add(String(team.team_head));
+    });
 
     const teamMembers = await Project_Team_Members.find({
-      project_team_id: task.assigned_teams,
+      project_team_id: { $in: teamIds },
     })
       .select("user_id")
       .lean();

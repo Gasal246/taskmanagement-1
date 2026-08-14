@@ -4,7 +4,7 @@ import Calendar_Events from "@/models/calendar_events.model";
 import Business_Tasks from "@/models/business_tasks.model";
 import Eq_enquiry_histories from "@/models/eq_enquiry_histories";
 import Project_Teams from "@/models/project_team.model";
-import Team_Members from "@/models/team_members.model";
+import ProjectTeamMembers from "@/models/project_team_members.model";
 import Region_staffs from "@/models/region_staffs.model";
 import Area_staffs from "@/models/area_staffs.model";
 import Location_staffs from "@/models/location_staffs.model";
@@ -201,13 +201,13 @@ export async function GET(req: NextRequest) {
       if (!isAdmin) {
         const domainId = getDomainId(req, roleName);
         const [teamMembers, headedTeams, headStaffUserIds] = await Promise.all([
-          Team_Members.find({ user_id: session.user.id }).select("team_id").lean(),
+          ProjectTeamMembers.find({ user_id: session.user.id }).select("project_team_id").lean(),
           Project_Teams.find({ team_head: session.user.id }).select("_id").lean(),
           getHeadStaffUserIds(roleName, domainId),
         ]);
 
         const teamIds = [
-          ...teamMembers.map((item: any) => item?.team_id).filter(Boolean),
+          ...teamMembers.map((item: any) => item?.project_team_id).filter(Boolean),
           ...headedTeams.map((item: any) => item?._id).filter(Boolean),
         ];
 
@@ -245,7 +245,9 @@ export async function GET(req: NextRequest) {
           status: String(task?.status || ""),
           assignedLabel:
             task?.assigned_to?.name ||
-            task?.assigned_teams?.team_name ||
+            (Array.isArray(task?.assigned_teams)
+              ? task.assigned_teams.map((team: any) => team?.team_name).filter(Boolean).join(", ")
+              : task?.assigned_teams?.team_name) ||
             "Unassigned",
           createdBy: String(task?.creator?.name || ""),
           isProjectTask: Boolean(task?.is_project_task),

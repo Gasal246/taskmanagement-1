@@ -19,7 +19,6 @@ connectDB();
 const validSections = new Set([
   "operations",
   "flow",
-  "teams",
   "departments",
   "docs",
   "assignment-candidates",
@@ -158,10 +157,6 @@ export async function GET(
           .lean();
         return NextResponse.json({ data: flows });
       }
-      case "teams":
-        return NextResponse.json({
-          data: await getTeams(projectid, userId, access.canManage),
-        });
       case "departments": {
         const departments = await ProjectDepartments.find({
           project_id: projectid,

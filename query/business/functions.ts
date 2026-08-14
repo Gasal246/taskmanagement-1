@@ -938,21 +938,6 @@ export async function addNewTeamFunc (payload:any){
     }
 }
 
-export async function getTeamByProject(business_id:string, project_id?:string){
-    try{
-        const res = await axios.get(`/api/project/teams/get-all-byproj`, {
-            params: {
-                business_id,
-                project_id
-            }
-        })
-        return res.data;
-    } catch(err){
-        console.log(err);
-        
-    }
-}
-
 export async function updateTeamByProject(payload:any){
     try{
         const res = await axios.put(`/api/project/teams/edit-team`, payload);

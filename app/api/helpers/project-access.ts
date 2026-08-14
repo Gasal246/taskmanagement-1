@@ -165,6 +165,8 @@ export type ProjectAccess = {
   project: any;
   canView: boolean;
   canManage: boolean;
+  canViewAllTeams: boolean;
+  canCreateTasks: boolean;
   canApprove: boolean;
   canDelete: boolean;
   isAdmin: boolean;
@@ -185,6 +187,8 @@ export async function resolveProjectAccess(
       project,
       canView: false,
       canManage: false,
+      canViewAllTeams: false,
+      canCreateTasks: false,
       canApprove: false,
       canDelete: false,
       isAdmin: false,
@@ -222,6 +226,7 @@ export async function resolveProjectAccess(
       : false;
 
   let isTeamParticipant = false;
+  let isTeamHead = false;
   if (
     staffAssignment &&
     !isCreator &&
@@ -231,7 +236,8 @@ export async function resolveProjectAccess(
     const teams: any[] = await ProjectTeams.find({ project_id: project._id })
       .select("_id team_head")
       .lean();
-    isTeamParticipant = teams.some((team: any) => id(team.team_head) === userId);
+    isTeamHead = teams.some((team: any) => id(team.team_head) === userId);
+    isTeamParticipant = isTeamHead;
     if (!isTeamParticipant && teams.length > 0) {
       isTeamParticipant = Boolean(
         await ProjectTeamMembers.exists({
@@ -249,11 +255,18 @@ export async function resolveProjectAccess(
   const canManage =
     isAdmin ||
     Boolean(staffAssignment) && (isCreator || isProjectHead || isScopedHead);
+  const canViewAllTeams = canManage || isDirectAssignment;
+  const canCreateTasks =
+    isAdmin ||
+    (Boolean(staffAssignment) &&
+      (isCreator || isDirectAssignment || isScopedHead || isTeamHead));
 
   return {
     project,
     canView,
     canManage,
+    canViewAllTeams,
+    canCreateTasks,
     canApprove: isAdmin,
     canDelete: isAdmin,
     isAdmin,

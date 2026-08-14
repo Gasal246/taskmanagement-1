@@ -67,6 +67,7 @@ export async function buildProjectDetails(access: ProjectAccess) {
     completed_task_count: completedTaskCount,
     permissions: {
       canManage: access.canManage,
+      canCreateTasks: access.canCreateTasks,
       canApprove: access.canApprove,
       canDelete: access.canDelete,
     },

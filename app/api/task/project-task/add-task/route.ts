@@ -7,12 +7,15 @@ import { getAdminMessaging } from "@/lib/firebaseAdmin";
 import Flow_Log from "@/models/Flow_Log.model";
 import Users from "@/models/users.model";
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeProjectRequest } from "@/app/api/helpers/project-access";
+import ProjectTeams from "@/models/project_team.model";
+import mongoose from "mongoose";
 
 connectDB();
 
 interface Body{
     project_id: string | null,
-    assigned_to: string | null,
+    assigned_to: string | string[] | null,
     task_name:string,
     task_description: string,
     start_date: Date,
@@ -31,6 +34,39 @@ export async function POST(req:NextRequest){
 
         const body:Body = await req.json();
 
+        if (body.is_project_task) {
+            if (!body.project_id || !mongoose.isValidObjectId(body.project_id)) {
+                return NextResponse.json({ message: "Valid project_id is required" }, { status: 400 });
+            }
+            const authorization = await authorizeProjectRequest(body.project_id, "view");
+            if (!authorization.ok) return authorization.response;
+            if (!authorization.access.canCreateTasks) {
+                return NextResponse.json({ message: "You cannot create tasks for this project" }, { status: 403 });
+            }
+            const teamIds = Array.from(new Set(
+                (Array.isArray(body.assigned_to) ? body.assigned_to : body.assigned_to ? [body.assigned_to] : [])
+                    .map(String)
+                    .filter(Boolean)
+            ));
+            if (!teamIds.length || teamIds.some((teamId) => !mongoose.isValidObjectId(teamId))) {
+                return NextResponse.json({ message: "Select at least one valid team" }, { status: 400 });
+            }
+            const teams: any[] = await ProjectTeams.find({ _id: { $in: teamIds }, project_id: body.project_id })
+                .select("_id team_head")
+                .lean();
+            if (teams.length !== teamIds.length) {
+                return NextResponse.json({ message: "Every selected team must belong to this project" }, { status: 400 });
+            }
+            if (
+                !authorization.access.canViewAllTeams &&
+                teams.some((team) => String(team.team_head || "") !== String(session.user.id))
+            ) {
+                return NextResponse.json({ message: "Team leads may select only teams they lead" }, { status: 403 });
+            }
+            body.assigned_to = teamIds;
+            body.business_id = String(authorization.access.project.business_id);
+        }
+
         if(!body.assigned_to){
             body.assigned_to = null;
         }
@@ -43,12 +79,12 @@ export async function POST(req:NextRequest){
             task_description: body.task_description,
             start_date: body.start_date,
             end_date: body.end_date,
-            status: body.status,
+            status: body.is_project_task ? "To Do" : body.status,
             activity_count: 0,
             completed_activity: 0,
             business_id: body.business_id
         });
-        {body.is_project_task ? newTask.assigned_teams = body.assigned_to : newTask.assigned_to = body.assigned_to}
+        {body.is_project_task ? newTask.assigned_teams = body.assigned_to || [] : newTask.assigned_to = body.assigned_to}
         const Task = await newTask.save();
         if(body.is_project_task){
             const taskFLow = new Flow_Log({

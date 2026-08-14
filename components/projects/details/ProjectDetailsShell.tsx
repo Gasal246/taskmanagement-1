@@ -8,6 +8,7 @@ import {
   Building2,
   Files,
   LayoutDashboard,
+  ListTodo,
   Settings2,
   Users,
   Workflow,
@@ -42,6 +43,9 @@ const OperationsSection = dynamic(() => import("./OperationsSection"), {
 const TeamsSection = dynamic(() => import("./TeamsSection"), {
   loading: () => <ProjectSectionSkeleton cards={4} />,
 });
+const ProjectTasksSection = dynamic(() => import("./ProjectTasksSection"), {
+  loading: () => <ProjectSectionSkeleton cards={6} />,
+});
 const DepartmentsSection = dynamic(() => import("./DepartmentsSection"), {
   loading: () => <ProjectSectionSkeleton cards={4} />,
 });
@@ -59,6 +63,7 @@ const menu: Array<{
   { value: "flow", label: "Flow", icon: Workflow },
   { value: "operations", label: "Operations", icon: Settings2 },
   { value: "teams", label: "Teams", icon: Users },
+  { value: "tasks", label: "Tasks", icon: ListTodo },
   { value: "departments", label: "Departments", icon: Building2 },
   { value: "docs", label: "Docs", icon: Files },
 ];
@@ -91,6 +96,7 @@ export default function ProjectDetailsShell({
   }, [activeSection]);
 
   const canManage = Boolean(details.data?.permissions?.canManage);
+  const canCreateTasks = Boolean(details.data?.permissions?.canCreateTasks);
   const projectName = details.data?.project_name || "Project";
   const basePath = `/${mode}/projects/${projectId}`;
 
@@ -186,6 +192,15 @@ export default function ProjectDetailsShell({
         {visited.has("teams") && (
           <section hidden={activeSection !== "teams"}>
             <TeamsSection {...sectionProps} />
+          </section>
+        )}
+        {visited.has("tasks") && (
+          <section hidden={activeSection !== "tasks"}>
+            <ProjectTasksSection
+              projectId={projectId}
+              mode={mode}
+              canCreateTasks={canCreateTasks}
+            />
           </section>
         )}
         {visited.has("departments") && (

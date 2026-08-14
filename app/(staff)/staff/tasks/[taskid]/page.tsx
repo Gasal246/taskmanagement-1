@@ -74,6 +74,8 @@ import Cookies from "js-cookie";
 import { getSession } from "next-auth/react";
 import ActivityCommentsSheet from "@/components/task/ActivityCommentsSheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import axios from "axios";
+import ProjectTaskHeaderSummary from "@/components/tasks/ProjectTaskHeaderSummary";
 
 const statusStyles: Record<string, string> = {
   Completed: "border-emerald-500/40 bg-emerald-500/15 text-emerald-200",
@@ -206,7 +208,8 @@ const TaskDetails = () => {
 
   const taskData = task?.data;
   const isHead = HEAD_ROLES.includes(roleName);
-  const canAddActivity = isCreator || isHead;
+  const canManageActivities = Boolean(taskData?.permissions?.canManageActivities);
+  const canAddActivity = taskData?.is_project_task ? canManageActivities : isCreator || isHead;
   const visibleActivities = Array.isArray(taskData?.activities) ? taskData.activities : [];
   const visibleActivityCount = visibleActivities.length;
   const visibleCompletedActivityCount = visibleActivities.filter((activity: any) => activity?.is_done).length;
@@ -272,6 +275,18 @@ const TaskDetails = () => {
   }, [taskData]);
 
   const loadMyStaffs = useCallback(async () => {
+    if (taskData?.is_project_task) {
+      setLoadingStaffs(true);
+      try {
+        const response = await axios.get(`/api/task/${params.taskid}/assignment-candidates`);
+        setStaffOptions(response.data?.data || []);
+      } catch {
+        setStaffOptions([]);
+      } finally {
+        setLoadingStaffs(false);
+      }
+      return;
+    }
     if (!roleId || !roleName || !domainData) return;
     const domainId = resolveDomainId(roleName, domainData);
     if (!domainId) return;
@@ -283,7 +298,7 @@ const TaskDetails = () => {
       setStaffOptions([]);
     }
     setLoadingStaffs(false);
-  }, [domainData, getMyStaffs, roleId, roleName]);
+  }, [domainData, getMyStaffs, params.taskid, roleId, roleName, taskData?.is_project_task]);
 
   const handleOpenAssignDialog = (activity: any) => {
     setActiveActivity(activity);
@@ -313,6 +328,7 @@ const TaskDetails = () => {
   }, [getHierarchyHeads, hierarchyHeadsLoaded, loadingHierarchyHeads]);
 
   const handleAssignTabChange = (value: string) => {
+    if (taskData?.is_project_task) return;
     const nextTab = value === "departments" ? "departments" : "staffs";
     setAssignTab(nextTab);
     setSelectedStaff(null);
@@ -493,8 +509,7 @@ const TaskDetails = () => {
       comments: values.comments || undefined,
       status: values.status,
       is_project_task: taskData?.is_project_task,
-      assigned_to: taskData?.assigned_to || null,
-      assigned_teams: taskData?.assigned_teams || null,
+      ...(!taskData?.is_project_task ? { assigned_to: taskData?.assigned_to || null } : {}),
       start_date: values.start_date || taskData?.start_date,
       end_date: values.end_date || taskData?.end_date,
     };
@@ -577,7 +592,7 @@ const TaskDetails = () => {
 
   const handleNavigateToProject = () => {
     if (taskData?.project_id) {
-      router.push(`/staff/projects/${taskData.project_id}`);
+      router.push(`/staff/projects/${taskData.project_id}?section=tasks`);
     }
   };
 
@@ -683,40 +698,44 @@ const TaskDetails = () => {
           </div>
         </div>
 
-        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-lg border border-slate-800/70 bg-slate-900/60 p-3">
-            <p className="text-[11px] uppercase tracking-wide text-slate-500">Activities</p>
-            <p className="text-base font-semibold text-slate-100 mt-1">
-              {visibleActivityCount}
-            </p>
-            <p className="text-xs text-slate-400">Completed {visibleCompletedActivityCount}</p>
-          </div>
-          <div className="rounded-lg border border-slate-800/70 bg-slate-900/60 p-3">
-            <p className="text-[11px] uppercase tracking-wide text-slate-500">Assigned</p>
-            <p className="text-sm font-semibold text-slate-100 mt-1">
-              {taskData.is_project_task
-                ? taskData.assigned_team?.team_name || "Not assigned"
-                : taskData.assigned_user?.name || "Not assigned"}
-            </p>
-            {taskData.is_project_task && (
-              <p className="text-xs text-slate-400">
-                {taskData.project_details?.project_name || "Project"}
+        {taskData.is_project_task ? (
+          <ProjectTaskHeaderSummary
+            activityCount={visibleActivityCount}
+            completedActivityCount={visibleCompletedActivityCount}
+            teams={Array.isArray(taskData.assigned_teams) ? taskData.assigned_teams : []}
+            projectName={taskData.project_details?.project_name}
+            startDate={taskData.start_date}
+            endDate={taskData.end_date}
+          />
+        ) : (
+          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-lg border border-slate-800/70 bg-slate-900/60 p-3">
+              <p className="text-[11px] uppercase tracking-wide text-slate-500">Activities</p>
+              <p className="text-base font-semibold text-slate-100 mt-1">
+                {visibleActivityCount}
               </p>
-            )}
+              <p className="text-xs text-slate-400">Completed {visibleCompletedActivityCount}</p>
+            </div>
+            <div className="rounded-lg border border-slate-800/70 bg-slate-900/60 p-3">
+              <p className="text-[11px] uppercase tracking-wide text-slate-500">Assigned</p>
+              <p className="text-sm font-semibold text-slate-100 mt-1">
+                {taskData.assigned_user?.name || "Not assigned"}
+              </p>
+            </div>
+            <div className="rounded-lg border border-slate-800/70 bg-slate-900/60 p-3">
+              <p className="text-[11px] uppercase tracking-wide text-slate-500">Start Date</p>
+              <p className="text-sm font-semibold text-slate-100 mt-1">
+                {formatDateTiny(taskData.start_date) || "N/A"}
+              </p>
+            </div>
+            <div className="rounded-lg border border-slate-800/70 bg-slate-900/60 p-3">
+              <p className="text-[11px] uppercase tracking-wide text-slate-500">End Date</p>
+              <p className="text-sm font-semibold text-slate-100 mt-1">
+                {formatDateTiny(taskData.end_date) || "N/A"}
+              </p>
+            </div>
           </div>
-          <div className="rounded-lg border border-slate-800/70 bg-slate-900/60 p-3">
-            <p className="text-[11px] uppercase tracking-wide text-slate-500">Start Date</p>
-            <p className="text-sm font-semibold text-slate-100 mt-1">
-              {formatDateTiny(taskData.start_date) || "N/A"}
-            </p>
-          </div>
-          <div className="rounded-lg border border-slate-800/70 bg-slate-900/60 p-3">
-            <p className="text-[11px] uppercase tracking-wide text-slate-500">End Date</p>
-            <p className="text-sm font-semibold text-slate-100 mt-1">
-              {formatDateTiny(taskData.end_date) || "N/A"}
-            </p>
-          </div>
-        </div>
+        )}
 
         <div className="mt-4 flex items-center gap-3">
           <div className="h-2 flex-1 rounded-full bg-slate-800/80">
@@ -768,7 +787,7 @@ const TaskDetails = () => {
                           </span>
                         )}
                         {activity?.forwarded_to?._id && (
-                          isHead ? (
+                          (taskData.is_project_task ? canManageActivities : isHead) ? (
                             <button
                               type="button"
                               onClick={() => handleOpenRemoveReassignment(activity)}
@@ -813,7 +832,7 @@ const TaskDetails = () => {
                         <History size={12} />
                         History
                       </motion.button>
-                      {isHead && (
+                      {(taskData.is_project_task ? canManageActivities : isHead) && (
                         <motion.button
                           whileHover={{ scale: 1.02 }}
                           whileTap={{ scale: 0.98 }}
@@ -893,26 +912,27 @@ const TaskDetails = () => {
           <DialogHeader>
             <DialogTitle>Reassign Activity</DialogTitle>
             <DialogDescription>
-              Reassign {activeActivity?.activity || "this activity"} to one of your staffs
-              or another department HEAD.
+              {taskData?.is_project_task
+                ? `Reassign ${activeActivity?.activity || "this activity"} to a head or member of the selected teams.`
+                : `Reassign ${activeActivity?.activity || "this activity"} to one of your staffs or another department HEAD.`}
             </DialogDescription>
           </DialogHeader>
           <Tabs value={assignTab} onValueChange={handleAssignTabChange}>
-            <TabsList className="grid h-auto w-full grid-cols-2 gap-2 bg-transparent p-0">
+            <TabsList className={`grid h-auto w-full gap-2 bg-transparent p-0 ${taskData?.is_project_task ? "grid-cols-1" : "grid-cols-2"}`}>
               <TabsTrigger
                 value="staffs"
                 className="h-10 border border-slate-700 bg-slate-900/60 text-xs text-slate-300 data-[state=active]:border-cyan-500/60 data-[state=active]:bg-cyan-500/10 data-[state=active]:text-cyan-200"
               >
                 <UserPlus className="mr-2 size-4" />
-                Your Staffs
+                {taskData?.is_project_task ? "Selected Team People" : "Your Staffs"}
               </TabsTrigger>
-              <TabsTrigger
+              {!taskData?.is_project_task && <TabsTrigger
                 value="departments"
                 className="h-10 border border-slate-700 bg-slate-900/60 text-xs text-slate-300 data-[state=active]:border-cyan-500/60 data-[state=active]:bg-cyan-500/10 data-[state=active]:text-cyan-200"
               >
                 <Building2 className="mr-2 size-4" />
                 Other Departments
-              </TabsTrigger>
+              </TabsTrigger>}
             </TabsList>
 
             <div className="mt-3 rounded-xl border border-slate-800/70 bg-slate-900/60 p-3">

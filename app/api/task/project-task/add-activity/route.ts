@@ -8,6 +8,10 @@ import { notifyTaskActivityChange } from "@/app/api/helpers/task-activity-notifi
 import AdminAssignBusiness from "@/models/admin_assign_business.model";
 import { resolveSelectedHeadContext } from "@/app/api/helpers/head-reassignment-scope";
 import { hasStaffTaskAccess } from "@/app/api/helpers/staff-task-access";
+import {
+    canManageProjectTaskActivities,
+    getProjectTaskCandidateIds,
+} from "@/app/api/helpers/project-task-teams";
 
 connectDB();
 
@@ -33,7 +37,7 @@ export async function POST(req: NextRequest) {
         const task: {
             _id: any,
             assigned_to?: string | null,
-            assigned_teams?: string | null,
+            assigned_teams?: string[] | string | null,
             is_project_task?: boolean,
             project_id?: string | null,
             business_id?: string | null,
@@ -43,7 +47,7 @@ export async function POST(req: NextRequest) {
             .lean<{
                 _id: any,
                 assigned_to?: string | null,
-                assigned_teams?: string | null,
+                assigned_teams?: string[] | string | null,
                 is_project_task?: boolean,
                 project_id?: string | null,
                 business_id?: string | null,
@@ -69,14 +73,29 @@ export async function POST(req: NextRequest) {
         const headHasTaskAccess = headContext
             ? await hasStaffTaskAccess(task, actorId)
             : false;
-        if (!adminAccess && !isCreator && !headHasTaskAccess) {
+        const canManageProjectActivity = task.is_project_task
+            ? await canManageProjectTaskActivities(task, actorId)
+            : false;
+        const allowedToAdd = task.is_project_task
+            ? canManageProjectActivity
+            : Boolean(adminAccess || isCreator || headHasTaskAccess);
+        if (!allowedToAdd) {
             return NextResponse.json(
                 { message: "You are not allowed to add activities to this task" },
                 { status: 403 }
             );
         }
 
-        const assignedTo = !task.is_project_task ? task.assigned_to : null;
+        let assignedTo = !task.is_project_task ? task.assigned_to : body.assigned_to || null;
+        if (task.is_project_task && assignedTo) {
+            const candidates = await getProjectTaskCandidateIds(task);
+            if (!candidates.includes(String(assignedTo))) {
+                return NextResponse.json(
+                    { message: "Activities can only be assigned to active heads or members of the selected teams" },
+                    { status: 403 }
+                );
+            }
+        }
         const projectId = body.project_id ?? task.project_id ?? null;
 
         const newActivity = new Task_Activities({
