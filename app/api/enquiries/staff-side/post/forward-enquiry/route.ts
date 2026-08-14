@@ -1,4 +1,5 @@
 import { auth } from "@/auth";
+import { notifyEnquiryForward } from "@/app/api/helpers/enquiry-notifications";
 import connectDB from "@/lib/mongo";
 import Eq_camps from "@/models/eq_camps.model";
 import Eq_enquiry from "@/models/eq_enquiries.model";
@@ -6,132 +7,249 @@ import Eq_enquiry_access from "@/models/eq_enquiry_access.model";
 import Eq_enquiry_histories from "@/models/eq_enquiry_histories";
 import Eq_users_log from "@/models/eq_users_log.model";
 import Users from "@/models/users.model";
+import mongoose from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
-import { notifyEnquiryForward } from "@/app/api/helpers/enquiry-notifications";
+import { z } from "zod";
 
-connectDB();
+const objectIdSchema = z
+  .string()
+  .trim()
+  .refine((value) => mongoose.Types.ObjectId.isValid(value), "must be a valid ID");
 
-interface Body {
-    enquiry_id: string,
-    access_users: string[],
-    assigned_to: string | string[],
-    priority: number,
-    action: string,
-    feedback: string,
-    is_finished: boolean,
-    next_date: Date
+const forwardEnquirySchema = z
+  .object({
+    enquiry_id: objectIdSchema,
+    access_users: z.array(objectIdSchema).max(100).optional().default([]),
+    // Kept temporarily for clients that loaded the old page bundle.
+    users: z.array(objectIdSchema).max(100).optional().default([]),
+    assigned_to: z.union([
+      objectIdSchema,
+      z.array(objectIdSchema).min(1).max(100),
+    ]),
+    priority: z.coerce.number().int().min(1).max(10),
+    action: z.enum(["Visit", "Call", "Finished"]),
+    feedback: z.string().max(5000).optional().default(""),
+    next_date: z.preprocess(
+      (value) => (value === "" || value === undefined ? null : value),
+      z.union([z.null(), z.coerce.date()])
+    ),
+  })
+  .transform((body) => ({
+    enquiryId: body.enquiry_id,
+    accessUsers: Array.from(new Set([...body.access_users, ...body.users])),
+    assignedTo: Array.from(
+      new Set(Array.isArray(body.assigned_to) ? body.assigned_to : [body.assigned_to])
+    ),
+    priority: body.priority,
+    action: body.action,
+    feedback: body.feedback.trim(),
+    nextDate: body.next_date,
+    isFinished: body.action === "Finished",
+  }));
+
+class RequestError extends Error {
+  constructor(
+    public readonly status: number,
+    message: string
+  ) {
+    super(message);
+    this.name = "RequestError";
+  }
 }
 
+const jsonResponse = (message: string, status: number) =>
+  NextResponse.json({ message, status }, { status });
+
 export async function POST(req: NextRequest) {
+  let rawBody: unknown;
+  try {
+    rawBody = await req.json();
+  } catch {
+    return jsonResponse("Request body must be valid JSON", 400);
+  }
+
+  const parsedBody = forwardEnquirySchema.safeParse(rawBody);
+  if (!parsedBody.success) {
+    const issue = parsedBody.error.issues[0];
+    const field = issue?.path.length ? `${issue.path.join(".")}: ` : "";
+    return jsonResponse(`Invalid request. ${field}${issue?.message || "Check the submitted values."}`, 400);
+  }
+
+  try {
+    const session: any = await auth();
+    if (!session?.user?.id) {
+      return jsonResponse("Unauthorized Access", 401);
+    }
+    if (!mongoose.Types.ObjectId.isValid(session.user.id)) {
+      return jsonResponse("Invalid authenticated user", 401);
+    }
+
+    await connectDB({ throwOnError: true });
+    if (mongoose.connection.readyState !== 1) {
+      throw new Error("MongoDB connection is unavailable");
+    }
+
+    const {
+      enquiryId,
+      accessUsers,
+      assignedTo,
+      priority,
+      action,
+      feedback,
+      nextDate,
+      isFinished,
+    } = parsedBody.data;
+    const actorId = String(session.user.id);
+    const recipientIds = Array.from(
+      new Set([...accessUsers, ...assignedTo, actorId])
+    );
+
+    let actorName = "User";
+
+    const dbSession = await mongoose.startSession();
     try {
-        const session: any = await auth();
-        if(!session) return NextResponse.json({message:"Unauthorized Access", status: 401}, {status: 401});
+      await dbSession.withTransaction(async () => {
+        // MongoDB does not support parallel operations on one transaction session.
+        const actor = await Users.findById(actorId).select("name").session(dbSession);
+        const enquiry = await Eq_enquiry.findById(enquiryId).session(dbSession);
+        const latestHistoryResult = await Eq_enquiry_histories
+          .findOne({ enquiry_id: enquiryId })
+          .sort({ step_number: -1, createdAt: -1 })
+          .session(dbSession)
+          .lean();
+        const validRecipients = await Users.find({ _id: { $in: recipientIds } })
+          .select("_id")
+          .session(dbSession)
+          .lean();
 
-        const user = await Users.findById(session?.user?.id);
-
-        const body: Body = await req.json();
-        console.log("body: ", body);
-        
-        if (!Array.isArray(body.access_users)) {
-            body.access_users = [];
+        if (!actor) {
+          throw new RequestError(401, "Authenticated user no longer exists");
         }
-        const assignedToList = Array.isArray(body.assigned_to)
-            ? body.assigned_to
-            : body.assigned_to
-                ? [body.assigned_to]
-                : [];
+        if (!enquiry) {
+          throw new RequestError(404, "Enquiry not found");
+        }
+        const latestHistory: any = latestHistoryResult;
 
-        const ogEnq:any = await Eq_enquiry.findById(body.enquiry_id);
+        const latestAssignees = Array.isArray(latestHistory?.assigned_to)
+          ? latestHistory.assigned_to.map(String)
+          : [];
+        const isCreator = String(enquiry.createdBy || "") === actorId;
+        if (!isCreator && !latestAssignees.includes(actorId)) {
+          throw new RequestError(403, "You are not allowed to forward this enquiry");
+        }
 
-        const camp:any = await Eq_camps.findById(ogEnq.camp_id).select("camp_name").lean();
+        if (validRecipients.length !== recipientIds.length) {
+          throw new RequestError(
+            400,
+            "One or more selected users no longer exist. Refresh the page and select again."
+          );
+        }
 
-        const existingEnq: any = await Eq_enquiry_histories
-            .findOne({ enquiry_id: body.enquiry_id })
-            .sort({ step_number: -1 })   // highest step_number first
-            .lean();
+        const [stepResult] = await Eq_enquiry_histories.aggregate<{
+          maxStep?: number;
+        }>([
+          {
+            $match: {
+              enquiry_id: enquiry._id,
+              step_number: { $type: "number" },
+            },
+          },
+          { $group: { _id: null, maxStep: { $max: "$step_number" } } },
+        ]).session(dbSession);
+        const previousStep = Number(stepResult?.maxStep || 0);
+        const nextStep = Number.isSafeInteger(previousStep) && previousStep >= 0
+          ? previousStep + 1
+          : 1;
 
         const newHistory = new Eq_enquiry_histories({
-            camp_id: existingEnq.camp_id,
-            enquiry_id: existingEnq.enquiry_id,
-            assigned_to: assignedToList,
-            forwarded_by: session?.user?.id,
-            step_number: ++existingEnq.step_number,
-            priority: body.priority,
-            is_finished: body.is_finished,
-            action: body.action,
-            feedback: body.feedback,
-            next_step_date: body.next_date
+          camp_id: enquiry.camp_id || null,
+          enquiry_id: enquiry._id,
+          assigned_to: assignedTo,
+          forwarded_by: actor._id,
+          step_number: nextStep,
+          priority,
+          is_finished: isFinished,
+          action,
+          feedback,
+          next_step_date: nextDate,
         });
+        const savedHistory = await newHistory.save({ session: dbSession });
 
-        const savedHistory = await newHistory.save();
+        await Eq_enquiry_access.insertMany(
+          recipientIds.map((userId) => ({
+            history_id: savedHistory._id,
+            enquiry_id: enquiry._id,
+            camp_id: enquiry.camp_id || null,
+            user_id: userId,
+          })),
+          { session: dbSession }
+        );
 
-        const newAccess: any = [];
-        body.access_users.push(...assignedToList);
-        body.access_users.push(session?.user?.id);
+        const [priorityResult] = await Eq_enquiry_histories.aggregate<{
+          average?: number;
+        }>([
+          {
+            $match: {
+              enquiry_id: enquiry._id,
+              priority: { $type: "number" },
+            },
+          },
+          { $group: { _id: null, average: { $avg: "$priority" } } },
+        ]).session(dbSession);
+        enquiry.priority = String(Math.round(priorityResult?.average ?? priority));
+        if (isFinished) enquiry.status = "Closed";
+        await enquiry.save({ session: dbSession });
 
-        const uniqueAccess = Array.from(new Set(body.access_users.filter(Boolean)));
-
-        uniqueAccess.forEach(x => {
-            const singleAccess = {
-                history_id: savedHistory._id,
-                enquiry_id: savedHistory.enquiry_id,
-                camp_id: savedHistory.camp_id,
-                user_id: x
-            };
-            newAccess.push(singleAccess);
-        })
-
-        await Eq_enquiry_access.insertMany(newAccess);
-
-        if (user?._id) {
-            await notifyEnquiryForward({
-                req,
-                recipientIds: uniqueAccess.map((id) => String(id)),
-                enquiryId: savedHistory.enquiry_id,
-                action: body.action,
-                priority: body.priority,
-                actorId: String(user._id),
-                actorName: user?.name || "User",
-            });
+        if (latestHistory?.action === "Visit" || latestHistory?.action === "Call") {
+          const camp: any = enquiry.camp_id
+            ? await Eq_camps.findById(enquiry.camp_id)
+                .select("camp_name")
+                .session(dbSession)
+                .lean()
+            : null;
+          const actionLabel = latestHistory.action === "Visit" ? "Visited" : "Called";
+          const campLabel = camp?.camp_name || "the camp";
+          await new Eq_users_log({
+            user_id: actor._id,
+            camp_id: enquiry.camp_id || null,
+            enquiry_id: enquiry._id,
+            log: `${actor.name || "User"} ${actionLabel} ${campLabel}`,
+          }).save({ session: dbSession });
         }
 
-        if (body.is_finished) {
-            console.log("FINISHED: ", body.enquiry_id);
-            ogEnq.status = "Closed";
-        };
-
-        const allPriorities = await Eq_enquiry_histories.find({enquiry_id: body.enquiry_id}).select("priority");
-        const priorArray = allPriorities?.map((p)=> p.priority);
-        const avg = Math.round(priorArray?.reduce((sum, value)=> sum + value, 0) / priorArray.length);
-        console.log("average priority: ", avg);
-        ogEnq.priority = avg;
-        await ogEnq.save();
-
-        switch(existingEnq?.action){
-            case "Visit": {
-                    const newLog = new Eq_users_log({
-                    user_id: session?.user?.id,
-                    camp_id: ogEnq?.camp_id,
-                    enquiry_id: body.enquiry_id,
-                    log: `${user?.name} Visitted ${camp?.camp_name}`
-                });
-                await newLog.save();
-                break;
-            }
-            case "Call": {
-                const newLog = new Eq_users_log({
-                    user_id: session?.user?.id,
-                    camp_id: ogEnq?.camp_id,
-                    enquiry_id: body.enquiry_id,
-                    log: `${user?.name} Called ${camp?.camp_name}`
-                });
-                await newLog.save();
-                break;
-            }
-        }
-        return NextResponse.json({ message: "Enquiry Forwarded", status: 201 }, { status: 201 });
-    } catch (err) {
-        console.log("Error while forwarding enquiry: ", err);
-        return NextResponse.json({ message: "Internal Server Error", status: 500 }, { status: 500 })
+        actorName = String(actor.name || "User");
+      });
+    } finally {
+      await dbSession.endSession();
     }
+
+    // Notifications are secondary: a notification outage must not roll back a
+    // successfully committed forward operation or invite duplicate retries.
+    try {
+      await notifyEnquiryForward({
+        req,
+        recipientIds,
+        enquiryId,
+        action,
+        priority,
+        actorId,
+        actorName,
+      });
+    } catch (error) {
+      console.error("Enquiry forwarded, but notifications failed:", error);
+    }
+
+    return jsonResponse("Enquiry Forwarded", 201);
+  } catch (error) {
+    if (error instanceof RequestError) {
+      return jsonResponse(error.message, error.status);
+    }
+    if (error instanceof mongoose.Error.ValidationError || error instanceof mongoose.Error.CastError) {
+      console.error("Invalid forward enquiry data:", error);
+      return jsonResponse("The enquiry contains invalid data and could not be forwarded", 400);
+    }
+
+    console.error("Error while forwarding enquiry:", error);
+    return jsonResponse("Internal Server Error", 500);
+  }
 }

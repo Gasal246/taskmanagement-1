@@ -165,13 +165,13 @@ export default function EscalatePage() {
 
     const finalPayload = {
       enquiry_id: enquiryId,
-      users: selectedUsers,
+      access_users: selectedUsers,
       priority: Number(priority),
       assigned_to: assignedTo,
       action,
       feedback: feedback.trim(),
       is_finished: action === "Finished",
-      next_date: nextDate,
+      next_date: nextDate || null,
     };
 
     const res = await ForwardEnquiry(finalPayload);
@@ -346,7 +346,7 @@ export default function EscalatePage() {
 
             <section className="rounded-3xl border border-slate-800 bg-slate-950/55 p-5 shadow-sm">
               <div>
-                <h2 className="text-lg font-semibold text-white">Ownership</h2>
+                <h2 className="text-lg font-semibold text-white">Assign Action To</h2>
                 <p className="mt-1 text-sm text-slate-400">
                   Pick who should take the next action on this enquiry.
                 </p>
@@ -375,7 +375,7 @@ export default function EscalatePage() {
 
               <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
                 <div>
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Select Owner</p>
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Select {user_type === "users" ? "User" : "Agent"}</p>
                   <Select
                     value={assignedTo === "" ? undefined : assignedTo}
                     onValueChange={(value: string) => setAssignedTo(value)}
@@ -397,7 +397,7 @@ export default function EscalatePage() {
                 </div>
 
                 <div className="rounded-2xl border border-slate-700 bg-slate-900/50 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Selected Owner</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Selected {user_type === "users" ? "User" : "Agent"}</p>
                   {selectedAssignee ? (
                     <div className="mt-3 space-y-1">
                       <p className="text-sm font-semibold text-slate-100">{selectedAssignee.name}</p>
@@ -407,7 +407,7 @@ export default function EscalatePage() {
                       </p>
                     </div>
                   ) : (
-                    <p className="mt-3 text-sm text-slate-500">No owner selected yet.</p>
+                    <p className="mt-3 text-sm text-slate-500">No {user_type === "users" ? "user" : "agent"} selected yet.</p>
                   )}
                 </div>
               </div>
@@ -495,7 +495,7 @@ export default function EscalatePage() {
                     {selectedAssignee?.name || "Not selected"}
                   </p>
                   <p className="mt-1 text-xs text-slate-400">
-                    {selectedAssignee?.email || "Choose an owner to continue"}
+                    {selectedAssignee?.email || "Choose a " + (user_type === "users" ? "user" : "agent") + " to continue"}
                   </p>
                 </div>
 

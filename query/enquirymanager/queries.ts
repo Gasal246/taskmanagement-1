@@ -473,7 +473,7 @@ export const useForwardHistory = () => {
 //Get Enquiry Users
 export const useGetEqUsers = (business_id: string, user_type: string) => {
     return useQuery({
-        queryKey: ["users", user_type],
+        queryKey: ["users", business_id, user_type],
         queryFn: () => GetEqUsers(business_id, user_type),
         enabled: !!business_id
     })

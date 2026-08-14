@@ -88,13 +88,13 @@ const filteredUsers = useMemo(() => {
   const handleSubmit = async() => {
     const finalPayload = {
       enquiry_id,
-      users: selectedUsers,
+      access_users: selectedUsers,
       priority: Number(priority),
       assigned_to: assignedTo,
       action,
       feedback,
       is_finished: action == "Finished",
-      next_date: nextDate
+      next_date: nextDate || null
     };
 
     const res = await ForwardEnquiry(finalPayload);

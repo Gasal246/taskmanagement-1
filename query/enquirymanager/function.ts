@@ -751,6 +751,13 @@ export async function ForwardEnquiryByStaff(payload: any) {
         return res.data;
     }catch(err){
         console.log(err);
+        if (axios.isAxiosError(err)) {
+            return err.response?.data ?? {
+                status: err.response?.status ?? 500,
+                message: "Unable to forward enquiry",
+            };
+        }
+        return { status: 500, message: "Unable to forward enquiry" };
     }
 }
 
