@@ -2,9 +2,9 @@ import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import Business_Tasks from "@/models/business_tasks.model";
 import ActivityComments from "@/models/activity_comments.model";
+import Business_Project from "@/models/business_project.model";
 import Project_Teams from "@/models/project_team.model";
 import Task_Activities from "@/models/task_activities.model";
-import ProjectTeamMembers from "@/models/project_team_members.model";
 import { NextRequest, NextResponse } from "next/server";
 import {
   escapeRegex,
@@ -87,9 +87,17 @@ export async function GET(req: NextRequest) {
 
     const roleName = getRoleNameFromRequest(req);
     const userObjectId = toObjectId(userId);
-    const [teams, headedTeams, accessibleActivityTaskIds, headStaffIds] = await Promise.all([
-      ProjectTeamMembers.find({ user_id: userId }).select("project_team_id").lean(),
+    const [headedTeams, operationProjects, accessibleActivityTaskIds, headStaffIds] = await Promise.all([
       Project_Teams.find({ team_head: userId }).select("_id").lean(),
+      Business_Project.find({
+        $or: [
+          { project_head: userObjectId },
+          { project_heads: userObjectId },
+          { project_supervisors: userObjectId },
+          { account_managers: userObjectId },
+          { site_operational_heads: userObjectId },
+        ],
+      }).select("_id").lean(),
       Task_Activities.distinct("task_id", {
         $or: [{ assigned_to: userId }, { forwarded_to: userId }],
       }),
@@ -106,10 +114,8 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const teamIds = [
-      ...teams.map((team: any) => team.project_team_id).filter(Boolean),
-      ...headedTeams.map((team: any) => team._id).filter(Boolean),
-    ].map(toObjectId);
+    const headedTeamIds = headedTeams.map((team: any) => toObjectId(team._id));
+    const operationProjectIds = operationProjects.map((project: any) => toObjectId(project._id));
     const activityTaskIds = accessibleActivityTaskIds.filter(Boolean).map(toObjectId);
     const staffObjectId = staffId ? toObjectId(staffId) : null;
 
@@ -120,42 +126,83 @@ export async function GET(req: NextRequest) {
       if (hasValidEnd && endDate) query.start_date.$lte = new Date(endDate);
     }
 
-    if (staffObjectId) {
-      if (type === "single") query.is_project_task = false;
-      if (type === "project") query.is_project_task = true;
-      if (type === "created") query.creator = userObjectId;
-    } else if (type === "single") {
-      query.is_project_task = false;
-      query.$or = [
+    const individualVisibility = {
+      $or: [
         { assigned_to: userObjectId },
         { creator: userObjectId },
         { _id: { $in: activityTaskIds } },
-      ];
-    } else if (type === "project") {
-      query.is_project_task = true;
-      query.$or = [
-        { assigned_teams: { $in: teamIds } },
+      ],
+    };
+    const projectVisibility = {
+      $or: [
+        { creator: userObjectId },
+        { project_id: { $in: operationProjectIds } },
+        { assigned_teams: { $in: headedTeamIds } },
         { _id: { $in: activityTaskIds } },
+      ],
+    };
+
+    if (type === "single") query.is_project_task = false;
+    if (type === "project") query.is_project_task = true;
+    if (type === "created") query.creator = userObjectId;
+
+    if (!staffObjectId) {
+      query.$and = [
+        ...(query.$and || []),
+        {
+          $or: [
+            { is_project_task: false, ...individualVisibility },
+            { is_project_task: true, ...projectVisibility },
+          ],
+        },
       ];
-    } else if (type === "created") {
-      query.creator = userObjectId;
     } else {
-      query.$or = [
-        { assigned_to: userObjectId },
-        { creator: userObjectId },
-        { assigned_teams: { $in: teamIds } },
-        { _id: { $in: activityTaskIds } },
+      query.$and = [
+        ...(query.$and || []),
+        {
+          $or: [
+            { is_project_task: { $ne: true } },
+            { is_project_task: true, ...projectVisibility },
+          ],
+        },
       ];
     }
+
+    const fullActivityTaskIds = await Business_Tasks.distinct("_id", {
+      $or: [
+        {
+          is_project_task: false,
+          $or: [{ assigned_to: userObjectId }, { creator: userObjectId }],
+        },
+        {
+          is_project_task: true,
+          $or: [
+            { creator: userObjectId },
+            { project_id: { $in: operationProjectIds } },
+            { assigned_teams: { $in: headedTeamIds } },
+          ],
+        },
+      ],
+    });
+    const visibleActivityScope = {
+      $or: [
+        { task_id: { $in: fullActivityTaskIds } },
+        { assigned_to: userObjectId },
+        { forwarded_to: userObjectId },
+      ],
+    };
 
     const nameRegex = nameQuery ? new RegExp(escapeRegex(nameQuery), "i") : null;
     const [nameActivityMatches, staffActivityMatches] = await Promise.all([
       nameRegex
-        ? Task_Activities.find({ activity: nameRegex }).select("task_id").lean()
+        ? Task_Activities.find({ $and: [{ activity: nameRegex }, visibleActivityScope] }).select("task_id").lean()
         : Promise.resolve([]),
       staffObjectId
         ? Task_Activities.find({
-            $or: [{ assigned_to: staffObjectId }, { forwarded_to: staffObjectId }],
+            $and: [
+              { $or: [{ assigned_to: staffObjectId }, { forwarded_to: staffObjectId }] },
+              visibleActivityScope,
+            ],
           })
             .select("task_id")
             .lean()
@@ -195,7 +242,13 @@ export async function GET(req: NextRequest) {
       {
         $lookup: {
           from: Task_Activities.collection.name,
-          let: { taskId: "$_id" },
+          let: {
+            taskId: "$_id",
+            isProjectTask: "$is_project_task",
+            creator: "$creator",
+            projectId: "$project_id",
+            assignedTeams: { $ifNull: ["$assigned_teams", []] },
+          },
           pipeline: [
             {
               $match: {
@@ -204,6 +257,23 @@ export async function GET(req: NextRequest) {
                     { $eq: ["$task_id", "$$taskId"] },
                     {
                       $or: [
+                        {
+                          $and: [
+                            { $eq: ["$$isProjectTask", true] },
+                            {
+                              $or: [
+                                { $eq: ["$$creator", userObjectId] },
+                                { $in: ["$$projectId", operationProjectIds] },
+                                {
+                                  $gt: [
+                                    { $size: { $setIntersection: ["$$assignedTeams", headedTeamIds] } },
+                                    0,
+                                  ],
+                                },
+                              ],
+                            },
+                          ],
+                        },
                         { $eq: ["$assigned_to", userObjectId] },
                         { $eq: ["$forwarded_to", userObjectId] },
                       ],
@@ -275,6 +345,8 @@ export async function GET(req: NextRequest) {
                 },
                 creator: 1,
                 assigned_to: 1,
+                project_id: 1,
+                assigned_teams: 1,
               },
             },
           ],
@@ -284,48 +356,37 @@ export async function GET(req: NextRequest) {
 
     const taskRows = result?.data || [];
     const taskIds = taskRows.map((task: any) => task._id);
+    const operationProjectIdSet = new Set(operationProjectIds.map((projectId) => projectId.toString()));
+    const headedTeamIdSet = new Set(headedTeamIds.map((teamId) => teamId.toString()));
+    const fullTaskIds = taskRows
+      .filter((task: any) => {
+        if (!task.is_project_task) return true;
+        if (task.creator?.toString() === userId) return true;
+        if (operationProjectIdSet.has(task.project_id?.toString())) return true;
+        return (Array.isArray(task.assigned_teams) ? task.assigned_teams : [])
+          .some((teamId: any) => headedTeamIdSet.has(teamId?.toString()));
+      })
+      .map((task: any) => task._id);
+    const fullTaskIdSet = new Set<string>(fullTaskIds.map((taskId: any) => taskId.toString()));
+    const visibleActivityIds = taskIds.length
+      ? await Task_Activities.distinct("_id", {
+          task_id: { $in: taskIds },
+          $or: [
+            { task_id: { $in: fullTaskIds } },
+            { assigned_to: userObjectId },
+            { forwarded_to: userObjectId },
+          ],
+        })
+      : [];
     const [tasksWithAssignments, visibleActivityCommentStats] = await Promise.all([
-      addTaskAssignmentSummaries(taskRows),
-      taskIds.length
-        ? Task_Activities.aggregate([
-            {
-              $match: {
-                task_id: { $in: taskIds },
-                $or: [
-                  { assigned_to: userObjectId },
-                  { forwarded_to: userObjectId },
-                ],
-              },
-            },
-            {
-              $lookup: {
-                from: ActivityComments.collection.name,
-                let: { activityId: "$_id" },
-                pipeline: [
-                  {
-                    $match: {
-                      deleted_at: null,
-                      $expr: { $eq: ["$activity_id", "$$activityId"] },
-                    },
-                  },
-                  { $count: "total" },
-                ],
-                as: "comment_stats",
-              },
-            },
-            {
-              $group: {
-                _id: "$task_id",
-                comments: {
-                  $sum: {
-                    $ifNull: [
-                      { $arrayElemAt: ["$comment_stats.total", 0] },
-                      0,
-                    ],
-                  },
-                },
-              },
-            },
+      addTaskAssignmentSummaries(taskRows, {
+        userId,
+        fullTaskIds: Array.from(fullTaskIdSet),
+      }),
+      visibleActivityIds.length
+        ? ActivityComments.aggregate([
+            { $match: { activity_id: { $in: visibleActivityIds }, deleted_at: null } },
+            { $group: { _id: "$task_id", comments: { $sum: 1 } } },
           ])
         : Promise.resolve([]),
     ]);

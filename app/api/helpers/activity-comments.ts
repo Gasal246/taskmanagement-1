@@ -2,9 +2,12 @@ import AdminAssignBusiness from "@/models/admin_assign_business.model";
 import ActivityCommentReads from "@/models/activity_comment_reads.model";
 import ActivityComments from "@/models/activity_comments.model";
 import BusinessStaffs from "@/models/business_staffs.model";
+import BusinessProjects from "@/models/business_project.model";
 import BusinessTasks from "@/models/business_tasks.model";
+import ProjectTeams from "@/models/project_team.model";
 import TaskActivities from "@/models/task_activities.model";
 import Users from "@/models/users.model";
+import { normalizeProjectTaskTeamIds, resolveProjectTaskStaffAccess } from "@/app/api/helpers/project-task-teams";
 import mongoose from "mongoose";
 
 export async function authorizeActivityViewer(userId: string, activityId: string) {
@@ -23,8 +26,12 @@ export async function authorizeActivityViewer(userId: string, activityId: string
   const isAssignedStaff =
     Boolean(activeUser && staffAssignment) && [activity.assigned_to, activity.forwarded_to]
       .some((assignedUserId) => String(assignedUserId || "") === String(userId));
+  const projectTaskAccess = task.is_project_task
+    ? await resolveProjectTaskStaffAccess(task, userId)
+    : null;
+  const canViewProjectActivity = Boolean(projectTaskAccess?.canViewAllActivities);
 
-  if (!isAdmin && !isAssignedStaff) {
+  if (!isAdmin && !isAssignedStaff && !canViewProjectActivity) {
     return { status: 403 as const, activity: null, task: null, isAdmin: false };
   }
   return { status: 200 as const, activity, task, isAdmin };
@@ -35,7 +42,8 @@ export async function getActivityViewerIds(task: any, activity: any) {
     business_id: task.business_id,
     status: 1,
   }).select("user_id").lean();
-  const ids = new Set(admins.map((row: any) => String(row.user_id || "")).filter(Boolean));
+  const adminIds = new Set(admins.map((row: any) => String(row.user_id || "")).filter(Boolean));
+  const staffCandidateIds = new Set<string>();
 
   const activityStaffIds = [activity.assigned_to, activity.forwarded_to]
     .map((userId) => String(userId || ""))
@@ -46,9 +54,40 @@ export async function getActivityViewerIds(task: any, activity: any) {
       user_id: { $in: activityStaffIds },
       status: 1,
     }).select("user_id").lean();
-    activeStaff.forEach((staff: any) => ids.add(String(staff.user_id)));
+    activeStaff.forEach((staff: any) => staffCandidateIds.add(String(staff.user_id)));
   }
 
+  if (task.is_project_task && task.project_id) {
+    const teamIds = normalizeProjectTaskTeamIds(task.assigned_teams);
+    const [projectResult, teams] = await Promise.all([
+      BusinessProjects.findById(task.project_id)
+        .select("project_head project_heads project_supervisors account_managers site_operational_heads")
+        .lean(),
+      teamIds.length
+        ? ProjectTeams.find({ _id: { $in: teamIds } }).select("team_head").lean()
+        : Promise.resolve([]),
+    ]);
+    const project: any = projectResult;
+    const fullViewerIds = [
+      task.creator,
+      project?.project_head,
+      ...(Array.isArray(project?.project_heads) ? project.project_heads : []),
+      ...(Array.isArray(project?.project_supervisors) ? project.project_supervisors : []),
+      ...(Array.isArray(project?.account_managers) ? project.account_managers : []),
+      ...(Array.isArray(project?.site_operational_heads) ? project.site_operational_heads : []),
+      ...teams.map((team: any) => team.team_head),
+    ].map((userId) => String(userId || "")).filter(Boolean);
+    if (fullViewerIds.length) {
+      const activeProjectStaff = await BusinessStaffs.find({
+        business_id: task.business_id,
+        user_id: { $in: fullViewerIds },
+        status: 1,
+      }).select("user_id").lean();
+      activeProjectStaff.forEach((staff: any) => staffCandidateIds.add(String(staff.user_id)));
+    }
+  }
+
+  const ids = new Set([...adminIds, ...staffCandidateIds]);
   const activeUsers = await Users.find({ _id: { $in: Array.from(ids) }, status: 1 })
     .select("_id")
     .lean();

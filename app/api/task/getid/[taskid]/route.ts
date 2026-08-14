@@ -11,7 +11,7 @@ import AdminAssignBusiness from "@/models/admin_assign_business.model";
 import { addUnreadCommentCounts } from "@/app/api/helpers/activity-comments";
 import { resolveSessionUserId } from "@/lib/utils";
 import { hasStaffTaskAccess } from "@/app/api/helpers/staff-task-access";
-import { canManageProjectTaskActivities, normalizeProjectTaskTeamIds } from "@/app/api/helpers/project-task-teams";
+import { normalizeProjectTaskTeamIds, resolveProjectTaskStaffAccess } from "@/app/api/helpers/project-task-teams";
 connectDB();
 
 export async function GET(req:NextRequest, context: {params: Promise<{taskid:string}>}){
@@ -29,16 +29,24 @@ export async function GET(req:NextRequest, context: {params: Promise<{taskid:str
         let task = await Business_Tasks.findById(taskid);
         if(task){
             const userId = resolveSessionUserId(session);
+            const projectTaskAccess = task.is_project_task
+                ? await resolveProjectTaskStaffAccess(task, userId)
+                : null;
             const activeBusinessAccess = isAssignedActivityScope
-                ? await hasStaffTaskAccess(task, userId)
+                ? projectTaskAccess?.canViewTask ?? await hasStaffTaskAccess(task, userId)
                 : await AdminAssignBusiness.exists({ user_id: userId, business_id: task.business_id, status: 1 });
             if (!activeBusinessAccess) {
                 return NextResponse.json({ message: "Forbidden" }, { status: 403 });
             }
             const canManageActivities = task.is_project_task
-                ? await canManageProjectTaskActivities(task, userId)
+                ? Boolean(projectTaskAccess?.canManageActivities)
                 : Boolean(activeBusinessAccess);
-            const restrictActivities = isAssignedActivityScope && !canManageActivities;
+            const canAssignActivities = task.is_project_task
+                ? Boolean(projectTaskAccess?.canAssignActivities)
+                : canManageActivities;
+            const restrictActivities = isAssignedActivityScope && task.is_project_task
+                ? !projectTaskAccess?.canViewAllActivities
+                : isAssignedActivityScope && !canManageActivities;
             const assignedActivityQuery: any = restrictActivities
                 ? {
                     task_id: taskid,
@@ -65,7 +73,10 @@ export async function GET(req:NextRequest, context: {params: Promise<{taskid:str
             taskObj.creator_details = await Users.findById(task.creator).select("name email avatar_url");
             taskObj.permissions = {
                 canManageActivities,
-                canAssignActivities: canManageActivities,
+                canAssignActivities,
+                canViewAllActivities: task.is_project_task
+                    ? Boolean(projectTaskAccess?.canViewAllActivities)
+                    : true,
             };
             if(task.is_project_task){
                 const teamIds = normalizeProjectTaskTeamIds(task.assigned_teams);

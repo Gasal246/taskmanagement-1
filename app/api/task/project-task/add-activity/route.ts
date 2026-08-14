@@ -10,7 +10,6 @@ import { resolveSelectedHeadContext } from "@/app/api/helpers/head-reassignment-
 import { hasStaffTaskAccess } from "@/app/api/helpers/staff-task-access";
 import {
     canManageProjectTaskActivities,
-    getProjectTaskCandidateIds,
 } from "@/app/api/helpers/project-task-teams";
 
 connectDB();
@@ -86,16 +85,8 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        let assignedTo = !task.is_project_task ? task.assigned_to : body.assigned_to || null;
-        if (task.is_project_task && assignedTo) {
-            const candidates = await getProjectTaskCandidateIds(task);
-            if (!candidates.includes(String(assignedTo))) {
-                return NextResponse.json(
-                    { message: "Activities can only be assigned to active heads or members of the selected teams" },
-                    { status: 403 }
-                );
-            }
-        }
+        const assignedTo = task.is_project_task ? null : task.assigned_to;
+        const assignedSkill = task.is_project_task ? null : body.assigned_skill || null;
         const projectId = body.project_id ?? task.project_id ?? null;
 
         const newActivity = new Task_Activities({
@@ -106,7 +97,8 @@ export async function POST(req: NextRequest) {
             is_done: false,
             created_by: session?.user?.id || null,
             assigned_to: assignedTo || null,
-            assigned_skill: body.assigned_skill || null
+            forwarded_to: null,
+            assigned_skill: assignedSkill,
         });
         const savedActivity = await newActivity.save();
 

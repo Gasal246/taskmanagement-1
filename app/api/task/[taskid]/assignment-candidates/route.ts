@@ -1,7 +1,7 @@
 import { auth } from "@/auth";
 import {
-  canManageProjectTaskActivities,
-  getProjectTaskCandidateIds,
+  canAssignProjectTaskActivities,
+  getProjectTaskAssignmentCandidateIds,
 } from "@/app/api/helpers/project-task-teams";
 import connectDB from "@/lib/mongo";
 import BusinessTasks from "@/models/business_tasks.model";
@@ -30,11 +30,11 @@ export async function GET(
     if (!task || !task.is_project_task) {
       return NextResponse.json({ message: "Project task not found" }, { status: 404 });
     }
-    if (!(await canManageProjectTaskActivities(task, userId))) {
+    if (!(await canAssignProjectTaskActivities(task, userId))) {
       return NextResponse.json({ message: "You cannot assign activities for this task" }, { status: 403 });
     }
 
-    let candidateIds = await getProjectTaskCandidateIds(task);
+    let candidateIds = await getProjectTaskAssignmentCandidateIds(task, userId);
     const skillId = (new URL(req.url).searchParams.get("skill_id") || "").trim();
     if (skillId) {
       if (!mongoose.isValidObjectId(skillId)) {

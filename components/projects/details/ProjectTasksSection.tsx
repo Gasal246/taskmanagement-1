@@ -88,6 +88,9 @@ export default function ProjectTasksSection({
   const [sheetOpen, setSheetOpen] = useState(false);
   const [taskName, setTaskName] = useState("");
   const [description, setDescription] = useState("");
+  const [priority, setPriority] = useState("normal");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
   const [dialogTeams, setDialogTeams] = useState<TaskTeam[]>([]);
 
@@ -124,6 +127,9 @@ export default function ProjectTasksSection({
       const response = await axios.post(`/api/project/tasks/${projectId}`, {
         task_name: taskName.trim(),
         task_description: description.trim(),
+        priority,
+        start_date: startDate,
+        end_date: endDate,
         team_ids: selectedTeams,
       });
       return response.data;
@@ -133,6 +139,9 @@ export default function ProjectTasksSection({
       setSheetOpen(false);
       setTaskName("");
       setDescription("");
+      setPriority("normal");
+      setStartDate("");
+      setEndDate("");
       setSelectedTeams([]);
       await queryClient.invalidateQueries({ queryKey: ["project-tasks", projectId] });
       await queryClient.invalidateQueries({ queryKey: ["project-details", projectId, mode] });
@@ -365,6 +374,9 @@ export default function ProjectTasksSection({
             onSubmit={(event) => {
               event.preventDefault();
               if (taskName.trim().length < 2) return toast.error("Enter a task title");
+              if (!priority) return toast.error("Select a priority");
+              if (!startDate || !endDate) return toast.error("Select a start and end date");
+              if (endDate < startDate) return toast.error("End date cannot be before start date");
               if (!selectedTeams.length) return toast.error("Select at least one team");
               createTask.mutate();
             }}
@@ -376,6 +388,54 @@ export default function ProjectTasksSection({
             <div className="space-y-2">
               <label htmlFor="project-task-description" className="text-sm font-medium text-slate-200">Description</label>
               <Textarea id="project-task-description" value={description} onChange={(event) => setDescription(event.target.value)} maxLength={2000} rows={6} placeholder="Describe the task" className="border-slate-700 bg-slate-900" />
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="project-task-priority" className="text-sm font-medium text-slate-200">
+                Priority <span className="text-rose-400">*</span>
+              </label>
+              <Select value={priority} onValueChange={setPriority}>
+                <SelectTrigger id="project-task-priority" className="border-slate-700 bg-slate-900">
+                  <SelectValue placeholder="Select priority" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="high">High</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="normal">Normal</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <label htmlFor="project-task-start-date" className="text-sm font-medium text-slate-200">
+                  Start Date <span className="text-rose-400">*</span>
+                </label>
+                <Input
+                  id="project-task-start-date"
+                  type="date"
+                  value={startDate}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    setStartDate(value);
+                    if (endDate && value && endDate < value) setEndDate("");
+                  }}
+                  required
+                  className="border-slate-700 bg-slate-900"
+                />
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="project-task-end-date" className="text-sm font-medium text-slate-200">
+                  End Date <span className="text-rose-400">*</span>
+                </label>
+                <Input
+                  id="project-task-end-date"
+                  type="date"
+                  min={startDate || undefined}
+                  value={endDate}
+                  onChange={(event) => setEndDate(event.target.value)}
+                  required
+                  className="border-slate-700 bg-slate-900"
+                />
+              </div>
             </div>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
@@ -405,7 +465,19 @@ export default function ProjectTasksSection({
             </div>
             <SheetFooter>
               <Button type="button" variant="outline" onClick={() => setSheetOpen(false)} disabled={createTask.isPending}>Cancel</Button>
-              <Button type="submit" disabled={createTask.isPending || taskName.trim().length < 2 || !selectedTeams.length} className="bg-cyan-600 text-white hover:bg-cyan-500">
+              <Button
+                type="submit"
+                disabled={
+                  createTask.isPending ||
+                  taskName.trim().length < 2 ||
+                  !priority ||
+                  !startDate ||
+                  !endDate ||
+                  endDate < startDate ||
+                  !selectedTeams.length
+                }
+                className="bg-cyan-600 text-white hover:bg-cyan-500"
+              >
                 {createTask.isPending ? "Creating..." : "Create and Open Task"}
               </Button>
             </SheetFooter>

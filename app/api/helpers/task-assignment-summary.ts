@@ -3,13 +3,36 @@ import Users from "@/models/users.model";
 
 type AssignmentPerson = { id: string; name: string };
 
-export async function addTaskAssignmentSummaries(tasks: any[]) {
+export async function addTaskAssignmentSummaries(
+  tasks: any[],
+  viewer?: { userId: string; fullTaskIds: string[] }
+) {
   if (!tasks.length) return tasks;
 
   const taskIds = tasks.map((task) => task._id).filter(Boolean);
+  const fullTaskIds = new Set(viewer?.fullTaskIds || []);
+  const limitedTaskIds = viewer
+    ? taskIds.filter((taskId) => !fullTaskIds.has(taskId.toString()))
+    : [];
+  const visibilityScope = viewer
+    ? {
+        $or: [
+          { task_id: { $in: taskIds.filter((taskId) => fullTaskIds.has(taskId.toString())) } },
+          {
+            task_id: { $in: limitedTaskIds },
+            $or: [
+              { assigned_to: viewer.userId },
+              { forwarded_to: viewer.userId },
+            ],
+          },
+        ],
+      }
+    : { task_id: { $in: taskIds } };
   const activities = await Task_Activities.find({
-    task_id: { $in: taskIds },
-    $or: [{ assigned_to: { $ne: null } }, { forwarded_to: { $ne: null } }],
+    $and: [
+      visibilityScope,
+      { $or: [{ assigned_to: { $ne: null } }, { forwarded_to: { $ne: null } }] },
+    ],
   })
     .select("task_id assigned_to forwarded_to createdAt")
     .sort({ createdAt: 1 })

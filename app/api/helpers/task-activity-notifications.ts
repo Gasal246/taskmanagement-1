@@ -1,7 +1,7 @@
+import AdminAssignBusiness from "@/models/admin_assign_business.model";
 import Business_Tasks from "@/models/business_tasks.model";
-import Task_Activities from "@/models/task_activities.model";
+import Business_Project from "@/models/business_project.model";
 import Project_Teams from "@/models/project_team.model";
-import Project_Team_Members from "@/models/project_team_members.model";
 import Notifications from "@/models/notifications.model";
 import FcmTokens from "@/models/fcm_tokens.model";
 import { getAdminMessaging } from "@/lib/firebaseAdmin";
@@ -80,39 +80,34 @@ export async function notifyTaskActivityChange({
     assigned_to?: string | null;
     assigned_teams?: string[] | string | null;
     creator?: string | null;
+    project_id?: string | null;
+    business_id?: string | null;
   } | null = await Business_Tasks.findById(taskId)
-    .select("task_name is_project_task assigned_to assigned_teams creator")
+    .select("task_name is_project_task assigned_to assigned_teams creator project_id business_id")
     .lean<{
       task_name?: string;
       is_project_task?: boolean;
       assigned_to?: string | null;
       assigned_teams?: string[] | string | null;
       creator?: string | null;
+      project_id?: string | null;
+      business_id?: string | null;
     }>();
   if (!task) return;
 
   const recipients = new Set<string>();
+  if (task.business_id) {
+    const admins = await AdminAssignBusiness.find({
+      business_id: task.business_id,
+      status: 1,
+    }).select("user_id").lean();
+    admins.forEach((admin: any) => {
+      if (admin?.user_id) recipients.add(String(admin.user_id));
+    });
+  }
   if (task.creator) recipients.add(String(task.creator));
   if (task.assigned_to) recipients.add(String(task.assigned_to));
   if (activityAssignedTo) recipients.add(String(activityAssignedTo));
-
-  const activityAssignees = await Task_Activities.find({
-    task_id: taskId,
-    $or: [
-      { assigned_to: { $ne: null } },
-      { forwarded_to: { $ne: null } },
-    ],
-  })
-    .select("assigned_to forwarded_to")
-    .lean();
-  activityAssignees.forEach((activity: any) => {
-    if (activity?.assigned_to) {
-      recipients.add(String(activity.assigned_to));
-    }
-    if (activity?.forwarded_to) {
-      recipients.add(String(activity.forwarded_to));
-    }
-  });
 
   if (task.is_project_task && task.assigned_teams) {
     const teamIds = (Array.isArray(task.assigned_teams) ? task.assigned_teams : [task.assigned_teams])
@@ -124,15 +119,20 @@ export async function notifyTaskActivityChange({
     teams.forEach((team) => {
       if (team?.team_head) recipients.add(String(team.team_head));
     });
-
-    const teamMembers = await Project_Team_Members.find({
-      project_team_id: { $in: teamIds },
-    })
-      .select("user_id")
-      .lean();
-    teamMembers.forEach((member: any) => {
-      if (member?.user_id) recipients.add(String(member.user_id));
-    });
+    if (task.project_id) {
+      const project: any = await Business_Project.findById(task.project_id)
+        .select("project_head project_heads project_supervisors account_managers site_operational_heads")
+        .lean();
+      [
+        project?.project_head,
+        ...(Array.isArray(project?.project_heads) ? project.project_heads : []),
+        ...(Array.isArray(project?.project_supervisors) ? project.project_supervisors : []),
+        ...(Array.isArray(project?.account_managers) ? project.account_managers : []),
+        ...(Array.isArray(project?.site_operational_heads) ? project.site_operational_heads : []),
+      ].forEach((userId) => {
+        if (userId) recipients.add(String(userId));
+      });
+    }
   }
 
   const recipientIds = Array.from(recipients).filter(Boolean);

@@ -66,7 +66,7 @@ import {
 import { toast } from "sonner";
 import { formatDateTimeShort, formatDateTiny } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { HEAD_ROLES, TASK_STATUS } from "@/lib/constants";
+import { HEAD_ROLES } from "@/lib/constants";
 import LoaderSpin from "@/components/shared/LoaderSpin";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "antd";
@@ -119,8 +119,6 @@ const taskSchema = z.object({
   task_name: z.string().min(2, { message: "Task name must be at least 2 characters." }),
   task_description: z.string().min(5, { message: "Description must be at least 5 characters." }).optional(),
   priority: z.string().optional(),
-  comments: z.string().optional(),
-  status: z.string(),
   start_date: z.string().optional(),
   end_date: z.string().optional(),
 });
@@ -151,7 +149,7 @@ const resolveDomainId = (roleName: string, domainData: any) => {
 const normalizeStaff = (staff: any) => {
   const user = staff?.user_id || staff?.staff_id || staff;
   return {
-    _id: user?._id,
+    _id: user?._id || user?.id,
     name: user?.name || staff?.name || "",
     email: user?.email || staff?.email || "",
     avatar_url: user?.avatar_url || staff?.avatar_url || null,
@@ -209,6 +207,7 @@ const TaskDetails = () => {
   const taskData = task?.data;
   const isHead = HEAD_ROLES.includes(roleName);
   const canManageActivities = Boolean(taskData?.permissions?.canManageActivities);
+  const canAssignActivities = Boolean(taskData?.permissions?.canAssignActivities);
   const canAddActivity = taskData?.is_project_task ? canManageActivities : isCreator || isHead;
   const visibleActivities = Array.isArray(taskData?.activities) ? taskData.activities : [];
   const visibleActivityCount = visibleActivities.length;
@@ -232,8 +231,6 @@ const TaskDetails = () => {
       task_name: "",
       task_description: "",
       priority: "",
-      comments: "",
-      status: "To Do",
       start_date: "",
       end_date: "",
     },
@@ -259,8 +256,6 @@ const TaskDetails = () => {
     taskForm.setValue("task_name", taskData.task_name);
     taskForm.setValue("task_description", taskData.task_description || "");
     taskForm.setValue("priority", taskData.priority || "");
-    taskForm.setValue("comments", taskData.comments || "");
-    taskForm.setValue("status", taskData.status);
     taskForm.setValue("start_date", taskData.start_date || "");
     taskForm.setValue("end_date", taskData.end_date || "");
   }, [taskData, taskForm]);
@@ -279,7 +274,7 @@ const TaskDetails = () => {
       setLoadingStaffs(true);
       try {
         const response = await axios.get(`/api/task/${params.taskid}/assignment-candidates`);
-        setStaffOptions(response.data?.data || []);
+        setStaffOptions((response.data?.data || []).map(normalizeStaff));
       } catch {
         setStaffOptions([]);
       } finally {
@@ -342,6 +337,12 @@ const TaskDetails = () => {
     if (!assignDialogOpen) return;
     loadMyStaffs();
   }, [assignDialogOpen, loadMyStaffs]);
+
+  useEffect(() => {
+    if (!addActivityDialog) return;
+    const frame = window.requestAnimationFrame(() => activityForm.setFocus("activity_name"));
+    return () => window.cancelAnimationFrame(frame);
+  }, [activityForm, addActivityDialog]);
 
   const filteredStaffs = useMemo(() => {
     const term = staffSearch.trim().toLowerCase();
@@ -506,8 +507,6 @@ const TaskDetails = () => {
       task_name: values.task_name,
       task_description: values.task_description,
       priority: values.priority || undefined,
-      comments: values.comments || undefined,
-      status: values.status,
       is_project_task: taskData?.is_project_task,
       ...(!taskData?.is_project_task ? { assigned_to: taskData?.assigned_to || null } : {}),
       start_date: values.start_date || taskData?.start_date,
@@ -787,7 +786,7 @@ const TaskDetails = () => {
                           </span>
                         )}
                         {activity?.forwarded_to?._id && (
-                          (taskData.is_project_task ? canManageActivities : isHead) ? (
+                          (taskData.is_project_task ? canAssignActivities : isHead) ? (
                             <button
                               type="button"
                               onClick={() => handleOpenRemoveReassignment(activity)}
@@ -832,7 +831,7 @@ const TaskDetails = () => {
                         <History size={12} />
                         History
                       </motion.button>
-                      {(taskData.is_project_task ? canManageActivities : isHead) && (
+                      {(taskData.is_project_task ? canAssignActivities : isHead) && (
                         <motion.button
                           whileHover={{ scale: 1.02 }}
                           whileTap={{ scale: 0.98 }}
@@ -1397,8 +1396,13 @@ const TaskDetails = () => {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-xs text-slate-300 font-semibold">Description</FormLabel>
-                    <FormControl className="border-slate-600 focus:border-slate-400">
-                      <Input placeholder="Task description" {...field} />
+                    <FormControl>
+                      <Textarea
+                        placeholder="Task description"
+                        rows={3}
+                        className="min-h-[96px] border-slate-600 focus:border-slate-400"
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -1424,47 +1428,6 @@ const TaskDetails = () => {
                         <SelectItem value="high">High</SelectItem>
                         <SelectItem value="medium">Medium</SelectItem>
                         <SelectItem value="normal">Normal</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={taskForm.control}
-                name="comments"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs text-slate-300 font-semibold">Comments</FormLabel>
-                    <FormControl className="border-slate-600 focus:border-slate-400">
-                      <Textarea
-                        placeholder="Optional additional comments"
-                        {...field}
-                        className="min-h-[90px]"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={taskForm.control}
-                name="status"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs text-slate-300 font-semibold">Status</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger className="border-slate-600 focus:border-slate-400">
-                          <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {TASK_STATUS.map((status) => (
-                          <SelectItem key={status.value} value={status.value}>
-                            {status.label}
-                          </SelectItem>
-                        ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />

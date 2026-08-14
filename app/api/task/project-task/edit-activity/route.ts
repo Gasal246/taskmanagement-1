@@ -12,8 +12,9 @@ import {
     resolveSelectedHeadContext,
 } from "@/app/api/helpers/head-reassignment-scope";
 import {
+    canAssignProjectTaskActivities,
     canManageProjectTaskActivities,
-    getProjectTaskCandidateIds,
+    getProjectTaskAssignmentCandidateIds,
 } from "@/app/api/helpers/project-task-teams";
 
 connectDB();
@@ -50,7 +51,7 @@ export async function PUT(req: NextRequest) {
                 .select("business_id project_id creator is_project_task assigned_teams")
                 .lean();
             if (task?.is_project_task) {
-                if (!(await canManageProjectTaskActivities(task, actorId))) {
+                if (!(await canAssignProjectTaskActivities(task, actorId))) {
                     return NextResponse.json(
                         { message: "Only the task creator or a project manager can reassign this activity", status: 403 },
                         { status: 403 }
@@ -60,7 +61,7 @@ export async function PUT(req: NextRequest) {
                     await Task_Activities.findByIdAndUpdate(body.activity_id, { $set: { forwarded_to: null } });
                     return NextResponse.json({ message: "Activity reassignment removed", status: 200 }, { status: 200 });
                 }
-                const candidates = await getProjectTaskCandidateIds(task);
+                const candidates = await getProjectTaskAssignmentCandidateIds(task, actorId);
                 if (!candidates.includes(String(body.forwarded_to))) {
                     return NextResponse.json(
                         { message: "Activities can only be reassigned to active heads or members of the selected teams", status: 403 },
@@ -261,14 +262,26 @@ export async function PUT(req: NextRequest) {
                 .lean();
             if (task?.is_project_task) {
                 const actorId = String(session?.user?.id || "");
-                if (!(await canManageProjectTaskActivities(task, actorId))) {
+                const hasContentUpdates =
+                    Object.prototype.hasOwnProperty.call(body, "activity") ||
+                    Object.prototype.hasOwnProperty.call(body, "description");
+                const hasAssignmentUpdates =
+                    Object.prototype.hasOwnProperty.call(body, "assigned_to") ||
+                    Object.prototype.hasOwnProperty.call(body, "assigned_skill");
+                if (hasContentUpdates && !(await canManageProjectTaskActivities(task, actorId))) {
                     return NextResponse.json(
-                        { message: "Only the task creator or a project manager can edit or assign this activity", status: 403 },
+                        { message: "Only the task creator or a project manager can edit this activity", status: 403 },
+                        { status: 403 }
+                    );
+                }
+                if (hasAssignmentUpdates && !(await canAssignProjectTaskActivities(task, actorId))) {
+                    return NextResponse.json(
+                        { message: "You cannot assign this activity", status: 403 },
                         { status: 403 }
                     );
                 }
                 if (Object.prototype.hasOwnProperty.call(body, "assigned_to") && body.assigned_to) {
-                    const candidates = await getProjectTaskCandidateIds(task);
+                    const candidates = await getProjectTaskAssignmentCandidateIds(task, actorId);
                     if (!candidates.includes(String(body.assigned_to))) {
                         return NextResponse.json(
                             { message: "Activities can only be assigned to active heads or members of the selected teams", status: 403 },

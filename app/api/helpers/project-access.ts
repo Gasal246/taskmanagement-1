@@ -170,6 +170,7 @@ export type ProjectAccess = {
   canApprove: boolean;
   canDelete: boolean;
   isAdmin: boolean;
+  isProjectOperations: boolean;
 };
 
 export async function resolveProjectAccess(
@@ -192,6 +193,7 @@ export async function resolveProjectAccess(
       canApprove: false,
       canDelete: false,
       isAdmin: false,
+      isProjectOperations: false,
     };
   }
 
@@ -270,6 +272,7 @@ export async function resolveProjectAccess(
     canApprove: isAdmin,
     canDelete: isAdmin,
     isAdmin,
+    isProjectOperations: Boolean(staffAssignment) && isDirectAssignment,
   };
 }
 

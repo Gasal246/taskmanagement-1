@@ -68,7 +68,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useSelector } from "react-redux";
 import { RootState } from "@/redux/store";
 import { useGetBusinessStaffs } from "@/query/user/queries";
-import { TASK_STATUS } from "@/lib/constants";
 import LoaderSpin from "@/components/shared/LoaderSpin";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "antd";
@@ -120,8 +119,6 @@ const taskSchema = z.object({
   task_name: z.string().min(2, { message: "Task name must be at least 2 characters." }),
   task_description: z.string().min(5, { message: "Description must be at least 5 characters." }).optional(),
   priority: z.string().optional(),
-  comments: z.string().optional(),
-  status: z.string(),
   assigned_team_id: z.string().optional(),
   assigned_user_id: z.string().optional(),
 });
@@ -243,8 +240,6 @@ const TaskDetailPage = () => {
       task_name: "",
       task_description: "",
       priority: "",
-      comments: "",
-      status: "To Do",
       assigned_team_id: "",
       assigned_user_id: "",
     },
@@ -265,8 +260,6 @@ const TaskDetailPage = () => {
     taskForm.setValue("task_name", taskData.task_name);
     taskForm.setValue("task_description", taskData.task_description || "");
     taskForm.setValue("priority", taskData.priority || "");
-    taskForm.setValue("comments", taskData.comments || "");
-    taskForm.setValue("status", taskData.status);
 
     if (!taskData.is_project_task && loadedStaffs) {
       taskForm.setValue("assigned_user_id", taskData.assigned_to || "");
@@ -319,6 +312,12 @@ const TaskDetailPage = () => {
     };
     fetchStaffs();
   }, [selectStaffDialogOpen, selectedSkill?._id, businessData?._id, getStaffsBySkill, isProjectTask, params.taskid]);
+
+  useEffect(() => {
+    if (!addActivityDialog) return;
+    const frame = window.requestAnimationFrame(() => activityForm.setFocus("activity_name"));
+    return () => window.cancelAnimationFrame(frame);
+  }, [activityForm, addActivityDialog]);
 
   const handleAddActivity = () => {
     activityForm.reset();
@@ -459,8 +458,6 @@ const TaskDetailPage = () => {
       task_name: values.task_name,
       task_description: values.task_description,
       priority: values.priority || undefined,
-      comments: values.comments || undefined,
-      status: values.status,
       is_project_task: taskData?.is_project_task,
       ...(!taskData?.is_project_task ? { assigned_to: assignedTo } : {}),
     };
@@ -1416,8 +1413,13 @@ const TaskDetailPage = () => {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-xs text-slate-300 font-semibold">Description</FormLabel>
-                    <FormControl className="border-slate-600 focus:border-slate-400">
-                      <Input placeholder="Task description" {...field} />
+                    <FormControl>
+                      <Textarea
+                        placeholder="Task description"
+                        rows={3}
+                        className="min-h-[96px] border-slate-600 focus:border-slate-400"
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -1443,47 +1445,6 @@ const TaskDetailPage = () => {
                         <SelectItem value="high">High</SelectItem>
                         <SelectItem value="medium">Medium</SelectItem>
                         <SelectItem value="normal">Normal</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={taskForm.control}
-                name="comments"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs text-slate-300 font-semibold">Comments</FormLabel>
-                    <FormControl className="border-slate-600 focus:border-slate-400">
-                      <Textarea
-                        placeholder="Optional additional comments"
-                        {...field}
-                        className="min-h-[90px]"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={taskForm.control}
-                name="status"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs text-slate-300 font-semibold">Status</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger className="border-slate-600 focus:border-slate-400">
-                          <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {TASK_STATUS.map((status) => (
-                          <SelectItem key={status.value} value={status.value}>
-                            {status.label}
-                          </SelectItem>
-                        ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />
