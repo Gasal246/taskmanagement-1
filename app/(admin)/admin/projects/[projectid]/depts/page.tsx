@@ -19,10 +19,11 @@ const ProjectDepartments = () => {
   const [availableDepartments, setAvailableDepartments] = useState<any[]>([]);
   const [addDepartmentDialog, setAddDepartmentDialog] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>("");
+  const [selectedDepartmentIds, setSelectedDepartmentIds] = useState<string[]>([]);
+  const [isAddingDepartments, setIsAddingDepartments] = useState(false);
   const { data: businessDepartmentsData } = useGetBusinessDepartmentsByBusiness_id(businessData?._id);
   const { data: project_depts, refetch: refetchProjectDepts } = useGetAddedProjectDepartments(params.projectid);
-  const { mutateAsync: addProjectDept, isPending: addingProjectDept } = useAddProjectDepartment();
+  const { mutateAsync: addProjectDept } = useAddProjectDepartment();
   const { mutateAsync: selectActiveDept } = useSelectActiveProjectDepartment();
   const { mutateAsync: removeProjDept, isPending: removingProjDept } = useRemoveAddedProjectDepartment();
 
@@ -54,29 +55,62 @@ const ProjectDepartments = () => {
     }
   };
 
-  const handleAddDepartment = async (deptId: string) => {
-    if (!deptId) {
-      toast.error("Please select a department.");
+  const toggleDepartmentSelection = (deptId: string) => {
+    setSelectedDepartmentIds((currentIds) =>
+      currentIds.includes(deptId)
+        ? currentIds.filter((id) => id !== deptId)
+        : [...currentIds, deptId]
+    );
+  };
+
+  const handleAddDepartments = async () => {
+    if (selectedDepartmentIds.length === 0) {
+      toast.error("Please select at least one department.");
       return;
     }
-    const data = {
-      project_id: params.projectid,
-      department_id: deptId,
-      department_name: availableDepartments.find((dept) => dept._id === deptId)?.dep_name || "Unknown",
-      is_active: false
-    };
-    const res = await addProjectDept(data);
 
-    if (res.status == 201) {
-      toast.success("Department added to project successfully");
+    setIsAddingDepartments(true);
+
+    try {
+      const results = await Promise.allSettled(
+        selectedDepartmentIds.map((deptId) =>
+          addProjectDept({
+            project_id: params.projectid,
+            department_id: deptId,
+            department_name:
+              availableDepartments.find((dept) => dept._id.toString() === deptId)?.dep_name || "Unknown",
+            is_active: false,
+          })
+        )
+      );
+
+      const successfulIds = selectedDepartmentIds.filter((_, index) => {
+        const result = results[index];
+        return result.status === "fulfilled" && result.value?.status === 201;
+      });
+      const failedIds = selectedDepartmentIds.filter((id) => !successfulIds.includes(id));
+
+      if (successfulIds.length > 0) {
+        toast.success(
+          `${successfulIds.length} ${successfulIds.length === 1 ? "department" : "departments"} added to the project successfully`
+        );
+        await refetchProjectDepts();
+      }
+
+      if (failedIds.length > 0) {
+        toast.error(
+          `${failedIds.length} ${failedIds.length === 1 ? "department could" : "departments could"} not be added. Please try again.`
+        );
+        setSelectedDepartmentIds(failedIds);
+        return;
+      }
+
+      setSelectedDepartmentIds([]);
+      setSearchQuery("");
       setAddDepartmentDialog(false);
-      refetchProjectDepts();
-    } else {
-      toast.error("Error while adding department to project");
+    } finally {
+      setIsAddingDepartments(false);
     }
-    setSelectedDepartmentId("");
-    setSearchQuery("");
-    setAddDepartmentDialog(false);
   };
 
   const handleRemoveDepartment = async (deptId: string) => {
@@ -226,17 +260,18 @@ const ProjectDepartments = () => {
       <Dialog
         open={addDepartmentDialog}
         onOpenChange={(open) => {
+          if (!open && isAddingDepartments) return;
           setAddDepartmentDialog(open);
           if (!open) {
-            setSelectedDepartmentId("");
+            setSelectedDepartmentIds([]);
             setSearchQuery("");
           }
         }}
       >
         <DialogContent className="sm:max-w-[460px] max-h-[75vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle>Add Department to Project</DialogTitle>
-            <DialogDescription>Choose a department to contribute to this project.</DialogDescription>
+            <DialogTitle>Add Departments to Project</DialogTitle>
+            <DialogDescription>Select one or more departments to contribute to this project.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="relative">
@@ -244,6 +279,7 @@ const ProjectDepartments = () => {
                 placeholder="Search departments..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                disabled={isAddingDepartments}
                 className="border-slate-700 focus:border-cyan-500 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 pl-8 text-sm"
               />
               <Search size={16} className="absolute left-2 top-2.5 text-slate-400" />
@@ -253,31 +289,62 @@ const ProjectDepartments = () => {
               <Sparkles size={14} className="text-cyan-400" />
               Departments already linked to this project are hidden from the list.
             </div>
+
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-cyan-300">
+                {selectedDepartmentIds.length} {selectedDepartmentIds.length === 1 ? "department" : "departments"} selected
+              </span>
+              {selectedDepartmentIds.length > 0 && (
+                <button
+                  type="button"
+                  className="text-slate-400 transition hover:text-slate-200"
+                  onClick={() => setSelectedDepartmentIds([])}
+                  disabled={isAddingDepartments}
+                >
+                  Clear selection
+                </button>
+              )}
+            </div>
           </div>
 
-          <div className="relative flex-1 overflow-y-auto mt-3 pb-16">
+          <div className="relative flex-1 space-y-2 overflow-y-auto mt-3 pb-16">
             {filteredAvailableDepartments?.length > 0 ? (
-              filteredAvailableDepartments.map((dept: any) => (
-                <motion.div
-                  key={dept._id}
-                  whileHover={{ scale: 1.01 }}
-                  whileTap={{ scale: 0.98 }}
-                  className={`p-3 rounded-lg cursor-pointer border ${
-                    selectedDepartmentId === dept._id
-                      ? 'border-cyan-400/60 bg-cyan-500/10'
-                      : 'border-slate-800 hover:border-slate-600 bg-slate-950/30'
-                  } relative`}
-                  onClick={() => setSelectedDepartmentId(dept._id)}
-                >
-                  <p className="text-sm font-medium text-slate-100">{dept.dep_name}</p>
-                  <p className="text-[11px] text-slate-400">Type: {dept?.type || 'General'}</p>
-                  {selectedDepartmentId === dept._id && (
-                    <div className="absolute top-2 right-2">
-                      <CheckCircle size={16} className="text-cyan-400" />
-                    </div>
-                  )}
-                </motion.div>
-              ))
+              filteredAvailableDepartments.map((dept: any) => {
+                const departmentId = dept._id.toString();
+                const isSelected = selectedDepartmentIds.includes(departmentId);
+
+                return (
+                  <motion.div
+                    key={departmentId}
+                    whileHover={{ scale: 1.01 }}
+                    whileTap={{ scale: 0.98 }}
+                    role="checkbox"
+                    aria-checked={isSelected}
+                    aria-disabled={isAddingDepartments}
+                    tabIndex={isAddingDepartments ? -1 : 0}
+                    className={`p-3 rounded-lg cursor-pointer border ${
+                      isSelected
+                        ? 'border-cyan-400/60 bg-cyan-500/10'
+                        : 'border-slate-800 hover:border-slate-600 bg-slate-950/30'
+                    } relative ${isAddingDepartments ? 'pointer-events-none opacity-60' : ''}`}
+                    onClick={() => toggleDepartmentSelection(departmentId)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        toggleDepartmentSelection(departmentId);
+                      }
+                    }}
+                  >
+                    <p className="text-sm font-medium text-slate-100">{dept.dep_name}</p>
+                    <p className="text-[11px] text-slate-400">Type: {dept?.type || 'General'}</p>
+                    {isSelected && (
+                      <div className="absolute top-2 right-2">
+                        <CheckCircle size={16} className="text-cyan-400" />
+                      </div>
+                    )}
+                  </motion.div>
+                );
+              })
             ) : (
               <div className="flex items-center justify-center h-[12vh]">
                 <p className="text-xs text-slate-400">
@@ -291,12 +358,16 @@ const ProjectDepartments = () => {
             <div className="pt-2 bg-slate-950/80 w-full">
               <motion.button
                 whileTap={{ scale: 0.98 }}
-                onClick={() => handleAddDepartment(selectedDepartmentId)}
-                disabled={!selectedDepartmentId || addingProjectDept}
+                onClick={handleAddDepartments}
+                disabled={selectedDepartmentIds.length === 0 || isAddingDepartments}
                 className="w-full bg-gradient-to-tr from-slate-900 to-slate-800 p-3 hover:border-cyan-500 border border-slate-700 select-none rounded-lg flex items-center gap-2 justify-center text-sm font-semibold text-slate-200 disabled:opacity-50"
               >
                 <Plus size={16} />
-                {addingProjectDept ? "Adding..." : "Add Department"}
+                {isAddingDepartments
+                  ? "Adding departments..."
+                  : selectedDepartmentIds.length > 0
+                    ? `Add ${selectedDepartmentIds.length} ${selectedDepartmentIds.length === 1 ? "Department" : "Departments"}`
+                    : "Add Departments"}
               </motion.button>
             </div>
           </DialogFooter>
