@@ -247,7 +247,19 @@ export async function GET(req: NextRequest) {
             isProjectTask: "$is_project_task",
             creator: "$creator",
             projectId: "$project_id",
-            assignedTeams: { $ifNull: ["$assigned_teams", []] },
+            assignedTeams: {
+              $cond: [
+                { $isArray: "$assigned_teams" },
+                "$assigned_teams",
+                {
+                  $cond: [
+                    { $ne: [{ $ifNull: ["$assigned_teams", null] }, null] },
+                    ["$assigned_teams"],
+                    [],
+                  ],
+                },
+              ],
+            },
           },
           pipeline: [
             {
@@ -363,7 +375,12 @@ export async function GET(req: NextRequest) {
         if (!task.is_project_task) return true;
         if (task.creator?.toString() === userId) return true;
         if (operationProjectIdSet.has(task.project_id?.toString())) return true;
-        return (Array.isArray(task.assigned_teams) ? task.assigned_teams : [])
+        const assignedTeams = Array.isArray(task.assigned_teams)
+          ? task.assigned_teams
+          : task.assigned_teams
+            ? [task.assigned_teams]
+            : [];
+        return assignedTeams
           .some((teamId: any) => headedTeamIdSet.has(teamId?.toString()));
       })
       .map((task: any) => task._id);
