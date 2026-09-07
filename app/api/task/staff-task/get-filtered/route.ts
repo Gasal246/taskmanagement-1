@@ -19,7 +19,7 @@ import {
   isTaskStatusFilter,
   normalizeTaskSummary,
 } from "@/app/api/helpers/task-list-status";
-import type { StaffTaskStatusFilter } from "@/types/staff-tasks";
+import type { StaffTaskStatusFilter, TaskPriorityFilter } from "@/types/staff-tasks";
 
 connectDB();
 
@@ -59,6 +59,7 @@ export async function GET(req: NextRequest) {
     const nameQuery = (searchParams.get("nameQuery") || "").trim();
     const staffId = (searchParams.get("staffId") || "").trim();
     const statusParam = (searchParams.get("status") || "").trim();
+    const priorityParam = (searchParams.get("priority") || "").trim().toLowerCase();
     const hasValidStart = Boolean(startDate && startDate !== "undefined");
     const hasValidEnd = Boolean(endDate && endDate !== "undefined");
     const hasType = Boolean(typeParam);
@@ -71,13 +72,21 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    if (priorityParam && !["high", "medium", "normal"].includes(priorityParam)) {
+      return NextResponse.json(
+        { message: "Invalid task priority filter", status: 400 },
+        { status: 400 }
+      );
+    }
+
     if (
       !hasType &&
       !hasValidStart &&
       !hasValidEnd &&
       !nameQuery &&
       !staffId &&
-      !statusParam
+      !statusParam &&
+      !priorityParam
     ) {
       return NextResponse.json(
         { message: "No filters provided", data: [], status: 203 },
@@ -120,6 +129,7 @@ export async function GET(req: NextRequest) {
     const staffObjectId = staffId ? toObjectId(staffId) : null;
 
     const query: Record<string, any> = {};
+    if (priorityParam) query.priority = priorityParam as TaskPriorityFilter;
     if (hasValidStart || hasValidEnd) {
       query.start_date = {};
       if (hasValidStart && startDate) query.start_date.$gte = new Date(startDate);

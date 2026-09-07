@@ -2,6 +2,7 @@ import type {
   StaffTaskCard,
   StaffTaskStatusFilter,
   StaffTasksResponse,
+  TaskPriorityFilter,
 } from "@/types/staff-tasks";
 
 export type AdminTaskTab = "all" | "single" | "project" | "admin-created";
@@ -15,6 +16,7 @@ export type AdminTaskQueryParams = {
   staffId?: string;
   assignedById?: string;
   status?: StaffTaskStatusFilter;
+  priority?: TaskPriorityFilter;
   page: string;
   limit: string;
 };

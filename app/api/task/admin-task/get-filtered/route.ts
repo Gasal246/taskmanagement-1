@@ -17,7 +17,7 @@ import ActivityComments from "@/models/activity_comments.model";
 import Business_staffs from "@/models/business_staffs.model";
 import Business_Tasks from "@/models/business_tasks.model";
 import Task_Activities from "@/models/task_activities.model";
-import type { StaffTaskStatusFilter } from "@/types/staff-tasks";
+import type { StaffTaskStatusFilter, TaskPriorityFilter } from "@/types/staff-tasks";
 import mongoose from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -54,6 +54,7 @@ export async function GET(req: NextRequest) {
     const staffId = (searchParams.get("staffId") || "").trim();
     const assignedById = (searchParams.get("assignedById") || "").trim();
     const statusParam = (searchParams.get("status") || "").trim();
+    const priorityParam = (searchParams.get("priority") || "").trim().toLowerCase();
     const page = Math.max(1, Number(searchParams.get("page")) || 1);
     const limit = Math.min(50, Math.max(1, Number(searchParams.get("limit")) || 12));
     const skip = (page - 1) * limit;
@@ -63,6 +64,9 @@ export async function GET(req: NextRequest) {
     }
     if (statusParam && !isTaskStatusFilter(statusParam)) {
       return NextResponse.json({ message: "Invalid task status filter", status: 400 }, { status: 400 });
+    }
+    if (priorityParam && !["high", "medium", "normal"].includes(priorityParam)) {
+      return NextResponse.json({ message: "Invalid task priority filter", status: 400 }, { status: 400 });
     }
     if (staffId && !mongoose.isValidObjectId(staffId)) {
       return NextResponse.json({ message: "Invalid staff filter", status: 400 }, { status: 400 });
@@ -101,6 +105,7 @@ export async function GET(req: NextRequest) {
     if (type === "single") query.is_project_task = false;
     if (type === "project") query.is_project_task = true;
     if (type === "admin-created") query.creator = adminObjectId;
+    if (priorityParam) query.priority = priorityParam as TaskPriorityFilter;
     if (startDate || endDate) {
       query.start_date = {};
       if (startDate) query.start_date.$gte = startDate;

@@ -11,6 +11,8 @@ export type StaffTaskStatusFilter =
   | "in_progress"
   | "completed";
 
+export type TaskPriorityFilter = "high" | "medium" | "normal";
+
 export type StaffTaskQueryParams = {
   taskType: "all" | "single" | "project" | "created";
   start_date?: string;
@@ -18,6 +20,7 @@ export type StaffTaskQueryParams = {
   nameQuery?: string;
   staffId?: string;
   status?: StaffTaskStatusFilter;
+  priority?: TaskPriorityFilter;
   page: string;
   limit: string;
 };

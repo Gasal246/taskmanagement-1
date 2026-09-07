@@ -34,6 +34,7 @@ type CampMapProps = {
   focusedCampKey?: number;
   isLoading?: boolean;
   hasCountrySelection: boolean;
+  onDirectionsRequested: (destination: { latitude: number; longitude: number }) => void;
 };
 
 declare global {
@@ -130,40 +131,10 @@ const getMarkerIconUrl = (color: string) => {
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg.trim())}`;
 };
 
-const openGoogleDirections = (latitude: number, longitude: number) => {
-  const destination = `${latitude},${longitude}`;
-
-  const openDirections = (origin?: string) => {
-    const url = new URL("https://www.google.com/maps/dir/");
-    url.searchParams.set("api", "1");
-    url.searchParams.set("destination", destination);
-    url.searchParams.set("travelmode", "driving");
-    if (origin) {
-      url.searchParams.set("origin", origin);
-    }
-    window.open(url.toString(), "_blank", "noopener,noreferrer");
-  };
-
-  if (!navigator.geolocation) {
-    openDirections();
-    return;
-  }
-
-  navigator.geolocation.getCurrentPosition(
-    (position) => {
-      openDirections(`${position.coords.latitude},${position.coords.longitude}`);
-    },
-    () => {
-      openDirections();
-    },
-    {
-      enableHighAccuracy: true,
-      timeout: 10000,
-    }
-  );
-};
-
-const createInfoWindowContent = (camp: CampMapItem) => {
+const createInfoWindowContent = (
+  camp: CampMapItem,
+  onDirectionsRequested: CampMapProps["onDirectionsRequested"]
+) => {
   const wrapper = document.createElement("div");
   wrapper.style.maxWidth = "260px";
   wrapper.style.padding = "6px 4px 2px";
@@ -247,7 +218,7 @@ const createInfoWindowContent = (camp: CampMapItem) => {
   direction.style.boxShadow = "0 8px 18px rgba(37, 99, 235, 0.22)";
   direction.style.cursor = "pointer";
   direction.addEventListener("click", () => {
-    openGoogleDirections(camp.latitude, camp.longitude);
+    onDirectionsRequested({ latitude: camp.latitude, longitude: camp.longitude });
   });
   actions.appendChild(direction);
 
@@ -256,7 +227,10 @@ const createInfoWindowContent = (camp: CampMapItem) => {
   return wrapper;
 };
 
-const createCustomInfoWindowContent = (pin: CustomMapPin) => {
+const createCustomInfoWindowContent = (
+  pin: CustomMapPin,
+  onDirectionsRequested: CampMapProps["onDirectionsRequested"]
+) => {
   const wrapper = document.createElement("div");
   wrapper.style.maxWidth = "260px";
   wrapper.style.padding = "6px 4px 2px";
@@ -301,7 +275,7 @@ const createCustomInfoWindowContent = (pin: CustomMapPin) => {
   direction.style.boxShadow = "0 8px 18px rgba(147, 51, 234, 0.22)";
   direction.style.cursor = "pointer";
   direction.addEventListener("click", () => {
-    openGoogleDirections(pin.latitude, pin.longitude);
+    onDirectionsRequested({ latitude: pin.latitude, longitude: pin.longitude });
   });
   wrapper.appendChild(direction);
 
@@ -316,6 +290,7 @@ export default function CampMap({
   focusedCampKey = 0,
   isLoading = false,
   hasCountrySelection,
+  onDirectionsRequested,
 }: CampMapProps) {
   const mapRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<any>(null);
@@ -397,7 +372,7 @@ export default function CampMap({
 
       marker.addListener("click", () => {
         if (!infoWindowRef.current) return;
-        infoWindowRef.current.setContent(createInfoWindowContent(camp));
+        infoWindowRef.current.setContent(createInfoWindowContent(camp, onDirectionsRequested));
         infoWindowRef.current.open({ map, anchor: marker });
       });
 
@@ -419,7 +394,7 @@ export default function CampMap({
 
       marker.addListener("click", () => {
         if (!infoWindowRef.current) return;
-        infoWindowRef.current.setContent(createCustomInfoWindowContent(pin));
+        infoWindowRef.current.setContent(createCustomInfoWindowContent(pin, onDirectionsRequested));
         infoWindowRef.current.open({ map, anchor: marker });
       });
 
@@ -430,14 +405,14 @@ export default function CampMap({
     markersRef.current = [...campMarkers, ...customPinMarkers];
 
     if (customPins.length === 1 && customPinMarkers[0] && infoWindowRef.current) {
-      infoWindowRef.current.setContent(createCustomInfoWindowContent(customPins[0]));
+      infoWindowRef.current.setContent(createCustomInfoWindowContent(customPins[0], onDirectionsRequested));
       infoWindowRef.current.open({ map, anchor: customPinMarkers[0] });
     }
 
     const focusedCampIndex = focusedCampId ? camps.findIndex((camp) => camp._id === focusedCampId) : -1;
     if (focusedCampIndex >= 0 && campMarkers[focusedCampIndex] && infoWindowRef.current) {
       const focusedCamp = camps[focusedCampIndex];
-      infoWindowRef.current.setContent(createInfoWindowContent(focusedCamp));
+      infoWindowRef.current.setContent(createInfoWindowContent(focusedCamp, onDirectionsRequested));
       infoWindowRef.current.open({ map, anchor: campMarkers[focusedCampIndex] });
       map.setCenter({ lat: focusedCamp.latitude, lng: focusedCamp.longitude });
       map.setZoom(14);
@@ -457,7 +432,7 @@ export default function CampMap({
         map.setZoom(14);
       }
     });
-  }, [camps, customPins, customPinsFocusKey, focusedCampId, focusedCampKey]);
+  }, [camps, customPins, customPinsFocusKey, focusedCampId, focusedCampKey, onDirectionsRequested]);
 
   return (
     <div className="relative overflow-hidden rounded-[28px] border border-slate-800/80 bg-slate-950/80">

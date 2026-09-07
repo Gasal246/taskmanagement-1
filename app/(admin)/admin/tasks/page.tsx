@@ -40,7 +40,7 @@ import type {
   AdminTaskQueryParams,
   AdminTaskTab,
 } from "@/types/admin-tasks";
-import type { StaffTaskStatusFilter } from "@/types/staff-tasks";
+import type { StaffTaskStatusFilter, TaskPriorityFilter } from "@/types/staff-tasks";
 
 const { RangePicker } = DatePicker;
 const PAGE_SIZE = 9;
@@ -62,11 +62,13 @@ const TasksPage = () => {
   const [showStaffFilter, setShowStaffFilter] = useState(false);
   const [showAssignedByFilter, setShowAssignedByFilter] = useState(false);
   const [showPeriodFilter, setShowPeriodFilter] = useState(false);
+  const [showPriorityFilter, setShowPriorityFilter] = useState(false);
   const [staffSearch, setStaffSearch] = useState("");
   const [selectedStaffId, setSelectedStaffId] = useState("");
   const [assignedBySearch, setAssignedBySearch] = useState("");
   const [selectedAssignedById, setSelectedAssignedById] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<StaffTaskStatusFilter>();
+  const [selectedPriority, setSelectedPriority] = useState<TaskPriorityFilter>();
 
   const staffOptionQuery = useGetAdminTaskFilterOptions(
     businessId,
@@ -105,6 +107,7 @@ const TasksPage = () => {
       staffId: selectedStaffId || undefined,
       assignedById: selectedAssignedById || undefined,
       status: selectedStatus,
+      priority: selectedPriority,
       page: String(page),
       limit: String(PAGE_SIZE),
     }),
@@ -117,6 +120,7 @@ const TasksPage = () => {
       selectedAssignedById,
       selectedStaffId,
       selectedStatus,
+      selectedPriority,
     ]
   );
 
@@ -260,6 +264,7 @@ const TasksPage = () => {
                 if (value === "staff") setShowStaffFilter(true);
                 if (value === "assigned-by") setShowAssignedByFilter(true);
                 if (value === "period") setShowPeriodFilter(true);
+                if (value === "priority") setShowPriorityFilter(true);
               }}
             >
               <SelectTrigger className="w-[180px] border-slate-700 bg-slate-900 text-slate-200">
@@ -270,8 +275,31 @@ const TasksPage = () => {
                 {!showStaffFilter && <SelectItem value="staff">By staff</SelectItem>}
                 {!showAssignedByFilter && <SelectItem value="assigned-by">By assigned by</SelectItem>}
                 {!showPeriodFilter && <SelectItem value="period">Within period</SelectItem>}
+                {!showPriorityFilter && <SelectItem value="priority">Priority</SelectItem>}
               </SelectContent>
             </Select>
+
+            {showPriorityFilter && (
+              <div className="flex min-w-[190px] items-center gap-1 rounded-md border border-slate-700 bg-slate-900 pr-2">
+                <Select
+                  value={selectedPriority}
+                  onValueChange={(value) => {
+                    setSelectedPriority(value as TaskPriorityFilter);
+                    setPage(1);
+                  }}
+                >
+                  <SelectTrigger className="border-0 bg-transparent text-slate-200 shadow-none focus:ring-0">
+                    <SelectValue placeholder="Select priority" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="normal">Normal</SelectItem>
+                  </SelectContent>
+                </Select>
+                <button type="button" aria-label="Remove priority filter" onClick={() => { setShowPriorityFilter(false); setSelectedPriority(undefined); setPage(1); }} className="text-slate-400 hover:text-slate-100"><X size={16} /></button>
+              </div>
+            )}
 
             {showNameFilter && (
               <div className="relative min-w-[230px]">

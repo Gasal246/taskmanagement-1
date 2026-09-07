@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
@@ -226,12 +226,12 @@ export default function EnquiriesMapPage() {
     setCustomPinDialogOpen(true);
   };
 
-  const openDirectionsDialog = (pin: Pick<CustomMapPin, "latitude" | "longitude">) => {
+  const openDirectionsDialog = useCallback((pin: Pick<CustomMapPin, "latitude" | "longitude">) => {
     setDirectionsTarget({
       latitude: pin.latitude,
       longitude: pin.longitude,
     });
-  };
+  }, []);
 
   const handleOpenDirections = (provider: "google-app" | "apple" | "google-web") => {
     if (!directionsTarget) return;
@@ -520,6 +520,7 @@ export default function EnquiriesMapPage() {
               focusedCampKey={campFocusKey}
               isLoading={isMapLoading || isMapFetching}
               hasCountrySelection={!!country_id}
+              onDirectionsRequested={openDirectionsDialog}
             />
           </div>
         </section>
