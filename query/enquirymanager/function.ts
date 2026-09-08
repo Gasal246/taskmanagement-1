@@ -455,7 +455,8 @@ export async function GetEnquiriesWithFilters(queryParams: any) {
     return res.data || { data: [] };
   } catch (err) {
     console.log(err);
-    return { data: [], status: 500 };
+    const error = err as any;
+    return { data: [], status: error?.response?.status || 500, message: error?.response?.data?.message || "Unable to load enquiries" };
   }
 }
 
@@ -583,6 +584,8 @@ export async function GetAccessEnquiriesForStaffs(queryParams: any) {
         return res.data;
     }catch(err){
         console.log(err);
+        const error = err as any;
+        return { data: [], status: error?.response?.status || 500, message: error?.response?.data?.message || "Unable to load enquiries" };
     }
 }
 

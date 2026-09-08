@@ -128,7 +128,7 @@ const TaskDetailPage = () => {
   const params = useParams<{ taskid: string }>();
   const searchParams = useSearchParams();
   const { businessData } = useSelector((state: RootState) => state.user);
-  const { data: task, isLoading, refetch } = useGetTaskById(params.taskid);
+  const { data: task, isLoading, isError, error, isFetching, refetch } = useGetTaskById(params.taskid);
   const { mutateAsync: AddTaskActivity, isPending: isAddingActivity } = useAddTaskActivity();
   const { mutateAsync: UpdateTaskActivity, isPending: isUpdatingActivity } = useUpdateTaskActivity();
   const { mutateAsync: DeleteTaskActivity, isPending: isDeletingActivity } = useDeleteTaskActivity();
@@ -551,6 +551,26 @@ const TaskDetailPage = () => {
     return (
       <div className="p-5 overflow-y-scroll pb-20 min-h-screen flex items-center justify-center">
         <LoaderSpin size={40} />
+      </div>
+    );
+  }
+
+  if (isError && !taskData) {
+    const status = axios.isAxiosError(error) ? error.response?.status : undefined;
+    const message = status === 401
+      ? "Your session has expired. Please sign in again."
+      : status === 403
+        ? "You do not have permission to view this task."
+        : status === 404
+          ? "Task not found."
+          : "Unable to load this task. Please try again.";
+
+    return (
+      <div className="p-5 text-slate-300 space-y-3" role="alert">
+        <p>{message}</p>
+        <Button onClick={() => void refetch()} disabled={isFetching}>
+          {isFetching ? "Retrying..." : "Retry"}
+        </Button>
       </div>
     );
   }

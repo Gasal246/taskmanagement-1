@@ -1,4 +1,5 @@
 "use client";
+import EnquiryLifecycleHistory from "@/components/enquiries/EnquiryLifecycleHistory";
 
 import React from "react";
 import { ArrowLeft, User, CalendarClock, MessageSquare, Flag, Download, Mail } from "lucide-react";
@@ -43,7 +44,7 @@ export default function EnquiryHistoryPage() {
   const historyList = histories?.histories ?? [];
   const forwardHistories = historyList.filter((history: any) => {
     const type = history?.history_id?.change_type ?? "FORWARD";
-    return type !== "ENQUIRY_EDIT";
+    return !["ENQUIRY_EDIT", "ENQUIRY_COMPLETED", "ENQUIRY_REOPENED"].includes(type);
   });
   const updateHistories = historyList.filter((history: any) => {
     const type = history?.history_id?.change_type ?? "FORWARD";
@@ -67,7 +68,7 @@ export default function EnquiryHistoryPage() {
               .map((change: any) => `${change?.label || change?.field}: ${formatChangeValue(change?.from_value)} -> ${formatChangeValue(change?.to_value)}`)
               .join(" | ")
           : "",
-        h.action ?? "",
+        h.previous_action && h.previous_action !== h.action ? `${h.previous_action} -> ${h.action}` : h.action ?? "",
         h.feedback ?? "",
         h.createdAt ? new Date(h.createdAt).toLocaleString() : "",
       ];
@@ -130,6 +131,7 @@ export default function EnquiryHistoryPage() {
       </div>
 
       <div className="space-y-6">
+        <EnquiryLifecycleHistory histories={historyList.map((entry: any) => entry.history_id ?? entry)} />
         <div className="space-y-3">
           <h2 className="text-lg font-semibold">Forwards</h2>
           {forwardHistories.length === 0 && (

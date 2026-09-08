@@ -102,7 +102,9 @@ export default function StaffEnquiryActionPage() {
       </div>
 
       {/* FORWARD BUTTON */}
+      {!actionData?.canForward && <p className="text-sm text-amber-200">This enquiry must be approved and open before it can be forwarded.</p>}
       <Button
+        disabled={!actionData?.canForward}
         className="flex items-center gap-1"
         onClick={() =>
           router.push(`/staff/enquiry/${params.enquiry_id}/forward-enquiry`)

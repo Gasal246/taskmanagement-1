@@ -8,6 +8,8 @@ export interface IEq_enquiry_histories extends Document {
     forwarded_by?: ObjectId,
     changed_by?: ObjectId,
     change_type?: String,
+    source_forward_id?: ObjectId,
+    previous_action?: String,
     changed_fields?: Array<{
         field: String,
         label: String,
@@ -30,7 +32,9 @@ const Eq_enquiry_historiesSchema: Schema = new Schema({
     assigned_to: { type: [Schema.Types.ObjectId], ref: "users", default: [] },
     forwarded_by: {type: Schema.Types.ObjectId, ref: "users"},
     changed_by: {type: Schema.Types.ObjectId, ref: "users"},
-    change_type: {type: String, enum: ["FORWARD", "ENQUIRY_EDIT"], default: "FORWARD"},
+    change_type: {type: String, enum: ["FORWARD", "ENQUIRY_EDIT", "ENQUIRY_COMPLETED", "ENQUIRY_REOPENED"], default: "FORWARD"},
+    source_forward_id: { type: Schema.Types.ObjectId, ref: "eq_enquiry_histories" },
+    previous_action: { type: String },
     changed_fields: [{
         field: { type: String },
         label: { type: String },
@@ -44,6 +48,12 @@ const Eq_enquiry_historiesSchema: Schema = new Schema({
     feedback: {type: String},
     next_step_date: {type: Date}
 }, {timestamps: true});
+
+Eq_enquiry_historiesSchema.index({ enquiry_id: 1, step_number: -1, createdAt: -1 });
+
+if (mongoose.models.eq_enquiry_histories && !mongoose.models.eq_enquiry_histories.schema.path("source_forward_id")) {
+    mongoose.deleteModel("eq_enquiry_histories");
+}
 
 const Eq_enquiry_histories = mongoose.models?.eq_enquiry_histories || mongoose.model<IEq_enquiry_histories>("eq_enquiry_histories", Eq_enquiry_historiesSchema);
 

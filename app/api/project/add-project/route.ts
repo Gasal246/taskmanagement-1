@@ -1,3 +1,4 @@
+import { stampAutomaticCompletion } from "@/lib/enquiries/completion-server";
 import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import { ObjectId } from "mongoose";
@@ -39,9 +40,10 @@ interface Body {
     enquiry_id?: string | null
 }
 
-const updateLinkedEnquiryIfNeeded = async (enquiry_id?: string | null) => {
+const updateLinkedEnquiryIfNeeded = async (enquiry_id: string | null | undefined, actorId: string) => {
     if(!enquiry_id) return;
 
+    await stampAutomaticCompletion(enquiry_id, actorId, "converted");
     await Eq_enquiry.findByIdAndUpdate(enquiry_id, {
         $set: {
             status: "Project Awarded",
@@ -303,7 +305,7 @@ export async function POST(req: NextRequest){
                     return new NextResponse("You are not authorized to create projects", { status: 403 });
             }
         }
-        await updateLinkedEnquiryIfNeeded(body?.enquiry_id);
+        await updateLinkedEnquiryIfNeeded(body?.enquiry_id, session.user.id);
 
         return NextResponse.json({ message: "Project created successfully", status:201}, { status: 201 });
     } catch(err: any){

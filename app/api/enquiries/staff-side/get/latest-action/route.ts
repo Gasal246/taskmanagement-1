@@ -1,3 +1,5 @@
+import Eq_enquiry from "@/models/eq_enquiries.model";
+import { forwardHistoryFilter, historyOrder, isManuallyClosed } from "@/lib/enquiries/completion";
 import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import Eq_enquiry_histories from "@/models/eq_enquiry_histories";
@@ -13,7 +15,7 @@ export async function GET(req:NextRequest){
         const {searchParams} = new URL(req.url);
         const enquiry_id = searchParams.get("enquiry_id");
 
-        const latestAction:any = await Eq_enquiry_histories.findOne({enquiry_id: enquiry_id}).populate("camp_id").sort({step_number: -1}).lean();
+        const latestAction:any = await Eq_enquiry_histories.findOne({enquiry_id: enquiry_id, ...forwardHistoryFilter}).populate("camp_id").sort(historyOrder).lean();
 
         const assignedList = Array.isArray(latestAction?.assigned_to)
             ? latestAction.assigned_to
@@ -24,7 +26,8 @@ export async function GET(req:NextRequest){
             return NextResponse.json({message: "Unauthorized Access", status: 401}, {status: 401});
         }
 
-        return NextResponse.json({action: latestAction, status: 200}, {status: 200});
+        const enquiry = await Eq_enquiry.findById(enquiry_id).lean();
+        return NextResponse.json({action: latestAction, canForward: Boolean(enquiry && (enquiry as any).is_active && !isManuallyClosed(enquiry)), status: 200}, {status: 200});
 
     }catch(err){
         console.log("Error while getting latest action of enquiry: ", err);

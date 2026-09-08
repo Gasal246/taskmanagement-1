@@ -35,11 +35,27 @@ export interface IEq_enquiries extends Document{
     project_closed_by: ObjectId[],
     project_managed_by: ObjectId[],
     enquiry_user_notes: String,
+    is_completed: boolean,
+    completed_at?: Date,
+    completed_by?: ObjectId,
+    completion_action?: string,
+    completion_notes?: string,
+    completion_source?: string,
+    completion_forward_id?: ObjectId,
+    completion_date_estimated?: boolean,
     createdAt: Date,
     updatedAt: Date
 }
 
 const Eq_enquiriesSchema:Schema = new Schema({
+    is_completed: { type: Boolean, default: false },
+    completed_at: { type: Date },
+    completed_by: { type: Schema.Types.ObjectId, ref: "users" },
+    completion_action: { type: String },
+    completion_notes: { type: String },
+    completion_source: { type: String, enum: ["manual", "awarded", "converted", "legacy"] },
+    completion_forward_id: { type: Schema.Types.ObjectId, ref: "eq_enquiry_histories" },
+    completion_date_estimated: { type: Boolean, default: false },
     country_id: {type: Schema.Types.ObjectId, ref:"eq_countries"},
     region_id: {type: Schema.Types.ObjectId, ref: "eq_region"},
     province_id: {type: Schema.Types.ObjectId, ref: "eq_province"},
@@ -74,6 +90,11 @@ const Eq_enquiriesSchema:Schema = new Schema({
     project_managed_by: { type: [Schema.Types.ObjectId], ref: "users", default: [] },
     enquiry_user_notes: { type: String }
 }, {timestamps: true});
+
+// Refresh the cached development model when this additive schema is hot-reloaded.
+if (mongoose.models.eq_enquiry && !mongoose.models.eq_enquiry.schema.path("completed_at")) {
+    mongoose.deleteModel("eq_enquiry");
+}
 
 const Eq_enquiry = mongoose.models?.eq_enquiry || mongoose.model<IEq_enquiries>("eq_enquiry", Eq_enquiriesSchema);
 

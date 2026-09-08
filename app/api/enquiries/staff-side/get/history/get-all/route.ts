@@ -33,13 +33,14 @@ export async function GET(req: NextRequest) {
             ]
         }).lean();
 
-        histories.sort((a: any, b: any) => {
+        const visibleHistories = histories.filter((entry: any) => entry.history_id);
+        visibleHistories.sort((a: any, b: any) => {
             return b.history_id.step_number - a.history_id.step_number;
         });
 
-        await hydrateChangedFieldNames(histories, (entry) => entry?.history_id);
+        await hydrateChangedFieldNames(visibleHistories, (entry) => entry?.history_id);
 
-        return NextResponse.json({ histories, status: 200 }, { status: 200 });
+        return NextResponse.json({ histories: visibleHistories, status: 200 }, { status: 200 });
     } catch (err) {
         console.log("Error while getting histories: ", err);
         return NextResponse.json({ message: "Internal Server Error", status: 500 }, { status: 500 });

@@ -1,4 +1,6 @@
 "use client";
+import EnquiryCompletionActions from "@/components/enquiries/EnquiryCompletionActions";
+import { isManuallyClosed } from "@/lib/enquiries/completion";
 
 import React, { useState, useMemo, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -15,7 +17,6 @@ import { useCloseEqnuiry, useForwardEnquiryByStaff, useGetEnquiryByIdForStaffs, 
 import { toast } from "sonner";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import Cookies from "js-cookie";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { AlertTriangle, CalendarDays, CheckCircle2, Search, Send, ShieldCheck, UserRound, Users } from "lucide-react";
 
@@ -44,7 +45,6 @@ export default function EscalatePage() {
   const { data: assigneeDirectory, isLoading: isAssigneeDirectoryLoading } = useGetEqUsers(businessId, user_type);
   const { data: viewUsersData, isLoading: isViewUsersLoading } = useGetEqUsers(businessId, "users");
   const { mutateAsync: ForwardEnquiry, isPending } = useForwardEnquiryByStaff();
-  const { mutateAsync: CloseEnquiry, isPending: isClosing } = useCloseEqnuiry();
 
   const [search, setSearch] = useState("");
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
@@ -53,8 +53,6 @@ export default function EscalatePage() {
   const [action, setAction] = useState("Visit");
   const [feedback, setFeedback] = useState("");
   const [nextDate, setNextDate] = useState("");
-  const [closureFeedback, setClosureFeedback] = useState("");
-  const [closureModal, setClosureModal] = useState(false);
 
   const fetchBusinessId = () => {
     const domainCookie = Cookies.get("user_domain");
@@ -148,6 +146,7 @@ export default function EscalatePage() {
   }, [user_type]);
 
   const handleSubmit = async () => {
+    if (!enquiryData?.enquiry?.is_active || isManuallyClosed(enquiryData?.enquiry)) { toast.error("This enquiry must be approved and reopened before forwarding."); return; }
     if (!assignedTo) {
       toast.error("Select the user or agent responsible for the next step.");
       return;
@@ -170,7 +169,7 @@ export default function EscalatePage() {
       assigned_to: assignedTo,
       action,
       feedback: feedback.trim(),
-      is_finished: action === "Finished",
+      is_finished: false,
       next_date: nextDate || null,
     };
 
@@ -184,27 +183,6 @@ export default function EscalatePage() {
     toast.error(res?.message || "Failed to forward enquiry");
   };
 
-  const handleCloseEnquiry = async () => {
-    if (!closureFeedback.trim()) {
-      toast.error("Add a closure note before closing the enquiry.");
-      return;
-    }
-
-    const payload = {
-      enquiry_id: enquiryId,
-      feedback: closureFeedback.trim(),
-    };
-
-    const res = await CloseEnquiry(payload);
-    if (res?.status === 200) {
-      toast.success(res?.message || "Closed");
-      router.replace(`/staff/enquiry/${enquiryId}`);
-      return;
-    } else {
-      toast.error(res?.message || "Failed to Close Enquiry");
-    }
-    setClosureModal(false);
-  };
 
   const enquiryUuid = enquiryData?.enquiry?.enquiry_uuid || enquiryId;
   const campName = enquiryData?.enquiry?.camp_id?.camp_name || "Camp not linked";
@@ -455,7 +433,7 @@ export default function EscalatePage() {
               <div className="mt-4">
                 <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Action Type</p>
                 <div className="flex flex-wrap gap-3">
-                  {["Visit", "Call", "Finished"].map((item) => (
+                  {["Visit", "Call"].map((item) => (
                     <Button
                       key={item}
                       type="button"
@@ -527,22 +505,13 @@ export default function EscalatePage() {
                 <Button
                   className="w-full gap-2 bg-cyan-500 text-slate-950 hover:bg-cyan-400"
                   onClick={handleSubmit}
-                  disabled={isPending}
+                  disabled={isPending || !enquiryData?.enquiry?.is_active || isManuallyClosed(enquiryData?.enquiry)}
                 >
                   <Send size={16} />
                   {isPending ? "Forwarding..." : "Forward Enquiry"}
                 </Button>
 
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full border-red-500/40 bg-red-500/10 text-red-100 hover:bg-red-500/20"
-                  onClick={() => setClosureModal(true)}
-                  disabled={isClosing}
-                >
-                  <AlertTriangle size={16} />
-                  Close Enquiry
-                </Button>
+                {enquiryData?.enquiry && <EnquiryCompletionActions enquiry={enquiryData.enquiry} basePath="/staff/enquiry" showFollowup={false} />}
 
                 <Button
                   type="button"
@@ -558,38 +527,7 @@ export default function EscalatePage() {
         </div>
       </div>
 
-      <Dialog open={closureModal} onOpenChange={setClosureModal}>
-        <DialogContent className="border border-slate-700 bg-slate-950 text-slate-200">
-          <DialogHeader>
-            <DialogTitle>Close Enquiry</DialogTitle>
-          </DialogHeader>
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
-            <label className="text-xs font-medium text-slate-400">
-              Add a short closure summary so the decision is clear in the record.
-            </label>
-            <Textarea
-              className="mt-3 min-h-[120px] border-slate-700 bg-slate-950/70 text-slate-100 placeholder:text-slate-500"
-              onChange={(e) => setClosureFeedback(e.target.value)}
-              placeholder="Explain why the enquiry is being closed."
-              value={closureFeedback}
-            />
-          </div>
 
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => setClosureModal(false)}
-            >
-              Cancel
-            </Button>
-
-            <Button onClick={handleCloseEnquiry} disabled={isClosing}>
-              Close Enquiry
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

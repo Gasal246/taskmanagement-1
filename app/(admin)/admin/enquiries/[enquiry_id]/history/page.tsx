@@ -1,4 +1,5 @@
 "use client";
+import EnquiryLifecycleHistory from "@/components/enquiries/EnquiryLifecycleHistory";
 
 import React from "react";
 import { ArrowLeft, User, CalendarClock, MessageSquare, Flag, Download, Mail } from "lucide-react";
@@ -41,7 +42,7 @@ export default function EnquiryHistoryPage() {
   const campName = enquiryData?.enquiry?.camp_id?.camp_name || "Unknown Camp";
   const enquiryUuid = enquiryData?.enquiry?.enquiry_uuid || params.enquiry_id;
   const historyList = histories?.histories ?? [];
-  const forwardHistories = historyList.filter((history: any) => history?.change_type !== "ENQUIRY_EDIT");
+  const forwardHistories = historyList.filter((history: any) => !["ENQUIRY_EDIT", "ENQUIRY_COMPLETED", "ENQUIRY_REOPENED"].includes(history?.change_type));
   const updateHistories = historyList.filter((history: any) => history?.change_type === "ENQUIRY_EDIT");
 
   const handleExport = () => {
@@ -59,7 +60,7 @@ export default function EnquiryHistoryPage() {
             .map((item: any) => `${item?.label || item?.field}: ${formatChangeValue(item?.from_value)} -> ${formatChangeValue(item?.to_value)}`)
             .join(" | ")
         : "",
-      h.action ?? "",
+      h.previous_action && h.previous_action !== h.action ? `${h.previous_action} -> ${h.action}` : h.action ?? "",
       h.feedback ?? "",
       h.createdAt ? new Date(h.createdAt).toLocaleString() : "",
     ]));
@@ -121,6 +122,7 @@ export default function EnquiryHistoryPage() {
       </div>
 
       <div className="space-y-6">
+        <EnquiryLifecycleHistory histories={historyList.map((entry: any) => entry.history_id ?? entry)} />
         <div className="space-y-3">
           <h2 className="text-lg font-semibold">Forwards</h2>
           {forwardHistories.length === 0 && (

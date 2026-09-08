@@ -1042,13 +1042,12 @@ export async function DeleteBusinessTaskFunc(task_id: string){
 }
 
 export async function GetTaskByIdFunc(taskid:string, activityScope?: "assigned"){
-    try{
-        const params = activityScope ? `?activityScope=${activityScope}` : "";
-        const res = await axios.get(`/api/task/getid/${taskid}${params}`);
-        return res.data;
-    }catch(err){
-        console.log(err);
+    const params = activityScope ? `?activityScope=${activityScope}` : "";
+    const res = await axios.get(`/api/task/getid/${taskid}${params}`);
+    if (res.data == null) {
+        throw new Error("The task request returned an empty response.");
     }
+    return res.data;
 }
 
 export async function GetAllTasks(searchParams:any){

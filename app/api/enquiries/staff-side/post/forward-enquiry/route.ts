@@ -1,3 +1,5 @@
+import { forwardHistoryFilter, historyOrder, isManuallyClosed } from "@/lib/enquiries/completion";
+import { enquiryActor } from "@/lib/enquiries/completion-server";
 import { auth } from "@/auth";
 import { notifyEnquiryForward } from "@/app/api/helpers/enquiry-notifications";
 import connectDB from "@/lib/mongo";
@@ -20,6 +22,7 @@ const forwardEnquirySchema = z
   .object({
     enquiry_id: objectIdSchema,
     access_users: z.array(objectIdSchema).max(100).optional().default([]),
+    is_finished: z.literal(false).optional(),
     // Kept temporarily for clients that loaded the old page bundle.
     users: z.array(objectIdSchema).max(100).optional().default([]),
     assigned_to: z.union([
@@ -27,7 +30,7 @@ const forwardEnquirySchema = z
       z.array(objectIdSchema).min(1).max(100),
     ]),
     priority: z.coerce.number().int().min(1).max(10),
-    action: z.enum(["Visit", "Call", "Finished"]),
+    action: z.enum(["Visit", "Call"]),
     feedback: z.string().max(5000).optional().default(""),
     next_date: z.preprocess(
       (value) => (value === "" || value === undefined ? null : value),
@@ -44,7 +47,6 @@ const forwardEnquirySchema = z
     action: body.action,
     feedback: body.feedback.trim(),
     nextDate: body.next_date,
-    isFinished: body.action === "Finished",
   }));
 
 class RequestError extends Error {
@@ -97,8 +99,8 @@ export async function POST(req: NextRequest) {
       action,
       feedback,
       nextDate,
-      isFinished,
     } = parsedBody.data;
+    const actorContext = await enquiryActor();
     const actorId = String(session.user.id);
     const recipientIds = Array.from(
       new Set([...accessUsers, ...assignedTo, actorId])
@@ -113,8 +115,8 @@ export async function POST(req: NextRequest) {
         const actor = await Users.findById(actorId).select("name").session(dbSession);
         const enquiry = await Eq_enquiry.findById(enquiryId).session(dbSession);
         const latestHistoryResult = await Eq_enquiry_histories
-          .findOne({ enquiry_id: enquiryId })
-          .sort({ step_number: -1, createdAt: -1 })
+          .findOne({ enquiry_id: enquiryId, ...forwardHistoryFilter })
+          .sort(historyOrder)
           .session(dbSession)
           .lean();
         const validRecipients = await Users.find({ _id: { $in: recipientIds } })
@@ -134,9 +136,12 @@ export async function POST(req: NextRequest) {
           ? latestHistory.assigned_to.map(String)
           : [];
         const isCreator = String(enquiry.createdBy || "") === actorId;
-        if (!isCreator && !latestAssignees.includes(actorId)) {
+        if (!actorContext?.admin && !isCreator && !latestAssignees.includes(actorId)) {
           throw new RequestError(403, "You are not allowed to forward this enquiry");
         }
+
+        if (isManuallyClosed(enquiry)) throw new RequestError(409, "An admin must reopen this enquiry before forwarding");
+        if (!enquiry.is_active) throw new RequestError(403, "Admin approval is required before forwarding");
 
         if (validRecipients.length !== recipientIds.length) {
           throw new RequestError(
@@ -168,7 +173,7 @@ export async function POST(req: NextRequest) {
           forwarded_by: actor._id,
           step_number: nextStep,
           priority,
-          is_finished: isFinished,
+          is_finished: false,
           action,
           feedback,
           next_step_date: nextDate,
@@ -192,12 +197,12 @@ export async function POST(req: NextRequest) {
             $match: {
               enquiry_id: enquiry._id,
               priority: { $type: "number" },
+              ...forwardHistoryFilter,
             },
           },
           { $group: { _id: null, average: { $avg: "$priority" } } },
         ]).session(dbSession);
         enquiry.priority = String(Math.round(priorityResult?.average ?? priority));
-        if (isFinished) enquiry.status = "Closed";
         await enquiry.save({ session: dbSession });
 
         if (latestHistory?.action === "Visit" || latestHistory?.action === "Call") {

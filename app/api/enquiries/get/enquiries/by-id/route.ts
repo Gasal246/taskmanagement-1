@@ -1,3 +1,5 @@
+import { canReadEnquiry, enrichEnquiries, enquiryActor } from "@/lib/enquiries/completion-server";
+import { forwardHistoryFilter, historyOrder } from "@/lib/enquiries/completion";
 import connectDB from "@/lib/mongo";
 import Eq_enquiry from "@/models/eq_enquiries.model";
 import { NextRequest, NextResponse } from "next/server";
@@ -18,11 +20,13 @@ connectDB();
 
 export async function GET(req:NextRequest){
     try{
+        const actor = await enquiryActor();
+        if (!actor) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
         const {searchParams} = new URL(req.url);
         const enquiry_id = searchParams.get("enquiry_id");
         if(!enquiry_id) return NextResponse.json({message:"Enquiry ID Missing", status:401}, {status: 401});
 
-        const enquiry = await Eq_enquiry.findById(enquiry_id)
+        const enquiry: any = await Eq_enquiry.findById(enquiry_id)
             .populate("country_id")
             .populate("region_id")
             .populate("province_id")
@@ -33,7 +37,11 @@ export async function GET(req:NextRequest){
             .populate({ path: "enquiry_brought_by", select: "name email", strictPopulate: false })
             .populate({ path: "meeting_initiated_by", select: "name email", strictPopulate: false })
             .populate({ path: "project_closed_by", select: "name email", strictPopulate: false })
-            .populate({ path: "project_managed_by", select: "name email", strictPopulate: false });
+            .populate({ path: "project_managed_by", select: "name email", strictPopulate: false }).lean();
+
+        if (!enquiry) return NextResponse.json({ message: "Enquiry not found" }, { status: 404 });
+        if (!await canReadEnquiry(enquiry, actor)) return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+        const enriched = (await enrichEnquiries([enquiry], actor))[0];
 
         const contacts = await Eq_camp_contacts.find({enquiry_id: enquiry_id}).limit(1);
         const head_office = await Eq_camp_headoffice.findById(enquiry?.camp_id?.headoffice_id).limit(1);
@@ -46,12 +54,12 @@ export async function GET(req:NextRequest){
             personal_provider = await Eq_enquiry_wifi_personal.findOne({enquiry_id: enquiry?._id});
         }
 
-        const assigned = await Eq_enquiry_histories.findOne({enquiry_id}).populate({
+        const assigned = await Eq_enquiry_histories.findOne({enquiry_id, ...forwardHistoryFilter}).populate({
             path: "assigned_to",
             select: "name"
-        }).sort({step_number: -1}).lean();
+        }).sort(historyOrder).lean();
 
-        return NextResponse.json({enquiry, contacts, head_office, external_provider, personal_provider, assigned, status: 200}, {status: 200});
+        return NextResponse.json({enquiry: enriched, contacts, head_office, external_provider, personal_provider, assigned, status: 200}, {status: 200});
     }catch(err){
         console.log("Error while getting enquiry by Id: ", err);
         return NextResponse.json({message:"Internal Server Error", status: 500}, {status: 500});

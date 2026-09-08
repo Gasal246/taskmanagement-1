@@ -1,3 +1,4 @@
+import { forwardHistoryFilter, historyOrder } from "@/lib/enquiries/completion";
 import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import Eq_enquiry_histories from "@/models/eq_enquiry_histories";
@@ -36,7 +37,7 @@ export async function GET(req: NextRequest) {
        1️⃣ FETCH ALL ENQUIRIES ASSIGNED TO USER (from history)
     -----------------------------------------------------*/
     const assignedHistory = await Eq_enquiry_histories
-      .find({ assigned_to: session.user.id })
+      .find({ assigned_to: session.user.id, ...forwardHistoryFilter })
       .select("enquiry_id")
       .lean();
 

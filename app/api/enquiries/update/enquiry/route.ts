@@ -1,3 +1,4 @@
+import { forwardHistoryFilter, historyOrder } from "@/lib/enquiries/completion";
 import { auth } from "@/auth";
 import { getCampVisitedStatusFromEnquiryStatus } from "@/lib/enquiries/camp-visited-status";
 import connectDB from "@/lib/mongo";
@@ -348,8 +349,8 @@ export async function PUT(req: NextRequest) {
         }
 
         const latestHistoryForAccess: any = await Eq_enquiry_histories
-            .findOne({ enquiry_id: enquiry._id })
-            .sort({ step_number: -1 })
+            .findOne({ enquiry_id: enquiry._id, ...forwardHistoryFilter })
+            .sort(historyOrder)
             .select("assigned_to")
             .lean();
 
@@ -378,6 +379,8 @@ export async function PUT(req: NextRequest) {
                 { status: 403 }
             );
         }
+
+        if (toTextOrNull(body.followup_status) === "Closed" && enquiry.status !== "Closed") return NextResponse.json({ message: "Use Complete Enquiry to record a final action and notes", status: 400 }, { status: 400 });
 
         const beforeSnapshot = await buildEnquiryAuditSnapshot(enquiryId);
 
@@ -606,7 +609,20 @@ export async function PUT(req: NextRequest) {
         enquiry.city_id = cityId;
         enquiry.area_id = areaId;
         enquiry.camp_id = campId;
-        enquiry.status = toTextOrNull(body.followup_status);
+        // Preserve completion when editing an older Closed record before migration.
+        if ((enquiry.status === "Closed" || enquiry.status === "Project Awarded" || enquiry.is_converted) && !enquiry.completed_at) {
+            enquiry.is_completed = true;
+            enquiry.completed_at = enquiry.updatedAt;
+            enquiry.completion_date_estimated = true;
+            enquiry.completion_source = enquiry.is_converted ? "converted" : enquiry.status === "Project Awarded" ? "awarded" : "legacy";
+        }
+        const nextStatus = toTextOrNull(body.followup_status);
+        if (nextStatus === "Project Awarded") {
+            if (!enquiry.completed_at) { enquiry.completed_at = new Date(); enquiry.completed_by = currentUserId; enquiry.completion_date_estimated = false; }
+            enquiry.is_completed = true;
+            enquiry.completion_source = "awarded";
+        }
+        enquiry.status = nextStatus;
         enquiry.priority = toTextOrNull(body.priority);
         enquiry.alert_date = toTextOrNull(body.alert_date);
         enquiry.due_date = toTextOrNull(body.next_action_due);

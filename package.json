@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "migrate:project-task-teams": "node scripts/migrate-project-task-teams.mjs"
+    "migrate:project-task-teams": "node scripts/migrate-project-task-teams.mjs",
+    "migrate:enquiry-completion": "node scripts/migrate-enquiry-completion.mjs",
+    "test:enquiries": "node --test tests/enquiries/*.test.cjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.6.0",

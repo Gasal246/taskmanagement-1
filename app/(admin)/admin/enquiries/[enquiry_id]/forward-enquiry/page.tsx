@@ -1,4 +1,6 @@
 "use client";
+import EnquiryCompletionActions from "@/components/enquiries/EnquiryCompletionActions";
+import { isManuallyClosed } from "@/lib/enquiries/completion";
 
 import React, { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -31,17 +33,10 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import EnquiryUserMultiSelect from "@/components/enquiries/EnquiryUserMultiSelect";
 import {
-  useCloseEqnuiry,
+  useGetEnquiryById,
   useForwardHistory,
   useGetEqUsers,
 } from "@/query/enquirymanager/queries";
@@ -62,7 +57,7 @@ export default function EscalatePage() {
   const { data: agents } = useGetEqUsers(businessData?._id, "agents");
   const { data: view_users } = useGetEqUsers(businessData?._id, "users");
   const { mutateAsync: ForwardEnquiry, isPending } = useForwardHistory();
-  const { mutateAsync: CloseEnquiry } = useCloseEqnuiry();
+  const { data: enquiryData } = useGetEnquiryById(enquiry_id);
 
   const [search, setSearch] = useState("");
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
@@ -72,8 +67,6 @@ export default function EscalatePage() {
   const [action, setAction] = useState("");
   const [feedback, setFeedback] = useState("");
   const [nextDate, setNextDate] = useState("");
-  const [closureFeedback, setClosureFeedback] = useState("");
-  const [closureModal, setClosureModal] = useState(false);
 
   const availableViewUsers = useMemo(
     () => view_users?.users || [],
@@ -157,6 +150,7 @@ export default function EscalatePage() {
   };
 
   const handleSubmit = async () => {
+    if (!enquiryData?.enquiry?.is_active || isManuallyClosed(enquiryData?.enquiry)) { toast.error("This enquiry must be approved and reopened before forwarding."); return; }
     const assignedTo = [...assignedUsers, ...assignedAgents].filter(Boolean);
     const accessUsers = Array.from(
       new Set([...selectedUsers, ...assignedTo].filter(Boolean))
@@ -169,7 +163,7 @@ export default function EscalatePage() {
       assigned_to: assignedTo,
       action,
       feedback,
-      is_finished: action === "Finished",
+      is_finished: false,
       next_date: nextDate,
     });
 
@@ -182,21 +176,6 @@ export default function EscalatePage() {
     toast.error(res?.message || "Failed to forward enquiry");
   };
 
-  const handleCloseEnquiry = async () => {
-    const res = await CloseEnquiry({
-      enquiry_id,
-      feedback: closureFeedback,
-    });
-
-    if (res?.status === 200) {
-      toast.success(res?.message || "Closed");
-      router.replace(`/admin/enquiries/${enquiry_id}`);
-      return;
-    }
-
-    toast.error(res?.message || "Failed to Close Enquiry");
-    setClosureModal(false);
-  };
 
   return (
     <div className="p-4 pb-10 text-slate-200">
@@ -541,7 +520,7 @@ export default function EscalatePage() {
                   className="w-full gap-2 bg-emerald-500 text-slate-950 hover:bg-emerald-400"
                   onClick={handleSubmit}
                   disabled={
-                    isPending ||
+                    !enquiryData?.enquiry?.is_active || isManuallyClosed(enquiryData?.enquiry) || isPending ||
                     !priority ||
                     (!assignedUsers.length && !assignedAgents.length) ||
                     !action
@@ -564,14 +543,7 @@ export default function EscalatePage() {
                   Convert to Project
                 </Button>
 
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full border-red-500/40 bg-red-500/10 text-red-100 hover:bg-red-500/20"
-                  onClick={() => setClosureModal(true)}
-                >
-                  Close Enquiry
-                </Button>
+                {enquiryData?.enquiry && <EnquiryCompletionActions enquiry={enquiryData.enquiry} basePath="/admin/enquiries" showFollowup={false} />}
 
                 <Button
                   type="button"
@@ -587,33 +559,7 @@ export default function EscalatePage() {
         </div>
       </div>
 
-      <Dialog open={closureModal} onOpenChange={setClosureModal}>
-        <DialogContent className="border border-slate-700 bg-slate-950 text-slate-200">
-          <DialogHeader>
-            <DialogTitle>Close Enquiry</DialogTitle>
-          </DialogHeader>
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
-            <Textarea
-              className="min-h-[120px] border-slate-700 bg-slate-950/70 text-slate-100 placeholder:text-slate-500"
-              onChange={(e) => setClosureFeedback(e.target.value)}
-              placeholder="Add feedback"
-              value={closureFeedback}
-            />
-          </div>
 
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => setClosureModal(false)}
-            >
-              Cancel
-            </Button>
-
-            <Button onClick={handleCloseEnquiry}>Close Enquiry</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

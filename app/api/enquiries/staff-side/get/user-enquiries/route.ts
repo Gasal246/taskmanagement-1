@@ -1,3 +1,5 @@
+import { completionFilterStages, matchesCompletionPeriod } from "@/lib/enquiries/completion";
+import { enrichEnquiries, enquiryActor } from "@/lib/enquiries/completion-server";
 import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import Eq_camps from "@/models/eq_camps.model";
@@ -113,6 +115,10 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
 
+    const completionParams = Object.fromEntries(searchParams);
+    completionFilterStages(completionParams);
+    const actor = await enquiryActor();
+    if (!actor) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     const status = searchParams.get("status");
     const priority = searchParams.get("priority");
     const country_id = searchParams.get("country_id");
@@ -219,6 +225,10 @@ export async function GET(req: NextRequest) {
       forwarded_priority: latestPriorityByEnquiry.get(String(entry?._id)) ?? null,
     }));
 
+    enquiries = await enrichEnquiries(enquiries, actor);
+    enquiries = enquiries.filter((entry: any) => matchesCompletionPeriod(entry, completionParams));
+    const nextAction = searchParams.get("next_action");
+    if (nextAction && nextAction !== "all") enquiries = enquiries.filter((entry: any) => entry.latest_forward?.action === nextAction);
     if (search) {
       enquiries = enquiries.filter((entry: any) => matchesInlineSearch(entry, parsedSearch));
     }
@@ -261,6 +271,7 @@ export async function GET(req: NextRequest) {
       { status: 200 }
     );
   } catch (err) {
+    if (err instanceof Error && /Invalid (completion filter|period range)/.test(err.message)) return NextResponse.json({ message: err.message, status: 400 }, { status: 400 });
     console.log("Error while getting staff enquiries:", err);
     return NextResponse.json(
       { message: "Internal Server Error", status: 500 },

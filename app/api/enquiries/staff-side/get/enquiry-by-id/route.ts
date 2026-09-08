@@ -1,3 +1,5 @@
+import { canReadEnquiry, enrichEnquiries, enquiryActor } from "@/lib/enquiries/completion-server";
+import { forwardHistoryFilter, historyOrder, isManuallyClosed } from "@/lib/enquiries/completion";
 import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import Eq_camp_contacts from "@/models/eq_camp_contacts.model";
@@ -22,6 +24,8 @@ export async function GET(req:NextRequest){
         const session:any = await auth();
         if(!session) return NextResponse.json({message: "Unauthorized access", status: 401}, {status: 401});
 
+        const actor = await enquiryActor();
+        if (!actor) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
         const {searchParams} = new URL(req.url);
         const enquiry_id = searchParams.get("enquiry_id");
 
@@ -35,6 +39,10 @@ export async function GET(req:NextRequest){
         .populate("createdBy")
         .lean();
 
+        if (!enquiry) return NextResponse.json({ message: "Enquiry not found" }, { status: 404 });
+        if (!await canReadEnquiry(enquiry, actor)) return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+        const enriched = (await enrichEnquiries([enquiry], actor))[0];
+
         const contacts = await Eq_camp_contacts.find({enquiry_id: enquiry_id}).limit(1);
         const head_office = await Eq_camp_headoffice.findById(enquiry?.camp_id?.headoffice_id).limit(1);
 
@@ -46,7 +54,7 @@ export async function GET(req:NextRequest){
             personal_provider = await Eq_enquiry_wifi_personal.findOne({enquiry_id: enquiry?._id});
         }
 
-        const isAssigned:any = await Eq_enquiry_histories.findOne({enquiry_id: enquiry_id}).sort({step_number: -1}).lean();
+        const isAssigned:any = await Eq_enquiry_histories.findOne({enquiry_id: enquiry_id, ...forwardHistoryFilter}).sort(historyOrder).lean();
 
         const assignedList = Array.isArray(isAssigned?.assigned_to)
             ? isAssigned.assigned_to
@@ -58,12 +66,12 @@ export async function GET(req:NextRequest){
         ? enquiry.enquiry_brought_by
         : [];
         const isCreatedByCurrentUser = String(enquiry?.createdBy?._id ?? enquiry?.createdBy ?? "") === String(session?.user?.id);
-        const canForward = assignedList.some((id: any) => String(id) === String(session?.user?.id)) || isCreatedByCurrentUser;
+        const canForward = !isManuallyClosed(enquiry) && (assignedList.some((id: any) => String(id) === String(session?.user?.id)) || isCreatedByCurrentUser);
         const canEdit = isCreatedByCurrentUser
-            || canForward
+            || assignedList.some((id: any) => String(id) === actor.actorId)
             || broughtByList.some((id: any) => String(id) === String(session?.user?.id));
 
-        return NextResponse.json({enquiry, contacts, head_office, external_provider, personal_provider, canForward, hasAssignedAction, canEdit, status: 200}, {status: 200});
+        return NextResponse.json({enquiry: enriched, contacts, head_office, external_provider, personal_provider, canForward, hasAssignedAction, canEdit, status: 200}, {status: 200});
 
     }catch(err){
         console.log("Error while getting Enquiry By ID: ", err);

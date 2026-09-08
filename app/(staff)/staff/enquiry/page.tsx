@@ -1,4 +1,7 @@
 "use client";
+import { periodBounds } from "@/lib/enquiries/period";
+import EnquiryCard from "@/components/enquiries/EnquiryCard";
+import EnquiryCompletionFilters, { completionFilterDefaults } from "@/components/enquiries/EnquiryCompletionFilters";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -68,6 +71,7 @@ export default function EnquiriesPage() {
   const dispatch = useDispatch();
   const savedListState = useSelector((state: RootState) => state.application.staffEnquiriesListState);
   const initialFilters = useMemo(() => ({
+    ...completionFilterDefaults,
     country_id: "",
     region_id: "",
     province_id: "",
@@ -123,12 +127,13 @@ export default function EnquiriesPage() {
 
   const normalizedFilters = useMemo(() => ({
     ...filters,
+    ...periodBounds(filters.period_preset || "all", filters.period_start, filters.period_end),
     status: filters.status === "all" ? "" : filters.status,
     next_action: filters.next_action === "all" ? "" : filters.next_action,
   }), [filters]);
   const hasActiveFilters = useMemo(() => {
     return Object.entries(filters).some(([key, value]) => {
-      if ((key === "status" || key === "next_action") && value === "all") return false;
+      if (value === "all") return false;
       return value !== "" && value !== null && value !== undefined;
     });
   }, [filters]);
@@ -664,9 +669,13 @@ export default function EnquiriesPage() {
           })}
         </div>
 
-        {!isLoading && visibleEnquiries.length === 0 && (
+        {enquiries?.status >= 400 && <p role="alert" className="mb-3 rounded-lg border border-red-800/60 bg-red-950/30 p-3 text-sm text-red-200">{enquiries?.message || "Unable to load enquiries"}</p>}
+
+        {!isLoading && !(enquiries?.status >= 400) && visibleEnquiries.length === 0 && (
           <p className="text-xs text-slate-500 italic">No enquiries found.</p>
         )}
+
+        <EnquiryCompletionFilters filters={filters} onChange={(changes) => { setFilters((prev: typeof initialFilters) => ({ ...prev, ...changes })); setPage(1); }} />
 
         <div className="space-y-2">
           {visibleEnquiries.map((e, index) => {
@@ -676,33 +685,7 @@ export default function EnquiriesPage() {
               ? Math.max(totalRecords - ((currentPage - 1) * limit + index), 0)
               : Math.max(visibleEnquiries.length - index, 0);
             return (
-              <div
-                key={e._id}
-                className="relative p-3 border border-slate-700 rounded-lg hover:bg-slate-800/60 transition cursor-pointer"
-                onClick={() => router.replace(`/staff/enquiry/${e._id}`)}
-              >
-                {!e?.is_active && (
-                  <div className="absolute top-3 right-3">
-                    <span className="inline-flex items-center rounded-full border border-amber-400/40 bg-amber-950/50 px-2.5 py-1 text-[11px] font-semibold text-amber-300 shadow-sm">
-                      Action Required
-                    </span>
-                  </div>
-                )}
-                <div className="absolute top-3 left-3 text-xs font-bold text-slate-400 p-1">
-                  {String(enquiryNumber).padStart(2, "0")} )
-                </div>
-                <h2 className="text-md font-medium text-slate-200 truncate ml-8 uppercase">
-                  Camp: {e.camp_id?.camp_name ?? "N/A"}
-                </h2>
-                <div className="mt-1 text-xs text-slate-400 flex flex-wrap gap-2">
-                  <p className="bg-gradient-to-br from-slate-700 to-slate-900 px-2 py-1 rounded-sm font-bold">Status: <span className="text-white/80 font-normal">{e.status}</span></p>
-                  <p className="bg-gradient-to-br from-slate-700 to-slate-900 px-2 py-1 rounded-sm font-bold">Priority: <span className="text-white/80 font-normal">{e.forwarded_priority ?? e.priority}</span></p>
-                  <p className="bg-gradient-to-br from-slate-700 to-slate-900 px-2 py-1 rounded-sm font-bold">Occupancy: <span className="text-white/80 font-normal">{e.camp_id?.camp_occupancy ?? "N/A"}</span></p>
-                  <p className="bg-gradient-to-br from-slate-700 to-slate-900 px-2 py-1 rounded-sm font-bold">UUID: <span className="text-white/80 font-normal">{e.enquiry_uuid}</span></p>
-                  <p className="bg-gradient-to-br from-slate-700 to-slate-900 px-2 py-1 rounded-sm font-bold">WiFi: <span className="text-white/80 font-normal">{e.wifi_available ? "Yes" : "No"}</span></p>
-                  <p className="bg-gradient-to-br from-slate-700 to-slate-900 px-2 py-1 rounded-sm font-bold">Due Date: <span className="text-white/80 font-normal">{e.due_date?.slice(0, 10)}</span></p>
-                </div>
-              </div>
+              <EnquiryCard key={e._id} enquiry={e} number={enquiryNumber} basePath="/staff/enquiry" staff={true} />
             )
           })}
         </div>
