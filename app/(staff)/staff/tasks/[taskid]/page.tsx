@@ -208,7 +208,7 @@ const TaskDetails = () => {
   const isHead = HEAD_ROLES.includes(roleName);
   const canManageActivities = Boolean(taskData?.permissions?.canManageActivities);
   const canAssignActivities = Boolean(taskData?.permissions?.canAssignActivities);
-  const canAddActivity = taskData?.is_project_task ? canManageActivities : isCreator || isHead;
+  const canAddActivity = taskData?.is_project_task ? canManageActivities && isCreator : isCreator || (isHead && canManageActivities);
   const visibleActivities = Array.isArray(taskData?.activities) ? taskData.activities : [];
   const visibleActivityCount = visibleActivities.length;
   const visibleCompletedActivityCount = visibleActivities.filter((activity: any) => activity?.is_done).length;
@@ -806,7 +806,7 @@ const TaskDetails = () => {
                           </span>
                         )}
                         {activity?.forwarded_to?._id && (
-                          (taskData.is_project_task ? canAssignActivities : isHead) ? (
+                          (activity.canChangeStatus && (taskData.is_project_task ? canAssignActivities : isHead)) ? (
                             <button
                               type="button"
                               onClick={() => handleOpenRemoveReassignment(activity)}
@@ -851,7 +851,7 @@ const TaskDetails = () => {
                         <History size={12} />
                         History
                       </motion.button>
-                      {(taskData.is_project_task ? canAssignActivities : isHead) && (
+                      {(activity.canChangeStatus && (taskData.is_project_task ? canAssignActivities : isHead)) && (
                         <motion.button
                           whileHover={{ scale: 1.02 }}
                           whileTap={{ scale: 0.98 }}
@@ -862,7 +862,7 @@ const TaskDetails = () => {
                           Reassign
                         </motion.button>
                       )}
-                      {activity?.is_done ? (
+                      {activity.canChangeStatus && (activity?.is_done ? (
                         <motion.button
                           whileHover={{ scale: 1.02 }}
                           whileTap={{ scale: 0.98 }}
@@ -882,7 +882,7 @@ const TaskDetails = () => {
                           <CheckCircle size={12} />
                           Mark Completed
                         </motion.button>
-                      )}
+                      ))}
                       {isCreator && (
                         <>
                           <motion.div

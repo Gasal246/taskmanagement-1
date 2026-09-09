@@ -17,6 +17,9 @@ import {
     getProjectTaskAssignmentCandidateIds,
 } from "@/app/api/helpers/project-task-teams";
 
+import AdminAssignBusiness from "@/models/admin_assign_business.model";
+import BusinessStaffs from "@/models/business_staffs.model";
+import { canChangeActivityStatus } from "@/app/api/helpers/activity-status-access";
 connectDB();
 
 interface Body {
@@ -162,19 +165,16 @@ export async function PUT(req: NextRequest) {
                 return NextResponse.json({ message: "Activity not found", status: 404 }, { status: 404 });
             }
             const task: any = await Business_Tasks.findById(currentActivity.task_id)
-                .select("business_id project_id creator is_project_task assigned_teams")
+                .select("business_id project_id creator assigned_to is_project_task assigned_teams")
                 .lean();
-            if (task?.is_project_task) {
-                const actorId = String(session?.user?.id || "");
-                const isActivityParticipant =
-                    String(currentActivity.assigned_to || "") === actorId ||
-                    String(currentActivity.forwarded_to || "") === actorId;
-                if (!isActivityParticipant && !(await canManageProjectTaskActivities(task, actorId))) {
-                    return NextResponse.json(
-                        { message: "You cannot change this activity status", status: 403 },
-                        { status: 403 }
-                    );
-                }
+            if (!task) return NextResponse.json({ message: "Task not found" }, { status: 404 });
+            const actorId = String(session?.user?.id || "");
+            const [adminAccess, staffAccess] = await Promise.all([
+                AdminAssignBusiness.exists({ user_id: actorId, business_id: task.business_id, status: 1 }),
+                BusinessStaffs.exists({ user_id: actorId, business_id: task.business_id, status: 1 }),
+            ]);
+            if (actor?.status !== 1 || !(adminAccess || (staffAccess && canChangeActivityStatus(task, currentActivity, actorId)))) {
+                return NextResponse.json({ message: "You cannot change this activity status", status: 403 }, { status: 403 });
             }
 
             const changeStatus = await Task_Activities.findByIdAndUpdate(body.activity_id, {

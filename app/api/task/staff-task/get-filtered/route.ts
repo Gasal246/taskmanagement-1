@@ -8,8 +8,6 @@ import Task_Activities from "@/models/task_activities.model";
 import { NextRequest, NextResponse } from "next/server";
 import {
   escapeRegex,
-  getHeadStaffIds,
-  getRoleNameFromRequest,
 } from "@/app/api/helpers/task-filter-scope";
 import mongoose from "mongoose";
 import { addTaskAssignmentSummaries } from "@/app/api/helpers/task-assignment-summary";
@@ -21,6 +19,7 @@ import {
 } from "@/app/api/helpers/task-list-status";
 import type { StaffTaskStatusFilter, TaskPriorityFilter } from "@/types/staff-tasks";
 
+import { resolveSelectedHeadContext, getSelectedHeadDirectStaffIds } from "@/app/api/helpers/head-reassignment-scope";
 connectDB();
 
 const toObjectId = (value: unknown) =>
@@ -94,9 +93,15 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const roleName = getRoleNameFromRequest(req);
+    const headContext = await resolveSelectedHeadContext(req, userId);
+    const headStaffIds = headContext ? await getSelectedHeadDirectStaffIds(headContext) : [];
+    const supervisedActivityTaskIds = headStaffIds.length
+      ? await Task_Activities.distinct("task_id", {
+          $or: [{ assigned_to: { $in: headStaffIds } }, { forwarded_to: { $in: headStaffIds } }],
+        })
+      : [];
     const userObjectId = toObjectId(userId);
-    const [headedTeams, operationProjects, accessibleActivityTaskIds, headStaffIds] = await Promise.all([
+    const [headedTeams, operationProjects, accessibleActivityTaskIds] = await Promise.all([
       Project_Teams.find({ team_head: userId }).select("_id").lean(),
       Business_Project.find({
         $or: [
@@ -110,7 +115,6 @@ export async function GET(req: NextRequest) {
       Task_Activities.distinct("task_id", {
         $or: [{ assigned_to: userId }, { forwarded_to: userId }],
       }),
-      staffId ? getHeadStaffIds(userId, roleName) : Promise.resolve([]),
     ]);
 
     if (
@@ -128,6 +132,14 @@ export async function GET(req: NextRequest) {
     const activityTaskIds = accessibleActivityTaskIds.filter(Boolean).map(toObjectId);
     const staffObjectId = staffId ? toObjectId(staffId) : null;
 
+    const supervisedStaffObjectIds = headStaffIds.map(toObjectId);
+    const supervisedVisibility = headContext ? [{
+      business_id: toObjectId(headContext.businessId),
+      $or: [
+        { is_project_task: false, assigned_to: { $in: supervisedStaffObjectIds } },
+        { _id: { $in: supervisedActivityTaskIds.filter(Boolean).map(toObjectId) } },
+      ],
+    }] : [];
     const query: Record<string, any> = {};
     if (priorityParam) query.priority = priorityParam as TaskPriorityFilter;
     if (hasValidStart || hasValidEnd) {
@@ -141,6 +153,7 @@ export async function GET(req: NextRequest) {
         { assigned_to: userObjectId },
         { creator: userObjectId },
         { _id: { $in: activityTaskIds } },
+        ...supervisedVisibility,
       ],
     };
     const projectVisibility = {
@@ -149,6 +162,7 @@ export async function GET(req: NextRequest) {
         { project_id: { $in: operationProjectIds } },
         { assigned_teams: { $in: headedTeamIds } },
         { _id: { $in: activityTaskIds } },
+        ...supervisedVisibility,
       ],
     };
 
@@ -171,7 +185,7 @@ export async function GET(req: NextRequest) {
         ...(query.$and || []),
         {
           $or: [
-            { is_project_task: { $ne: true } },
+            { is_project_task: { $ne: true }, ...individualVisibility },
             { is_project_task: true, ...projectVisibility },
           ],
         },
@@ -180,6 +194,7 @@ export async function GET(req: NextRequest) {
 
     const fullActivityTaskIds = await Business_Tasks.distinct("_id", {
       $or: [
+        ...(headContext ? [{ is_project_task: false, business_id: toObjectId(headContext.businessId), assigned_to: { $in: supervisedStaffObjectIds } }] : []),
         {
           is_project_task: false,
           $or: [{ assigned_to: userObjectId }, { creator: userObjectId }],
@@ -199,6 +214,8 @@ export async function GET(req: NextRequest) {
         { task_id: { $in: fullActivityTaskIds } },
         { assigned_to: userObjectId },
         { forwarded_to: userObjectId },
+        { assigned_to: { $in: supervisedStaffObjectIds } },
+        { forwarded_to: { $in: supervisedStaffObjectIds } },
       ],
     };
 
@@ -279,23 +296,9 @@ export async function GET(req: NextRequest) {
                     { $eq: ["$task_id", "$$taskId"] },
                     {
                       $or: [
-                        {
-                          $and: [
-                            { $eq: ["$$isProjectTask", true] },
-                            {
-                              $or: [
-                                { $eq: ["$$creator", userObjectId] },
-                                { $in: ["$$projectId", operationProjectIds] },
-                                {
-                                  $gt: [
-                                    { $size: { $setIntersection: ["$$assignedTeams", headedTeamIds] } },
-                                    0,
-                                  ],
-                                },
-                              ],
-                            },
-                          ],
-                        },
+                        { $in: ["$$taskId", fullActivityTaskIds.map(toObjectId)] },
+                        { $in: ["$assigned_to", supervisedStaffObjectIds] },
+                        { $in: ["$forwarded_to", supervisedStaffObjectIds] },
                         { $eq: ["$assigned_to", userObjectId] },
                         { $eq: ["$forwarded_to", userObjectId] },
                       ],
@@ -380,9 +383,10 @@ export async function GET(req: NextRequest) {
     const taskIds = taskRows.map((task: any) => task._id);
     const operationProjectIdSet = new Set(operationProjectIds.map((projectId) => projectId.toString()));
     const headedTeamIdSet = new Set(headedTeamIds.map((teamId) => teamId.toString()));
+    const fullActivityTaskIdSet = new Set(fullActivityTaskIds.map(String));
     const fullTaskIds = taskRows
       .filter((task: any) => {
-        if (!task.is_project_task) return true;
+        if (!task.is_project_task) return fullActivityTaskIdSet.has(String(task._id));
         if (task.creator?.toString() === userId) return true;
         if (operationProjectIdSet.has(task.project_id?.toString())) return true;
         const assignedTeams = Array.isArray(task.assigned_teams)
@@ -402,6 +406,8 @@ export async function GET(req: NextRequest) {
             { task_id: { $in: fullTaskIds } },
             { assigned_to: userObjectId },
             { forwarded_to: userObjectId },
+            { assigned_to: { $in: supervisedStaffObjectIds } },
+            { forwarded_to: { $in: supervisedStaffObjectIds } },
           ],
         })
       : [];

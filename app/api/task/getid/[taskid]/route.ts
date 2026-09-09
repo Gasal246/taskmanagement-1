@@ -8,10 +8,13 @@ import Business_Project from "@/models/business_project.model";
 import Project_Teams from "@/models/project_team.model";
 import "@/models/business_skills.model";
 import AdminAssignBusiness from "@/models/admin_assign_business.model";
+import BusinessStaffs from "@/models/business_staffs.model";
 import { addUnreadCommentCounts } from "@/app/api/helpers/activity-comments";
 import { resolveSessionUserId } from "@/lib/utils";
 import { hasStaffTaskAccess } from "@/app/api/helpers/staff-task-access";
 import { normalizeProjectTaskTeamIds, resolveProjectTaskStaffAccess } from "@/app/api/helpers/project-task-teams";
+import { resolveSelectedHeadContext, getSelectedHeadDirectStaffIds } from "@/app/api/helpers/head-reassignment-scope";
+import { canChangeActivityStatus } from "@/app/api/helpers/activity-status-access";
 connectDB();
 
 export async function GET(req:NextRequest, context: {params: Promise<{taskid:string}>}){
@@ -35,7 +38,22 @@ export async function GET(req:NextRequest, context: {params: Promise<{taskid:str
             const activeBusinessAccess = isAssignedActivityScope
                 ? projectTaskAccess?.canViewTask ?? await hasStaffTaskAccess(task, userId)
                 : await AdminAssignBusiness.exists({ user_id: userId, business_id: task.business_id, status: 1 });
-            if (!activeBusinessAccess) {
+            const headContext = isAssignedActivityScope
+                ? await resolveSelectedHeadContext(req, userId, String(task.business_id))
+                : null;
+            const supervisedStaffIds = headContext ? await getSelectedHeadDirectStaffIds(headContext) : [];
+            const visibleStaffIds = [userId, ...supervisedStaffIds];
+            const supervisesTaskOwner = !task.is_project_task && supervisedStaffIds.includes(String(task.assigned_to));
+            const participantAccess = isAssignedActivityScope && !activeBusinessAccess && (!task.is_project_task || supervisedStaffIds.length > 0)
+                ? Boolean(
+                    await BusinessStaffs.exists({ user_id: userId, business_id: task.business_id, status: 1 }) &&
+                    (supervisesTaskOwner || await Task_Activities.exists({
+                        task_id: taskid,
+                        $or: [{ assigned_to: { $in: task.is_project_task ? supervisedStaffIds : visibleStaffIds } }, { forwarded_to: { $in: task.is_project_task ? supervisedStaffIds : visibleStaffIds } }],
+                    }))
+                )
+                : false;
+            if (!activeBusinessAccess && !participantAccess) {
                 return NextResponse.json({ message: "Forbidden" }, { status: 403 });
             }
             const canManageActivities = task.is_project_task
@@ -46,13 +64,13 @@ export async function GET(req:NextRequest, context: {params: Promise<{taskid:str
                 : canManageActivities;
             const restrictActivities = isAssignedActivityScope && task.is_project_task
                 ? !projectTaskAccess?.canViewAllActivities
-                : isAssignedActivityScope && !canManageActivities;
+                : isAssignedActivityScope && !canManageActivities && !supervisesTaskOwner;
             const assignedActivityQuery: any = restrictActivities
                 ? {
                     task_id: taskid,
                     $or: [
-                        { assigned_to: userId },
-                        { forwarded_to: userId },
+                        { assigned_to: { $in: visibleStaffIds } },
+                        { forwarded_to: { $in: visibleStaffIds } },
                     ],
                 }
                 : null;
@@ -69,14 +87,17 @@ export async function GET(req:NextRequest, context: {params: Promise<{taskid:str
                 .populate({ path: "reassignment_history.previous_recipient_id", select: "name email avatar_url" })
                 .populate({ path: "assigned_skill", select: "skill_name" });
             const activitiesWithUnread = await addUnreadCommentCounts(activities, userId);
-            if(activities.length > 0 || isAssignedActivityScope) taskObj.activities = activitiesWithUnread;
+            if(activities.length > 0 || isAssignedActivityScope) taskObj.activities = activitiesWithUnread.map((activity: any) => ({
+                ...activity,
+                canChangeStatus: !isAssignedActivityScope || canChangeActivityStatus(task, activity, userId),
+            }));
             taskObj.creator_details = await Users.findById(task.creator).select("name email avatar_url");
             taskObj.permissions = {
                 canManageActivities,
                 canAssignActivities,
                 canViewAllActivities: task.is_project_task
                     ? Boolean(projectTaskAccess?.canViewAllActivities)
-                    : true,
+                    : !restrictActivities,
             };
             if(task.is_project_task){
                 const teamIds = normalizeProjectTaskTeamIds(task.assigned_teams);
