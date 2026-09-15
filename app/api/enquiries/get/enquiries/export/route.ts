@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
       const params = new URLSearchParams();
       for (const [key, value] of Object.entries(filters || {})) if (value !== "" && value != null) params.set(key, String(value));
       params.set("page", "1"); params.set("limit", String(MAX_EXPORT_RECORDS));
-      selectedIds = (await filteredAdminEnquiries(params)).data.map((entry: any) => entry._id);
+      selectedIds = (await filteredAdminEnquiries(params, actor.actorId)).data.map((entry: any) => entry._id);
     }
     const enquiries: any[] = await Eq_enquiry.find({ _id: { $in: selectedIds } })
       .populate({ path: "city_id", select: "city_name" })
@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ status: 200, data: payload }, { status: 200 });
   } catch (err) {
-    if (err instanceof Error && /Invalid (completion filter|period range)/.test(err.message)) return NextResponse.json({ message: err.message, status: 400 }, { status: 400 });
+    if (err instanceof Error && /Invalid (action filter|action scope|period range)/.test(err.message)) return NextResponse.json({ message: err.message, status: 400 }, { status: 400 });
     console.error("Error exporting enquiries:", err);
     return NextResponse.json(
       { message: "Internal Server Error", status: 500 },

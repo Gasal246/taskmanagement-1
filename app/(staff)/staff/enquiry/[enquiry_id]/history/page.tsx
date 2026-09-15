@@ -1,4 +1,6 @@
 "use client";
+import EnquiryCompletionActions from "@/components/enquiries/EnquiryCompletionActions";
+import EnquiryActionProgress from "@/components/enquiries/EnquiryActionProgress";
 import EnquiryLifecycleHistory from "@/components/enquiries/EnquiryLifecycleHistory";
 
 import React from "react";
@@ -44,7 +46,7 @@ export default function EnquiryHistoryPage() {
   const historyList = histories?.histories ?? [];
   const forwardHistories = historyList.filter((history: any) => {
     const type = history?.history_id?.change_type ?? "FORWARD";
-    return !["ENQUIRY_EDIT", "ENQUIRY_COMPLETED", "ENQUIRY_REOPENED"].includes(type);
+    return !["ENQUIRY_EDIT", "ENQUIRY_COMPLETED", "ENQUIRY_REOPENED", "ACTION_COMPLETED", "ACTION_CANCELLED", "ACTION_REOPENED"].includes(type);
   });
   const updateHistories = historyList.filter((history: any) => {
     const type = history?.history_id?.change_type ?? "FORWARD";
@@ -131,6 +133,7 @@ export default function EnquiryHistoryPage() {
       </div>
 
       <div className="space-y-6">
+        {enquiryData?.enquiry && <EnquiryCompletionActions enquiry={enquiryData.enquiry} basePath="/staff/enquiry" />}
         <EnquiryLifecycleHistory histories={historyList.map((entry: any) => entry.history_id ?? entry)} />
         <div className="space-y-3">
           <h2 className="text-lg font-semibold">Forwards</h2>
@@ -154,10 +157,11 @@ export default function EnquiryHistoryPage() {
                     h.history_id?.is_finished ? "bg-green-700/70" : "bg-slate-700/70"
                   }`}
                 >
-                  {h.history_id?.is_finished ? "Completed" : "In Progress"}
+                  Scheduled
                 </span>
               </div>
 
+              <EnquiryActionProgress action={h.history_id} />
               <div className="text-sm space-y-2">
                 <p className="flex items-center gap-2 text-slate-300">
                   <Flag size={14} className="text-cyan-400" />

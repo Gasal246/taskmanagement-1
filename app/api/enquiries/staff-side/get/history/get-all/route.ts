@@ -18,6 +18,8 @@ export async function GET(req: NextRequest) {
         const histories = await Eq_enquiry_access.find({ enquiry_id: enquiry_id, user_id: session?.user?.id }).populate({
             path: "history_id",
             populate: [
+                { path: "action_assignee", select: "name email" },
+                { path: "action_assignments.user_id", select: "name email" },
                 {
                     path: "assigned_to",
                     select: "name email"

@@ -1,3 +1,4 @@
+import { preserveInitialAction, canScheduleAction } from "@/lib/enquiries/completion-server";
 import { forwardHistoryFilter, historyOrder } from "@/lib/enquiries/completion";
 import { auth } from "@/auth";
 import { getCampVisitedStatusFromEnquiryStatus } from "@/lib/enquiries/camp-visited-status";
@@ -363,7 +364,7 @@ export async function PUT(req: NextRequest) {
             ? enquiry.enquiry_brought_by
             : [];
 
-        const isAssignedToCurrentUser = assignedList.some((id: any) => String(id) === currentUserId);
+        const isAssignedToCurrentUser = await canScheduleAction(enquiry, { actorId: currentUserId, admin: false });
         const isBroughtByCurrentUser = broughtByList.some((id: any) => String(id) === currentUserId);
         const isCreatedByCurrentUser = String(enquiry?.createdBy || "") === currentUserId;
         const isSuperUser = Boolean(session?.user?.is_super);
@@ -380,8 +381,11 @@ export async function PUT(req: NextRequest) {
             );
         }
 
-        if (toTextOrNull(body.followup_status) === "Closed" && enquiry.status !== "Closed") return NextResponse.json({ message: "Use Complete Enquiry to record a final action and notes", status: 400 }, { status: 400 });
+        if (toTextOrNull(body.followup_status) === "Closed" && enquiry.status !== "Closed") return NextResponse.json({ message: "Use Follow-up actions to record completed calls and visits", status: 400 }, { status: 400 });
 
+        await preserveInitialAction(enquiry);
+        const previousAction = enquiry.next_action;
+        const previousActionDue = enquiry.next_action_due;
         const beforeSnapshot = await buildEnquiryAuditSnapshot(enquiryId);
 
         const countryId = toIdOrNull(body.country);
@@ -609,20 +613,7 @@ export async function PUT(req: NextRequest) {
         enquiry.city_id = cityId;
         enquiry.area_id = areaId;
         enquiry.camp_id = campId;
-        // Preserve completion when editing an older Closed record before migration.
-        if ((enquiry.status === "Closed" || enquiry.status === "Project Awarded" || enquiry.is_converted) && !enquiry.completed_at) {
-            enquiry.is_completed = true;
-            enquiry.completed_at = enquiry.updatedAt;
-            enquiry.completion_date_estimated = true;
-            enquiry.completion_source = enquiry.is_converted ? "converted" : enquiry.status === "Project Awarded" ? "awarded" : "legacy";
-        }
-        const nextStatus = toTextOrNull(body.followup_status);
-        if (nextStatus === "Project Awarded") {
-            if (!enquiry.completed_at) { enquiry.completed_at = new Date(); enquiry.completed_by = currentUserId; enquiry.completion_date_estimated = false; }
-            enquiry.is_completed = true;
-            enquiry.completion_source = "awarded";
-        }
-        enquiry.status = nextStatus;
+        enquiry.status = toTextOrNull(body.followup_status);
         enquiry.priority = toTextOrNull(body.priority);
         enquiry.alert_date = toTextOrNull(body.alert_date);
         enquiry.due_date = toTextOrNull(body.next_action_due);
@@ -660,6 +651,25 @@ export async function PUT(req: NextRequest) {
         }
 
         await enquiry.save();
+        if (["Call", "Visit"].includes(String(enquiry.next_action)) &&
+            (String(previousAction || "") !== String(enquiry.next_action) || String(previousActionDue || "") !== String(enquiry.next_action_due || ""))) {
+            const initialExists = await Eq_enquiry_histories.exists({ _id: enquiry._id, action_origin: "initial" });
+            if (!initialExists) {
+                await preserveInitialAction(enquiry);
+            } else {
+            const last: any = await Eq_enquiry_histories.findOne({ enquiry_id: enquiry._id }).sort(historyOrder).lean();
+            const scheduled = await Eq_enquiry_histories.create({ enquiry_id: enquiry._id, camp_id: enquiry.camp_id,
+                change_type: "ACTION_SCHEDULED", action_origin: "enquiry_edit", action: enquiry.next_action,
+                assigned_to: [enquiry.createdBy || currentUserId], forwarded_by: currentUserId,
+                action_assignments: [{ user_id: enquiry.createdBy || currentUserId, status: "pending", revision: 0 }],
+                next_step_date: enquiry.next_action_due, step_number: Number(last?.step_number || 0) + 1,
+            });
+            const viewers: any[] = await Eq_enquiry_access.find({ enquiry_id: enquiry._id }).select("user_id").lean();
+            const users = new Set([...viewers.map(v => String(v.user_id)), String(enquiry.createdBy || currentUserId), currentUserId]);
+            await Eq_enquiry_access.insertMany([...users].map(user_id => ({ user_id, enquiry_id: enquiry._id, history_id: scheduled._id, camp_id: enquiry.camp_id })));
+            }
+        }
+
 
         await Eq_enquiry_histories.updateMany({ enquiry_id: enquiry._id }, { $set: { camp_id: campId } });
         await Eq_enquiry_access.updateMany({ enquiry_id: enquiry._id }, { $set: { camp_id: campId } });

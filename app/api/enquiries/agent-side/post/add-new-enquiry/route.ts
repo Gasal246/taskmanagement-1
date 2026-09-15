@@ -1,3 +1,4 @@
+import { preserveInitialAction } from "@/lib/enquiries/completion-server";
 import { auth } from "@/auth";
 import Admin_assign_business from "@/models/admin_assign_business.model";
 import Business_staffs from "@/models/business_staffs.model";
@@ -109,7 +110,7 @@ export async function POST(req:NextRequest){
         if(!session) return NextResponse.json({message: "Unauthorized Access", status: 401}, {status: 401});
 
         const body:Body = await req.json();
-        if (body.followup_status === "Closed") return NextResponse.json({ message: "Create the enquiry first, then use Complete Enquiry", status: 400 }, { status: 400 });
+        if (body.followup_status === "Closed") return NextResponse.json({ message: "Create the enquiry first, then record completed actions", status: 400 }, { status: 400 });
         const businessAssignment: any =
             (session?.user?.id
                 ? await Business_staffs.findOne({ user_id: session.user.id, status: 1 }).select("business_id").lean()
@@ -361,11 +362,8 @@ export async function POST(req:NextRequest){
             enquiry_user_notes: body.enquiry_user_notes || null
         });
 
-        if (newEnquiry.status === "Project Awarded") {
-            newEnquiry.is_completed = true; newEnquiry.completed_at = new Date(); newEnquiry.completed_by = session.user.id;
-            newEnquiry.completion_source = "awarded"; newEnquiry.completion_date_estimated = false;
-        }
         const savedEnquiry = await newEnquiry.save();
+        await preserveInitialAction(savedEnquiry);
 
         const initialComment = String(body.comments || "").trim();
         if (initialComment) {

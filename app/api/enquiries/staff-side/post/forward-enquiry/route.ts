@@ -1,13 +1,11 @@
-import { forwardHistoryFilter, historyOrder, isManuallyClosed } from "@/lib/enquiries/completion";
-import { enquiryActor } from "@/lib/enquiries/completion-server";
+import { forwardHistoryFilter, historyOrder } from "@/lib/enquiries/completion";
+import { enquiryActor, canScheduleAction, preserveInitialAction } from "@/lib/enquiries/completion-server";
 import { auth } from "@/auth";
 import { notifyEnquiryForward } from "@/app/api/helpers/enquiry-notifications";
 import connectDB from "@/lib/mongo";
-import Eq_camps from "@/models/eq_camps.model";
 import Eq_enquiry from "@/models/eq_enquiries.model";
 import Eq_enquiry_access from "@/models/eq_enquiry_access.model";
 import Eq_enquiry_histories from "@/models/eq_enquiry_histories";
-import Eq_users_log from "@/models/eq_users_log.model";
 import Users from "@/models/users.model";
 import mongoose from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
@@ -114,11 +112,6 @@ export async function POST(req: NextRequest) {
         // MongoDB does not support parallel operations on one transaction session.
         const actor = await Users.findById(actorId).select("name").session(dbSession);
         const enquiry = await Eq_enquiry.findById(enquiryId).session(dbSession);
-        const latestHistoryResult = await Eq_enquiry_histories
-          .findOne({ enquiry_id: enquiryId, ...forwardHistoryFilter })
-          .sort(historyOrder)
-          .session(dbSession)
-          .lean();
         const validRecipients = await Users.find({ _id: { $in: recipientIds } })
           .select("_id")
           .session(dbSession)
@@ -130,17 +123,10 @@ export async function POST(req: NextRequest) {
         if (!enquiry) {
           throw new RequestError(404, "Enquiry not found");
         }
-        const latestHistory: any = latestHistoryResult;
-
-        const latestAssignees = Array.isArray(latestHistory?.assigned_to)
-          ? latestHistory.assigned_to.map(String)
-          : [];
-        const isCreator = String(enquiry.createdBy || "") === actorId;
-        if (!actorContext?.admin && !isCreator && !latestAssignees.includes(actorId)) {
+        if (!actorContext || !await canScheduleAction(enquiry, actorContext)) {
           throw new RequestError(403, "You are not allowed to forward this enquiry");
         }
 
-        if (isManuallyClosed(enquiry)) throw new RequestError(409, "An admin must reopen this enquiry before forwarding");
         if (!enquiry.is_active) throw new RequestError(403, "Admin approval is required before forwarding");
 
         if (validRecipients.length !== recipientIds.length) {
@@ -149,6 +135,8 @@ export async function POST(req: NextRequest) {
             "One or more selected users no longer exist. Refresh the page and select again."
           );
         }
+
+        await preserveInitialAction(enquiry, dbSession);
 
         const [stepResult] = await Eq_enquiry_histories.aggregate<{
           maxStep?: number;
@@ -170,6 +158,8 @@ export async function POST(req: NextRequest) {
           camp_id: enquiry.camp_id || null,
           enquiry_id: enquiry._id,
           assigned_to: assignedTo,
+          action_origin: "forward",
+          action_assignments: assignedTo.map(user_id => ({ user_id, status: "pending", revision: 0 })),
           forwarded_by: actor._id,
           step_number: nextStep,
           priority,
@@ -204,23 +194,6 @@ export async function POST(req: NextRequest) {
         ]).session(dbSession);
         enquiry.priority = String(Math.round(priorityResult?.average ?? priority));
         await enquiry.save({ session: dbSession });
-
-        if (latestHistory?.action === "Visit" || latestHistory?.action === "Call") {
-          const camp: any = enquiry.camp_id
-            ? await Eq_camps.findById(enquiry.camp_id)
-                .select("camp_name")
-                .session(dbSession)
-                .lean()
-            : null;
-          const actionLabel = latestHistory.action === "Visit" ? "Visited" : "Called";
-          const campLabel = camp?.camp_name || "the camp";
-          await new Eq_users_log({
-            user_id: actor._id,
-            camp_id: enquiry.camp_id || null,
-            enquiry_id: enquiry._id,
-            log: `${actor.name || "User"} ${actionLabel} ${campLabel}`,
-          }).save({ session: dbSession });
-        }
 
         actorName = String(actor.name || "User");
       });

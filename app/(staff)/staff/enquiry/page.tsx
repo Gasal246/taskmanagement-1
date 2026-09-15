@@ -94,7 +94,10 @@ export default function EnquiriesPage() {
     created_by: "",
   }), []);
   const restoredFilters = useMemo(
-    () => ({ ...initialFilters, ...(savedListState?.filters ?? {}) }),
+    () => ({ ...initialFilters,
+      ...Object.fromEntries(Object.entries(savedListState?.filters ?? {}).filter(([key]) => key in initialFilters)),
+      ...(!savedListState?.filters?.action_state ? completionFilterDefaults : {}),
+    }),
     [initialFilters, savedListState?.filters]
   );
   const [showFilters, setShowFilters] = useState(Boolean(savedListState?.showFilters));

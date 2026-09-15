@@ -1,6 +1,5 @@
 "use client";
 import EnquiryCompletionActions from "@/components/enquiries/EnquiryCompletionActions";
-import { isManuallyClosed } from "@/lib/enquiries/completion";
 
 import React, { useState, useMemo, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -146,7 +145,7 @@ export default function EscalatePage() {
   }, [user_type]);
 
   const handleSubmit = async () => {
-    if (!enquiryData?.enquiry?.is_active || isManuallyClosed(enquiryData?.enquiry)) { toast.error("This enquiry must be approved and reopened before forwarding."); return; }
+    if (!enquiryData?.enquiry?.is_active) { toast.error("This enquiry must be approved before scheduling an action."); return; }
     if (!assignedTo) {
       toast.error("Select the user or agent responsible for the next step.");
       return;
@@ -505,7 +504,7 @@ export default function EscalatePage() {
                 <Button
                   className="w-full gap-2 bg-cyan-500 text-slate-950 hover:bg-cyan-400"
                   onClick={handleSubmit}
-                  disabled={isPending || !enquiryData?.enquiry?.is_active || isManuallyClosed(enquiryData?.enquiry)}
+                  disabled={isPending || !enquiryData?.enquiry?.is_active}
                 >
                   <Send size={16} />
                   {isPending ? "Forwarding..." : "Forward Enquiry"}

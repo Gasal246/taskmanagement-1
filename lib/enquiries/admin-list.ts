@@ -1,9 +1,11 @@
 import Eq_camps from "@/models/eq_camps.model";
 import Eq_enquiry from "@/models/eq_enquiries.model";
 import mongoose from "mongoose";
-import { completionFilterStages, forwardHistoryFilter, historyOrder } from "./completion";
-export async function filteredAdminEnquiries(searchParams: URLSearchParams) {
-    completionFilterStages(Object.fromEntries(searchParams));
+import { matchesActionFilters, validateActionFilters } from "./completion";
+import { actionsForEnquiries } from "./completion-server";
+export async function filteredAdminEnquiries(searchParams: URLSearchParams, actorId = "") {
+    const actionParams = Object.fromEntries(searchParams);
+    validateActionFilters(actionParams);
     const filter: any = {};
 
     // --- Location Filters ---
@@ -103,31 +105,6 @@ export async function filteredAdminEnquiries(searchParams: URLSearchParams) {
       });
     }
 
-    {
-      pipeline.push(
-        {
-          $lookup: {
-            from: "eq_enquiry_histories",
-            let: { enquiryId: "$_id" },
-            pipeline: [
-              { $match: { $expr: { $eq: ["$enquiry_id", "$$enquiryId"] }, ...forwardHistoryFilter } },
-              { $sort: historyOrder },
-              { $limit: 1 },
-              { $project: { action: 1 } },
-            ],
-            as: "latestHistory",
-          },
-        },
-        {
-          $unwind: {
-            path: "$latestHistory",
-            preserveNullAndEmptyArrays: true,
-          },
-        },
-        ...(actionFilter ? [{ $match: { "latestHistory.action": actionFilter } }] : [])
-      );
-    }
-
     if (hasPriorityFilter) {
       pipeline.push(
         {
@@ -157,21 +134,14 @@ export async function filteredAdminEnquiries(searchParams: URLSearchParams) {
         : { $sort: { createdAt: -1 } }
     );
 
-    pipeline.push(...completionFilterStages(Object.fromEntries(searchParams)));
-
-    pipeline.push({
-      $facet: {
-        metadata: [{ $count: "totalRecords" }],
-        data: [{ $skip: skip }, { $limit: limit }],
-      },
-    });
-
-    const result = await Eq_enquiry.aggregate(pipeline);
-    const metadata = result?.[0]?.metadata?.[0];
-    const totalRecords = metadata?.totalRecords ?? 0;
-    const totalPages = totalRecords > 0 ? Math.ceil(totalRecords / limit) : 0;
-    const data = result?.[0]?.data ?? [];
-    return { data, pagination: { page, limit, totalRecords, totalPages } };
-
-
+    const candidates = await Eq_enquiry.aggregate(pipeline);
+    const actions = await actionsForEnquiries(candidates);
+    const byEnquiry = new Map<string, any[]>();
+    for (const action of actions) {
+      const key = String(action.enquiry_id);
+      byEnquiry.set(key, [...(byEnquiry.get(key) || []), action]);
+    }
+    const matches = candidates.filter((entry: any) => matchesActionFilters(byEnquiry.get(String(entry._id)) || [], actionParams, actorId));
+    const totalRecords = matches.length;
+    return { data: matches.slice(skip, skip + limit), pagination: { page, limit, totalRecords, totalPages: Math.ceil(totalRecords / limit) } };
 }

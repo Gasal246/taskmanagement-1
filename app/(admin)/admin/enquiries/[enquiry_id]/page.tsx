@@ -1,6 +1,5 @@
 "use client";
 import EnquiryCompletionActions from "@/components/enquiries/EnquiryCompletionActions";
-import { isManuallyClosed, isCompleted } from "@/lib/enquiries/completion";
 import React, { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Mail, Phone, User, Pencil, Trash2, UserCircle2, MapPin, Wifi, Sparkles } from "lucide-react";
@@ -139,7 +138,6 @@ export default function SingleEnquiryPage() {
   const isProjectAwarded = enquiry?.enquiry?.status === "Project Awarded";
 
   const handleProtectedNavigation = (action: "edit" | "forward") => {
-    if (action === "forward" && isManuallyClosed(enquiry?.enquiry)) { toast.error("An admin must reopen this enquiry before forwarding."); return; }
     if (isProjectAwarded) {
       setAwardedAction(action);
       return;
@@ -295,9 +293,7 @@ export default function SingleEnquiryPage() {
         </Dialog>
 
         <div className="mb-5 space-y-2 rounded-xl border border-slate-800 bg-slate-900/40 p-4">
-          {isCompleted(enquiry?.enquiry) && <p className="text-sm font-semibold text-emerald-300">Enquiry completed</p>}
           {enquiry?.enquiry && <EnquiryCompletionActions enquiry={enquiry.enquiry} basePath="/admin/enquiries" />}
-          {isManuallyClosed(enquiry?.enquiry) && <p className="text-xs text-slate-400">An admin must reopen this enquiry before further forwarding.</p>}
         </div>
 
         <Dialog open={!!awardedAction} onOpenChange={(open) => !open && setAwardedAction(null)}>
@@ -596,7 +592,7 @@ export default function SingleEnquiryPage() {
             <Button
               onClick={() => handleProtectedNavigation("forward")}
               className="flex items-center gap-1"
-              disabled={!enquiry?.enquiry?.is_active || isManuallyClosed(enquiry?.enquiry)}
+              disabled={!enquiry?.enquiry?.is_active}
             >
               Forward Enquiry
             </Button>

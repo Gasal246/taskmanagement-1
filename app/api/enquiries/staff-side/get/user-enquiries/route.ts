@@ -1,4 +1,4 @@
-import { completionFilterStages, matchesCompletionPeriod } from "@/lib/enquiries/completion";
+import { validateActionFilters, matchesActionFilters } from "@/lib/enquiries/completion";
 import { enrichEnquiries, enquiryActor } from "@/lib/enquiries/completion-server";
 import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
@@ -116,7 +116,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
 
     const completionParams = Object.fromEntries(searchParams);
-    completionFilterStages(completionParams);
+    validateActionFilters(completionParams);
     const actor = await enquiryActor();
     if (!actor) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     const status = searchParams.get("status");
@@ -226,9 +226,7 @@ export async function GET(req: NextRequest) {
     }));
 
     enquiries = await enrichEnquiries(enquiries, actor);
-    enquiries = enquiries.filter((entry: any) => matchesCompletionPeriod(entry, completionParams));
-    const nextAction = searchParams.get("next_action");
-    if (nextAction && nextAction !== "all") enquiries = enquiries.filter((entry: any) => entry.latest_forward?.action === nextAction);
+    enquiries = enquiries.filter((entry: any) => matchesActionFilters(entry.actions || [], completionParams, actor.actorId));
     if (search) {
       enquiries = enquiries.filter((entry: any) => matchesInlineSearch(entry, parsedSearch));
     }
@@ -271,7 +269,7 @@ export async function GET(req: NextRequest) {
       { status: 200 }
     );
   } catch (err) {
-    if (err instanceof Error && /Invalid (completion filter|period range)/.test(err.message)) return NextResponse.json({ message: err.message, status: 400 }, { status: 400 });
+    if (err instanceof Error && /Invalid (action filter|action scope|period range)/.test(err.message)) return NextResponse.json({ message: err.message, status: 400 }, { status: 400 });
     console.log("Error while getting staff enquiries:", err);
     return NextResponse.json(
       { message: "Internal Server Error", status: 500 },

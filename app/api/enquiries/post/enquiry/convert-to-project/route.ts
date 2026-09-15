@@ -1,4 +1,3 @@
-import { stampAutomaticCompletion } from "@/lib/enquiries/completion-server";
 import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import Business_Project from "@/models/business_project.model";
@@ -48,7 +47,6 @@ export async function POST(req:NextRequest){
 
         const saved = await newProject.save();
 
-        await stampAutomaticCompletion(body.enquiry_id, session.user.id, "converted");
         await Eq_enquiry.findByIdAndUpdate(body.enquiry_id, {$set: {status: "Closed", is_converted: true}});
 
         return NextResponse.json({message: "Project Added", status: 200, project_id: saved._id}, {status: 200});

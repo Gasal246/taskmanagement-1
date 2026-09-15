@@ -2,10 +2,10 @@
 import Link from "next/link";
 import { ArrowUpRight, Building2 } from "lucide-react";
 import EnquiryCompletionActions, { enquiryDate } from "./EnquiryCompletionActions";
-import { isCompleted } from "@/lib/enquiries/completion";
+
 
 export default function EnquiryCard({ enquiry: e, number, basePath, staff = false }: { enquiry: any; number: number; basePath: string; staff?: boolean }) {
-  const complete = isCompleted(e);
+  const complete = e.actions?.length > 0 && e.actions.every((a: any) => a.progress?.status === "completed");
   return <article className={`group relative rounded-xl border bg-gradient-to-br from-slate-900/90 to-slate-950 p-4 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-lg focus-within:ring-2 focus-within:ring-cyan-500 ${complete ? "border-emerald-900/70 hover:border-emerald-600/70" : "border-slate-700 hover:border-cyan-700"}`}>
     <div className="flex flex-wrap items-start justify-between gap-3">
       <Link href={`${basePath}/${e._id}`} className="min-w-0 flex-1 rounded-md outline-none after:absolute after:inset-0 after:rounded-xl focus-visible:ring-2 focus-visible:ring-cyan-400">
@@ -14,7 +14,7 @@ export default function EnquiryCard({ enquiry: e, number, basePath, staff = fals
       </Link>
       <div className="flex flex-wrap gap-2 text-[11px] font-semibold">
         {!e.is_active && <span className="rounded-full border border-amber-500/40 bg-amber-950/50 px-2.5 py-1 text-amber-200">Awaiting approval</span>}
-        <span className={`rounded-full border px-2.5 py-1 ${complete ? "border-emerald-700 bg-emerald-950/60 text-emerald-200" : "border-slate-700 bg-slate-800 text-slate-300"}`}>{complete ? "Completed" : "In progress"}</span>
+        <span className={`rounded-full border px-2.5 py-1 ${complete ? "border-emerald-700 bg-emerald-950/60 text-emerald-200" : "border-slate-700 bg-slate-800 text-slate-300"}`}>{complete ? "All actions completed" : e.actions?.length ? "Actions in progress" : "No action"}</span>
       </div>
     </div>
     <dl className="my-4 grid grid-cols-2 gap-x-5 gap-y-3 text-xs sm:grid-cols-3 lg:grid-cols-5">

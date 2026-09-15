@@ -1,4 +1,6 @@
 "use client";
+import EnquiryCompletionActions from "@/components/enquiries/EnquiryCompletionActions";
+import EnquiryActionProgress from "@/components/enquiries/EnquiryActionProgress";
 import EnquiryLifecycleHistory from "@/components/enquiries/EnquiryLifecycleHistory";
 
 import React from "react";
@@ -42,7 +44,7 @@ export default function EnquiryHistoryPage() {
   const campName = enquiryData?.enquiry?.camp_id?.camp_name || "Unknown Camp";
   const enquiryUuid = enquiryData?.enquiry?.enquiry_uuid || params.enquiry_id;
   const historyList = histories?.histories ?? [];
-  const forwardHistories = historyList.filter((history: any) => !["ENQUIRY_EDIT", "ENQUIRY_COMPLETED", "ENQUIRY_REOPENED"].includes(history?.change_type));
+  const forwardHistories = historyList.filter((history: any) => !["ENQUIRY_EDIT", "ENQUIRY_COMPLETED", "ENQUIRY_REOPENED", "ACTION_COMPLETED", "ACTION_CANCELLED", "ACTION_REOPENED"].includes(history?.change_type));
   const updateHistories = historyList.filter((history: any) => history?.change_type === "ENQUIRY_EDIT");
 
   const handleExport = () => {
@@ -122,6 +124,7 @@ export default function EnquiryHistoryPage() {
       </div>
 
       <div className="space-y-6">
+        {enquiryData?.enquiry && <EnquiryCompletionActions enquiry={enquiryData.enquiry} basePath="/admin/enquiries" />}
         <EnquiryLifecycleHistory histories={historyList.map((entry: any) => entry.history_id ?? entry)} />
         <div className="space-y-3">
           <h2 className="text-lg font-semibold">Forwards</h2>
@@ -145,10 +148,11 @@ export default function EnquiryHistoryPage() {
                     h.is_finished ? "bg-green-700/70" : "bg-slate-700/70"
                   }`}
                 >
-                  {h.is_finished ? "Completed" : "In Progress"}
+                  Scheduled
                 </span>
               </div>
 
+              <EnquiryActionProgress action={h} />
               <div className="text-sm space-y-2">
                 <p className="flex items-center gap-2 text-slate-300">
                   <Flag size={14} className="text-cyan-400" />

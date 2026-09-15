@@ -1,5 +1,5 @@
 import Eq_enquiry from "@/models/eq_enquiries.model";
-import { forwardHistoryFilter, historyOrder, isManuallyClosed } from "@/lib/enquiries/completion";
+import { forwardHistoryFilter, historyOrder } from "@/lib/enquiries/completion";
 import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import Eq_enquiry_histories from "@/models/eq_enquiry_histories";
@@ -27,7 +27,7 @@ export async function GET(req:NextRequest){
         }
 
         const enquiry = await Eq_enquiry.findById(enquiry_id).lean();
-        return NextResponse.json({action: latestAction, canForward: Boolean(enquiry && (enquiry as any).is_active && !isManuallyClosed(enquiry)), status: 200}, {status: 200});
+        return NextResponse.json({action: latestAction, canForward: Boolean(enquiry && (enquiry as any).is_active), status: 200}, {status: 200});
 
     }catch(err){
         console.log("Error while getting latest action of enquiry: ", err);

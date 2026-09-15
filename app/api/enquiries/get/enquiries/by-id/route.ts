@@ -59,7 +59,7 @@ export async function GET(req:NextRequest){
             select: "name"
         }).sort(historyOrder).lean();
 
-        return NextResponse.json({enquiry: enriched, contacts, head_office, external_provider, personal_provider, assigned, status: 200}, {status: 200});
+        return NextResponse.json({enquiry: enriched, contacts, head_office, external_provider, personal_provider, assigned, canForward: enriched.canScheduleAction, status: 200}, {status: 200});
     }catch(err){
         console.log("Error while getting enquiry by Id: ", err);
         return NextResponse.json({message:"Internal Server Error", status: 500}, {status: 500});

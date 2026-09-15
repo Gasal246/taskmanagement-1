@@ -1,6 +1,5 @@
 "use client";
 import EnquiryCompletionActions from "@/components/enquiries/EnquiryCompletionActions";
-import { isManuallyClosed } from "@/lib/enquiries/completion";
 
 import React, { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -150,7 +149,7 @@ export default function EscalatePage() {
   };
 
   const handleSubmit = async () => {
-    if (!enquiryData?.enquiry?.is_active || isManuallyClosed(enquiryData?.enquiry)) { toast.error("This enquiry must be approved and reopened before forwarding."); return; }
+    if (!enquiryData?.enquiry?.is_active) { toast.error("This enquiry must be approved before scheduling an action."); return; }
     const assignedTo = [...assignedUsers, ...assignedAgents].filter(Boolean);
     const accessUsers = Array.from(
       new Set([...selectedUsers, ...assignedTo].filter(Boolean))
@@ -520,7 +519,7 @@ export default function EscalatePage() {
                   className="w-full gap-2 bg-emerald-500 text-slate-950 hover:bg-emerald-400"
                   onClick={handleSubmit}
                   disabled={
-                    !enquiryData?.enquiry?.is_active || isManuallyClosed(enquiryData?.enquiry) || isPending ||
+                    !enquiryData?.enquiry?.is_active || isPending ||
                     !priority ||
                     (!assignedUsers.length && !assignedAgents.length) ||
                     !action

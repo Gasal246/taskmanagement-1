@@ -1,5 +1,5 @@
-import { canReadEnquiry, enrichEnquiries, enquiryActor } from "@/lib/enquiries/completion-server";
-import { forwardHistoryFilter, historyOrder, isManuallyClosed } from "@/lib/enquiries/completion";
+import { canReadEnquiry, enrichEnquiries, enquiryActor, canScheduleAction } from "@/lib/enquiries/completion-server";
+import { forwardHistoryFilter, historyOrder } from "@/lib/enquiries/completion";
 import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import Eq_camp_contacts from "@/models/eq_camp_contacts.model";
@@ -61,12 +61,12 @@ export async function GET(req:NextRequest){
             : isAssigned?.assigned_to
                 ? [isAssigned.assigned_to]
                 : [];
-        const hasAssignedAction = Boolean(isAssigned) && assignedList.some((id: any) => String(id) === String(session?.user?.id));
+        const hasAssignedAction = enriched.actions.some((action: any) => action.action_assignments.some((part: any) => String(part.user_id?._id || part.user_id) === actor.actorId));
         const broughtByList = Array.isArray(enquiry?.enquiry_brought_by)
         ? enquiry.enquiry_brought_by
         : [];
         const isCreatedByCurrentUser = String(enquiry?.createdBy?._id ?? enquiry?.createdBy ?? "") === String(session?.user?.id);
-        const canForward = !isManuallyClosed(enquiry) && (assignedList.some((id: any) => String(id) === String(session?.user?.id)) || isCreatedByCurrentUser);
+        const canForward = Boolean(enquiry.is_active && await canScheduleAction(enquiry, actor));
         const canEdit = isCreatedByCurrentUser
             || assignedList.some((id: any) => String(id) === actor.actorId)
             || broughtByList.some((id: any) => String(id) === String(session?.user?.id));

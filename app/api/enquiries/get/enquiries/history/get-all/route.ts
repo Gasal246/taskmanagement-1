@@ -12,6 +12,8 @@ export async function GET(req:NextRequest){
         if(!enquiry_id) return NextResponse.json({message: "Please provide enquiry id", status: 400}, {status: 400});
 
         const histories = await Eq_enquiry_histories.find({enquiry_id: enquiry_id}).sort({step_number: -1}).populate([
+            { path: "action_assignee", select: "name email" },
+            { path: "action_assignments.user_id", select: "name email" },
             {
                 path: "assigned_to",
                 select: "name email"

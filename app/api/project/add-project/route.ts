@@ -1,4 +1,3 @@
-import { stampAutomaticCompletion } from "@/lib/enquiries/completion-server";
 import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import { ObjectId } from "mongoose";
@@ -43,7 +42,6 @@ interface Body {
 const updateLinkedEnquiryIfNeeded = async (enquiry_id: string | null | undefined, actorId: string) => {
     if(!enquiry_id) return;
 
-    await stampAutomaticCompletion(enquiry_id, actorId, "converted");
     await Eq_enquiry.findByIdAndUpdate(enquiry_id, {
         $set: {
             status: "Project Awarded",
