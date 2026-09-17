@@ -2,16 +2,17 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { DatePicker, Space } from 'antd';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { CalendarPlus, CheckCircle2, Clock3, Filter, PanelsTopLeft, Search } from 'lucide-react';
+import { CalendarPlus, Clock3, Filter, PanelsTopLeft, Search } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import { RootState } from '@/redux/store';
 import { useGetAreasandDeptsForRegion, useGetBusinessClients, useGetBusinessRegions, useGetProjects } from '@/query/business/queries';
 import { DEPARTMENT_TYPES } from '@/lib/constants';
-import LoaderSpin from '@/components/shared/LoaderSpin';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
+import ProjectListCard from '@/components/projects/ProjectListCard';
+import ProjectCatalogueFilters from '@/components/projects/ProjectCatalogueFilters';
 import {
   Pagination,
   PaginationContent,
@@ -49,6 +50,9 @@ const ProjectsPage = () => {
     client_id: clientIdFromUrl,
     region_id: '',
     area_id: '',
+    project_sector: '',
+    facility_type: '',
+    solutions_required: [] as string[],
     startDate: '',
     endDate: '',
   });
@@ -103,7 +107,7 @@ const ProjectsPage = () => {
 
   useEffect(() => {
     setPage(1);
-  }, [tab, filters.type, filters.client_id, filters.region_id, filters.area_id, filters.startDate, filters.endDate, search]);
+  }, [tab, filters.type, filters.client_id, filters.region_id, filters.area_id, filters.project_sector, filters.facility_type, filters.solutions_required, filters.startDate, filters.endDate, search]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -120,13 +124,16 @@ const ProjectsPage = () => {
       client_id: filters.client_id || undefined,
       region_id: filters.region_id || undefined,
       area_id: filters.area_id || undefined,
+      project_sector: filters.project_sector || undefined,
+      facility_type: filters.facility_type || undefined,
+      solutions_required: filters.solutions_required.length ? filters.solutions_required.join(',') : undefined,
       startDate: filters.startDate || undefined,
       endDate: filters.endDate || undefined,
       search: search || undefined,
       page: String(page),
       limit: String(limit)
     };
-  }, [businessData?._id, filters.area_id, filters.client_id, filters.endDate, filters.region_id, filters.startDate, filters.type, page, search, tab]);
+  }, [businessData?._id, filters.area_id, filters.client_id, filters.endDate, filters.facility_type, filters.project_sector, filters.region_id, filters.solutions_required, filters.startDate, filters.type, page, search, tab]);
 
   const { data: projectsResponse, isLoading } = useGetProjects(queryParams);
   const projects = projectsResponse?.data ?? [];
@@ -182,6 +189,9 @@ const ProjectsPage = () => {
       client_id: '',
       region_id: '',
       area_id: '',
+      project_sector: '',
+      facility_type: '',
+      solutions_required: [] as string[],
       startDate: '',
       endDate: '',
     });
@@ -200,40 +210,6 @@ const ProjectsPage = () => {
     }
     const queryString = nextSearchParams.toString();
     router.replace(queryString ? `/admin/projects?${queryString}` : '/admin/projects', { scroll: false });
-  };
-
-  const formatDate = (value?: string) => {
-    if (!value) return "-";
-    return new Date(value).toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
-  };
-
-  const getStatusBadge = (project: any) => {
-    if (!project?.is_approved) {
-      return {
-        label: "Waiting for approval",
-        className: "bg-amber-500/10 text-amber-200 border border-amber-500/30"
-      };
-    }
-    if (project?.status === "completed") {
-      return {
-        label: "Completed",
-        className: "bg-emerald-500/10 text-emerald-200 border border-emerald-500/30"
-      };
-    }
-    if (project?.status === "cancelled") {
-      return {
-        label: "Cancelled",
-        className: "bg-rose-500/10 text-rose-200 border border-rose-500/30"
-      };
-    }
-    return {
-      label: "On going",
-      className: "bg-cyan-500/10 text-cyan-200 border border-cyan-500/30"
-    };
   };
 
   const selectedRegionName = businessRegions.find((r: any) => r._id === filters.region_id)?.region_name;
@@ -376,6 +352,15 @@ const ProjectsPage = () => {
             </Select>
           </div>
 
+          <ProjectCatalogueFilters
+            value={{
+              project_sector: filters.project_sector,
+              facility_type: filters.facility_type,
+              solutions_required: filters.solutions_required,
+            }}
+            onChange={(catalogueFilters) => setFilters((previous) => ({ ...previous, ...catalogueFilters }))}
+          />
+
           <div className="space-y-1 lg:col-span-2">
             <p className="text-[11px] text-slate-400">Timeline</p>
             <div className="rounded-md border border-slate-700 bg-slate-950/60 px-2 py-1 shadow-sm focus-within:ring-1 focus-within:ring-slate-400/50">
@@ -390,13 +375,16 @@ const ProjectsPage = () => {
           </div>
         </div>
 
-        {(search || filters.type || filters.client_id || filters.region_id || filters.area_id || filters.startDate || filters.endDate) && (
+        {(search || filters.type || filters.client_id || filters.region_id || filters.area_id || filters.project_sector || filters.facility_type || filters.solutions_required.length || filters.startDate || filters.endDate) && (
           <div className="mt-4 flex flex-wrap gap-2 text-[11px] text-slate-300">
             {search && <span className="rounded-full border border-slate-700 px-3 py-1">Search: {search}</span>}
             {filters.type && <span className="rounded-full border border-slate-700 px-3 py-1">Domain: {selectedDomainLabel}</span>}
             {filters.client_id && <span className="rounded-full border border-slate-700 px-3 py-1">Client: {selectedClientName}</span>}
             {filters.region_id && <span className="rounded-full border border-slate-700 px-3 py-1">Region: {selectedRegionName}</span>}
             {filters.area_id && <span className="rounded-full border border-slate-700 px-3 py-1">Area: {selectedAreaName}</span>}
+            {filters.project_sector && <span className="rounded-full border border-slate-700 px-3 py-1">Project Sector: {filters.project_sector}</span>}
+            {filters.facility_type && <span className="rounded-full border border-slate-700 px-3 py-1">Facility Type: {filters.facility_type}</span>}
+            {filters.solutions_required.length > 0 && <span className="rounded-full border border-slate-700 px-3 py-1">Solutions: {filters.solutions_required.length}</span>}
             {(filters.startDate || filters.endDate) && (
               <span className="rounded-full border border-slate-700 px-3 py-1">
                 Date: {filters.startDate || "-"} to {filters.endDate || "-"}
@@ -422,64 +410,14 @@ const ProjectsPage = () => {
           </div>
         )}
 
-        <div className="mt-4 grid gap-3 md:grid-cols-2">
-          {projects?.map((proj: any) => {
-            const status = getStatusBadge(proj);
-            const regionName = proj?.region_id?.region_name || "-";
-            const areaName = proj?.area_id?.area_name || "-";
-            const clientName = proj?.client_id?.client_name || "-";
-            const createdBy = proj?.creator?.name || proj?.admin_id?.name || "-";
-            const typeLabel = DEPARTMENT_TYPES.find((t) => t.value === proj?.type)?.label || proj?.type || "-";
-            return (
-              <div
-                key={proj._id}
-                className="min-w-0 w-full rounded-xl border border-slate-800 bg-gradient-to-tr from-slate-950/60 to-slate-900/60 p-4 hover:border-cyan-500/40 transition cursor-pointer"
-                onClick={() => router.push(`/admin/projects/${proj._id}`)}
-              >
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className='min-w-0 flex-1'>
-                    <h3 className="break-words text-sm font-semibold text-slate-100">{proj.project_name}</h3>
-                    <p className="mt-1 w-full overflow-hidden text-[11px] text-slate-400 truncate">{proj.project_description || "No description provided"}</p>
-                  </div>
-                  <span className={`inline-flex w-fit px-2 py-1 rounded-full text-[10px] ${status.className}`}>{status.label}</span>
-                </div>
-
-                <div className="mt-3 grid gap-2 text-[11px] text-slate-300 sm:grid-cols-2">
-                  <div className="min-w-0">
-                    <span className="text-slate-500">Client</span>
-                    <p className="break-words text-slate-200">{clientName}</p>
-                  </div>
-                  <div className="min-w-0">
-                    <span className="text-slate-500">Domain</span>
-                    <p className="break-words text-slate-200">{typeLabel}</p>
-                  </div>
-                  <div className="min-w-0">
-                    <span className="text-slate-500">Region</span>
-                    <p className="break-words text-slate-200">{regionName}</p>
-                  </div>
-                  <div className="min-w-0">
-                    <span className="text-slate-500">Area</span>
-                    <p className="break-words text-slate-200">{areaName}</p>
-                  </div>
-                  <div className="min-w-0">
-                    <span className="text-slate-500">Priority</span>
-                    <p className="break-words text-slate-200 capitalize">{proj.priority || "normal"}</p>
-                  </div>
-                  <div className="min-w-0">
-                    <span className="text-slate-500">Timeline</span>
-                    <p className="break-words text-slate-200">{formatDate(proj.start_date)} - {formatDate(proj.end_date)}</p>
-                  </div>
-                </div>
-
-                <div className="mt-3 flex flex-col gap-2 text-[11px] text-slate-400 sm:flex-row sm:items-center sm:justify-between">
-                  <span className="break-words">Created by {createdBy}</span>
-                  <span className="flex items-center gap-1 text-slate-500">
-                    <CheckCircle2 size={12} /> {formatDate(proj.createdAt)}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+          {projects?.map((project: any) => (
+            <ProjectListCard
+              key={project._id}
+              project={project}
+              href={`/admin/projects/${project._id}`}
+            />
+          ))}
         </div>
 
         {totalPages > 1 && (

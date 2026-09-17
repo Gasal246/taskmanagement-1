@@ -148,14 +148,13 @@ export async function GET(req: NextRequest) {
       ];
     }
 
-    const todayStartUtc = new Date();
-    todayStartUtc.setUTCHours(0, 0, 0, 0);
+    const now = new Date();
     const statusMatch = getTaskStatusMatchStages(
       statusParam ? (statusParam as StaffTaskStatusFilter) : undefined
     );
     const [result] = await Business_Tasks.aggregate([
       { $match: query },
-      ...getTaskStatusAggregationStages(todayStartUtc),
+      ...getTaskStatusAggregationStages(now),
       {
         $facet: {
           summary: [
@@ -182,7 +181,7 @@ export async function GET(req: NextRequest) {
                 pending_since: {
                   $cond: [
                     { $eq: ["$__displayStatus", "Pending"] },
-                    { $dateAdd: { startDate: "$end_date", unit: "day", amount: 1 } },
+                    "$end_date",
                     "$$REMOVE",
                   ],
                 },

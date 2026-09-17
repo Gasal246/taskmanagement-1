@@ -232,7 +232,8 @@ export async function GET(req: NextRequest) {
 
       return tasks
         .filter((task: any) =>
-          isWithinRange(task?.start_date || task?.createdAt, task?.end_date || task?.start_date, filterStart, filterEnd)
+          task?.start_date && task?.end_date &&
+          isWithinRange(task.start_date, task.end_date, filterStart, filterEnd)
         )
         .map((task: any) => ({
           id: `task-${task?._id}`,
@@ -240,8 +241,8 @@ export async function GET(req: NextRequest) {
           sourceId: String(task?._id || ""),
           title: String(task?.task_name || "Untitled task"),
           description: String(task?.task_description || ""),
-          start: toIsoString(task?.start_date || task?.createdAt),
-          end: toIsoString(task?.end_date || task?.start_date || task?.createdAt),
+          start: toIsoString(task.start_date),
+          end: toIsoString(task.end_date),
           status: String(task?.status || ""),
           assignedLabel:
             task?.assigned_to?.name ||

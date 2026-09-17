@@ -1,4 +1,8 @@
 "use client";
+import CampSolutionsFields from "@/components/enquiries/CampSolutionsFields";
+import { EMPTY_CAMP_SOLUTIONS } from "@/lib/enquiries/solutions";
+import CampClassificationFields from "@/components/enquiries/CampClassificationFields";
+import { sectorFieldValuesRecord, solutionDetailsRecord } from "@/lib/enquiries/catalogue";
 
 import React, { useEffect, useMemo, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
@@ -15,7 +19,7 @@ import {
     useUpdateEqCamp,
     useGetEqHeadOfficesFiltered
 } from "@/query/enquirymanager/queries";
-import { EQ_CAMP_TYPES, EQ_CAMP_VISITED_STATUS_OPTIONS, EQ_CAPACITY_LIMITS, Eq_CAPACITY_OPTIONS } from "@/lib/constants";
+import { EQ_CAMP_VISITED_STATUS_OPTIONS, EQ_CAPACITY_LIMITS, Eq_CAPACITY_OPTIONS } from "@/lib/constants";
 import { toast } from "sonner";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { useParams, useRouter } from "next/navigation";
@@ -51,7 +55,7 @@ export default function EditCampPage() {
         limit: 200
     });
 
-    const { register, handleSubmit, reset, control } = useForm();
+    const { register, handleSubmit, reset, control, watch, setValue } = useForm();
 
     const fetchCountries = async () => {
         const res = await GetCountries();
@@ -151,6 +155,17 @@ export default function EditCampPage() {
         reset({
             camp_name: camp?.camp_name || "",
             camp_type: camp?.camp_type || "",
+            solutions_required: camp?.solutions_required || [],
+            solution_other: camp?.solution_other || "",
+            solution_details: solutionDetailsRecord(camp?.solution_details, camp?.solution_other),
+            primary_solution: camp?.primary_solution || "",
+            commercial_model: camp?.commercial_model || EMPTY_CAMP_SOLUTIONS.commercial_model,
+            project_sector: camp?.project_sector || "",
+            facility_type: camp?.facility_type || "",
+            facility_type_other: camp?.facility_type_other || "",
+            facility_type_detail: camp?.facility_type_detail || camp?.facility_type_other || "",
+            sector_field_values: sectorFieldValuesRecord(camp?.sector_field_values),
+            hotel_classification: camp?.hotel_classification || "",
             visited_status: camp?.visited_status || "To Visit",
             camp_capacity: camp?.camp_capacity ? String(camp?.camp_capacity) : "",
             camp_occupancy: camp?.camp_occupancy ?? "",
@@ -167,13 +182,22 @@ export default function EditCampPage() {
         const occupancyValue = data.camp_occupancy === "" ? undefined : Number(data.camp_occupancy);
 
         if (data.camp_capacity && occupancyValue !== undefined && limit && occupancyValue > limit) {
-            return toast.error("Camp occupancy cannot exceed Camp Capacity");
+            return toast.error("Facility occupancy cannot exceed capacity");
         }
 
         const payload: any = {
             camp_id: params.camp_id,
             camp_name: data.camp_name,
-            camp_type: data.camp_type,
+            solutions_required: data.solutions_required || [],
+            solution_other: data.solution_other || "",
+            solution_details: data.solution_details || {},
+            primary_solution: data.primary_solution || "",
+            commercial_model: data.commercial_model || EMPTY_CAMP_SOLUTIONS.commercial_model,
+            project_sector: data.project_sector,
+            facility_type: data.facility_type,
+            facility_type_other: data.facility_type_other,
+            facility_type_detail: data.facility_type_detail,
+            sector_field_values: data.sector_field_values || {},
             visited_status: data.visited_status,
             camp_capacity: data.camp_capacity,
             latitude: data.latitude ?? "",
@@ -194,10 +218,10 @@ export default function EditCampPage() {
 
         const res = await UpdateCamp(payload);
         if (res?.status == 200) {
-            toast.success(res?.message || "Camp updated");
+            toast.success(res?.message || "Facility updated");
             return router.replace(`/admin/enquiries/camps/${params.camp_id}`);
         }
-        toast.error(res?.message || "Failed to update camp");
+        toast.error(res?.message || "Failed to update Facility");
     };
 
     if (isCampLoading) {
@@ -217,46 +241,31 @@ export default function EditCampPage() {
                     </BreadcrumbItem>
                     <BreadcrumbSeparator />
                     <BreadcrumbItem>
-                        <BreadcrumbLink onClick={() => router.back()}>Manage Camps</BreadcrumbLink>
+                        <BreadcrumbLink onClick={() => router.back()}>Manage Facilities</BreadcrumbLink>
                     </BreadcrumbItem>
                     <BreadcrumbSeparator />
                     <BreadcrumbItem>
-                        <BreadcrumbPage>Edit Camp</BreadcrumbPage>
+                        <BreadcrumbPage>Edit Facility</BreadcrumbPage>
                     </BreadcrumbItem>
                 </BreadcrumbList>
             </Breadcrumb>
 
             <div className="p-6 max-w-4xl mx-auto space-y-6">
-                <h1 className="text-xl font-semibold text-slate-200">Edit Camp</h1>
+                <h1 className="text-xl font-semibold text-slate-200">Edit Facility</h1>
 
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                     <div className="mt-6 mb-2 flex items-center gap-2">
                         <div className="h-px bg-slate-700 flex-1" />
-                        <span className="text-xs text-slate-400 whitespace-nowrap">Camp Details</span>
+                        <span className="text-xs text-slate-400 whitespace-nowrap">Facility Details</span>
                         <div className="h-px bg-slate-700 flex-1" />
                     </div>
 
-                    <Input placeholder="Camp Name" {...register("camp_name", { required: true })} />
+                    <Input placeholder="Facility Name" {...register("camp_name", { required: true })} />
 
-                    <Controller
-                        control={control}
-                        name="camp_type"
-                        defaultValue=""
-                        render={({ field }) => (
-                            <select
-                                value={field.value ?? ""}
-                                onChange={field.onChange}
-                                className="w-full rounded-md border border-slate-700 bg-slate-900 text-slate-200 p-2 focus:border-slate-500 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
-                            >
-                                <option value="">Select Camp Type</option>
-                                {EQ_CAMP_TYPES.map((c) => (
-                                    <option key={c} value={c}>
-                                        {c}
-                                    </option>
-                                ))}
-                            </select>
-                        )}
-                    />
+                    {!campData?.camp?.project_sector && campData?.camp?.camp_type && <div className="rounded-lg border border-amber-800/60 bg-amber-950/25 px-3 py-2 text-xs text-amber-200">Legacy Camp Type: {campData.camp.camp_type}. Select a Project Sector and Facility Type to classify this Facility.</div>}
+                    <CampClassificationFields control={control} watch={watch} setValue={setValue} />
+
+                    <CampSolutionsFields control={control} watch={watch} setValue={setValue} />
 
                     <Controller
                         control={control}
@@ -440,7 +449,7 @@ export default function EditCampPage() {
                     <Input placeholder="Client Company" {...register("client_company")} />
 
                     <Button type="submit" className="bg-cyan-700 hover:bg-cyan-600" disabled={isCampUpdating || isCountryLoading}>
-                        {isCampUpdating ? "Saving..." : "Save Camp"}
+                        {isCampUpdating ? "Saving..." : "Save Facility"}
                     </Button>
                 </form>
             </div>
@@ -449,7 +458,7 @@ export default function EditCampPage() {
                 <DialogContent className="sm:max-w-[425px] max-h-[70vh] flex flex-col">
                     <DialogHeader>
                         <DialogTitle>Select Head Office</DialogTitle>
-                        <DialogDescription>Choose a head office to attach to this camp.</DialogDescription>
+                        <DialogDescription>Choose a head office to attach to this Facility.</DialogDescription>
                     </DialogHeader>
                     <div className="space-y-2">
                         <Input

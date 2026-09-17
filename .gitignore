@@ -45,3 +45,6 @@ firebase/*.json
 *.json
 firebase/taskmanager-4b024-firebase-adminsdk-fbsvc-1a48bd159d.json
 .env
+# Public enquiry classification catalogues
+!lib/enquiries/project-sectors.json
+!lib/enquiries/solution-catalogue.json

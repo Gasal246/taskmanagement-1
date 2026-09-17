@@ -1,5 +1,11 @@
 "use client";
 
+import ActivityHistorySheet from "@/components/task/ActivityHistorySheet";
+import ChangeActivityDeadlineDialog from "@/components/task/ChangeActivityDeadlineDialog";
+
+import ActivityScheduleFields from "@/components/task/ActivityScheduleFields";
+import { activityScheduleFields, isScheduleOrdered, scheduleOrderError, toLocalDateTimeInput, formatScheduleDate } from "@/lib/activity-schedule";
+
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Breadcrumb,
@@ -63,7 +69,6 @@ import {
   useUpdateTaskActivity,
 } from "@/query/business/queries";
 import { toast } from "sonner";
-import { formatDateTimeShort, formatDateTiny } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useSelector } from "react-redux";
 import { RootState } from "@/redux/store";
@@ -108,11 +113,14 @@ const priorityStyles: Record<string, string> = {
 };
 
 // Validation schema for activity form
-const activitySchema = z.object({
+const activityContentSchema = z.object({
   activity_name: z.string().min(2, { message: "Activity name must be at least 2 characters." }),
   description: z.string().min(5, { message: "Description must be at least 5 characters." }).optional(),
   _id: z.string().optional(),
+  start_date: z.string(),
+  end_date: z.string(),
 });
+const activitySchema = activityContentSchema.extend(activityScheduleFields).refine(isScheduleOrdered, scheduleOrderError);
 
 // Validation schema for task form
 const taskSchema = z.object({
@@ -160,7 +168,7 @@ const TaskDetailPage = () => {
   const [selectStaffDialogOpen, setSelectStaffDialogOpen] = useState(false);
   const [activeActivity, setActiveActivity] = useState<any>(null);
   const [historySheetOpen, setHistorySheetOpen] = useState(false);
-  const [historyActivity, setHistoryActivity] = useState<any>(null);
+  const [historyActivityId, setHistoryActivityId] = useState<string | null>(null);
   const [skills, setSkills] = useState<any[]>([]);
   const [skillSearch, setSkillSearch] = useState("");
   const [staffOptions, setStaffOptions] = useState<any[]>([]);
@@ -172,64 +180,28 @@ const TaskDetailPage = () => {
   const [pendingStatusValue, setPendingStatusValue] = useState<boolean | null>(null);
 
   const taskData = task?.data;
+  const historyActivity = taskData?.activities?.find((activity: any) => String(activity._id) === historyActivityId) || null;
   const isProjectTask = Boolean(taskData?.is_project_task);
   const progress = getProgressValue(
     Number(taskData?.completed_activity || 0),
     Number(taskData?.activity_count || 0)
   );
 
-  const historyEntries = useMemo(() => {
-    if (!historyActivity?._id) return [];
 
-    const entries = Array.isArray(historyActivity?.reassignment_history)
-      ? historyActivity.reassignment_history
-      : [];
-    const timelineEntries: any[] = entries
-      .filter((entry: any) => entry?.action === "reassigned")
-      .map((entry: any) => ({
-        ...entry,
-        event_type: "reassigned",
-        event_user: entry?.recipient_id,
-        event_order: 2,
-      }));
-
-    if (historyActivity?.assigned_to?._id) {
-      timelineEntries.push({
-        _id: `assigned-${historyActivity._id}`,
-        event_type: "assigned",
-        event_user: historyActivity.assigned_to,
-        event_order: 1,
-        createdAt: historyActivity.createdAt,
-      });
-    }
-
-    const createdBy = historyActivity?.created_by?._id
-      ? historyActivity.created_by
-      : taskData?.creator_details;
-    if (createdBy?._id) {
-      timelineEntries.push({
-        _id: `created-${historyActivity._id}`,
-        event_type: "created",
-        event_user: createdBy,
-        event_order: 0,
-        createdAt: historyActivity.createdAt,
-      });
-    }
-
-    return timelineEntries.sort((first: any, second: any) => {
-      const timeDifference =
-        new Date(second?.createdAt || 0).getTime() -
-        new Date(first?.createdAt || 0).getTime();
-      return timeDifference || Number(second?.event_order || 0) - Number(first?.event_order || 0);
-    });
-  }, [historyActivity, taskData?.creator_details]);
 
   // Activity form
   const activityForm = useForm<z.infer<typeof activitySchema>>({
-    resolver: zodResolver(activitySchema),
+    resolver: (values, context, options) => {
+      const unchanged = editActivityDialog && editingActivity &&
+        values.start_date === toLocalDateTimeInput(editingActivity.start_date) &&
+        values.end_date === toLocalDateTimeInput(editingActivity.end_date);
+      return zodResolver(unchanged ? activityContentSchema : activitySchema)(values, context, options);
+    },
     defaultValues: {
       activity_name: "",
       description: "",
+      start_date: "",
+      end_date: "",
     },
   });
 
@@ -326,8 +298,12 @@ const TaskDetailPage = () => {
 
   const handleEditActivity = (activity: any) => {
     setEditingActivity(activity);
-    activityForm.setValue("activity_name", activity.activity);
-    activityForm.setValue("description", activity.description || "");
+    activityForm.reset({
+      activity_name: activity.activity,
+      description: activity.description || "",
+      start_date: toLocalDateTimeInput(activity.start_date),
+      end_date: toLocalDateTimeInput(activity.end_date),
+    });
     setEditActivityDialog(true);
   };
 
@@ -372,13 +348,13 @@ const TaskDetailPage = () => {
   };
 
   const handleOpenHistory = (activity: any) => {
-    setHistoryActivity(activity);
+    setHistoryActivityId(String(activity._id));
     setHistorySheetOpen(true);
   };
 
   const handleCloseHistory = () => {
     setHistorySheetOpen(false);
-    setHistoryActivity(null);
+    setHistoryActivityId(null);
   };
 
   const handleSelectSkill = (skill: any) => {
@@ -419,36 +395,52 @@ const TaskDetailPage = () => {
   };
 
   const onActivitySubmit = async (values: z.infer<typeof activitySchema>) => {
-    if (addActivityDialog) {
-      const newActivity = {
-        task_id: params.taskid,
-        activity: values.activity_name,
-        description: values.description,
-      };
-      const res = await AddTaskActivity(newActivity);
-      if (res?.status == 201) {
-        toast.success(res?.data.message);
-      } else {
-        toast.error(res?.data.message);
+    const scheduleChanged = !editActivityDialog ||
+      values.start_date !== toLocalDateTimeInput(editingActivity?.start_date) ||
+      values.end_date !== toLocalDateTimeInput(editingActivity?.end_date);
+    const schedule = scheduleChanged ? {
+      start_date: new Date(values.start_date).toISOString(),
+      end_date: new Date(values.end_date).toISOString(),
+      ...(editActivityDialog ? {
+        expected_start_date: editingActivity.start_date ?? null,
+        expected_end_date: editingActivity.end_date ?? null,
+      } : {}),
+    } : {};
+    try {
+      if (addActivityDialog) {
+        const res = await AddTaskActivity({
+          task_id: params.taskid,
+          activity: values.activity_name,
+          description: values.description,
+          ...schedule,
+        });
+        if (res?.status !== 201) {
+          toast.error(res?.data?.message || "Failed to add activity");
+          return;
+        }
+        toast.success(res.data?.message || "Activity added");
+      } else if (editActivityDialog) {
+        const res = await UpdateTaskActivity({
+          activity_id: editingActivity._id,
+          activity: values.activity_name,
+          description: values.description,
+          is_status: false,
+          ...schedule,
+        });
+        if (res?.status !== 200) {
+          toast.error(res?.message || "Failed to update activity");
+          return;
+        }
+        toast.success(res.message || "Activity updated");
       }
-    } else if (editActivityDialog) {
-      const editData = {
-        activity_id: editingActivity._id,
-        activity: values.activity_name,
-        description: values.description,
-        is_status: false,
-      };
-      const res = await UpdateTaskActivity(editData);
-      if (res?.status == 200) {
-        toast.success(res?.message || "Activity updated.");
-      } else {
-        toast.error(res?.message || "Failed to update activity.");
-      }
+      setAddActivityDialog(false);
+      setEditActivityDialog(false);
+      setEditingActivity(null);
+      activityForm.reset();
+      refetch();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to save activity");
     }
-    setAddActivityDialog(false);
-    setEditActivityDialog(false);
-    setEditingActivity(null);
-    refetch();
   };
 
   const onTaskSubmit = async (values: z.infer<typeof taskSchema>) => {
@@ -622,6 +614,10 @@ const TaskDetailPage = () => {
             <p className="text-base font-semibold text-slate-100">{activity.activity}</p>
             <p className="text-xs text-slate-400">
               {activity.description || "No description."}
+            </p>
+            <p className="mt-2 text-xs text-slate-400">
+              Start: {formatScheduleDate(activity.start_date)}<br />
+              End: {formatScheduleDate(activity.end_date)}
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
               <span className="rounded-md border border-slate-700/70 bg-slate-900/60 px-2 py-1">
@@ -820,15 +816,15 @@ const TaskDetailPage = () => {
               </p>
             </div>
             <div className="rounded-lg border border-slate-800/70 bg-slate-900/60 p-3">
-              <p className="text-[11px] uppercase tracking-wide text-slate-500">Start Date</p>
+              <p className="text-[11px] uppercase tracking-wide text-slate-500">Start · calculated</p>
               <p className="text-sm font-semibold text-slate-100 mt-1">
-                {formatDateTiny(taskData.start_date) || "N/A"}
+                {formatScheduleDate(taskData.start_date)}
               </p>
             </div>
             <div className="rounded-lg border border-slate-800/70 bg-slate-900/60 p-3">
-              <p className="text-[11px] uppercase tracking-wide text-slate-500">End Date</p>
+              <p className="text-[11px] uppercase tracking-wide text-slate-500">End · calculated</p>
               <p className="text-sm font-semibold text-slate-100 mt-1">
-                {formatDateTiny(taskData.end_date) || "N/A"}
+                {formatScheduleDate(taskData.end_date)}
               </p>
             </div>
           </div>
@@ -1101,121 +1097,12 @@ const TaskDetailPage = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Reassignment History Sheet */}
-      <Sheet
+      <ActivityHistorySheet
+        activity={historyActivity}
+        creator={taskData?.creator_details}
         open={historySheetOpen}
         onOpenChange={(open) => (open ? setHistorySheetOpen(true) : handleCloseHistory())}
-      >
-        <SheetContent className="flex w-full flex-col overflow-hidden border-slate-800 bg-slate-950 p-0 [&>button:first-child]:z-20 [&>button:first-child]:bg-slate-800/80 [&>button:first-child]:text-slate-300 sm:max-w-[620px]">
-          <SheetHeader className="shrink-0 border-b border-slate-800 bg-gradient-to-br from-slate-950 via-slate-950 to-cyan-950/30 px-6 py-5 pr-16 text-left">
-            <div className="flex items-center gap-3">
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-cyan-500/30 bg-cyan-500/10 text-cyan-300">
-                <History className="size-5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <SheetTitle className="m-0 text-base text-slate-100">
-                    Reassignment History
-                  </SheetTitle>
-                  <span className="rounded-full border border-slate-700 bg-slate-900/80 px-2 py-0.5 text-[10px] font-medium text-slate-400">
-                    {historyEntries.length} {historyEntries.length === 1 ? "entry" : "entries"}
-                  </span>
-                </div>
-                <SheetDescription className="mt-1 truncate text-xs text-slate-400">
-                  {historyActivity?.activity || "Activity"}
-                </SheetDescription>
-              </div>
-            </div>
-          </SheetHeader>
-
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6">
-            {historyEntries.length === 0 ? (
-              <div className="flex min-h-52 flex-col items-center justify-center rounded-xl border border-dashed border-slate-800 bg-slate-900/30 px-6 text-center">
-                <History className="mb-3 size-8 text-slate-700" />
-                <p className="text-sm font-medium text-slate-300">No reassignment history</p>
-                <p className="mt-1 text-xs text-slate-500">
-                  Staff reassignments will appear here.
-                </p>
-              </div>
-            ) : (
-              <div className="relative">
-                <span
-                  className="absolute bottom-8 left-[11px] top-7 border-l-2 border-dashed border-cyan-700/50 sm:left-[13px]"
-                  aria-hidden="true"
-                />
-                {historyEntries.map((entry: any, index: number) => {
-                  const user = entry?.event_user;
-                  const eventType = entry?.event_type || "reassigned";
-                  const eventLabel =
-                    eventType === "created"
-                      ? "Created by"
-                      : eventType === "assigned"
-                        ? "Assigned to"
-                        : "Reassigned to";
-                  const markerClass =
-                    eventType === "created"
-                      ? "bg-amber-400"
-                      : eventType === "assigned"
-                        ? "bg-cyan-500"
-                        : "bg-emerald-400";
-                  const date = entry?.createdAt ? new Date(entry.createdAt) : null;
-                  const formattedDate =
-                    date && !Number.isNaN(date.getTime())
-                      ? date.toLocaleDateString("en-GB", {
-                          day: "2-digit",
-                          month: "short",
-                          year: "numeric",
-                        })
-                      : "Date unavailable";
-
-                  return (
-                    <section
-                      key={entry?._id || `${entry?.createdAt}-${user?._id}-${index}`}
-                      className="relative pb-10 pl-9 last:pb-0 sm:pl-11"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="h-px min-w-4 flex-1 border-t border-dashed border-cyan-700/60" />
-                        <p className="shrink-0 text-[11px] font-medium text-cyan-300 sm:text-xs">
-                          {eventLabel} <span className="text-slate-400">{formattedDate}</span>
-                        </p>
-                        <span className="h-px min-w-4 flex-1 border-t border-dashed border-cyan-700/60" />
-                      </div>
-
-                      <span
-                        className={`absolute left-[4px] top-[66px] size-4 rounded-full border-2 border-slate-950 shadow-[0_0_0_3px_rgba(15,23,42,1)] sm:left-[6px] ${markerClass}`}
-                        aria-hidden="true"
-                      />
-
-                      <div className="mt-5 flex items-center gap-3 rounded-xl border border-cyan-800/60 bg-gradient-to-br from-cyan-950/60 via-slate-900/80 to-slate-950 p-3.5 shadow-sm shadow-black/20 transition-colors hover:border-cyan-700 sm:p-4">
-                        <Avatar src={user?.avatar_url || "/avatar.png"} size={44} />
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium text-slate-100">
-                            {user?.name || "Unknown staff"}
-                          </p>
-                          <p className="truncate text-xs text-slate-400">
-                            {user?.email || "Email unavailable"}
-                          </p>
-                        </div>
-                        <time
-                          className="hidden shrink-0 rounded-md border border-slate-700/70 bg-slate-950/60 px-2 py-1 text-[10px] text-slate-500 sm:block"
-                          title={formatDateTimeShort(String(entry?.createdAt || ""))}
-                        >
-                          {date && !Number.isNaN(date.getTime())
-                            ? date.toLocaleTimeString("en-US", {
-                                hour: "numeric",
-                                minute: "2-digit",
-                              })
-                            : ""}
-                        </time>
-                      </div>
-                    </section>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </SheetContent>
-      </Sheet>
+      />
 
       {/* Add Activity Sheet */}
       <Sheet open={addActivityDialog} onOpenChange={setAddActivityDialog}>
@@ -1238,7 +1125,7 @@ const TaskDetailPage = () => {
               onSubmit={activityForm.handleSubmit(onActivitySubmit)}
               className="flex min-h-0 flex-1 flex-col"
             >
-              <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-hidden px-6 py-6">
+              <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-6 py-6">
                 <FormField
                   control={activityForm.control}
                   name="activity_name"
@@ -1267,6 +1154,7 @@ const TaskDetailPage = () => {
                     </FormItem>
                   )}
                 />
+                <ActivityScheduleFields disabled={Boolean(editActivityDialog && editingActivity?.is_done)} />
                 <FormField
                   control={activityForm.control}
                   name="description"
@@ -1278,7 +1166,7 @@ const TaskDetailPage = () => {
                       <FormControl>
                         <Textarea
                           placeholder="Write the activity description..."
-                          className="min-h-0 flex-1 resize-none border-slate-700 bg-slate-900/40 p-4 leading-relaxed text-slate-200 focus-visible:border-cyan-600 focus-visible:ring-cyan-700/40"
+                          className="min-h-32 flex-1 resize-none border-slate-700 bg-slate-900/40 p-4 leading-relaxed text-slate-200 focus-visible:border-cyan-600 focus-visible:ring-cyan-700/40"
                           {...field}
                         />
                       </FormControl>
@@ -1327,12 +1215,24 @@ const TaskDetailPage = () => {
               </div>
             </div>
           </SheetHeader>
+          {editingActivity && (
+            <div className="shrink-0 border-b border-slate-800 px-6 py-3">
+              <ChangeActivityDeadlineDialog
+                activity={taskData?.activities?.find((activity: any) => String(activity._id) === String(editingActivity._id)) || editingActivity}
+                onChanged={(period) => {
+                  setEditingActivity((current: any) => ({ ...current, ...period }));
+                  activityForm.setValue("start_date", toLocalDateTimeInput(period.start_date));
+                  activityForm.setValue("end_date", toLocalDateTimeInput(period.end_date));
+                }}
+              />
+            </div>
+          )}
           <Form {...activityForm}>
             <form
               onSubmit={activityForm.handleSubmit(onActivitySubmit)}
               className="flex min-h-0 flex-1 flex-col"
             >
-              <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-hidden px-6 py-6">
+              <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-6 py-6">
                 <FormField
                   control={activityForm.control}
                   name="activity_name"
@@ -1361,6 +1261,7 @@ const TaskDetailPage = () => {
                     </FormItem>
                   )}
                 />
+                <ActivityScheduleFields disabled={Boolean(editActivityDialog && editingActivity?.is_done)} />
                 <FormField
                   control={activityForm.control}
                   name="description"
@@ -1372,7 +1273,7 @@ const TaskDetailPage = () => {
                       <FormControl>
                         <Textarea
                           placeholder="Write the activity description..."
-                          className="min-h-0 flex-1 resize-none border-slate-700 bg-slate-900/40 p-4 leading-relaxed text-slate-200 focus-visible:border-cyan-600 focus-visible:ring-cyan-700/40"
+                          className="min-h-32 flex-1 resize-none border-slate-700 bg-slate-900/40 p-4 leading-relaxed text-slate-200 focus-visible:border-cyan-600 focus-visible:ring-cyan-700/40"
                           {...field}
                         />
                       </FormControl>

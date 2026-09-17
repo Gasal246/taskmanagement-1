@@ -1,3 +1,6 @@
+import { saveCampWithSolutions } from "@/app/api/helpers/camp-solutions";
+import { projectSupportingFieldsSchema } from "@/lib/enquiries/project-classification";
+import { CatalogueValidationError, validateDynamicClassification, validateDynamicSolutions } from "@/lib/enquiries/catalogue-server";
 import connectDB from "@/lib/mongo";
 import Eq_camp_client_company from "@/models/eq_camp_client_company.model";
 import Eq_camp_landlord from "@/models/eq_camp_landlord.model";
@@ -5,11 +8,11 @@ import Eq_camp_realestate from "@/models/eq_camp_realestate.model";
 import Eq_camps from "@/models/eq_camps.model";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
 
 interface Body {
     camp_name: string,
-    camp_type: string,
+    project_sector: string,
+    facility_type: string,
     landlord: string,
     real_estate: string,
     client_company: string,
@@ -29,7 +32,15 @@ interface Body {
 export async function POST(req:NextRequest){
     try{
         const body:Body = await req.json();
+        await connectDB({ throwOnError: true });
+        const classification = await validateDynamicClassification(body);
+        const supporting = projectSupportingFieldsSchema.safeParse(body);
+        if (!supporting.success) return NextResponse.json({ message: supporting.error.issues[0].message, status: 400 }, { status: 400 });
+        if (typeof body.camp_name !== "string" || !body.camp_name.trim()) {
+            return NextResponse.json({ message: "Camp / facility name is required", status: 400 }, { status: 400 });
+        }
         
+        const solutions = await validateDynamicSolutions(body);
         let landlord_id = "";
         let real_estate_id = "";
         let client_company_id = "";
@@ -82,8 +93,9 @@ export async function POST(req:NextRequest){
             realestate_id: real_estate_id || null,
             client_company_id: client_company_id || null,
             headoffice_id: body.headoffice_id || null,
-            camp_type: body.camp_type,
-            camp_name: body.camp_name,
+            ...classification,
+            ...supporting.data,
+            camp_name: body.camp_name.trim(),
             camp_capacity: body.camp_capacity,
             camp_occupancy: body.camp_occupancy,
             visited_status: body.visited_status || "To Visit",
@@ -92,10 +104,11 @@ export async function POST(req:NextRequest){
             is_active: true
         });
 
-        const savedCamp = await newCamp.save();
+        await saveCampWithSolutions(newCamp, solutions);
 
         return NextResponse.json({message: "New camp created", status: 201}, {status: 201});
     }catch(err){
+        if (err instanceof CatalogueValidationError) return NextResponse.json({ message: err.message, status: 400 }, { status: 400 });
         console.log("Error while adding new camp: ", err);
         return NextResponse.json({message:"Internal server error", status: 500}, {status: 500});
     }

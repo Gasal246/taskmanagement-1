@@ -1,5 +1,7 @@
 "use client";
 
+import { formatScheduleDate } from "@/lib/activity-schedule";
+
 import { useEffect, useMemo, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { useRouter } from "next/navigation";
@@ -110,8 +112,6 @@ const taskSchema = z.object({
     .string()
     .min(2, { message: "Task name must be at least 2 characters." }),
   task_description: z.string().optional(),
-  start_date: z.string().optional(),
-  end_date: z.string().optional(),
   status: z.enum(["To Do", "In Progress", "Completed", "Cancelled"]),
 });
 
@@ -120,15 +120,6 @@ const statusClasses: Record<string, string> = {
   "In Progress": "border-amber-500/40 bg-amber-500/10 text-amber-200",
   "To Do": "border-sky-500/40 bg-sky-500/10 text-sky-200",
   Cancelled: "border-slate-500/40 bg-slate-500/20 text-slate-300",
-};
-
-const formatDateTiny = (date?: string) => {
-  if (!date) return "-";
-  return new Date(date).toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
 };
 
 const memberId = (member: TeamMemberRow) =>
@@ -238,8 +229,6 @@ export default function TeamDetailsPage({
     defaultValues: {
       task_name: "",
       task_description: "",
-      start_date: "",
-      end_date: "",
       status: "To Do",
     },
   });
@@ -338,8 +327,6 @@ export default function TeamDetailsPage({
     taskForm.reset({
       task_name: "",
       task_description: "",
-      start_date: "",
-      end_date: "",
       status: "To Do",
     });
     setAddTaskDialog(true);
@@ -357,8 +344,6 @@ export default function TeamDetailsPage({
         assigned_to: [teamId],
         task_name: values.task_name,
         task_description: values.task_description,
-        start_date: values.start_date,
-        end_date: values.end_date,
         status: values.status.trim(),
         business_id: businessId,
         is_project_task: true,
@@ -660,7 +645,7 @@ export default function TeamDetailsPage({
                     </div>
                     <div className="mt-3 flex items-center justify-between text-[11px] text-slate-500">
                       <span>
-                        {formatDateTiny(task?.start_date)} - {formatDateTiny(task?.end_date)}
+                        {formatScheduleDate(task?.start_date)} - {formatScheduleDate(task?.end_date)}
                       </span>
                       <Button
                         size="sm"
@@ -739,40 +724,8 @@ export default function TeamDetailsPage({
                   </FormItem>
                 )}
               />
-              <div className="grid gap-3 sm:grid-cols-2">
-                <FormField
-                  control={taskForm.control}
-                  name="start_date"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs font-semibold text-slate-300">
-                        Start Date
-                      </FormLabel>
-                      <FormControl>
-                        <Input type="date" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={taskForm.control}
-                  name="end_date"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs font-semibold text-slate-300">
-                        End Date
-                      </FormLabel>
-                      <FormControl>
-                        <Input type="date" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
               <p className="rounded-md border border-cyan-900/50 bg-cyan-950/25 px-3 py-2 text-xs text-cyan-100">
-                New project tasks start in To Do.
+                New project tasks start in To Do. Their timeline is calculated after activities are added.
               </p>
               <div className="flex items-center justify-end gap-2">
                 <Button

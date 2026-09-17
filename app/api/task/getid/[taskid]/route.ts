@@ -1,3 +1,4 @@
+import { canEditActivitySchedule } from "@/app/api/helpers/activity-schedule-access";
 import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import Business_Tasks from "@/models/business_tasks.model";
@@ -75,6 +76,8 @@ export async function GET(req:NextRequest, context: {params: Promise<{taskid:str
                 }
                 : null;
 
+            const scheduleActor = await Users.findById(userId).select("name status");
+            const canEditSchedule = await canEditActivitySchedule(req, task, { _id: userId, status: scheduleActor?.status });
             const taskObj = task.toObject();
             const activities = await Task_Activities.find(
                 restrictActivities ? assignedActivityQuery : {task_id: taskid}
@@ -82,6 +85,7 @@ export async function GET(req:NextRequest, context: {params: Promise<{taskid:str
                 .populate({ path: "created_by", select: "name email avatar_url" })
                 .populate({ path: "assigned_to", select: "name email avatar_url" })
                 .populate({ path: "forwarded_to", select: "name email avatar_url" })
+                .populate({ path: "schedule_history.actor_id", select: "name avatar_url" })
                 .populate({ path: "reassignment_history.actor_id", select: "name email avatar_url" })
                 .populate({ path: "reassignment_history.recipient_id", select: "name email avatar_url" })
                 .populate({ path: "reassignment_history.previous_recipient_id", select: "name email avatar_url" })
@@ -89,6 +93,8 @@ export async function GET(req:NextRequest, context: {params: Promise<{taskid:str
             const activitiesWithUnread = await addUnreadCommentCounts(activities, userId);
             if(activities.length > 0 || isAssignedActivityScope) taskObj.activities = activitiesWithUnread.map((activity: any) => ({
                 ...activity,
+                schedule_history: activity.schedule_history || [],
+                canEditSchedule,
                 canChangeStatus: !isAssignedActivityScope || canChangeActivityStatus(task, activity, userId),
             }));
             taskObj.creator_details = await Users.findById(task.creator).select("name email avatar_url");

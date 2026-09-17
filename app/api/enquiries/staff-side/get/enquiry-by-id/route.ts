@@ -16,6 +16,7 @@ import "@/models/eq_city.model";
 import "@/models/eq_area.model";
 import "@/models/eq_camps.model";
 import "@/models/users.model";
+import { getEnquirySolutions, getFacilitySolutions } from "@/app/api/helpers/enquiry-solutions";
 
 connectDB();
 
@@ -42,6 +43,10 @@ export async function GET(req:NextRequest){
         if (!enquiry) return NextResponse.json({ message: "Enquiry not found" }, { status: 404 });
         if (!await canReadEnquiry(enquiry, actor)) return NextResponse.json({ message: "Forbidden" }, { status: 403 });
         const enriched = (await enrichEnquiries([enquiry], actor))[0];
+        const [enquirySolutions, facilitySolutions] = await Promise.all([
+            getEnquirySolutions(enquiry._id),
+            getFacilitySolutions(enquiry?.camp_id?._id || enquiry?.camp_id),
+        ]);
 
         const contacts = await Eq_camp_contacts.find({enquiry_id: enquiry_id}).limit(1);
         const head_office = await Eq_camp_headoffice.findById(enquiry?.camp_id?.headoffice_id).limit(1);
@@ -71,7 +76,7 @@ export async function GET(req:NextRequest){
             || assignedList.some((id: any) => String(id) === actor.actorId)
             || broughtByList.some((id: any) => String(id) === String(session?.user?.id));
 
-        return NextResponse.json({enquiry: enriched, contacts, head_office, external_provider, personal_provider, canForward, hasAssignedAction, canEdit, status: 200}, {status: 200});
+        return NextResponse.json({enquiry: { ...enriched, enquiry_solutions: enquirySolutions, facility_solutions: facilitySolutions }, contacts, head_office, external_provider, personal_provider, canForward, hasAssignedAction, canEdit, status: 200}, {status: 200});
 
     }catch(err){
         console.log("Error while getting Enquiry By ID: ", err);

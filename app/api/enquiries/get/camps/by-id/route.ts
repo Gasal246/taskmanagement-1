@@ -1,3 +1,5 @@
+import Eq_camp_solutions from "@/models/eq_camp_solutions.model";
+import { EMPTY_CAMP_SOLUTIONS } from "@/lib/enquiries/solutions";
 import connectDB from "@/lib/mongo";
 import Eq_camp_contacts from "@/models/eq_camp_contacts.model";
 import Eq_camps from "@/models/eq_camps.model";
@@ -49,7 +51,15 @@ export async function GET(req:NextRequest){
 
             const contacts = await Eq_camp_contacts.find({camp_id: camp_id}).lean();
 
-        return NextResponse.json({camp, contacts, status: 200}, {status: 200});
+        const mapping: any = await Eq_camp_solutions.findOne({ camp_id }).lean();
+        const solutions = mapping ? {
+            solutions_required: mapping.solutions_required,
+            solution_details: mapping.solution_details || [],
+            solution_other: mapping.solution_other,
+            primary_solution: mapping.primary_solution,
+            commercial_model: mapping.commercial_model,
+        } : EMPTY_CAMP_SOLUTIONS;
+        return NextResponse.json({camp: camp ? { ...camp, ...solutions } : camp, contacts, status: 200}, {status: 200});
     }catch(err){
         console.log("Error while getting camp by id: ", err);
         return NextResponse.json({message: "Internal Server Error", status: 500}, {status: 500});

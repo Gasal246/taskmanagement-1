@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
 import { DEPARTMENT_TYPES } from "@/lib/constants";
 import {
   useGetAreasandDeptsForRegion,
@@ -20,6 +21,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import CampClassificationFields from "@/components/enquiries/CampClassificationFields";
+import CampSolutionsFields from "@/components/enquiries/CampSolutionsFields";
+import {
+  sectorFieldValuesRecord,
+  solutionDetailsRecord,
+} from "@/lib/enquiries/catalogue";
+import { isValidProjectCapacity } from "@/lib/projects/capacity";
 
 const dateInput = (value?: string) =>
   value ? new Date(value).toISOString().slice(0, 10) : "";
@@ -46,6 +54,26 @@ export default function EditProjectDialog({
     client_id: project?.client_id?._id?.toString?.() || "",
     region_id: project?.region?._id?.toString?.() || project?.region_id?.toString?.() || "",
     area_id: project?.area?._id?.toString?.() || project?.area_id?.toString?.() || "",
+    facility_capacity: project?.facility_capacity === null || project?.facility_capacity === undefined
+      ? ""
+      : String(project.facility_capacity),
+    facility_occupancy: project?.facility_occupancy === null || project?.facility_occupancy === undefined
+      ? ""
+      : String(project.facility_occupancy),
+  });
+  const catalogueForm = useForm({
+    defaultValues: {
+      project_sector: project?.project_sector || "",
+      facility_type: project?.facility_type || "",
+      facility_type_detail: project?.facility_type_detail || project?.facility_type_other || "",
+      facility_type_other: project?.facility_type_other || project?.facility_type_detail || "",
+      sector_field_values: sectorFieldValuesRecord(project?.sector_field_values),
+      solutions_required: Array.isArray(project?.solutions_required) ? project.solutions_required : [],
+      solution_details: solutionDetailsRecord(project?.solution_details, project?.solution_other),
+      solution_other: project?.solution_other || "",
+      primary_solution: project?.primary_solution || "",
+      commercial_model: project?.commercial_model || "To Be Determined",
+    },
   });
   const [clients, setClients] = useState<any[]>([]);
   const [regions, setRegions] = useState<any[]>([]);
@@ -98,22 +126,35 @@ export default function EditProjectDialog({
       toast.error("Description must be at least 10 characters.");
       return;
     }
+    if (!isValidProjectCapacity(form.facility_capacity)) {
+      toast.error("Capacity must be a positive number, range, or limit.");
+      return;
+    }
+    if (form.facility_occupancy !== "" && (!Number.isFinite(Number(form.facility_occupancy)) || Number(form.facility_occupancy) < 0)) {
+      toast.error("Occupancy must be a positive number or zero.");
+      return;
+    }
+    if (!(await catalogueForm.trigger())) {
+      toast.error("Please correct the Project Sector, Facility Type, and Solutions fields.");
+      return;
+    }
     const response = await updateProject({
       project_id: project._id,
       ...form,
+      ...catalogueForm.getValues(),
     });
     if (response?.status === 200) {
       toast.success("Project updated.");
       await onSaved();
       onOpenChange(false);
     } else {
-      toast.error("Unable to update project.");
+      toast.error(response?.data?.message || "Unable to update project.");
     }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[calc(100dvh-40px)] w-[calc(100vw-1.5rem)] max-w-2xl flex-col overflow-hidden">
+      <DialogContent className="flex max-h-[calc(100dvh-40px)] w-[calc(100vw-1.5rem)] max-w-4xl flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle>Update Project</DialogTitle>
           <DialogDescription>
@@ -221,6 +262,51 @@ export default function EditProjectDialog({
               </select>
             </div>
           ))}
+          <div className="space-y-1">
+            <Label htmlFor="facility_capacity">Capacity</Label>
+            <Input
+              id="facility_capacity"
+              inputMode="decimal"
+              value={form.facility_capacity}
+              onChange={(event) => setField("facility_capacity", event.target.value)}
+              placeholder="Enter capacity"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="facility_occupancy">Occupancy</Label>
+            <Input
+              id="facility_occupancy"
+              type="number"
+              min="0"
+              step="1"
+              inputMode="numeric"
+              value={form.facility_occupancy}
+              onChange={(event) => setField("facility_occupancy", event.target.value)}
+              placeholder="Enter occupancy"
+            />
+          </div>
+          <section className="space-y-4 rounded-xl border border-slate-800 bg-slate-950/30 p-4 sm:col-span-2">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-100">
+                Project Sector and Facility Type
+              </h3>
+              <p className="mt-1 text-xs text-slate-400">
+                Classification options are loaded from Facility Settings.
+              </p>
+            </div>
+            <CampClassificationFields
+              control={catalogueForm.control}
+              watch={catalogueForm.watch}
+              setValue={catalogueForm.setValue}
+            />
+          </section>
+          <section className="rounded-xl border border-slate-800 bg-slate-950/30 p-4 sm:col-span-2">
+            <CampSolutionsFields
+              control={catalogueForm.control}
+              watch={catalogueForm.watch}
+              setValue={catalogueForm.setValue}
+            />
+          </section>
         </div>
         <div className="flex justify-end gap-2 pt-3">
           <Button variant="ghost" onClick={() => onOpenChange(false)}>

@@ -15,13 +15,18 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Avatar } from 'antd';
 import Cookies from 'js-cookie';
 import { motion } from 'framer-motion';
-import { CalendarCheck, Check, CheckCircle2, MapPinned, Plus, Sparkles } from 'lucide-react';
+import { Building2, CalendarCheck, Check, CheckCircle2, MapPinned, Plus, Sparkles } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useSelector } from 'react-redux';
 import { toast } from 'sonner';
 import * as z from 'zod';
+import CampClassificationFields from '@/components/enquiries/CampClassificationFields';
+import CampSolutionsFields from '@/components/enquiries/CampSolutionsFields';
+import { sectorFieldValuesRecord, solutionDetailsRecord } from '@/lib/enquiries/catalogue';
+import ProjectCapacityFields from '@/components/projects/ProjectCapacityFields';
+import { isValidProjectCapacity, isValidProjectOccupancy } from '@/lib/projects/capacity';
 
 const formSchema = z.object({
   project_name: z.string().min(1, "Project name is required"),
@@ -34,7 +39,19 @@ const formSchema = z.object({
   priority: z.string().optional(),
   region_id: z.string(),
   area_id: z.string().nullable().optional(),
-  project_head: z.string().min(1, "Project head is required")
+  project_head: z.string().min(1, "Project head is required"),
+  project_sector: z.string().min(1, "Project Sector is required"),
+  facility_type: z.string().min(1, "Facility Type is required"),
+  facility_type_detail: z.string().optional(),
+  facility_type_other: z.string().optional(),
+  sector_field_values: z.record(z.string()).default({}),
+  solutions_required: z.array(z.string()).default([]),
+  solution_details: z.record(z.string()).default({}),
+  solution_other: z.string().optional(),
+  primary_solution: z.string().optional(),
+  commercial_model: z.string().default("To Be Determined"),
+  facility_capacity: z.string().trim().refine(isValidProjectCapacity, "Enter a valid capacity"),
+  facility_occupancy: z.string().trim().refine(isValidProjectOccupancy, "Enter a valid occupancy"),
 });
 
 const formatSummaryValue = (value: any, fallback = "Not specified") => {
@@ -114,7 +131,19 @@ const AddNewProject = () => {
       priority: "normal",
       region_id: "",
       area_id: "",
-      project_head: ""
+      project_head: "",
+      project_sector: "",
+      facility_type: "",
+      facility_type_detail: "",
+      facility_type_other: "",
+      sector_field_values: {},
+      solutions_required: [],
+      solution_details: {},
+      solution_other: "",
+      primary_solution: "",
+      commercial_model: "To Be Determined",
+      facility_capacity: "",
+      facility_occupancy: "",
     },
   });
 
@@ -136,6 +165,7 @@ const AddNewProject = () => {
     if (!enquiryPrefill?.enquiry) return;
 
     const camp = enquiryCampPrefill?.camp || enquiryPrefill?.enquiry?.camp_id;
+    const projectSolutions = enquiryPrefill?.enquiry?.enquiry_solutions || camp || {};
     form.reset({
       project_name: camp?.camp_name || enquiryPrefill?.enquiry?.camp_id?.camp_name || "",
       project_description: buildProjectDescriptionFromEnquiry({
@@ -151,6 +181,22 @@ const AddNewProject = () => {
       region_id: "",
       area_id: "",
       project_head: "",
+      project_sector: camp?.project_sector || "",
+      facility_type: camp?.facility_type || "",
+      facility_type_detail: camp?.facility_type_detail || camp?.facility_type_other || "",
+      facility_type_other: camp?.facility_type_other || camp?.facility_type_detail || "",
+      sector_field_values: sectorFieldValuesRecord(camp?.sector_field_values),
+      solutions_required: projectSolutions?.solutions_required || [],
+      solution_details: solutionDetailsRecord(projectSolutions?.solution_details, projectSolutions?.solution_other),
+      solution_other: projectSolutions?.solution_other || "",
+      primary_solution: projectSolutions?.primary_solution || "",
+      commercial_model: projectSolutions?.commercial_model || "To Be Determined",
+      facility_capacity: camp?.camp_capacity === null || camp?.camp_capacity === undefined
+        ? ""
+        : String(camp.camp_capacity),
+      facility_occupancy: camp?.camp_occupancy === null || camp?.camp_occupancy === undefined
+        ? ""
+        : String(camp.camp_occupancy),
     });
 
     prefillAppliedRef.current = enquiryId;
@@ -400,6 +446,23 @@ const AddNewProject = () => {
                         </FormItem>
                       )}
                     />
+                  </div>
+                </div>
+
+                <div className="space-y-4 rounded-xl border border-slate-800 bg-slate-950/30 p-4">
+                  <div className="flex items-center gap-2 text-xs text-slate-300">
+                    <Building2 size={14} className="text-cyan-300" />
+                    <span className="font-semibold">Project Sector, Facility Type and Solutions</span>
+                  </div>
+                  {enquiryId && (
+                    <p className="text-xs text-slate-400">
+                      These values are copied from the enquiry and its linked Facility.
+                    </p>
+                  )}
+                  <ProjectCapacityFields control={form.control} disabled={Boolean(enquiryId)} />
+                  <CampClassificationFields control={form.control} watch={form.watch} setValue={form.setValue} disabled={Boolean(enquiryId)} />
+                  <div className="border-t border-slate-800 pt-4">
+                    <CampSolutionsFields control={form.control} watch={form.watch} setValue={form.setValue} disabled={Boolean(enquiryId)} />
                   </div>
                 </div>
 
@@ -655,6 +718,16 @@ const AddNewProject = () => {
                 <div>
                   <p className="text-[11px] text-slate-500">Client</p>
                   <p className="text-slate-300">{summaryValues.client_id ? selectedClientName : "-"}</p>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-[11px] text-slate-500">Capacity</p>
+                    <p className="text-slate-300">{summaryValues.facility_capacity || "-"}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] text-slate-500">Occupancy</p>
+                    <p className="text-slate-300">{summaryValues.facility_occupancy || "-"}</p>
+                  </div>
                 </div>
                 <div>
                   <p className="text-[11px] text-slate-500">Project Head</p>

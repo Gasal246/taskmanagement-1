@@ -1,4 +1,6 @@
 import { auth } from "@/auth";
+import { CatalogueValidationError } from "@/lib/enquiries/catalogue-server";
+import { resolveProjectCatalogueForCreate } from "@/lib/projects/catalogue";
 import connectDB from "@/lib/mongo";
 import Business_Project from "@/models/business_project.model";
 import Eq_enquiry from "@/models/eq_enquiries.model";
@@ -26,6 +28,8 @@ export async function POST(req:NextRequest){
         if(!session) return NextResponse.json({message: "Unauthorized Access", status: 401}, {status: 200});
         
         const enquiry = await Eq_enquiry.findById(body.enquiry_id).populate("camp_id");
+        if (!enquiry) return NextResponse.json({message: "Enquiry not found", status: 404}, {status: 404});
+        const catalogueFields = await resolveProjectCatalogueForCreate(body);
         
         const prioirty = enquiry.prioirty < 3 ? "low" : enquiry.prioirty > 3 && enquiry.prioirty < 7 ? "normal" : "high"
         
@@ -42,7 +46,8 @@ export async function POST(req:NextRequest){
             type: body.type,
             approved_by: session?.user?.id,
             admin_id: session?.user?.id,
-            prioirty: prioirty
+            prioirty: prioirty,
+            ...catalogueFields,
         });
 
         const saved = await newProject.save();
@@ -52,6 +57,9 @@ export async function POST(req:NextRequest){
         return NextResponse.json({message: "Project Added", status: 200, project_id: saved._id}, {status: 200});
 
     }catch(err){
+        if (err instanceof CatalogueValidationError) {
+            return NextResponse.json({message: err.message, status: 400}, {status: 400});
+        }
         console.log("Error while Converting Enquiry to Project: ", err);
         return NextResponse.json({message: "Internal Server Error", status: 500}, {status: 500});
         

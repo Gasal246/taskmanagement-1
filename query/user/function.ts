@@ -288,6 +288,7 @@ export async function GetAllUserTodos(){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -298,6 +299,7 @@ export async function PostTodo(payload:any){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -308,6 +310,7 @@ export async function CheckTodo(payload: any){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -316,8 +319,25 @@ export async function DeleteTodo(todo_id: string){
     try{
         const res = await axios.delete(`/api/todo/delete?todo_id=${todo_id}`);
         return res.data;
-    }catch(errr){
-        console.log(errr);
+    }catch(err){
+        console.log(err);
+        throw err;
+    }
+}
+
+//Update User Todo details
+export async function UpdateTodo(payload: {
+    todo_id: string;
+    content?: string;
+    priority?: "low" | "medium" | "high";
+    due_date?: string | null;
+}){
+    try{
+        const res = await axios.patch("/api/todo/update", payload);
+        return res.data;
+    }catch(err){
+        console.log(err);
+        throw err;
     }
 }
 

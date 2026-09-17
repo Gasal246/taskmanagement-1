@@ -13,6 +13,9 @@ import Notifications from "@/models/notifications.model";
 import FcmTokens from "@/models/fcm_tokens.model";
 import { getAdminMessaging } from "@/lib/firebaseAdmin";
 import { NextRequest, NextResponse } from "next/server";
+import Eq_enquiry_solutions from "@/models/eq_enquiry_solutions.model";
+import Eq_camp_solutions from "@/models/eq_camp_solutions.model";
+import { enquiryActor } from "@/lib/enquiries/completion-server";
 
 connectDB();
 
@@ -23,6 +26,9 @@ interface IBody {
 
 export async function PUT(req:NextRequest){
     try{
+        const actor = await enquiryActor();
+        if (!actor) return NextResponse.json({ message: "Unauthorized", status: 401 }, { status: 401 });
+        if (!actor.admin) return NextResponse.json({ message: "Only an administrator can match Facilities", status: 403 }, { status: 403 });
         const body: IBody = await req.json();
 
         const enquiry: any = await Eq_enquiry.findById(body.enquiry_id)
@@ -114,6 +120,7 @@ export async function PUT(req:NextRequest){
 
         if (oldCampId && oldCampId !== body.camp_id) {
             await Eq_camps.findByIdAndDelete(oldCampId);
+            await Eq_camp_solutions.deleteOne({ camp_id: oldCampId });
         }
 
         await Promise.all([
@@ -125,6 +132,7 @@ export async function PUT(req:NextRequest){
             Eq_Enquiry_Personal_Wifi_Edit.deleteMany({ enquiry_id: body.enquiry_id }),
             Eq_Enquiry_Edit.deleteMany({ enquiry_id: body.enquiry_id }),
             Eq_camp_contacts.deleteMany({ enquiry_id: body.enquiry_id }),
+            Eq_enquiry_solutions.deleteOne({ enquiry_id: body.enquiry_id }),
             Eq_enquiry.findByIdAndDelete(body.enquiry_id),
         ]);
 

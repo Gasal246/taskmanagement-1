@@ -1,4 +1,6 @@
 import { auth } from "@/auth";
+import { CatalogueValidationError } from "@/lib/enquiries/catalogue-server";
+import { resolveProjectCatalogueForCreate } from "@/lib/projects/catalogue";
 import connectDB from "@/lib/mongo";
 import { ObjectId } from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
@@ -36,7 +38,19 @@ interface Body {
     role_id: string,
     dept_id: string | null,
     project_head: string | null,
-    enquiry_id?: string | null
+    enquiry_id?: string | null,
+    project_sector: string,
+    facility_type: string,
+    facility_type_detail?: string,
+    facility_type_other?: string,
+    sector_field_values?: Record<string, string>,
+    solutions_required?: string[],
+    solution_details?: Record<string, string>,
+    solution_other?: string,
+    primary_solution?: string,
+    commercial_model?: string,
+    facility_capacity?: string | null,
+    facility_occupancy?: number | string | null
 }
 
 const updateLinkedEnquiryIfNeeded = async (enquiry_id: string | null | undefined, actorId: string) => {
@@ -57,6 +71,7 @@ export async function POST(req: NextRequest){
 
         const username = await Users.findById(session?.user?.id).select("name");
         const body = await req.json() as Body;
+        const catalogueFields = await resolveProjectCatalogueForCreate(body);
         //const user = await User_roles.findById(session?.user?.id).populate("role_id", "role_name");
         const userRole = await Roles.findById(body?.role_id);
         if(userRole?.role_name == "BUSINESS_ADMIN"){
@@ -77,6 +92,7 @@ export async function POST(req: NextRequest){
                 admin_id: session?.user?.id,
                 type: body.type,
                 priority: body.priority,
+                ...catalogueFields,
                 region_id: body.region_id,
                 area_id: body.area_id || null
             })
@@ -121,6 +137,7 @@ export async function POST(req: NextRequest){
                         is_approved: false,
                         type: body.type,
                         priority: body.priority,
+                        ...catalogueFields,
                         region_id: isSales?.reg_dep_id?.region_id,
                         department_id: body.dept_id
                     })
@@ -155,6 +172,7 @@ export async function POST(req: NextRequest){
                         is_approved: false,
                         type: body.type,
                         priority: body.priority,
+                        ...catalogueFields,
                         region_id: isSalesArea?.area_dep_id?.region_id,
                         area_id: isSalesArea?.area_dep_id?.area_id,
                         department_id: body.dept_id
@@ -189,6 +207,7 @@ export async function POST(req: NextRequest){
                         is_approved: false,
                         type: body.type,
                         priority: body.priority,
+                        ...catalogueFields,
                         region_id: isSalesLocation?.location_dep_id?.region_id,
                         area_id: isSalesLocation?.location_dep_id?.area_id,
                         location_id: isSalesLocation?.location_dep_id?.location_id,
@@ -222,6 +241,7 @@ export async function POST(req: NextRequest){
                         is_approved: false,
                         type: body.type,
                         priority: body.priority,
+                        ...catalogueFields,
                         region_id: isRegionSales?.region_dep_id?.region_id,
                         department_id: body.dept_id
                     });
@@ -253,6 +273,7 @@ export async function POST(req: NextRequest){
                         is_approved: false,
                         type: body.type,
                         priority: body.priority,
+                        ...catalogueFields,
                         region_id: isAreaSalesStaff?.area_dep_id?.region_id,
                         area_id: isAreaSalesStaff?.area_dep_id?.area_id,
                         department_id: body.dept_id
@@ -285,6 +306,7 @@ export async function POST(req: NextRequest){
                         is_approved: false,
                         type: body.type,
                         priority: body.priority,
+                        ...catalogueFields,
                         region_id: isLocSalesStaff?.location_dep_id?.region_id,
                         area_id: isLocSalesStaff?.location_dep_id?.area_id,
                         location_id: isLocSalesStaff?.location_dep_id?.location_id,
@@ -307,6 +329,7 @@ export async function POST(req: NextRequest){
 
         return NextResponse.json({ message: "Project created successfully", status:201}, { status: 201 });
     } catch(err: any){
+        if (err instanceof CatalogueValidationError) return NextResponse.json({ message: err.message, status: 400 }, { status: 400 });
         console.log("Error while adding a new project: ", err);
         return new NextResponse(err.message, { status: 500 });
     }

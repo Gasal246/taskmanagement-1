@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import React, { useEffect, useState } from 'react'
 import { Popover, PopoverContent, PopoverTrigger, } from "@/components/ui/popover";
 import { motion } from 'framer-motion';
-import { Bell, CircleUser } from 'lucide-react';
+import { Bell, CircleUser, ListTodo } from 'lucide-react';
 import { ExitIcon } from '@radix-ui/react-icons';
 import NotificationPane from '../shared/NotificationPane';
 import Cookies from "js-cookie";
@@ -139,6 +139,9 @@ const StaffTopbar = () => {
                         />
                         <motion.button onClick={() => router.push(`/staff/profile`)} whileTap={{ scale: 0.98 }} className='w-full rounded-lg bg-secondary/70 px-2 py-1.5 text-sm flex gap-1 items-center justify-center transition-colors hover:bg-slate-800'>
                             <CircleUser size={16} strokeWidth={2} /> Profile
+                        </motion.button>
+                        <motion.button onClick={() => router.push(`/staff/todo`)} whileTap={{ scale: 0.98 }} className='w-full rounded-lg bg-secondary/70 px-2 py-1.5 text-sm flex gap-1 items-center justify-center transition-colors hover:bg-slate-800'>
+                            <ListTodo size={16} strokeWidth={2} /> Personal Todo
                         </motion.button>
                         <Popconfirm
                             title="SignOut  TaskManager"

@@ -4,6 +4,11 @@ import { NextRequest, NextResponse } from "next/server";
 import Flow_Log from "@/models/Flow_Log.model";
 import Users from "@/models/users.model";
 import { authorizeProjectRequest } from "@/app/api/helpers/project-access";
+import {
+    validateProjectCapacity,
+    validateProjectCatalogue,
+} from "@/lib/projects/catalogue";
+import { CatalogueValidationError } from "@/lib/enquiries/catalogue-server";
 
 connectDB();
 
@@ -18,7 +23,19 @@ interface Body {
     type: string,
     client_id?: string | null,
     region_id?: string | null,
-    area_id?: string | null
+    area_id?: string | null,
+    facility_capacity?: number | string | null,
+    facility_occupancy?: number | string | null,
+    project_sector?: string,
+    facility_type?: string,
+    facility_type_detail?: string,
+    facility_type_other?: string,
+    sector_field_values?: Record<string, string>,
+    solutions_required?: string[],
+    solution_details?: Record<string, string>,
+    solution_other?: string,
+    primary_solution?: string,
+    commercial_model?: string
 }
 
 export async function PUT(req: NextRequest) {
@@ -29,6 +46,12 @@ export async function PUT(req: NextRequest) {
         const authorization = await authorizeProjectRequest(body.project_id, "manage");
         if (!authorization.ok) return authorization.response;
         const user = await Users.findById(authorization.userId).select("name");
+        const existingProject: any = await Business_Project.findById(body.project_id).lean();
+        if (!existingProject) {
+            return NextResponse.json({ message: "Project not found" }, { status: 404 });
+        }
+        const capacityFields = validateProjectCapacity(body);
+        const catalogueFields = await validateProjectCatalogue(body, existingProject);
 
         const updateData: Record<string, any> = {
             project_name: body.project_name,
@@ -37,7 +60,10 @@ export async function PUT(req: NextRequest) {
             start_date: body.start_date,
             end_date: body.end_date,
             type: body.type,
-            priority: body.priority
+            priority: body.priority,
+            ...catalogueFields,
+            facility_capacity: capacityFields.facility_capacity,
+            facility_occupancy: capacityFields.facility_occupancy,
         };
 
         if (body.region_id !== undefined) {
@@ -52,11 +78,11 @@ export async function PUT(req: NextRequest) {
             updateData.area_id = body.area_id === "" ? null : body.area_id;
         }
 
-        const projectToUpdate = await Business_Project.findByIdAndUpdate(body.project_id, {
+        await Business_Project.findByIdAndUpdate(body.project_id, {
             $set: updateData
         });
 
-        if (body.status == "completed" && projectToUpdate.status != "completed") {
+        if (body.status == "completed" && existingProject.status != "completed") {
             const completedFlow = new Flow_Log({
                 user_id: authorization.userId,
                 Log: `Project Marked as Completed by - ${user.name}`,
@@ -79,6 +105,9 @@ export async function PUT(req: NextRequest) {
         return NextResponse.json({ message: "Project Updated" }, { status: 200 });
     } catch (err) {
         console.log("error while updating project", err);
+        if (err instanceof CatalogueValidationError) {
+            return NextResponse.json({ message: err.message }, { status: err.status });
+        }
         return NextResponse.json({ message: "Internal Server Error" }, { status: 500 });
     }
 }

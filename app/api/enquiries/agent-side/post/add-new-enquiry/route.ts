@@ -1,12 +1,14 @@
-import { preserveInitialAction } from "@/lib/enquiries/completion-server";
 import { auth } from "@/auth";
+import connectDB from "@/lib/mongo";
+import { preserveInitialAction } from "@/lib/enquiries/completion-server";
+import { validateEnquiryFacilityPayload, solutionFields } from "@/lib/enquiries/facility-payload";
+import { CatalogueValidationError } from "@/lib/enquiries/catalogue-server";
+import { formatEnquiryUuid } from "@/lib/enquiries/enquiry-uuid";
 import Admin_assign_business from "@/models/admin_assign_business.model";
 import Business_staffs from "@/models/business_staffs.model";
-import { getCampVisitedStatusFromEnquiryStatus } from "@/lib/enquiries/camp-visited-status";
-import connectDB from "@/lib/mongo";
 import Eq_area from "@/models/eq_area.model";
 import Eq_camp_client_company from "@/models/eq_camp_client_company.model";
-import Eq_camp_contacts, { IEq_camp_contacts } from "@/models/eq_camp_contacts.model";
+import Eq_camp_contacts from "@/models/eq_camp_contacts.model";
 import Eq_camp_headoffice from "@/models/eq_camp_headoffice.model";
 import Eq_camp_landlord from "@/models/eq_camp_landlord.model";
 import Eq_camp_realestate from "@/models/eq_camp_realestate.model";
@@ -17,422 +19,185 @@ import Eq_enquiry_comments from "@/models/eq_enquiry_comments.model";
 import Eq_enquiry_wifi_external from "@/models/eq_enquiry_wifi_external.model";
 import Eq_enquiry_wifi_personal from "@/models/eq_enquiry_wifi_personal.model";
 import Eq_region from "@/models/eq_region.model";
-import { Decimal128, Types } from "mongoose";
+import { saveEnquirySolutions, saveFacilitySolutions } from "@/app/api/helpers/enquiry-solutions";
+import mongoose from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
+import { ZodError } from "zod";
 
 connectDB();
 
-interface Body {
-    country: string,
-    region: string,
-    province: string,
-    city: string,
-    area: string,
-    camp: string,
-    latitude: string,
-    longitude: string,
-    
-    //enquiry modes
-    area_input_mode: string,
-    camp_input_mode: string,
-
-    //New Area Req
-    area_name_request: string,
-
-    //Enquiry details
-    contacts : [],
-    priority: number,
-    competition_status: string,
-    competition_notes: string,
-    followup_status: string,
-
-    //Head Office Details
-    head_office_address: string | null,
-    head_office_contact: string | null,
-    head_office_details: string | null,
-    head_office_location: string | null,
-    selected_head_office_id?: string | null,
-
-    //Other camp details
-    landlord: string | null,
-    real_estate: string | null,
-    client_company: string | null,
-
-    //Camp details
-    camp_name_request: string | null,
-    camp_type: string | null,
-    camp_capacity: string | null,
-    camp_occupancy: number | null,
-
-
-    //Dates
-    alert_date: Date,
-    lease_expiry_due: Date,
-    next_action: string,
-    next_action_due: Date,
-    comments: string,
-    rent_terms: string,
-
-    //Wifi Details
-    wifi_available: string,
-    wifi_type: string | null,
-    other_wifi_details: string | null,
-
-    //No wifi
-    expected_monthly_price: Decimal128 | null,
-
-    //External Wifi
-    wifi_plan: string | null,
-    plain_points: string | null,
-    speed_mbps: number | null,
-    contract_start: Date | null,
-    contract_expiry: Date | null,
-    contractor_name: string | null,
-
-    //Personal Wifi
-    provider_plan: string | null,
-    personal_wifi_start: Date | null,
-    personal_wifi_expiry: Date | null,
-    personal_wifi_price: Decimal128 | null,
-
-    enquiry_brought_by?: string[],
-    meeting_initiated_by?: string[],
-    project_closed_by?: string[],
-    project_managed_by?: string[],
-    enquiry_user_notes?: string
-
+class RequestError extends Error {
+  constructor(public status: number, message: string) { super(message); }
 }
 
-export async function POST(req:NextRequest){
-    try{
+function text(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
 
-        const session:any = await auth();
-        if(!session) return NextResponse.json({message: "Unauthorized Access", status: 401}, {status: 401});
+async function findOrCreate(model: any, query: any, create: any, session: mongoose.ClientSession) {
+  const existing = await model.findOne(query).session(session);
+  if (existing) return existing._id;
+  const [saved] = await model.create([create], { session });
+  return saved._id;
+}
 
-        const body:Body = await req.json();
-        if (body.followup_status === "Closed") return NextResponse.json({ message: "Create the enquiry first, then record completed actions", status: 400 }, { status: 400 });
-        const businessAssignment: any =
-            (session?.user?.id
-                ? await Business_staffs.findOne({ user_id: session.user.id, status: 1 }).select("business_id").lean()
-                : null) ||
-            (session?.user?.id
-                ? await Admin_assign_business.findOne({ user_id: session.user.id, status: 1 }).select("business_id").lean()
-                : null);
-        const businessId = businessAssignment?.business_id || null;
-        const wifiAvailability = body.wifi_available === "Yes"
-            ? true
-            : body.wifi_available === "No"
-                ? false
-                : null;
+async function createUuid(body: any, projectSectorKey: string, session: mongoose.ClientSession) {
+  const now = new Date();
+  const [country, region]: any[] = await Promise.all([
+    Eq_Countries.findById(body.country).select("country_name").session(session).lean(),
+    Eq_region.findById(body.region).select("region_name").session(session).lean(),
+  ]);
+  let prefix = country?.country_name === "KSA" ? "KSA" : country?.country_name === "UAE" ? "UAE" : country?.country_name === "Oman" ? "OMN" : "EQ";
+  if (prefix === "KSA") {
+    const regionCode: Record<string, string> = {
+      "central region": "CR", "eastern region": "ER", "western region": "WR", "southern region": "SR",
+    };
+    const code = regionCode[String(region?.region_name || "").toLowerCase()];
+    if (code) prefix += `-${code}`;
+  }
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+  const count = await Eq_enquiry.countDocuments({ createdAt: { $gte: start, $lte: end }, country_id: body.country, region_id: body.region }).session(session);
+  return formatEnquiryUuid(prefix, projectSectorKey, now, count + 1);
+}
 
-        let areaId = body.area;
-        let campId = body.camp;
+export async function POST(req: NextRequest) {
+  const sessionData: any = await auth();
+  if (!sessionData?.user?.id) return NextResponse.json({ message: "Unauthorized Access", status: 401 }, { status: 401 });
 
-        let uuid = "";
-        const now = new Date();
+  const dbSession = await mongoose.startSession();
+  try {
+    const body: any = await req.json();
+    if (body.followup_status === "Closed") throw new RequestError(400, "Create the enquiry first, then record completed actions");
+    const facility = await validateEnquiryFacilityPayload(body);
+    const solutions = solutionFields(facility);
+    const requestingFacility = facility.area_input_mode === "new" || facility.camp_input_mode === "new";
+    let savedEnquiryId = "";
 
-        const day = String(now.getDate()).padStart(2, "0");
-        const month = String(now.getMonth() + 1).padStart(2, "0");
-        const year = now.getFullYear();
+    await dbSession.withTransaction(async () => {
+      let areaId: any = facility.area_input_mode === "existing" ? body.area : null;
+      let campId: any = facility.camp_input_mode === "existing" && facility.area_input_mode === "existing" ? facility.camp : null;
+      let projectSectorKey = facility.project_sector || "";
 
-        const country = await Eq_Countries.findById(body.country).select("country_name");
-        const region = await Eq_region.findById(body.region).select("region_name");
+      if (campId) {
+        const existingCamp: any = await Eq_camps.findOne({ _id: campId, is_active: true }).session(dbSession).lean();
+        if (!existingCamp) throw new RequestError(400, "Select an active Facility");
+        if (await Eq_enquiry.exists({ camp_id: campId }).session(dbSession)) throw new RequestError(409, "Enquiry already added for this Facility");
+        areaId = existingCamp.area_id;
+        body.country = String(existingCamp.country_id || body.country || "");
+        body.region = String(existingCamp.region_id || body.region || "");
+        body.province = String(existingCamp.province_id || body.province || "");
+        body.city = String(existingCamp.city_id || body.city || "");
+        projectSectorKey = String(existingCamp.project_sector || "");
+      }
 
-        switch(country?.country_name){
-            case "KSA": {
-                uuid = "KSA"
-                switch((region?.region_name || "").toLowerCase()){
-                    case "central region": {
-                        uuid += "-CR";
-                        break;
-                    }
-                    case "eastern region": {
-                        uuid += "-ER";
-                        break;
-                    }
-                    case "western region": {
-                        uuid += "-WR";
-                        break;
-                    }
-                    case "southern region": {
-                        uuid += "-SR";
-                        break;
-                    }
-                }
-                break;
-            }
-            case "UAE": {
-                uuid = "UAE"
-                break;
-            }
-            case "Oman": {
-                uuid = "OMN"
-                break;
-            }
-            default: {
-                uuid = "EQ";
-                break;
-            }
+      if (facility.area_input_mode === "new") {
+        if (!text(facility.area_name_request)) throw new RequestError(400, "New area name is required");
+        const [area] = await Eq_area.create([{
+          country_id: body.country, region_id: body.region, province_id: body.province || null,
+          city_id: body.city || null, area_name: facility.area_name_request, is_active: false,
+        }], { session: dbSession });
+        areaId = area._id;
+      }
+
+      if (requestingFacility) {
+        const assignment: any = await Business_staffs.findOne({ user_id: sessionData.user.id, status: 1 }).select("business_id").session(dbSession).lean()
+          || await Admin_assign_business.findOne({ user_id: sessionData.user.id, status: 1 }).select("business_id").session(dbSession).lean();
+        const normalize = (value: string) => value.toLowerCase().trim();
+        const landlordId = facility.landlord ? await findOrCreate(Eq_camp_landlord, { landlord_name: normalize(facility.landlord) }, { landlord_name: normalize(facility.landlord) }, dbSession) : null;
+        const realestateId = facility.real_estate ? await findOrCreate(Eq_camp_realestate, { company_name: normalize(facility.real_estate) }, { company_name: normalize(facility.real_estate) }, dbSession) : null;
+        const clientCompanyId = facility.client_company ? await findOrCreate(Eq_camp_client_company, { client_company_name: normalize(facility.client_company) }, { client_company_name: normalize(facility.client_company) }, dbSession) : null;
+
+        let headOfficeId: any = null;
+        if (facility.selected_head_office_id && mongoose.isValidObjectId(facility.selected_head_office_id)) {
+          const selected: any = await Eq_camp_headoffice.findOne({
+            _id: facility.selected_head_office_id,
+            $or: [{ created_by: sessionData.user.id }, { createdBy: sessionData.user.id }],
+          }).session(dbSession).lean();
+          if (selected) headOfficeId = selected._id;
+        }
+        if (!headOfficeId && (facility.head_office_address || facility.head_office_contact || facility.head_office_location || facility.head_office_details)) {
+          const [office] = await Eq_camp_headoffice.create([{
+            business_id: assignment?.business_id || null, created_by: sessionData.user.id, createdBy: sessionData.user.id,
+            phone: facility.head_office_contact, address: facility.head_office_address,
+            geo_location: facility.head_office_location, other_details: facility.head_office_details,
+          }], { session: dbSession });
+          headOfficeId = office._id;
         }
 
-            const startOfDay = new Date(year, now.getMonth(), now.getDate(), 0, 0, 0, 0);
-            const endOfDay = new Date(year, now.getMonth(), now.getDate(), 23, 59, 59, 999);
+        const [camp] = await Eq_camps.create([{
+          country_id: body.country, region_id: body.region, province_id: body.province || null,
+          city_id: body.city || null, area_id: areaId, landlord_id: landlordId,
+          realestate_id: realestateId, client_company_id: clientCompanyId, headoffice_id: headOfficeId,
+          camp_name: facility.camp_name_request, project_sector: facility.project_sector,
+          facility_type: facility.facility_type, facility_type_other: facility.facility_type_other,
+          facility_type_detail: facility.facility_type_detail, sector_field_values: facility.sector_field_values,
+          capacity_unit: facility.capacity_unit,
+          project_stage: facility.project_stage, ownership: facility.ownership,
+          camp_capacity: facility.camp_capacity, camp_occupancy: facility.camp_occupancy,
+          latitude: facility.latitude, longitude: facility.longitude,
+          is_active: false, is_eq_added: true, visited_status: "Just Added",
+        }], { session: dbSession });
+        campId = camp._id;
+        await saveFacilitySolutions(campId, solutions, dbSession);
+      }
 
-        const entryCount = await Eq_enquiry.countDocuments({
-            createdAt: {$gte: startOfDay, $lte: endOfDay },
-            country_id: body.country,
-            region_id: body.region
-        });
+      if (!areaId || !campId) throw new RequestError(400, "Area and Facility are required");
+      const uuid = await createUuid(body, projectSectorKey, dbSession);
+      const wifiAvailable = body.wifi_available === "Yes" ? true : body.wifi_available === "No" ? false : null;
+      const [enquiry] = await Eq_enquiry.create([{
+        country_id: body.country, region_id: body.region, province_id: body.province || null,
+        city_id: body.city || null, area_id: areaId, camp_id: campId, createdBy: sessionData.user.id,
+        enquiry_uuid: uuid, is_active: !requestingFacility, status: body.followup_status,
+        priority: body.priority || null, alert_date: body.alert_date || null, due_date: body.next_action_due || null,
+        wifi_available: wifiAvailable, wifi_type: wifiAvailable === true ? body.wifi_type || null : null,
+        expected_wifi_cost: wifiAvailable === false ? body.expected_monthly_price || null : null,
+        lease_expiry_due: body.lease_expiry_due || null,
+        competition_status: body.competition_status === "Yes", competition_notes: body.competition_notes || null,
+        next_action: body.next_action || null, next_action_due: body.next_action_due || null,
+        comments: body.comments || null, rent_terms: body.rent_terms || null,
+        wifi_setup: wifiAvailable === true && body.wifi_type === "Other Sources" ? body.other_wifi_details || null : null,
+        enquiry_brought_by: Array.isArray(body.enquiry_brought_by) ? body.enquiry_brought_by : [],
+        meeting_initiated_by: Array.isArray(body.meeting_initiated_by) ? body.meeting_initiated_by : [],
+        project_closed_by: Array.isArray(body.project_closed_by) ? body.project_closed_by : [],
+        project_managed_by: Array.isArray(body.project_managed_by) ? body.project_managed_by : [],
+        enquiry_user_notes: body.enquiry_user_notes || null,
+      }], { session: dbSession });
+      savedEnquiryId = String(enquiry._id);
+      await saveEnquirySolutions(enquiry._id, solutions, dbSession);
+      await preserveInitialAction(enquiry, dbSession);
 
-        uuid += `-${day}${month}${year}-${entryCount+1}`;
+      const initialComment = text(body.comments);
+      if (initialComment) await Eq_enquiry_comments.create([{ enquiry_id: enquiry._id, user_id: sessionData.user.id, comment: initialComment }], { session: dbSession });
 
-        if(body.camp){
-            const is_existing = await Eq_enquiry.find({camp_id: body.camp});
-            if(is_existing && is_existing.length > 0) return NextResponse.json({message: "Enquiry already added for camp", status: 400}, {status: 200})
-        }
+      const contacts = (Array.isArray(body.contacts) ? body.contacts : []).filter((contact: any) => text(contact?.name) || text(contact?.phone));
+      if (contacts.length) await Eq_camp_contacts.insertMany(contacts.map((contact: any) => ({
+        contact_name: text(contact.name), contact_phone: text(contact.phone), contact_email: text(contact.email),
+        contact_authorization: text(contact.authority_level), contact_designation: text(contact.designation),
+        is_decision_maker: contact.is_decision_maker === "Yes", camp_id: campId, enquiry_id: enquiry._id,
+      })), { session: dbSession });
 
-        if(body.area_input_mode == "new"){
-            body.camp_input_mode = "new";
-            const newArea = new Eq_area({
-                country_id: body.country,
-                region_id: body.region,
-                province_id: body.province,
-                city_id: body.city,
-                area_name: body.area_name_request,
-                is_active: false
-            });
-            const savedArea = await newArea.save();
-            areaId = savedArea._id;
-        }
+      if (wifiAvailable && body.wifi_type === "Existing Contractor") await Eq_enquiry_wifi_external.create([{
+        camp_id: campId, enquiry_id: enquiry._id, contractor_name: body.contractor_name || null,
+        contract_start_date: body.contract_start || null, contract_end_date: body.contract_expiry || null,
+        contract_speed: body.speed_mbps || null, contract_package: body.wifi_plan || null,
+        plain_points: body.pain_points || body.plain_points || null,
+      }], { session: dbSession });
+      if (wifiAvailable && body.wifi_type === "Personal WiFi") await Eq_enquiry_wifi_personal.create([{
+        camp_id: campId, enquiry_id: enquiry._id, personal_plan: body.provider_plan || null,
+        personal_start_date: body.personal_wifi_start || null, personal_end_date: body.personal_wifi_expiry || null,
+        personal_monthly_price: body.personal_wifi_price || null,
+      }], { session: dbSession });
+    });
 
-        if(body.camp_input_mode == "new"){
-            let landlordId = "";
-            let realestateId = "";
-            let client_companyId = ""; 
-            let headOfficeId = "";
-            if(body.landlord){
-                const isLandlordExist = await Eq_camp_landlord.findOne({landlord_name: body.landlord?.toLowerCase().trim()});
-                if(!isLandlordExist){
-                    const newLandlord = new Eq_camp_landlord({
-                        landlord_name: body.landlord?.toLowerCase().trim()
-                    });
-                    const savedLandlord = await newLandlord.save();
-                    landlordId = savedLandlord._id;
-                } else {
-                    landlordId = isLandlordExist._id;
-                }
-            }
-
-            if(body.real_estate){
-                const isRealEstateExist = await Eq_camp_realestate.findOne({company_name: body.real_estate.toLowerCase().trim()});
-                if(!isRealEstateExist){
-                    const newRealEstate = new Eq_camp_realestate({
-                        company_name: body.real_estate.toLowerCase().trim()
-                    });
-                    const savedRealEstate = await newRealEstate.save();
-                    realestateId = savedRealEstate._id;
-                } else {
-                    realestateId = isRealEstateExist._id;
-                }
-            }
-
-            if(body.client_company){
-                let isClientCompanyExist = await Eq_camp_client_company.findOne({client_company_name: body.client_company.toLowerCase().trim()});
-                if(!isClientCompanyExist){
-                    const newClientCompany = new Eq_camp_client_company({
-                        client_company_name: body.client_company.toLowerCase().trim()
-                    });
-                    const savedClientCompany = await newClientCompany.save();
-                    client_companyId = savedClientCompany._id;
-                } else {
-                    client_companyId = isClientCompanyExist._id;
-                }
-            }
-
-            const headOfficePhone = body.head_office_contact?.trim?.() || "";
-            const headOfficeAddress = body.head_office_address?.trim?.() || "";
-            const headOfficeLocation = body.head_office_location?.trim?.() || "";
-            const headOfficeDetails = body.head_office_details?.trim?.() || "";
-            const hasHeadOfficeDetails = Boolean(headOfficePhone || headOfficeAddress || headOfficeLocation || headOfficeDetails);
-
-            if (body.selected_head_office_id) {
-                const selectedHeadOffice: any = await Eq_camp_headoffice.findOne({
-                    _id: body.selected_head_office_id,
-                    $or: [{ created_by: session?.user?.id }, { createdBy: session?.user?.id }],
-                }).lean();
-
-                if (selectedHeadOffice) {
-                    const unchanged =
-                        (selectedHeadOffice.phone || "") === headOfficePhone &&
-                        (selectedHeadOffice.address || "") === headOfficeAddress &&
-                        (selectedHeadOffice.geo_location || "") === headOfficeLocation &&
-                        (selectedHeadOffice.other_details || "") === headOfficeDetails;
-
-                    if (unchanged) {
-                        headOfficeId = selectedHeadOffice._id;
-                    }
-                }
-            }
-
-            if (!headOfficeId && hasHeadOfficeDetails) {
-                const newHeadOffice = new Eq_camp_headoffice({
-                    business_id: businessId,
-                    created_by: session?.user?.id,
-                    createdBy: session?.user?.id,
-                    phone: headOfficePhone,
-                    geo_location: headOfficeLocation,
-                    other_details: headOfficeDetails,
-                    address: headOfficeAddress
-                });
-                const savedHeadOffice = await newHeadOffice.save();
-                headOfficeId = savedHeadOffice._id;
-            }
-
-            const newCamp = new Eq_camps({
-                area_id: areaId,
-                country_id: body.country,
-                region_id: body.region,
-                province_id: body.province,
-                city_id: body.city,
-                landlord_id: landlordId || null,
-                realestate_id: realestateId || null,
-                client_company_id: client_companyId || null,
-                headoffice_id: headOfficeId || null,
-                camp_type: body.camp_type,
-                camp_name: body.camp_name_request,
-                camp_capacity: body.camp_capacity,
-                camp_occupancy: body.camp_occupancy,
-                is_active: false,
-                visited_status: "Just Added",
-                latitude: body.latitude,
-                longitude: body.longitude,
-            })
-
-            const savedCamp = await newCamp.save();
-            campId = savedCamp._id;
-        } else {
-            const campToUpdate = await Eq_camps.findById(campId);
-            if (campToUpdate) {
-                campToUpdate.latitude = body.latitude;
-                campToUpdate.longitude = body.longitude;
-                campToUpdate.camp_capacity = body.camp_capacity;
-                campToUpdate.camp_occupancy = body.camp_occupancy;
-                if (campToUpdate.is_active) {
-                    const mappedVisitedStatus = getCampVisitedStatusFromEnquiryStatus(body.followup_status);
-                    if (mappedVisitedStatus && campToUpdate.visited_status !== mappedVisitedStatus) {
-                        campToUpdate.visited_status = mappedVisitedStatus;
-                    }
-                } else if (campToUpdate.visited_status !== "Just Added") {
-                    campToUpdate.visited_status = "Just Added";
-                }
-
-                await campToUpdate.save();
-            }
-        }
-
-        const newEnquiry = new Eq_enquiry({
-            country_id: body.country,
-            region_id: body.region,
-            province_id: body.province,
-            city_id: body.city,
-            area_id: areaId,
-            camp_id: campId,
-            createdBy: session?.user?.id,
-            is_active: body.area_input_mode == "existing" && body.camp_input_mode == "existing" ? true : false,
-            status: body.followup_status,
-            priority: body.priority,
-            alert_date: body.alert_date,
-            due_date: body.next_action_due,
-            wifi_available: wifiAvailability,
-            wifi_type: wifiAvailability === true ? body.wifi_type : null,
-            expected_wifi_cost: wifiAvailability === false ? body.expected_monthly_price || null : null,
-            lease_expiry_due: body.lease_expiry_due,
-            competition_status: body.competition_status == "Yes" ? true : false,
-            competition_notes: body.competition_notes || null,
-            next_action: body.next_action,
-            next_action_due: body.next_action_due,
-            comments: body.comments || null,
-            rent_terms: body.rent_terms,
-            enquiry_uuid: uuid,
-            wifi_setup: wifiAvailability === true && body.wifi_type == "Other Sources" ? body.other_wifi_details : null,
-            enquiry_brought_by: Array.isArray(body.enquiry_brought_by) ? body.enquiry_brought_by : [],
-            meeting_initiated_by: Array.isArray(body.meeting_initiated_by) ? body.meeting_initiated_by : [],
-            project_closed_by: Array.isArray(body.project_closed_by) ? body.project_closed_by : [],
-            project_managed_by: Array.isArray(body.project_managed_by) ? body.project_managed_by : [],
-            enquiry_user_notes: body.enquiry_user_notes || null
-        });
-
-        const savedEnquiry = await newEnquiry.save();
-        await preserveInitialAction(savedEnquiry);
-
-        const initialComment = String(body.comments || "").trim();
-        if (initialComment) {
-            await new Eq_enquiry_comments({
-                enquiry_id: savedEnquiry._id,
-                user_id: session?.user?.id,
-                comment: initialComment,
-            }).save();
-        }
-
-        const newContacts: any[] = [];
-        const contacts = Array.isArray(body.contacts) ? body.contacts : [];
-        contacts.forEach((x:any)=> {
-            const newContact: any = {
-                contact_name: x.name,
-                contact_phone: x.phone,
-                contact_email: x.email,
-                contact_authorization: x.authority_level,
-                contact_designation: x.designation,
-                is_decision_maker: x.is_decision_maker == "Yes" ? true : false,
-                camp_id: campId,
-                enquiry_id: savedEnquiry._id
-            };
-            newContacts.push(newContact);
-        });
-
-        if(newContacts.length > 0){
-            await Eq_camp_contacts.insertMany(newContacts);
-        };
-
-        if(wifiAvailability === true){
-            switch(body.wifi_type){
-                case "Existing Contractor": {
-                    const newExistingWifi = new Eq_enquiry_wifi_external({
-                        camp_id: campId,
-                        enquiry_id: savedEnquiry._id,
-                        contractor_name: body.contractor_name,
-                        contract_start_date: body.contract_start,
-                        contract_end_date: body.contract_expiry,
-                        contract_speed: body.speed_mbps,
-                        contract_package: body.wifi_plan,
-                        plain_points: (body as any).pain_points || body.plain_points || null
-                    });
-
-                    await newExistingWifi.save();
-                    break;
-                }
-                
-                case "Personal WiFi": {
-                    const newPersonalWifi = new Eq_enquiry_wifi_personal({
-                        camp_id: campId,
-                        enquiry_id: savedEnquiry._id,
-                        personal_plan: body.provider_plan,
-                        personal_start_date: body.personal_wifi_start,
-                        personal_end_date: body.personal_wifi_expiry,
-                        personal_monthly_price: body.personal_wifi_price
-                    });
-                    await newPersonalWifi.save();
-                }
-            }
-        }
-
-        if(savedEnquiry._id){
-            return NextResponse.json({message:"Enquiry Created",enquiry_id: savedEnquiry?._id , status: 201}, {status: 201});
-        }
-        return NextResponse.json({message: "Failed to create new enquiry", status: 400}, {status: 400})
-
-    }catch(err){
-        console.log("Error while adding new enquiry: ", err);
-        return NextResponse.json({message:"Internal server error", status: 500}, {status: 500});
-    }
+    return NextResponse.json({ message: "Enquiry created successfully", enquiry_id: savedEnquiryId, status: 201 }, { status: 201 });
+  } catch (error: any) {
+    if (error instanceof RequestError) return NextResponse.json({ message: error.message, status: error.status }, { status: error.status });
+    if (error instanceof CatalogueValidationError) return NextResponse.json({ message: error.message, status: 400 }, { status: 400 });
+    if (error instanceof ZodError) return NextResponse.json({ message: error.issues[0]?.message || "Invalid Facility details", errors: error.flatten().fieldErrors, status: 400 }, { status: 400 });
+    console.error("Error while adding new enquiry:", error);
+    return NextResponse.json({ message: error?.message || "Internal server error", status: 500 }, { status: 500 });
+  } finally {
+    await dbSession.endSession();
+  }
 }

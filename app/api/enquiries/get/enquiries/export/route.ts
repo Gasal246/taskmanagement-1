@@ -1,5 +1,6 @@
 import { filteredAdminEnquiries } from "@/lib/enquiries/admin-list";
 import { enquiryActor } from "@/lib/enquiries/completion-server";
+import { FacilityCatalogueFilterError } from "@/lib/enquiries/facility-list-filters";
 import connectDB from "@/lib/mongo";
 import Eq_camp_contacts from "@/models/eq_camp_contacts.model";
 import Eq_camp_headoffice from "@/models/eq_camp_headoffice.model";
@@ -65,7 +66,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ status: 200, data: payload }, { status: 200 });
   } catch (err) {
-    if (err instanceof Error && /Invalid (action filter|action scope|period range)/.test(err.message)) return NextResponse.json({ message: err.message, status: 400 }, { status: 400 });
+    if (err instanceof FacilityCatalogueFilterError || (err instanceof Error && /Invalid (action filter|action scope|period range)/.test(err.message))) return NextResponse.json({ message: err.message, status: 400 }, { status: 400 });
     console.error("Error exporting enquiries:", err);
     return NextResponse.json(
       { message: "Internal Server Error", status: 500 },

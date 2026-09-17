@@ -89,8 +89,6 @@ export default function ProjectTasksSection({
   const [taskName, setTaskName] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState("normal");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
   const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
   const [dialogTeams, setDialogTeams] = useState<TaskTeam[]>([]);
 
@@ -128,8 +126,6 @@ export default function ProjectTasksSection({
         task_name: taskName.trim(),
         task_description: description.trim(),
         priority,
-        start_date: startDate,
-        end_date: endDate,
         team_ids: selectedTeams,
       });
       return response.data;
@@ -140,8 +136,6 @@ export default function ProjectTasksSection({
       setTaskName("");
       setDescription("");
       setPriority("normal");
-      setStartDate("");
-      setEndDate("");
       setSelectedTeams([]);
       await queryClient.invalidateQueries({ queryKey: ["project-tasks", projectId] });
       await queryClient.invalidateQueries({ queryKey: ["project-details", projectId, mode] });
@@ -375,8 +369,6 @@ export default function ProjectTasksSection({
               event.preventDefault();
               if (taskName.trim().length < 2) return toast.error("Enter a task title");
               if (!priority) return toast.error("Select a priority");
-              if (!startDate || !endDate) return toast.error("Select a start and end date");
-              if (endDate < startDate) return toast.error("End date cannot be before start date");
               if (!selectedTeams.length) return toast.error("Select at least one team");
               createTask.mutate();
             }}
@@ -404,39 +396,7 @@ export default function ProjectTasksSection({
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <label htmlFor="project-task-start-date" className="text-sm font-medium text-slate-200">
-                  Start Date <span className="text-rose-400">*</span>
-                </label>
-                <Input
-                  id="project-task-start-date"
-                  type="date"
-                  value={startDate}
-                  onChange={(event) => {
-                    const value = event.target.value;
-                    setStartDate(value);
-                    if (endDate && value && endDate < value) setEndDate("");
-                  }}
-                  required
-                  className="border-slate-700 bg-slate-900"
-                />
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="project-task-end-date" className="text-sm font-medium text-slate-200">
-                  End Date <span className="text-rose-400">*</span>
-                </label>
-                <Input
-                  id="project-task-end-date"
-                  type="date"
-                  min={startDate || undefined}
-                  value={endDate}
-                  onChange={(event) => setEndDate(event.target.value)}
-                  required
-                  className="border-slate-700 bg-slate-900"
-                />
-              </div>
-            </div>
+            <p className="text-xs text-slate-400">The timeline is calculated after activities are added.</p>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium text-slate-200">Select Teams <span className="text-rose-400">*</span></p>
@@ -471,9 +431,6 @@ export default function ProjectTasksSection({
                   createTask.isPending ||
                   taskName.trim().length < 2 ||
                   !priority ||
-                  !startDate ||
-                  !endDate ||
-                  endDate < startDate ||
                   !selectedTeams.length
                 }
                 className="bg-cyan-600 text-white hover:bg-cyan-500"

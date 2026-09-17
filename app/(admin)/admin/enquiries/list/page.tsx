@@ -20,8 +20,9 @@ import LoaderSpin from "@/components/shared/LoaderSpin";
 import { toast } from "sonner";
 import EnquiryUserFilterField from "@/components/enquiries/EnquiryUserFilterField";
 import { GetEnquiriesWithFilters } from "@/query/enquirymanager/function";
-import { useExportEnquiries, useGetEnquiriesWithFilters, useGetEqAreas, useGetEqCampsByArea, useGetEqCities, useGetEqCountries, useGetEqProvince, useGetEqRegions } from "@/query/enquirymanager/queries";
+import { useExportEnquiries, useGetEnquiriesWithFilters, useGetEnquiryCatalogue, useGetEqAreas, useGetEqCampsByArea, useGetEqCities, useGetEqCountries, useGetEqProvince, useGetEqRegions } from "@/query/enquirymanager/queries";
 import { Eq_CAPACITY_OPTIONS } from "@/lib/constants";
+import { EMPTY_ENQUIRY_CATALOGUE, type EnquiryCatalogue } from "@/lib/enquiries/catalogue";
 import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 import { useDispatch, useSelector } from "react-redux";
 import { RootState } from "@/redux/store";
@@ -111,6 +112,8 @@ export default function EnquiriesPage() {
     city_id: "",
     area_id: "",
     camp_id: "",
+    project_sector: "",
+    facility_type: "",
     status: "all",
     next_action: "all",
     occupancy: "",
@@ -170,10 +173,12 @@ export default function EnquiriesPage() {
     ...periodBounds(filters.period_preset || "all", filters.period_start, filters.period_end),
     status: filters.status === "all" ? "" : filters.status,
     next_action: filters.next_action === "all" ? "" : filters.next_action,
+    facility_type: filters.project_sector ? filters.facility_type : "",
   }), [filters]);
 
   // Queries
   const { data: enquiries, isLoading } = useGetEnquiriesWithFilters({ ...normalizedFilters, page: page.toString(), limit: limit.toString() });
+  const { data: catalogueData, isLoading: isCatalogueLoading } = useGetEnquiryCatalogue();
   const { mutateAsync: exportEnquiries, isPending: isExporting } = useExportEnquiries();
   const { mutateAsync: GetCountries, isPending: isCompanyLoading } = useGetEqCountries();
   const { data: regions, isLoading: isRegionLoading } = useGetEqRegions(filters?.country_id);
@@ -181,6 +186,12 @@ export default function EnquiriesPage() {
   const { data: cities, isLoading: isCityLoading } = useGetEqCities(filters?.province_id);
   const { data: areas, isLoading: isAreaLoading } = useGetEqAreas(filters.city_id);
   const { data: camps, isLoading: isCampLoading } = useGetEqCampsByArea(filters?.area_id);
+  const catalogue: EnquiryCatalogue = catalogueData?.catalogue || EMPTY_ENQUIRY_CATALOGUE;
+  const activeProjectSectors = catalogue.project_sectors.filter((sector) => sector.is_active);
+  const projectSectorOptions = [{ _id: "all", name: "All Project Sectors" }, ...activeProjectSectors.map((sector) => ({ _id: sector.key, name: sector.name }))];
+  const facilityTypeOptions = (activeProjectSectors.find((sector) => sector.key === filters.project_sector)?.facility_types || [])
+    .filter((facilityType) => facilityType.is_active)
+    .map((facilityType) => ({ _id: facilityType.key, name: facilityType.name }));
 
   const exportSearchValue = exportSearch.trim();
   const { data: exportResults, isLoading: isExportSearchLoading } = useQuery({
@@ -749,6 +760,25 @@ export default function EnquiriesPage() {
                 options={camps?.camps}
                 onChange={(v: any) => updateFilter("camp_id", v)}
                 disabled={!filters.area_id}
+              />
+
+              <FilterSelect
+                label="Project Sector"
+                value={filters.project_sector || "all"}
+                options={projectSectorOptions}
+                onChange={(value: string) => {
+                  setFilters((previous: any) => ({ ...previous, project_sector: value === "all" ? "" : value, facility_type: "" }));
+                  setPage(1);
+                }}
+                disabled={isCatalogueLoading}
+              />
+
+              <FilterSelect
+                label="Facility Type"
+                value={filters.facility_type || "all"}
+                options={[{ _id: "all", name: "All Facility Types" }, ...facilityTypeOptions]}
+                onChange={(value: string) => updateFilter("facility_type", value === "all" ? "" : value)}
+                disabled={!filters.project_sector || isCatalogueLoading}
               />
 
               <EnquiryUserFilterField

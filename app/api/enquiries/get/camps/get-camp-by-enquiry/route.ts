@@ -1,6 +1,7 @@
 import connectDB from "@/lib/mongo";
 import Eq_camps from "@/models/eq_camps.model";
 import Eq_enquiry from "@/models/eq_enquiries.model";
+import { getFacilitySolutions } from "@/app/api/helpers/enquiry-solutions";
 import { NextRequest, NextResponse } from "next/server";
 
 connectDB();
@@ -18,9 +19,10 @@ export async function GET(req: NextRequest) {
         switch (is_new) {
             case "true": {
                 const camp_id: any = await Eq_enquiry.findById(enquiry_id).select("camp_id").lean();
-                const camp = await Eq_camps.findById(camp_id?.camp_id).lean();
+                const camp: any = await Eq_camps.findById(camp_id?.camp_id).lean();
+                const solutions = camp ? await getFacilitySolutions(camp._id) : null;
 
-                return NextResponse.json({ camp, status: 200 }, { status: 200 });
+                return NextResponse.json({ camp: camp ? { ...camp, ...solutions } : camp, status: 200 }, { status: 200 });
                 break;
             }
             case "false": {

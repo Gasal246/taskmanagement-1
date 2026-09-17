@@ -18,8 +18,16 @@ import "@/models/business_clients.model";
 import "@/models/business_regions.model";
 import "@/models/business_areas.model";
 import "@/models/users.model";
+import "@/models/eq_enquiries.model";
+import "@/models/eq_camps.model";
+import "@/models/eq_region.model";
+import "@/models/eq_area.model";
+import "@/models/eq_city.model";
+import "@/models/eq_camp_client_company.model";
 import { NextRequest, NextResponse } from "next/server";
 import { buildProjectSearchClause } from "@/app/api/helpers/project-search";
+import { parseFacilityCatalogueFilters } from "@/lib/enquiries/facility-list-filters";
+import { applyProjectCatalogueFilters } from "@/lib/projects/list-filters";
 
 connectDB();
 
@@ -77,6 +85,15 @@ export async function GET(req: NextRequest) {
         }
 
         const query: any = {};
+        let catalogueFilters;
+        try {
+            catalogueFilters = await parseFacilityCatalogueFilters(searchParams);
+        } catch (error) {
+            return NextResponse.json(
+                { message: error instanceof Error ? error.message : "Invalid Project filters", status: 400 },
+                { status: 400 }
+            );
+        }
         if (business_id) {
             query.business_id = business_id;
         }
@@ -276,6 +293,7 @@ export async function GET(req: NextRequest) {
         if (client_id) query.client_id = client_id;
         if (region_id) query.region_id = region_id;
         if (area_id) query.area_id = area_id;
+        applyProjectCatalogueFilters(query, catalogueFilters);
 
         if (startDate || endDate) {
             query.start_date = {};
@@ -296,6 +314,11 @@ export async function GET(req: NextRequest) {
                 .populate("client_id", "client_name")
                 .populate("region_id", "region_name")
                 .populate("area_id", "area_name region_id")
+                .populate("enquiry_id", "enquiry_uuid")
+                .populate("facility_region_id", "region_name")
+                .populate("facility_area_id", "area_name")
+                .populate("facility_city_id", "city_name")
+                .populate("facility_client_company_id", "client_company_name")
                 .populate("creator", "name email avatar_url")
                 .populate("admin_id", "name email avatar_url")
                 .lean(),

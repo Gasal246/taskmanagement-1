@@ -1,19 +1,20 @@
 import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
-import { message } from "antd";
 import { NextRequest, NextResponse } from "next/server";
 import Todos from "@/models/todo.model";
+import { resolveSessionUserId } from "@/lib/utils";
+import { resolveTodoCloudAccess } from "@/lib/todo-access";
 
 connectDB();
 
-export async function GET(req:NextRequest){
+export async function GET(_req:NextRequest){
     try{
         const session:any = await auth();
         if(!session) return NextResponse.json({message: "Un-Authorized Access", status: 401}, {status: 401});
-        console.log("user_id: ", session?.user?.id);
-        
-        const todos = await Todos.find({user_id: session?.user?.id}).lean();
-        console.log("todos: ", todos);
+        const userId = resolveSessionUserId(session);
+        const access = await resolveTodoCloudAccess(userId);
+        if (!access.allowed) return NextResponse.json({message: "Cloud todos are only available to Sales staff", status: 403}, {status: 403});
+        const todos = await Todos.find({user_id: userId}).sort({createdAt: -1}).lean();
         
         return NextResponse.json({data: todos, status: 200}, {status: 200});
 

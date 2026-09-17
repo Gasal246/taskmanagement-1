@@ -12,16 +12,16 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
-import { useActivateEqCamp, useAssignEqCamptoEnquiry, useGetEqCampById } from "@/query/enquirymanager/queries";
-import { EQ_CAMP_TYPES, Eq_CAPACITY_OPTIONS } from "@/lib/constants";
+import { useActivateEqCamp, useAssignEqCamptoEnquiry, useGetEnquiryCatalogue, useGetEqCampById } from "@/query/enquirymanager/queries";
 import { toast } from "sonner";
 import { Building2, Link2, Loader2, MapPin, PlusCircle, ShieldCheck } from "lucide-react";
+import { getCatalogueClassificationLabels, getCatalogueServiceLabel, resolveSectorFieldValues } from "@/lib/enquiries/catalogue";
 
 export default function ActivateCampPage() {
   const params = useParams<{ enquiry_id: string }>();
   const router = useRouter();
 
-  const [mode, setMode] = useState<"existing" | "new">("existing");
+  const [mode, setMode] = useState<"existing" | "new">("new");
   const [selectedCamp, setSelectedCamp] = useState("");
 
   const [campName, setCampName] = useState("");
@@ -33,12 +33,16 @@ export default function ActivateCampPage() {
 
   const { data: requestedCampData, isLoading: isRequestedCampLoading } = useGetEqCampById(params.enquiry_id, true);
   const { data: existingCampData, isLoading: isExistingCampLoading } = useGetEqCampById(params.enquiry_id, false);
+  const { data: catalogueData } = useGetEnquiryCatalogue();
   const { mutateAsync: ActivateCamp, isPending: isActivating } = useActivateEqCamp();
   const { mutateAsync: AssignCamp, isPending: isAssigning } = useAssignEqCamptoEnquiry();
 
   const requestedCamp = requestedCampData?.camp;
   const existingCamps = useMemo(() => existingCampData?.camps || [], [existingCampData?.camps]);
   const saving = isActivating || isAssigning;
+  const catalogue = catalogueData?.catalogue || { project_sectors: [], solution_categories: [] };
+  const classification = getCatalogueClassificationLabels(catalogue, requestedCamp || {});
+  const specialFields = resolveSectorFieldValues(catalogue, requestedCamp || {});
 
   useEffect(() => {
     if (!requestedCamp) return;
@@ -91,20 +95,9 @@ export default function ActivateCampPage() {
       return;
     }
 
-    if (!campName.trim()) {
-      toast.error("Camp name is required");
-      return;
-    }
-
     const res = await ActivateCamp({
       camp_id: requestedCamp._id,
       enquiry_id: params.enquiry_id,
-      camp_name: campName.trim(),
-      camp_type: campType,
-      camp_capacity: campCapacity,
-      camp_occupancy: campOccupancy === "" ? null : Number(campOccupancy),
-      latitude: latitude.trim(),
-      longitude: longitude.trim(),
     });
 
     if (res?.status === 200) {
@@ -133,10 +126,10 @@ export default function ActivateCampPage() {
           <div>
             <h1 className="text-xl font-semibold flex items-center gap-2">
               <ShieldCheck className="h-5 w-5 text-cyan-300" />
-              Camp Approval
+              Facility Approval
             </h1>
             <p className="mt-1 text-sm text-slate-400">
-              Review the staff-submitted camp and either match it with an existing active camp or activate it as a new camp.
+              Review the submitted Facility, correct it if needed, then approve it or match a duplicate.
             </p>
           </div>
           <Button variant="outline" onClick={() => router.replace(`/admin/enquiries/${params.enquiry_id}`)}>
@@ -149,12 +142,16 @@ export default function ActivateCampPage() {
         <section className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4 space-y-4">
           <div className="flex items-center gap-2 text-sm font-medium text-slate-200">
             <Building2 className="h-4 w-4 text-cyan-300" />
-            Staff Submitted Camp (Pending)
+            Submitted Facility (Pending)
           </div>
 
           <div className="grid gap-2 text-sm">
-            <InfoRow label="Camp Name" value={requestedCamp?.camp_name || "Not provided"} />
-            <InfoRow label="Camp Type" value={requestedCamp?.camp_type || "Not provided"} />
+            <InfoRow label="Facility Name" value={requestedCamp?.camp_name || "Not provided"} />
+            <InfoRow label="Project Sector" value={classification.sector || requestedCamp?.camp_type || "Not provided"} />
+            <InfoRow label="Facility Type" value={classification.facility || requestedCamp?.camp_type || "Not provided"} />
+            {specialFields.map((field: any) => <InfoRow key={field.field_key} label={field.field_name} value={`${field.value_name || field.text_value || "Not specified"}${field.is_active ? "" : " (Archived)"}`} />)}
+            <InfoRow label="Project Stage" value={requestedCamp?.project_stage || "Not provided"} />
+            <InfoRow label="Ownership" value={requestedCamp?.ownership || "Not provided"} />
             <InfoRow label="Capacity" value={requestedCamp?.camp_capacity || "Not provided"} />
             <InfoRow
               label="Occupancy"
@@ -166,6 +163,7 @@ export default function ActivateCampPage() {
             />
             <InfoRow label="Latitude" value={requestedCamp?.latitude || "Not provided"} />
             <InfoRow label="Longitude" value={requestedCamp?.longitude || "Not provided"} />
+            <InfoRow label="Solutions" value={(requestedCamp?.solutions_required || []).map((code: string) => getCatalogueServiceLabel(catalogue, code)).join(", ") || "Not specified"} />
           </div>
 
           <div className="rounded-xl border border-amber-800/60 bg-amber-950/20 p-3 text-xs text-amber-200">
@@ -184,7 +182,7 @@ export default function ActivateCampPage() {
             >
               <div className="flex items-center gap-2 text-sm font-semibold text-slate-100">
                 <Link2 className="h-4 w-4 text-cyan-300" />
-                Match Existing Camp
+                Match Existing Facility
               </div>
               <p className="mt-1 text-xs text-slate-400">
                 Use this if the site was already created earlier by another staff/admin entry.
@@ -200,7 +198,7 @@ export default function ActivateCampPage() {
             >
               <div className="flex items-center gap-2 text-sm font-semibold text-slate-100">
                 <PlusCircle className="h-4 w-4 text-emerald-300" />
-                Activate as New Camp
+                Approve New Facility
               </div>
               <p className="mt-1 text-xs text-slate-400">
                 Confirm and activate the staff-submitted camp details as a valid new camp.
@@ -243,65 +241,12 @@ export default function ActivateCampPage() {
             </div>
           ) : (
             <div className="space-y-4 rounded-xl border border-slate-800 bg-slate-900/30 p-4">
-              <div className="grid gap-3 md:grid-cols-2">
-                <Field label="Camp Name">
-                  <Input value={campName} onChange={(e) => setCampName(e.target.value)} placeholder="Camp name" />
-                </Field>
-
-                <Field label="Camp Type">
-                  <Select value={campType || undefined} onValueChange={setCampType}>
-                    <SelectTrigger className="text-slate-200">
-                      <SelectValue placeholder="Select camp type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {EQ_CAMP_TYPES.map((type: any) => (
-                        <SelectItem key={type} value={String(type)}>
-                          {String(type)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Field>
-
-                <Field label="Camp Capacity">
-                  <Select value={campCapacity || undefined} onValueChange={setCampCapacity}>
-                    <SelectTrigger className="text-slate-200">
-                      <SelectValue placeholder="Select capacity" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Eq_CAPACITY_OPTIONS.map((capacity) => (
-                        <SelectItem key={capacity} value={capacity}>
-                          {capacity}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Field>
-
-                <Field label="Camp Occupancy">
-                  <Input
-                    type="number"
-                    min={0}
-                    value={campOccupancy}
-                    onChange={(e) => setCampOccupancy(e.target.value)}
-                    placeholder="Current occupancy"
-                  />
-                </Field>
-
-                <Field label="Latitude">
-                  <div className="relative">
-                    <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-                    <Input className="pl-9" value={latitude} onChange={(e) => setLatitude(e.target.value)} placeholder="Latitude" />
-                  </div>
-                </Field>
-
-                <Field label="Longitude">
-                  <div className="relative">
-                    <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-                    <Input className="pl-9" value={longitude} onChange={(e) => setLongitude(e.target.value)} placeholder="Longitude" />
-                  </div>
-                </Field>
+              <div className="rounded-xl border border-amber-900/60 bg-amber-950/20 p-4 text-xs text-amber-100">
+                Approval uses the stored Facility details shown on this page. Complete any corrections in Edit Enquiry before approval.
               </div>
+              <Button type="button" variant="outline" onClick={() => router.push(`/admin/enquiries/${params.enquiry_id}/edit`)}>
+                Edit Facility Details
+              </Button>
             </div>
           )}
 
@@ -323,7 +268,7 @@ export default function ActivateCampPage() {
               ) : mode === "existing" ? (
                 "Match and Activate Enquiry"
               ) : (
-                "Activate New Camp"
+                "Approve Facility"
               )}
             </Button>
           </div>

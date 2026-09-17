@@ -834,8 +834,9 @@ export async function UpdateProjectFunc(payload:any){
     try{
         const res = await axios.put('/api/project/update-project', payload);
         return res;
-    }catch(err){
+    }catch(err: any){
         console.log(err);
+        return err?.response;
     }
 }
 
@@ -1074,7 +1075,8 @@ export async function AddTaskActivityFunc(payload:any){
         const res = await axios.post('/api/task/project-task/add-activity', payload);
         return res;
     }catch(err){
-        console.log(err);
+        if (axios.isAxiosError(err)) return err.response;
+        throw err;
     }
 }
 
@@ -1083,7 +1085,8 @@ export async function UpdateTaskActivityFunc(payload:any){
         const res = await axios.put('/api/task/project-task/edit-activity', payload);
         return res.data;
     }catch(err){
-        console.log(err);
+        if (axios.isAxiosError(err)) return err.response?.data;
+        throw err;
     }
 }
 

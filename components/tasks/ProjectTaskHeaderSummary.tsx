@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowRight } from "lucide-react";
-import { formatDateTiny } from "@/lib/utils";
+import { formatScheduleDate } from "@/lib/activity-schedule";
 
 type AssignedTeam = {
   _id?: string;
@@ -23,8 +23,8 @@ export default function ProjectTaskHeaderSummary({
   startDate?: string | Date | null;
   endDate?: string | Date | null;
 }) {
-  const startLabel = formatDateTiny(startDate) || "N/A";
-  const endLabel = formatDateTiny(endDate) || "N/A";
+  const startLabel = formatScheduleDate(startDate);
+  const endLabel = formatScheduleDate(endDate);
 
   return (
     <div className="mt-4 grid gap-3 md:grid-cols-3">
@@ -60,7 +60,7 @@ export default function ProjectTaskHeaderSummary({
         </p>
       </SummaryBox>
 
-      <SummaryBox label="Timeline">
+      <SummaryBox label="Timeline · calculated from activities">
         <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
           <TimelineEndpoint label="Start" value={startLabel} />
           <ArrowRight

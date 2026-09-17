@@ -32,6 +32,7 @@ import {
     removeUserSkillFunc,
     sendEmailVerification,
     setupUserPassword,
+    UpdateTodo,
     UpdateStaffProfile,
     updateStaffStatus,
     updateUserData,
@@ -274,10 +275,11 @@ export const useGetAdminProfile = (business_id: string) => {
 } 
 
 //Get all user todos
-export const useGetAllUserTodos = () => {
+export const useGetAllUserTodos = (ownerId = "", enabled = true) => {
     return useQuery({
-        queryKey: ["todos"],
+        queryKey: ["todos", ownerId],
         queryFn: () => GetAllUserTodos(),
+        enabled: enabled && Boolean(ownerId),
     })
 }
 
@@ -299,6 +301,18 @@ export const useCheckTodo = () => {
 export const useDeleteTodo = () => {
     return useMutation({
         mutationFn: (todo_id:string) => DeleteTodo(todo_id),
+    })
+}
+
+//Update todo details
+export const useUpdateTodo = () => {
+    return useMutation({
+        mutationFn: (payload: {
+            todo_id: string;
+            content?: string;
+            priority?: "low" | "medium" | "high";
+            due_date?: string | null;
+        }) => UpdateTodo(payload),
     })
 }
 

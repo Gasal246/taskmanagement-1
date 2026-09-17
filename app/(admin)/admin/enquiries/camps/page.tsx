@@ -5,12 +5,15 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
-import { useGetEqCountries, useGetEqRegions, useGetEqCities, useGetEqProvince, useGetEqAreas, useGetEqCampsFiltered, useUpdateEqCamp } from "@/query/enquirymanager/queries";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useGetEnquiryCatalogue, useGetEqCountries, useGetEqRegions, useGetEqCities, useGetEqProvince, useGetEqAreas, useGetEqCampsFiltered, useUpdateEqCamp } from "@/query/enquirymanager/queries";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { useRouter } from "next/navigation";
-import { ArrowRight, HandPlatter, Plus, Search } from "lucide-react";
+import { ArrowRight, Filter, HandPlatter, Plus, Search, Settings2 } from "lucide-react";
 import { EQ_CAMP_VISITED_STATUS_OPTIONS } from "@/lib/constants";
 import { toast } from "sonner";
+import { getCatalogueClassificationLabels } from "@/lib/enquiries/catalogue";
 import {
   Pagination,
   PaginationContent,
@@ -41,6 +44,11 @@ export default function CampsListPage() {
   const [city_id, setCity] = React.useState("");
   const [area_id, setArea] = useState("");
   const [visited_status, setVisitedStatus] = useState("all");
+  const [projectSector, setProjectSector] = useState("all");
+  const [facilityType, setFacilityType] = useState("all");
+  const [solutionFilter, setSolutionFilter] = useState<string[]>([]);
+  const [draftSolutions, setDraftSolutions] = useState<string[]>([]);
+  const [solutionsOpen, setSolutionsOpen] = useState(false);
   const [search, setSearch] = React.useState("");
   const [page, setPage] = React.useState(1);
   const [statusOverrides, setStatusOverrides] = useState<Record<string, string>>({});
@@ -49,6 +57,8 @@ export default function CampsListPage() {
 
   const { mutateAsync: GetCountries } = useGetEqCountries();
   const { mutateAsync: UpdateCamp } = useUpdateEqCamp();
+  const { data: catalogueData } = useGetEnquiryCatalogue();
+  const catalogue = catalogueData?.catalogue || { project_sectors: [], solution_categories: [] };
   const { data: regions } = useGetEqRegions(country_id);
   const { data: provinces } = useGetEqProvince(region_id);
   const { data: cities } = useGetEqCities(province_id);
@@ -61,6 +71,9 @@ export default function CampsListPage() {
     city_id,
     area_id,
     visited_status: visited_status === "all" ? "" : visited_status,
+    project_sector: projectSector === "all" ? "" : projectSector,
+    facility_type: facilityType === "all" ? "" : facilityType,
+    solutions_required: solutionFilter.join(","),
     search,
     page,
     limit
@@ -112,7 +125,18 @@ export default function CampsListPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [country_id, region_id, province_id, city_id, area_id, visited_status, search]);
+  }, [country_id, region_id, province_id, city_id, area_id, visited_status, projectSector, facilityType, solutionFilter, search]);
+
+  const facilityTypes = projectSector === "all"
+    ? []
+    : catalogue.project_sectors.find((sector: any) => sector.key === projectSector)?.facility_types.filter((type: any) => type.is_active) ?? [];
+
+  const updateDraftSolutions = (codes: string[], checked: boolean) => {
+    setDraftSolutions((current) => checked
+      ? Array.from(new Set([...current, ...codes]))
+      : current.filter((code) => !codes.includes(code))
+    );
+  };
 
   const getVisitedStatusTone = (status?: string | null) => {
     switch (status) {
@@ -142,14 +166,14 @@ export default function CampsListPage() {
 
       if (res?.status === 200) {
         setStatusOverrides((prev) => ({ ...prev, [camp._id]: nextStatus }));
-        toast.success("Camp visited status updated");
+        toast.success("Facility visited status updated");
         return;
       }
 
-      toast.error(res?.message || "Failed to update visited status");
+      toast.error(res?.message || "Failed to update facility visited status");
     } catch (err) {
       console.log(err);
-      toast.error("Failed to update visited status");
+      toast.error("Failed to update facility visited status");
     } finally {
       setUpdatingCampId("");
     }
@@ -164,7 +188,7 @@ export default function CampsListPage() {
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
-            <BreadcrumbPage>Manage Camps</BreadcrumbPage>
+            <BreadcrumbPage>Manage Facilities</BreadcrumbPage>
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
@@ -173,13 +197,18 @@ export default function CampsListPage() {
         <div className="flex flex-col gap-3 rounded-xl border border-slate-800/80 bg-gradient-to-r from-cyan-950/35 via-slate-900/75 to-emerald-950/30 p-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
             <h1 className="text-lg font-semibold text-slate-100 flex items-center gap-2">
-              <HandPlatter size={18} className="text-cyan-300" /> Camps Management
+              <HandPlatter size={18} className="text-cyan-300" /> Facilities Management
             </h1>
             <p className="text-xs text-slate-400">
-              Manage camps and navigate quickly to related head offices.
+              Manage facilities and navigate quickly to related head offices.
             </p>
           </div>
-          <div className="flex w-full sm:w-auto items-center gap-2">
+          <div className="grid w-full gap-2 sm:w-auto sm:grid-cols-3">
+            <Link href="/admin/enquiries/camps/settings" className="w-full sm:w-auto">
+              <Button variant="outline" className="w-full border-slate-700 bg-slate-900/70 text-slate-100 hover:bg-slate-800/70">
+                <Settings2 size={14} className="mr-1.5" /> Settings
+              </Button>
+            </Link>
             <Link href="/admin/enquiries/camps/head-offices" className="w-full sm:w-auto">
               <Button variant="outline" className="w-full sm:w-auto rounded-e-full rounded-s-lg border-slate-700 bg-slate-900/70 text-slate-100 hover:bg-slate-800/70">
                 Manage Head Offices
@@ -187,7 +216,7 @@ export default function CampsListPage() {
             </Link>
             <Link href="/admin/enquiries/camps/add-camp" className="w-full sm:w-auto">
               <Button className="w-full sm:w-auto bg-cyan-700 hover:bg-cyan-600 text-white rounded-e-full rounded-s-lg">
-                <Plus size={14} className="mr-1" /> Add New Camp
+                <Plus size={14} className="mr-1" /> Add New Facility
               </Button>
             </Link>
           </div>
@@ -195,7 +224,7 @@ export default function CampsListPage() {
 
         <div className="rounded-xl border border-slate-800/80 bg-gradient-to-b from-slate-900/70 to-slate-950/70 p-3">
           <div className="mb-3 flex items-center justify-between gap-2">
-            <h2 className="text-sm font-semibold text-slate-200">Camps</h2>
+            <h2 className="text-sm font-semibold text-slate-200">Facilities</h2>
             <p className="text-xs text-slate-400">Total: {totalRecords}</p>
           </div>
 
@@ -206,7 +235,7 @@ export default function CampsListPage() {
                 type="search"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search by camp, area, city, province, region, or country..."
+                placeholder="Search by facility, area, city, province, region, or country..."
                 className="pl-9 bg-slate-900/50 text-slate-200 border-slate-700 placeholder:text-slate-500"
               />
             </div>
@@ -250,38 +279,112 @@ export default function CampsListPage() {
                 ))}
               </SelectContent>
             </Select>
+            <Select value={projectSector} onValueChange={(value) => { setProjectSector(value); setFacilityType("all"); }}>
+              <SelectTrigger className="bg-slate-900/50 text-slate-200 border-slate-700"><SelectValue placeholder="Project Sector" /></SelectTrigger>
+              <SelectContent className="max-h-80">
+                <SelectItem value="all">All Project Sectors</SelectItem>
+                {catalogue.project_sectors.filter((sector: any) => sector.is_active).map((sector: any) => <SelectItem key={sector.key} value={sector.key}>{sector.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select disabled={projectSector === "all"} value={facilityType} onValueChange={setFacilityType}>
+              <SelectTrigger className="bg-slate-900/50 text-slate-200 border-slate-700"><SelectValue placeholder="Facility Type" /></SelectTrigger>
+              <SelectContent className="max-h-80">
+                <SelectItem value="all">All Facility Types</SelectItem>
+                {facilityTypes.map((facility: any) => <SelectItem key={facility.key} value={facility.key}>{facility.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Popover open={solutionsOpen} onOpenChange={(open) => { setSolutionsOpen(open); if (open) setDraftSolutions(solutionFilter); }}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="justify-between border-slate-700 bg-slate-900/50 text-slate-200 hover:bg-slate-800 hover:text-slate-100">
+                  <span className="flex items-center gap-2"><Filter size={14} /> Solutions Required</span>
+                  {solutionFilter.length > 0 && <span className="rounded-full bg-cyan-950 px-2 py-0.5 text-xs text-cyan-300">{solutionFilter.length}</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="w-[min(92vw,680px)] border-slate-800 bg-slate-950 p-0 text-slate-100">
+                <div className="border-b border-slate-800 p-4">
+                  <h3 className="text-sm font-semibold">Solutions Required</h3>
+                  <p className="mt-1 text-xs text-slate-400">Show facilities requiring any selected solution.</p>
+                </div>
+                <div className="max-h-[55vh] space-y-3 overflow-y-auto p-4">
+                  {catalogue.solution_categories.filter((group: any) => group.is_active).map((group: any) => {
+                    const activeServices = group.services.filter((solution: any) => solution.is_active);
+                    const codes = activeServices.map((solution: any) => solution.key);
+                    const selectedCount = codes.filter((code: string) => draftSolutions.includes(code)).length;
+                    const allSelected = selectedCount === codes.length;
+                    return (
+                      <fieldset key={group.key} className="rounded-lg border border-slate-800 p-3">
+                        <legend className="px-1 text-xs font-semibold text-slate-200">{group.name}</legend>
+                        <label className="mb-3 flex w-fit cursor-pointer items-center gap-2 text-xs text-cyan-300">
+                          <Checkbox
+                            checked={allSelected ? true : selectedCount > 0 ? "indeterminate" : false}
+                            onCheckedChange={(checked) => updateDraftSolutions(codes, checked === true)}
+                            aria-label={`Select all in ${group.name}`}
+                          />
+                          Select all in group
+                        </label>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          {activeServices.map((solution: any) => (
+                            <label key={solution.key} className="flex cursor-pointer items-start gap-2 text-xs leading-relaxed text-slate-300">
+                              <Checkbox
+                                className="mt-0.5 shrink-0"
+                                checked={draftSolutions.includes(solution.key)}
+                                onCheckedChange={(checked) => updateDraftSolutions([solution.key], checked === true)}
+                                aria-label={solution.name}
+                              />
+                              <span>{solution.name}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </fieldset>
+                    );
+                  })}
+                </div>
+                <div className="flex items-center justify-between gap-2 border-t border-slate-800 p-3">
+                  <Button variant="ghost" size="sm" onClick={() => { setDraftSolutions([]); setSolutionFilter([]); setSolutionsOpen(false); }}>Clear</Button>
+                  <Button size="sm" className="bg-cyan-700 text-white hover:bg-cyan-600" onClick={() => { setSolutionFilter(draftSolutions); setSolutionsOpen(false); }}>Apply Filter</Button>
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
 
           <div className="overflow-x-auto rounded-xl border border-slate-800/80 bg-gradient-to-b from-slate-900/80 via-slate-900/60 to-slate-950/80">
-            <table className="min-w-full text-sm text-slate-300">
+            <table className="min-w-[1280px] text-sm text-slate-300">
               <thead className="bg-slate-900/90">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-300">#</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-300">Country</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-300">Region</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-300">Province</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-300">City</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-300">Country / Region</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-300">Province / City</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-300">Area</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-300">Camp</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-300">Facility</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-300">Project Sector</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-300">Facility Type</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-300">Visited Status</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-300">Action</th>
                 </tr>
               </thead>
               <tbody>
                 {isLoading ? (
-                  <tr><td colSpan={9} className="p-6 text-center text-slate-400">Loading camps...</td></tr>
+                  <tr><td colSpan={9} className="p-6 text-center text-slate-400">Loading facilities...</td></tr>
                 ) : campList.length === 0 ? (
-                  <tr><td colSpan={9} className="p-6 text-center text-slate-400">No camps found.</td></tr>
+                  <tr><td colSpan={9} className="p-6 text-center text-slate-400">No facilities found.</td></tr>
                 ) : (
-                  campList.map((camp: any, index: number) => (
+                  campList.map((camp: any, index: number) => {
+                    const classification = getCatalogueClassificationLabels(catalogue, camp);
+                    return (
                     <tr key={camp._id} className="group border-t border-slate-800/80 transition-colors hover:bg-gradient-to-r hover:from-cyan-950/20 hover:to-emerald-950/20">
                       <td className="px-4 py-3 text-xs text-slate-400">{((pagination?.page ?? page) - 1) * limit + index + 1}</td>
-                      <td className="px-4 py-3 text-slate-300">{camp.country_id?.country_name}</td>
-                      <td className="px-4 py-3 text-slate-300">{camp.region_id?.region_name}</td>
-                      <td className="px-4 py-3 text-slate-300">{camp.province_id?.province_name}</td>
-                      <td className="px-4 py-3 text-slate-300">{camp.city_id?.city_name}</td>
+                      <td className="px-4 py-3 text-slate-300">
+                        <p>{camp.country_id?.country_name || "—"}</p>
+                        <p className="mt-1 text-xs text-slate-500">{camp.region_id?.region_name || "—"}</p>
+                      </td>
+                      <td className="px-4 py-3 text-slate-300">
+                        <p>{camp.province_id?.province_name || "—"}</p>
+                        <p className="mt-1 text-xs text-slate-500">{camp.city_id?.city_name || "—"}</p>
+                      </td>
                       <td className="px-4 py-3 text-slate-300">{camp.area_id?.area_name}</td>
                       <td className="px-4 py-3 font-medium text-slate-100">{camp.camp_name}</td>
+                      <td className="px-4 py-3 text-slate-300">{classification.sector || "Not classified"}</td>
+                      <td className="px-4 py-3 text-slate-300">{classification.facility || camp.camp_type || "—"}</td>
                       <td className="px-4 py-3">
                         <Select
                           value={statusOverrides[camp._id] ?? camp.visited_status ?? "Just Added"}
@@ -316,7 +419,8 @@ export default function CampsListPage() {
                         </div>
                       </td>
                     </tr>
-                  ))
+                    );
+                  })
                 )}
               </tbody>
             </table>

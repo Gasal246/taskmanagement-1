@@ -1,3 +1,6 @@
+import Eq_camp_solutions from "@/models/eq_camp_solutions.model";
+import { saveCampWithSolutions } from "@/app/api/helpers/camp-solutions";
+import { CatalogueValidationError, validateDynamicClassification, validateDynamicSolutions } from "@/lib/enquiries/catalogue-server";
 import connectDB from "@/lib/mongo";
 import Eq_camp_client_company from "@/models/eq_camp_client_company.model";
 import Eq_camp_landlord from "@/models/eq_camp_landlord.model";
@@ -12,6 +15,12 @@ interface IBody {
     camp_capacity?: string,
     camp_occupancy?: number | string,
     camp_type?: string,
+    project_sector?: string,
+    facility_type?: string,
+    facility_type_other?: string,
+    facility_type_detail?: string,
+    sector_field_values?: any,
+    hotel_classification?: string,
     camp_id: string,
     visited_status?: string,
     latitude?: string,
@@ -32,7 +41,15 @@ interface IBody {
 export async function PUT(req: NextRequest){
     try{
         const body: IBody = await req.json();
+        const hasSolutions = ["solutions_required", "solution_details", "solution_other", "primary_solution", "commercial_model"].some(key => Object.prototype.hasOwnProperty.call(body, key));
+        const existingSolutions: any = hasSolutions ? await Eq_camp_solutions.findOne({ camp_id: body.camp_id }).lean() : null;
         const campToEdit = await Eq_camps.findById(body.camp_id);
+        if (!campToEdit) return NextResponse.json({ message: "Camp not found", status: 404 }, { status: 404 });
+        const solutions = hasSolutions ? await validateDynamicSolutions({ ...existingSolutions, ...body }, existingSolutions) : null;
+        if (["project_sector", "facility_type", "facility_type_other", "facility_type_detail", "sector_field_values"].some(key => Object.prototype.hasOwnProperty.call(body, key))) {
+            const classification = await validateDynamicClassification({ ...campToEdit.toObject(), ...body }, campToEdit.toObject());
+            Object.assign(campToEdit, classification);
+        }
         const landlordName = body.landlord ?? body.landlord_company;
         const realEstateName = body.real_estate ?? body.realestate_company;
 
@@ -100,12 +117,14 @@ export async function PUT(req: NextRequest){
         if(body.latitude !== undefined) campToEdit.latitude = body.latitude;
         if(body.longitude !== undefined) campToEdit.longitude = body.longitude;
 
-        await campToEdit.save();
+        if (solutions) await saveCampWithSolutions(campToEdit, solutions);
+        else await campToEdit.save();
 
 
         return NextResponse.json({message: "camp updated", status: 200}, {status: 200});
 
     }catch(err){
+        if (err instanceof CatalogueValidationError) return NextResponse.json({ message: err.message, status: 400 }, { status: 400 });
         console.log("Error while updating camp: ", err);
         return NextResponse.json({message: "Internal Server Error", status: 500}, {status: 500});
     }

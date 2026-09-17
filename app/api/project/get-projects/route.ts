@@ -4,8 +4,16 @@ import "@/models/business_clients.model";
 import "@/models/business_regions.model";
 import "@/models/business_areas.model";
 import "@/models/users.model";
+import "@/models/eq_enquiries.model";
+import "@/models/eq_camps.model";
+import "@/models/eq_region.model";
+import "@/models/eq_area.model";
+import "@/models/eq_city.model";
+import "@/models/eq_camp_client_company.model";
 import { NextRequest } from "next/server";
 import { buildProjectSearchClause } from "@/app/api/helpers/project-search";
+import { parseFacilityCatalogueFilters } from "@/lib/enquiries/facility-list-filters";
+import { applyProjectCatalogueFilters } from "@/lib/projects/list-filters";
 
 connectDB();
 
@@ -32,6 +40,15 @@ export async function GET(req: NextRequest) {
     const limitRaw = searchParams.get("limit");
 
     const query: any = {};
+    let catalogueFilters;
+    try {
+      catalogueFilters = await parseFacilityCatalogueFilters(searchParams);
+    } catch (error) {
+      return Response.json(
+        { message: error instanceof Error ? error.message : "Invalid Project filters", status: 400 },
+        { status: 400 }
+      );
+    }
 
     // Always require business_id
     if (business_id) {
@@ -81,6 +98,7 @@ export async function GET(req: NextRequest) {
     if (client_id) query.client_id = client_id;
     if (type) query.type = type;
     if (priority) query.priority = priority;
+    applyProjectCatalogueFilters(query, catalogueFilters);
 
     // Handle date filter
     if (startDate || endDate) {
@@ -106,6 +124,11 @@ export async function GET(req: NextRequest) {
         .populate("client_id", "client_name")
         .populate("region_id", "region_name")
         .populate("area_id", "area_name region_id")
+        .populate("enquiry_id", "enquiry_uuid")
+        .populate("facility_region_id", "region_name")
+        .populate("facility_area_id", "area_name")
+        .populate("facility_city_id", "city_name")
+        .populate("facility_client_company_id", "client_company_name")
         .populate("creator", "name email avatar_url")
         .populate("admin_id", "name email avatar_url")
         .lean(),

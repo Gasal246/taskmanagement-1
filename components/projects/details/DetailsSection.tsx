@@ -26,6 +26,7 @@ import {
   useDeleteProject,
 } from "@/query/business/queries";
 import { toast } from "sonner";
+import ProjectCatalogueDetails from "./ProjectCatalogueDetails";
 
 const EditProjectDialog = dynamic(() => import("./EditProjectDialog"), {
   ssr: false,
@@ -189,6 +190,8 @@ export default function DetailsSection({
           </div>
         </div>
       </div>
+
+      <ProjectCatalogueDetails project={project} />
 
       <div className="mt-4 rounded-2xl border border-cyan-900/40 bg-slate-950/55 p-4">
         <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-100">

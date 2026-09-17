@@ -120,7 +120,7 @@ export default function EnquiriesDashboardPage() {
       isLoading: isCitiesLoading,
     },
     {
-      title: "Camps",
+      title: "Facilities",
       href: "/admin/enquiries/camps",
       buttonLabel: "Manage",
       icon: MapPinned,
@@ -147,14 +147,14 @@ export default function EnquiriesDashboardPage() {
 
   const tools: ToolCard[] = [
     {
-      title: "Camp Map",
-      description: "Review camp coverage visually across regions and provinces.",
+      title: "Facility Map",
+      description: "Review facility coverage visually across regions and provinces.",
       href: "/admin/enquiries/map",
       icon: MapPinned,
     },
     {
       title: "Add Enquiry",
-      description: "Create a new enquiry and continue expanding the camp network.",
+      description: "Create a new enquiry and continue expanding the facility network.",
       href: "/admin/enquiries/add-enquiry",
       icon: Plus,
     },

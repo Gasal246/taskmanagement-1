@@ -16,6 +16,11 @@ import Eq_enquiry_histories from "@/models/eq_enquiry_histories";
 import Eq_enquiry_wifi_external from "@/models/eq_enquiry_wifi_external.model";
 import Eq_enquiry_wifi_personal from "@/models/eq_enquiry_wifi_personal.model";
 import User_roles from "@/models/user_roles.model";
+import { projectSupportingFieldsSchema } from "@/lib/enquiries/project-classification";
+import { CatalogueValidationError, getEnquiryCatalogue, validateDynamicClassification, validateDynamicSolutions } from "@/lib/enquiries/catalogue-server";
+import { getCatalogueServiceLabel, sectorByKey } from "@/lib/enquiries/catalogue";
+import { saveEnquirySolutions, saveFacilitySolutions } from "@/app/api/helpers/enquiry-solutions";
+import Eq_enquiry_solutions from "@/models/eq_enquiry_solutions.model";
 import "@/models/roles.model";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -38,6 +43,18 @@ interface Body {
     camp_name_request?: string;
 
     camp_type?: string;
+    project_sector?: string;
+    facility_type?: string;
+    facility_type_other?: string;
+    hotel_classification?: string;
+    capacity_unit?: string;
+    project_stage?: string;
+    ownership?: string;
+    solutions_required?: string[];
+    solution_details?: Record<string, string> | Array<{ solution_key: string; value: string }>;
+    solution_other?: string;
+    primary_solution?: string;
+    commercial_model?: string;
     client_company?: string;
     landlord?: string;
     real_estate?: string;
@@ -131,6 +148,18 @@ type EnquiryAuditSnapshot = {
     camp_id: string | null;
     camp_name: string | null;
     camp_type: string | null;
+    project_sector: string | null;
+    facility_type: string | null;
+    facility_type_detail: string | null;
+    sector_field_values: string[];
+    hotel_classification: string | null;
+    project_stage: string | null;
+    ownership: string | null;
+    capacity_unit: string | null;
+    solutions_required: string[];
+    solution_details: string[];
+    primary_solution: string | null;
+    commercial_model: string | null;
     camp_capacity: string | null;
     camp_occupancy: string | null;
     latitude: string | null;
@@ -177,6 +206,18 @@ const EDIT_FIELD_LABELS: Record<keyof EnquiryAuditSnapshot, string> = {
     camp_id: "Camp",
     camp_name: "Camp Name",
     camp_type: "Camp Type",
+    project_sector: "Project Sector",
+    facility_type: "Facility Type",
+    facility_type_detail: "Facility Type Details",
+    sector_field_values: "Project Sector Fields",
+    hotel_classification: "Hotel Classification",
+    project_stage: "Project Stage",
+    ownership: "Ownership",
+    capacity_unit: "Capacity Unit",
+    solutions_required: "Solutions Required",
+    solution_details: "Solution Details",
+    primary_solution: "Primary Solution",
+    commercial_model: "Commercial Model",
     camp_capacity: "Camp Capacity",
     camp_occupancy: "Camp Occupancy",
     latitude: "Latitude",
@@ -270,6 +311,16 @@ const buildEnquiryAuditSnapshot = async (enquiryId: string): Promise<EnquiryAudi
     const camp: any = enquiry?.camp_id ? await Eq_camps.findById(enquiry.camp_id).lean() : null;
     const headOffice: any = camp?.headoffice_id ? await Eq_camp_headoffice.findById(camp.headoffice_id).lean() : null;
     const contacts: any[] = await Eq_camp_contacts.find({ enquiry_id: enquiry._id }).lean();
+    const solutions: any = await Eq_enquiry_solutions.findOne({ enquiry_id: enquiry._id }).lean();
+    const catalogue = await getEnquiryCatalogue();
+    const sector = sectorByKey(catalogue, camp?.project_sector);
+    const facilityType = sector?.facility_types.find((entry) => entry.key === camp?.facility_type);
+    const sectorFieldValues = (camp?.sector_field_values || []).map((value: any) => {
+        const field = sector?.fields.find((entry) => entry.key === value.field_key);
+        const option = field?.options.find((entry) => entry.key === value.option_key);
+        return `${field?.name || value.field_key}: ${option?.name || value.text_value || value.option_key || ""}`;
+    }).sort();
+    const solutionDetails = (solutions?.solution_details || []).map((value: any) => `${getCatalogueServiceLabel(catalogue, value.solution_key)}: ${value.value || ""}`).sort();
 
     return {
         status: enquiry?.status ? String(enquiry.status) : null,
@@ -286,6 +337,18 @@ const buildEnquiryAuditSnapshot = async (enquiryId: string): Promise<EnquiryAudi
         camp_id: enquiry?.camp_id ? String(enquiry.camp_id) : null,
         camp_name: camp?.camp_name ? String(camp.camp_name) : null,
         camp_type: camp?.camp_type ? String(camp.camp_type) : null,
+        project_sector: sector?.name || (camp?.project_sector ? String(camp.project_sector) : null),
+        facility_type: facilityType?.name || (camp?.facility_type ? String(camp.facility_type) : null),
+        facility_type_detail: camp?.facility_type_detail || camp?.facility_type_other || null,
+        sector_field_values: sectorFieldValues,
+        hotel_classification: camp?.hotel_classification ? String(camp.hotel_classification) : null,
+        project_stage: camp?.project_stage ? String(camp.project_stage) : null,
+        ownership: camp?.ownership ? String(camp.ownership) : null,
+        capacity_unit: camp?.capacity_unit ? String(camp.capacity_unit) : null,
+        solutions_required: (solutions?.solutions_required || []).map((key: string) => getCatalogueServiceLabel(catalogue, key)).sort(),
+        solution_details: solutionDetails,
+        primary_solution: solutions?.primary_solution ? getCatalogueServiceLabel(catalogue, String(solutions.primary_solution)) : null,
+        commercial_model: solutions?.commercial_model ? String(solutions.commercial_model) : null,
         camp_capacity: camp?.camp_capacity ? String(camp.camp_capacity) : null,
         camp_occupancy: camp?.camp_occupancy !== null && camp?.camp_occupancy !== undefined ? String(camp.camp_occupancy) : null,
         latitude: camp?.latitude ? String(camp.latitude) : enquiry?.latitude ? String(enquiry.latitude) : null,
@@ -325,7 +388,7 @@ export async function PUT(req: NextRequest) {
 
         const body: Body = await req.json();
         const enquiryId = toIdOrNull(body.enquiry_id);
-        const areaInputMode = body.area_input_mode === "new" ? "new" : "existing";
+        let areaInputMode = body.area_input_mode === "new" ? "new" : "existing";
         let campInputMode = body.camp_input_mode === "new" ? "new" : "existing";
 
         const wifiAvailability = body.wifi_available === "Yes"
@@ -383,17 +446,49 @@ export async function PUT(req: NextRequest) {
 
         if (toTextOrNull(body.followup_status) === "Closed" && enquiry.status !== "Closed") return NextResponse.json({ message: "Use Follow-up actions to record completed calls and visits", status: 400 }, { status: 400 });
 
+        const existingSolutionSnapshot: any = await Eq_enquiry_solutions.findOne({ enquiry_id: enquiry._id }).lean();
+        const solutionsResult = await validateDynamicSolutions({
+            solutions_required: body.solutions_required || [],
+            solution_details: body.solution_details || {},
+            solution_other: body.solution_other || "",
+            primary_solution: body.primary_solution || "",
+            commercial_model: body.commercial_model || "To Be Determined",
+        }, existingSolutionSnapshot);
+
         await preserveInitialAction(enquiry);
         const previousAction = enquiry.next_action;
         const previousActionDue = enquiry.next_action_due;
         const beforeSnapshot = await buildEnquiryAuditSnapshot(enquiryId);
 
-        const countryId = toIdOrNull(body.country);
-        const regionId = toIdOrNull(body.region);
-        const provinceId = toIdOrNull(body.province);
-        const cityId = toIdOrNull(body.city);
+        let countryId = toIdOrNull(body.country);
+        let regionId = toIdOrNull(body.region);
+        let provinceId = toIdOrNull(body.province);
+        let cityId = toIdOrNull(body.city);
         let areaId = toIdOrNull(body.area);
         let campId = toIdOrNull(body.camp);
+
+        if (enquiry.is_active) {
+            campId = String(enquiry.camp_id || "");
+            areaId = String(enquiry.area_id || "");
+            countryId = String(enquiry.country_id || "");
+            regionId = String(enquiry.region_id || "");
+            provinceId = enquiry.province_id ? String(enquiry.province_id) : null;
+            cityId = enquiry.city_id ? String(enquiry.city_id) : null;
+            areaInputMode = "existing";
+            campInputMode = "existing";
+        }
+
+        // A pending enquiry already owns its requested Facility. Edit that same record.
+        if (!enquiry.is_active && enquiry.camp_id) {
+            campId = String(enquiry.camp_id);
+            campInputMode = "existing";
+            if (enquiry.area_id) {
+                areaId = String(enquiry.area_id);
+                areaInputMode = "existing";
+            }
+        } else if (enquiry.is_active && campInputMode === "new") {
+            return NextResponse.json({ message: "An approved enquiry cannot request a replacement Facility", status: 400 }, { status: 400 });
+        }
 
         if (areaInputMode === "new" && !isBlank(body.area_name_request)) {
             const newArea = new Eq_area({
@@ -420,6 +515,8 @@ export async function PUT(req: NextRequest) {
         }
 
         if (campInputMode === "new" || areaInputMode === "new") {
+            const classificationResult = await validateDynamicClassification(body);
+            const supportingResult = projectSupportingFieldsSchema.parse(body);
             let landlordId: string | null = null;
             let realestateId: string | null = null;
             let clientCompanyId: string | null = null;
@@ -490,6 +587,8 @@ export async function PUT(req: NextRequest) {
                 client_company_id: clientCompanyId,
                 headoffice_id: headOfficeId,
                 camp_type: toTextOrNull(body.camp_type),
+                ...classificationResult,
+                ...supportingResult,
                 camp_name: toTextOrNull(body.camp_name_request),
                 camp_capacity: toTextOrNull(body.camp_capacity),
                 camp_occupancy: toNumberOrNull(body.camp_occupancy),
@@ -501,11 +600,23 @@ export async function PUT(req: NextRequest) {
 
             const savedCamp = await newCamp.save();
             campId = savedCamp._id;
+            await saveFacilitySolutions(savedCamp._id, solutionsResult);
         } else if (campId) {
             const campToEdit = await Eq_camps.findById(campId);
             if (!campToEdit) {
                 return NextResponse.json({ message: "Camp not found", status: 404 }, { status: 404 });
             }
+
+            if (campToEdit.is_active) {
+                const mappedVisitedStatus = getCampVisitedStatusFromEnquiryStatus(body.followup_status);
+                if (mappedVisitedStatus && campToEdit.visited_status !== mappedVisitedStatus) {
+                    campToEdit.visited_status = mappedVisitedStatus;
+                    await campToEdit.save();
+                }
+            } else {
+
+            const classificationResult = await validateDynamicClassification(body, campToEdit.toObject());
+            const supportingResult = projectSupportingFieldsSchema.parse(body);
 
             const hasHeadOfficePayload = [
                 body.head_office_contact,
@@ -587,6 +698,10 @@ export async function PUT(req: NextRequest) {
             campToEdit.camp_name = toTextOrNull(body.camp_name_request);
             campToEdit.camp_capacity = toTextOrNull(body.camp_capacity);
             campToEdit.camp_type = toTextOrNull(body.camp_type);
+            Object.assign(campToEdit, classificationResult);
+            campToEdit.capacity_unit = supportingResult.capacity_unit;
+            campToEdit.project_stage = supportingResult.project_stage;
+            campToEdit.ownership = supportingResult.ownership;
             campToEdit.camp_occupancy = toNumberOrNull(body.camp_occupancy);
             campToEdit.country_id = countryId;
             campToEdit.region_id = regionId;
@@ -605,6 +720,8 @@ export async function PUT(req: NextRequest) {
             }
 
             await campToEdit.save();
+            await saveFacilitySolutions(campToEdit._id, solutionsResult);
+            }
         }
 
         enquiry.country_id = countryId;
@@ -651,6 +768,7 @@ export async function PUT(req: NextRequest) {
         }
 
         await enquiry.save();
+        await saveEnquirySolutions(enquiry._id, solutionsResult);
         if (["Call", "Visit"].includes(String(enquiry.next_action)) &&
             (String(previousAction || "") !== String(enquiry.next_action) || String(previousActionDue || "") !== String(enquiry.next_action_due || ""))) {
             const initialExists = await Eq_enquiry_histories.exists({ _id: enquiry._id, action_origin: "initial" });
@@ -799,6 +917,7 @@ export async function PUT(req: NextRequest) {
 
         return NextResponse.json({ message: "Enquiry updated", status: 200 }, { status: 200 });
     } catch (err) {
+        if (err instanceof CatalogueValidationError) return NextResponse.json({ message: err.message, status: 400 }, { status: 400 });
         console.log("Error while updating enquiry: ", err);
         return NextResponse.json({ message: "Internal Server Error", status: 500 }, { status: 500 });
     }

@@ -1,5 +1,20 @@
 import axios from "axios";
 
+export async function GetEnquiryCatalogue(){
+    try { return (await axios.get("/api/enquiries/catalogue")).data; }
+    catch(err){ console.log(err); return (err as any)?.response?.data; }
+}
+
+export async function AddEnquiryCatalogueItem(payload:any){
+    try { return (await axios.post("/api/enquiries/catalogue/admin", payload)).data; }
+    catch(err){ return (err as any)?.response?.data; }
+}
+
+export async function UpdateEnquiryCatalogueItem(payload:any){
+    try { return (await axios.put("/api/enquiries/catalogue/admin", payload)).data; }
+    catch(err){ return (err as any)?.response?.data; }
+}
+
 //Get Countries
 export async function GetEqCountries(){
     try{
@@ -397,7 +412,7 @@ export async function AddNewEqCamp(payload: any){
         const res = await axios.post("/api/enquiries/post/add-camp", payload);
         return res.data;
     }catch(err){
-        console.log(err);
+        return (err as any)?.response?.data;
     }
 }
 
@@ -714,6 +729,7 @@ export async function ActivateEqCamp(payload:any){
         return res.data;
     }catch(err){
         console.log(err);
+        return (err as any)?.response?.data;
     }
 }
 

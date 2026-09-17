@@ -5,6 +5,8 @@ import Eq_region from "@/models/eq_region.model";
 import Eq_province from "@/models/eq_province.model";
 import Eq_city from "@/models/eq_city.model";
 import Eq_area from "@/models/eq_area.model";
+import Eq_camp_solutions from "@/models/eq_camp_solutions.model";
+import { parseFacilityCatalogueFilters } from "@/lib/enquiries/facility-list-filters";
 import { NextRequest, NextResponse } from "next/server";
 
 connectDB();
@@ -19,6 +21,15 @@ export async function GET(req:NextRequest){
         const area_id = searchParams.get("area_id");
         const visited_status = searchParams.get("visited_status");
         const search = searchParams.get("search")?.trim() || "";
+        let catalogueFilters;
+        try {
+            catalogueFilters = await parseFacilityCatalogueFilters(searchParams);
+        } catch (error) {
+            return NextResponse.json(
+                { message: error instanceof Error ? error.message : "Invalid Facility filters", status: 400 },
+                { status: 400 }
+            );
+        }
         const pageParam = Number(searchParams.get("page"));
         const limitParam = Number(searchParams.get("limit"));
         const page = Number.isFinite(pageParam) && pageParam > 0 ? pageParam : 1;
@@ -38,6 +49,14 @@ export async function GET(req:NextRequest){
         if(province_id) query.province_id = province_id;
         if(city_id) query.city_id = city_id;
         if(area_id) query.area_id = area_id;
+        if (catalogueFilters.project_sector) query.project_sector = catalogueFilters.project_sector;
+        if (catalogueFilters.facility_type) query.facility_type = catalogueFilters.facility_type;
+        if (catalogueFilters.solutions_required.length) {
+            const matchingFacilities = await Eq_camp_solutions.find({
+                solutions_required: { $in: catalogueFilters.solutions_required },
+            }).distinct("camp_id");
+            query._id = { $in: matchingFacilities };
+        }
         if (visited_status === "just_added") {
             andConditions.push({
                 $or: [

@@ -7,6 +7,7 @@ import Eq_enquiry_access from "@/models/eq_enquiry_access.model";
 import Eq_enquiry from "@/models/eq_enquiries.model";
 import Eq_enquiry_histories from "@/models/eq_enquiry_histories";
 import { NextRequest, NextResponse } from "next/server";
+import { FacilityCatalogueFilterError, parseFacilityCatalogueFilters } from "@/lib/enquiries/facility-list-filters";
 
 connectDB();
 
@@ -117,6 +118,7 @@ export async function GET(req: NextRequest) {
 
     const completionParams = Object.fromEntries(searchParams);
     validateActionFilters(completionParams);
+    const catalogueFilters = await parseFacilityCatalogueFilters(searchParams);
     const actor = await enquiryActor();
     if (!actor) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     const status = searchParams.get("status");
@@ -196,9 +198,16 @@ export async function GET(req: NextRequest) {
       .populate({
         path: "camp_id",
         model: Eq_camps,
-        select: "camp_name camp_occupancy",
+        select: "camp_name camp_occupancy project_sector facility_type facility_type_detail facility_type_other camp_type",
       })
       .lean();
+
+    if (catalogueFilters.project_sector) {
+      enquiries = enquiries.filter((entry: any) => entry?.camp_id?.project_sector === catalogueFilters.project_sector);
+    }
+    if (catalogueFilters.facility_type) {
+      enquiries = enquiries.filter((entry: any) => entry?.camp_id?.facility_type === catalogueFilters.facility_type);
+    }
 
     const enquiryIds = enquiries.map((entry: any) => entry?._id).filter(Boolean);
     let latestPriorityByEnquiry = new Map<string, number>();
@@ -269,7 +278,7 @@ export async function GET(req: NextRequest) {
       { status: 200 }
     );
   } catch (err) {
-    if (err instanceof Error && /Invalid (action filter|action scope|period range)/.test(err.message)) return NextResponse.json({ message: err.message, status: 400 }, { status: 400 });
+    if (err instanceof FacilityCatalogueFilterError || (err instanceof Error && /Invalid (action filter|action scope|period range)/.test(err.message))) return NextResponse.json({ message: err.message, status: 400 }, { status: 400 });
     console.log("Error while getting staff enquiries:", err);
     return NextResponse.json(
       { message: "Internal Server Error", status: 500 },

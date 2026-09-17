@@ -13,6 +13,8 @@ import React, { useEffect } from 'react'
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod'
+import EnquiryFacilityDetailsFields from '@/components/enquiries/EnquiryFacilityDetailsFields';
+import { sectorFieldValuesRecord, solutionDetailsRecord } from '@/lib/enquiries/catalogue';
 
 const Page = () => {
     const params = useParams<{ enquiry_id: string }>();
@@ -56,7 +58,11 @@ const Page = () => {
         next_action: z.string(),
         next_action_due: z.string(),
 
-        images: z.any().optional()
+        images: z.any().optional(),
+        project_sector: z.string().optional(), facility_type: z.string().optional(), facility_type_other: z.string().optional(), facility_type_detail: z.string().optional(), sector_field_values: z.record(z.string()).default({}),
+        hotel_classification: z.string().optional(), capacity_unit: z.string().optional(), project_stage: z.string().optional(), ownership: z.string().optional(),
+        solutions_required: z.array(z.string()).default([]), solution_other: z.string().optional(), solution_details: z.record(z.string()).default({}), primary_solution: z.string().optional(),
+        commercial_model: z.string().default("To Be Determined")
     })
 
     const form = useForm({
@@ -100,7 +106,21 @@ const Page = () => {
 
                 alert_date: formatDate(enquiry?.enquiry?.alert_date) ?? "",
                 next_action: enquiry?.enquiry?.next_action ?? "",
-                next_action_due: formatDate(enquiry?.enquiry?.next_action_due) ?? ""
+                next_action_due: formatDate(enquiry?.enquiry?.next_action_due) ?? "",
+                project_sector: enquiry?.enquiry?.camp_id?.project_sector || "",
+                facility_type: enquiry?.enquiry?.camp_id?.facility_type || "",
+                facility_type_other: enquiry?.enquiry?.camp_id?.facility_type_other || "",
+                facility_type_detail: enquiry?.enquiry?.camp_id?.facility_type_detail || enquiry?.enquiry?.camp_id?.facility_type_other || "",
+                sector_field_values: sectorFieldValuesRecord(enquiry?.enquiry?.camp_id?.sector_field_values),
+                hotel_classification: enquiry?.enquiry?.camp_id?.hotel_classification || "",
+                capacity_unit: enquiry?.enquiry?.camp_id?.capacity_unit || "",
+                project_stage: enquiry?.enquiry?.camp_id?.project_stage || "",
+                ownership: enquiry?.enquiry?.camp_id?.ownership || "",
+                solutions_required: enquiry?.enquiry?.enquiry_solutions?.solutions_required || [],
+                solution_other: enquiry?.enquiry?.enquiry_solutions?.solution_other || "",
+                solution_details: solutionDetailsRecord(enquiry?.enquiry?.enquiry_solutions?.solution_details, enquiry?.enquiry?.enquiry_solutions?.solution_other),
+                primary_solution: enquiry?.enquiry?.enquiry_solutions?.primary_solution || "",
+                commercial_model: enquiry?.enquiry?.enquiry_solutions?.commercial_model || "To Be Determined"
             })
         }
     }, [enquiry, form, params.enquiry_id])
@@ -140,6 +160,11 @@ const Page = () => {
             </div>
             <Form {...form}>
                 <form onSubmit={handleSubmit(onFormSubmit)} className='space-y-8'>
+                    <EnquiryFacilityDetailsFields
+                        form={form as any}
+                        isNewFacility={!Boolean(enquiry?.enquiry?.is_active)}
+                        selectedFacility={enquiry?.enquiry?.camp_id}
+                    />
                     {/* <FormField
                         control={form.control}
                         name="latitude"

@@ -1,10 +1,11 @@
 "use client";
+import { getCatalogueClassificationLabels, getCatalogueServiceLabel, resolveSectorFieldValues } from "@/lib/enquiries/catalogue";
 
 import { ArrowLeft, Home, Building2, Pencil, Trash } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { type ReactNode, useEffect, useState } from "react";
-import { useAddNewCampContact, useGetEqCampsById, useRemoveEqCamp, useUpdateEqCampContact } from "@/query/enquirymanager/queries";
+import { useAddNewCampContact, useGetEnquiryCatalogue, useGetEqCampsById, useRemoveEqCamp, useUpdateEqCampContact } from "@/query/enquirymanager/queries";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -29,6 +30,11 @@ export default function CampDetailsPage() {
     const router = useRouter();
     const params = useParams<{ camp_id: string }>()
     const { data: camps, isLoading, refetch } = useGetEqCampsById(params.camp_id);
+    const { data: catalogueData } = useGetEnquiryCatalogue();
+    const catalogue = catalogueData?.catalogue || { project_sectors: [], solution_categories: [] };
+    const classification = getCatalogueClassificationLabels(catalogue, camps?.camp || {});
+    const specialFields = resolveSectorFieldValues(catalogue, camps?.camp || {});
+    const solutionDetails = new Map((camps?.camp?.solution_details || []).map((entry: any) => [entry.solution_key, entry.value]));
     const { mutateAsync: updateContact, isPending } = useUpdateEqCampContact();
     const {mutateAsync: AddContact, isPending: isAdding } = useAddNewCampContact();
     const { mutateAsync: RemoveCamp, isPending: isRemoving } = useRemoveEqCamp();
@@ -151,7 +157,7 @@ export default function CampDetailsPage() {
                         router.push(`/admin/enquiries/camps/${params.camp_id}/edit_camp`)
                     }
                 >
-                    <Pencil size={16} /> Edit Camp
+                    <Pencil size={16} /> Edit Facility
                 </Button>
 
                 <Button
@@ -161,14 +167,24 @@ export default function CampDetailsPage() {
                         setDeleteModalOpen(true)
                     }
                 >
-                    <Trash size={16} /> Delete Camp
+                    <Trash size={16} /> Delete Facility
                 </Button>
                 </div>
             </div>
 
             {/* CAMP DETAILS */}
-            <DetailsCard title="Camp Information">
-                <Detail label="Camp Type" value={camps?.camp?.camp_type} />
+            <DetailsCard title="Facility Information">
+                {camps?.camp?.project_sector ? <>
+                    <Detail label="Project Sector" value={classification.sector || "Not classified"} />
+                    <Detail label="Facility Type" value={`${classification.facility || "Not classified"}${camps.camp.facility_type_detail ? ` — ${camps.camp.facility_type_detail}` : ""}`} />
+                    {specialFields.map((field: any) => <Detail key={field.field_key} label={field.field_name} value={`${field.value_name || field.text_value || "Not specified"}${field.is_active ? "" : " (Archived)"}`} />)}
+                    {camps.camp.capacity_unit && <Detail label="Capacity Unit" value={camps.camp.capacity_unit} />}
+                    {camps.camp.project_stage && <Detail label="Project Stage" value={camps.camp.project_stage} />}
+                    {camps.camp.ownership && <Detail label="Ownership" value={camps.camp.ownership} />}
+                </> : <Detail label="Camp Type" value={camps?.camp?.camp_type} />}
+                <Detail label="Solutions Required" value={camps?.camp?.solutions_required?.length ? camps.camp.solutions_required.map((code: string) => `${getCatalogueServiceLabel(catalogue, code)}${solutionDetails.get(code) ? ` — ${solutionDetails.get(code)}` : ""}`).join(" • ") : "Not specified"} />
+                <Detail label="Primary Solution" value={camps?.camp?.primary_solution ? getCatalogueServiceLabel(catalogue, camps.camp.primary_solution) : "Not specified"} />
+                <Detail label="Commercial Model" value={camps?.camp?.commercial_model || "To Be Determined"} />
                 <Detail label="Country" value={camps?.camp?.country_id?.country_name} />
                 <Detail label="Region" value={camps?.camp?.region_id?.region_name} />
                 <Detail label="Province" value={camps?.camp?.province_id?.province_name} />

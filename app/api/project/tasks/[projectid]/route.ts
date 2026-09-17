@@ -33,13 +33,6 @@ const parseDate = (value: string | null, endOfDay = false) => {
   return date;
 };
 
-const parseRequiredDate = (value: unknown) => {
-  const text = String(value || "").trim();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return null;
-  const date = new Date(`${text}T00:00:00.000Z`);
-  if (Number.isNaN(date.valueOf()) || date.toISOString().slice(0, 10) !== text) return null;
-  return date;
-};
 
 async function getTeamOptions(projectId: string, userId: string, allTeams: boolean) {
   return ProjectTeams.find({
@@ -171,8 +164,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ proj
       query.$and = [...(query.$and || []), { _id: { $in: personActivityIds } }];
     }
 
-    const todayStartUtc = new Date();
-    todayStartUtc.setUTCHours(0, 0, 0, 0);
+    const now = new Date();
     const statusStages = getTaskStatusMatchStages(status as StaffTaskStatusFilter || undefined);
     const scopedActivityStages = hasProjectWideVisibility
       ? []
@@ -219,7 +211,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ proj
     const [result] = await BusinessTasks.aggregate([
       { $match: query },
       ...scopedActivityStages,
-      ...getTaskStatusAggregationStages(todayStartUtc),
+      ...getTaskStatusAggregationStages(now),
       {
         $facet: {
           summary: [
@@ -246,7 +238,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ proj
               pending_since: {
                 $cond: [
                   { $eq: ["$__displayStatus", "Pending"] },
-                  { $dateAdd: { startDate: "$end_date", unit: "day", amount: 1 } },
+                  "$end_date",
                   "$$REMOVE",
                 ],
               },
@@ -371,8 +363,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pro
     const taskName = String(body?.task_name || "").trim();
     const taskDescription = String(body?.task_description || "").trim();
     const priority = String(body?.priority || "").trim().toLowerCase();
-    const startDate = parseRequiredDate(body?.start_date);
-    const endDate = parseRequiredDate(body?.end_date);
     const teamIds = Array.from(new Set(
       (Array.isArray(body?.team_ids) ? body.team_ids : []).map(String).filter(Boolean)
     ));
@@ -381,12 +371,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pro
     }
     if (!TASK_PRIORITIES.has(priority)) {
       return NextResponse.json({ message: "Select a valid priority", status: 400 }, { status: 400 });
-    }
-    if (!startDate || !endDate) {
-      return NextResponse.json({ message: "Start date and end date are required", status: 400 }, { status: 400 });
-    }
-    if (endDate < startDate) {
-      return NextResponse.json({ message: "End date cannot be before start date", status: 400 }, { status: 400 });
     }
     if (!teamIds.length || teamIds.some((teamId) => !mongoose.isValidObjectId(teamId))) {
       return NextResponse.json({ message: "Select at least one valid team", status: 400 }, { status: 400 });
@@ -411,8 +395,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pro
       task_name: taskName,
       task_description: taskDescription,
       priority,
-      start_date: startDate,
-      end_date: endDate,
+      start_date: null,
+      end_date: null,
       is_project_task: true,
       status: "To Do",
       activity_count: 0,

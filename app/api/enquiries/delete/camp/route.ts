@@ -1,3 +1,4 @@
+import Eq_camp_solutions from "@/models/eq_camp_solutions.model";
 import connectDB from "@/lib/mongo";
 import Eq_camp_client_company from "@/models/eq_camp_client_company.model";
 import Eq_camp_contacts from "@/models/eq_camp_contacts.model";
@@ -13,6 +14,7 @@ import Eq_enquiry_histories from "@/models/eq_enquiry_histories";
 import Eq_enquiry_wifi_external from "@/models/eq_enquiry_wifi_external.model";
 import Eq_enquiry_wifi_personal from "@/models/eq_enquiry_wifi_personal.model";
 import Eq_Enquiry_Personal_Wifi_Edit from "@/models/eq_enquriy_personal_wifi_edit.model";
+import Eq_enquiry_solutions from "@/models/eq_enquiry_solutions.model";
 import { message } from "antd";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -32,6 +34,7 @@ export async function DELETE(req:NextRequest){
             await Eq_Enquiry_External_Wifi_Edit.deleteOne({enquiry_id: isEnquiryAdded._id});
             await Eq_Enquiry_Personal_Wifi_Edit.deleteOne({enquiry_id: isEnquiryAdded._id});
             await Eq_Enquiry_Edit.deleteOne({enquiry_id: isEnquiryAdded._id});
+            await Eq_enquiry_solutions.deleteOne({ enquiry_id: isEnquiryAdded._id });
             await Eq_enquiry.findByIdAndDelete(isEnquiryAdded._id);
         }
 
@@ -41,6 +44,7 @@ export async function DELETE(req:NextRequest){
         await Eq_camp_headoffice.deleteOne({camp_id: camp_id});
         await Eq_camp_contacts.deleteMany({camp_id: camp_id});
         await Eq_camps.findByIdAndDelete(camp_id);
+        await Eq_camp_solutions.deleteOne({ camp_id });
 
         return NextResponse.json({message: "Camp and all it's contents removed", status: 200}, {status: 200});
 

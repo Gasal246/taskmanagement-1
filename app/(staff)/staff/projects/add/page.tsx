@@ -12,13 +12,17 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Avatar } from 'antd';
 import Cookies from 'js-cookie';
 import { motion } from 'framer-motion';
-import { CalendarCheck, Check, CheckCircle2, MapPinned, Plus, Sparkles } from 'lucide-react';
+import { Building2, CalendarCheck, Check, CheckCircle2, MapPinned, Plus, Sparkles } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import LoaderSpin from '@/components/shared/LoaderSpin';
 import { toast } from 'sonner';
 import * as z from 'zod';
+import CampClassificationFields from '@/components/enquiries/CampClassificationFields';
+import CampSolutionsFields from '@/components/enquiries/CampSolutionsFields';
+import ProjectCapacityFields from '@/components/projects/ProjectCapacityFields';
+import { isValidProjectCapacity, isValidProjectOccupancy } from '@/lib/projects/capacity';
 
 const formSchema = z.object({
   project_name: z.string().min(1, "Project name is required"),
@@ -34,6 +38,18 @@ const formSchema = z.object({
   project_head: z.string().min(1, "Project head is required"),
   role_id: z.string(),
   dept_id: z.string(),
+  project_sector: z.string().min(1, "Project Sector is required"),
+  facility_type: z.string().min(1, "Facility Type is required"),
+  facility_type_detail: z.string().optional(),
+  facility_type_other: z.string().optional(),
+  sector_field_values: z.record(z.string()).default({}),
+  solutions_required: z.array(z.string()).default([]),
+  solution_details: z.record(z.string()).default({}),
+  solution_other: z.string().optional(),
+  primary_solution: z.string().optional(),
+  commercial_model: z.string().default("To Be Determined"),
+  facility_capacity: z.string().trim().refine(isValidProjectCapacity, "Enter a valid capacity"),
+  facility_occupancy: z.string().trim().refine(isValidProjectOccupancy, "Enter a valid occupancy"),
 });
 
 const AddNewProject = () => {
@@ -70,6 +86,18 @@ const AddNewProject = () => {
       project_head: "",
       role_id: "",
       dept_id: "",
+      project_sector: "",
+      facility_type: "",
+      facility_type_detail: "",
+      facility_type_other: "",
+      sector_field_values: {},
+      solutions_required: [],
+      solution_details: {},
+      solution_other: "",
+      primary_solution: "",
+      commercial_model: "To Be Determined",
+      facility_capacity: "",
+      facility_occupancy: "",
     },
   });
 
@@ -172,6 +200,18 @@ const AddNewProject = () => {
           project_head: "",
           role_id: roleId,
           dept_id: deptId,
+          project_sector: "",
+          facility_type: "",
+          facility_type_detail: "",
+          facility_type_other: "",
+          sector_field_values: {},
+          solutions_required: [],
+          solution_details: {},
+          solution_other: "",
+          primary_solution: "",
+          commercial_model: "To Be Determined",
+          facility_capacity: "",
+          facility_occupancy: "",
         });
         setSelectedProjectHeadId("");
         setProjectHeadSearch("");
@@ -329,6 +369,18 @@ const AddNewProject = () => {
                         </FormItem>
                       )}
                     />
+                  </div>
+                </div>
+
+                <div className="space-y-4 rounded-xl border border-slate-800 bg-slate-950/30 p-4">
+                  <div className="flex items-center gap-2 text-xs text-slate-300">
+                    <Building2 size={14} className="text-cyan-300" />
+                    <span className="font-semibold">Project Sector, Facility Type and Solutions</span>
+                  </div>
+                  <ProjectCapacityFields control={form.control} />
+                  <CampClassificationFields control={form.control} watch={form.watch} setValue={form.setValue} />
+                  <div className="border-t border-slate-800 pt-4">
+                    <CampSolutionsFields control={form.control} watch={form.watch} setValue={form.setValue} />
                   </div>
                 </div>
 
@@ -538,6 +590,16 @@ const AddNewProject = () => {
               <div>
                 <p className="text-slate-500">Client</p>
                 <p className="text-slate-200 text-sm font-semibold">{selectedClientName}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-slate-500">Capacity</p>
+                  <p className="text-sm font-semibold text-slate-200">{summaryValues.facility_capacity || "-"}</p>
+                </div>
+                <div>
+                  <p className="text-slate-500">Occupancy</p>
+                  <p className="text-sm font-semibold text-slate-200">{summaryValues.facility_occupancy || "-"}</p>
+                </div>
               </div>
               <div>
                 <p className="text-slate-500">Project Head</p>

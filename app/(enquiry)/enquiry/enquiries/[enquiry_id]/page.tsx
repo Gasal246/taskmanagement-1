@@ -9,6 +9,7 @@ import { useGetEnquiryByIdForStaffs } from "@/query/enquirymanager/queries";
 import { formatDateTiny } from "@/lib/utils";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
+import FacilityDetailsSummary from "@/components/enquiries/FacilityDetailsSummary";
 
 
 export default function SingleEnquiryPage() {
@@ -55,6 +56,7 @@ export default function SingleEnquiryPage() {
 
         {/* CARD */}
         <div className="bg-gradient-to-tr from-slate-950/60 to-slate-900/60 p-5 rounded-xl border border-slate-800 space-y-5">
+          <FacilityDetailsSummary camp={enquiry?.enquiry?.camp_id} enquirySolutions={enquiry?.enquiry?.enquiry_solutions} pending={!enquiry?.enquiry?.is_active} />
           {/* BASIC INFO */}
 
           {/* LOCATION DETAILS */}

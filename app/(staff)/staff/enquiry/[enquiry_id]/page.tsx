@@ -1,10 +1,11 @@
 "use client";
 import EnquiryCompletionActions from "@/components/enquiries/EnquiryCompletionActions";
 import React, { useMemo, useState } from "react";
-import { Mail, Phone, User, UserCircle2, MapPin, Wifi, Pencil, History, Send } from "lucide-react";
+import { Mail, Phone, User, Building2, MapPin, Wifi, Pencil, History, Send } from "lucide-react";
 import { Avatar } from "antd";
 import { useParams, useRouter } from "next/navigation";
 import { useGetEnquiryByIdForStaffs, useGetEnquiryComments, useGetEnquiryContacts, useGetEqCampsById } from "@/query/enquirymanager/queries";
+import FacilityDetailsSummary from "@/components/enquiries/FacilityDetailsSummary";
 import { formatDateTiny } from "@/lib/utils";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
@@ -161,6 +162,7 @@ export default function SingleEnquiryPage() {
   const priorityLabel = enquiry?.enquiry?.priority ? `${enquiry?.enquiry?.priority}/10` : "Not set";
   const statusLabel = enquiry?.enquiry?.status || "Lead Received";
   const conversionLabel = enquiry?.enquiry?.is_converted ? "Yes" : "Not Yet";
+  const facilityName = camp?.camp_name || enquiry?.enquiry?.camp_id?.camp_name || "Facility not linked";
 
   return (
     <div className='p-4 pb-10'>
@@ -180,8 +182,8 @@ export default function SingleEnquiryPage() {
         <div className="mb-4 space-y-2">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h1 className="text-xl font-bold flex items-center gap-2">
-                <UserCircle2 size={20} /> Enquiry Details
+              <h1 className="flex items-center gap-2 break-words text-xl font-bold">
+                <Building2 size={20} className="shrink-0" /> {facilityName}
               </h1>
               <p className="text-sm text-slate-400 mt-1">
                 Enquiry ID: {enquiry?.enquiry?.enquiry_uuid}
@@ -253,6 +255,7 @@ export default function SingleEnquiryPage() {
         </Dialog>
 
         <div className="bg-gradient-to-tr from-slate-950/60 to-slate-900/60 p-5 rounded-xl border border-slate-800 space-y-6">
+          <FacilityDetailsSummary camp={camp} enquirySolutions={enquiry?.enquiry?.enquiry_solutions} pending={!enquiry?.enquiry?.is_active} />
           <div className="rounded-lg border border-slate-800 bg-slate-900/40 p-4">
             <h2 className="text-sm font-semibold text-slate-300">At a glance</h2>
             <div className="mt-3 grid gap-2 md:grid-cols-2 lg:grid-cols-3">
@@ -267,7 +270,7 @@ export default function SingleEnquiryPage() {
 
           <div className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="font-semibold text-lg">Location & Camp</h2>
+              <h2 className="font-semibold text-lg">Facility Location</h2>
               <Button variant="outline" size="sm" className="gap-2" onClick={openMap}>
                 <MapPin size={14} /> Open Map
               </Button>

@@ -28,7 +28,26 @@ export interface IBusiness_Project extends Document {
     is_approved: Boolean,
     createdAt: Date,
     updatedAt: Date,
-    type: String
+    type: String,
+    project_sector?: string,
+    facility_type?: string,
+    facility_type_detail?: string,
+    facility_type_other?: string,
+    sector_field_values?: Array<{ field_key: string; text_value?: string; option_key?: string }>,
+    solutions_required?: string[],
+    solution_details?: Array<{ solution_key: string; value: string }>,
+    solution_other?: string,
+    primary_solution?: string,
+    commercial_model?: string,
+    enquiry_id?: ObjectId,
+    enquiry_uuid?: string,
+    facility_id?: ObjectId,
+    facility_region_id?: ObjectId,
+    facility_area_id?: ObjectId,
+    facility_city_id?: ObjectId,
+    facility_client_company_id?: ObjectId,
+    facility_capacity?: string,
+    facility_occupancy?: number,
 }
 
 const ProjectsSchema: Schema = new Schema({
@@ -55,8 +74,41 @@ const ProjectsSchema: Schema = new Schema({
     is_approved: { type: Boolean, default: false },
     priority: { type: String, default: "normal", enum: ["low", "normal", "high"] },
     admin_id: { type: Schema.Types.ObjectId, ref: "users", required: false },
-    type: { type: String, default: "general", enum: ["sales", "marketing", "it", "finance", "hr", "operations", "customer-support", "legal", "rnd", "product-management", "procurement", "other"] }
+    type: { type: String, default: "general", enum: ["sales", "marketing", "it", "finance", "hr", "operations", "customer-support", "legal", "rnd", "product-management", "procurement", "other"] },
+    project_sector: { type: String },
+    facility_type: { type: String },
+    facility_type_detail: { type: String },
+    facility_type_other: { type: String },
+    sector_field_values: [{
+        field_key: { type: String, required: true },
+        text_value: { type: String },
+        option_key: { type: String },
+        _id: false,
+    }],
+    solutions_required: { type: [String], default: [] },
+    solution_details: [{
+        solution_key: { type: String, required: true },
+        value: { type: String, required: true },
+        _id: false,
+    }],
+    solution_other: { type: String, default: "" },
+    primary_solution: { type: String, default: "" },
+    commercial_model: { type: String, default: "To Be Determined" },
+    enquiry_id: { type: Schema.Types.ObjectId, ref: "eq_enquiry" },
+    enquiry_uuid: { type: String },
+    facility_id: { type: Schema.Types.ObjectId, ref: "eq_camps" },
+    facility_region_id: { type: Schema.Types.ObjectId, ref: "eq_region" },
+    facility_area_id: { type: Schema.Types.ObjectId, ref: "eq_area" },
+    facility_city_id: { type: Schema.Types.ObjectId, ref: "eq_city" },
+    facility_client_company_id: { type: Schema.Types.ObjectId, ref: "eq_camp_client_company" },
+    facility_capacity: { type: String },
+    facility_occupancy: { type: Number },
 }, { timestamps: true });
+
+// Refresh the cached development model when additive catalogue/source fields hot-reload.
+if (mongoose.models.business_project && !mongoose.models.business_project.schema.path("enquiry_id")) {
+    mongoose.deleteModel("business_project");
+}
 
 const Business_Project = mongoose.models?.business_project || mongoose.model<IBusiness_Project>('business_project', ProjectsSchema);
 

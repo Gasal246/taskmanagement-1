@@ -15,6 +15,7 @@ import Eq_camp_headoffice from "@/models/eq_camp_headoffice.model";
 import Eq_enquiry_wifi_external from "@/models/eq_enquiry_wifi_external.model";
 import Eq_enquiry_wifi_personal from "@/models/eq_enquiry_wifi_personal.model";
 import Eq_enquiry_histories from "@/models/eq_enquiry_histories";
+import { getEnquirySolutions, getFacilitySolutions } from "@/app/api/helpers/enquiry-solutions";
 
 connectDB();
 
@@ -42,6 +43,10 @@ export async function GET(req:NextRequest){
         if (!enquiry) return NextResponse.json({ message: "Enquiry not found" }, { status: 404 });
         if (!await canReadEnquiry(enquiry, actor)) return NextResponse.json({ message: "Forbidden" }, { status: 403 });
         const enriched = (await enrichEnquiries([enquiry], actor))[0];
+        const [enquirySolutions, facilitySolutions] = await Promise.all([
+            getEnquirySolutions(enquiry._id),
+            getFacilitySolutions(enquiry?.camp_id?._id || enquiry?.camp_id),
+        ]);
 
         const contacts = await Eq_camp_contacts.find({enquiry_id: enquiry_id}).limit(1);
         const head_office = await Eq_camp_headoffice.findById(enquiry?.camp_id?.headoffice_id).limit(1);
@@ -59,7 +64,7 @@ export async function GET(req:NextRequest){
             select: "name"
         }).sort(historyOrder).lean();
 
-        return NextResponse.json({enquiry: enriched, contacts, head_office, external_provider, personal_provider, assigned, canForward: enriched.canScheduleAction, status: 200}, {status: 200});
+        return NextResponse.json({enquiry: { ...enriched, enquiry_solutions: enquirySolutions, facility_solutions: facilitySolutions }, contacts, head_office, external_provider, personal_provider, assigned, canForward: enriched.canScheduleAction, status: 200}, {status: 200});
     }catch(err){
         console.log("Error while getting enquiry by Id: ", err);
         return NextResponse.json({message:"Internal Server Error", status: 500}, {status: 500});

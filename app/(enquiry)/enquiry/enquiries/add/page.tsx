@@ -20,8 +20,10 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useAddNewEnquiry, useGetEqAreas, useGetEqCampsByArea, useGetEqCities, useGetEqCountries, useGetEqProvince, useGetEqRegions } from "@/query/enquirymanager/queries";
 import { toast } from "sonner";
-import { EQ_CAMP_TYPES, EQ_CAPACITY_LIMITS, Eq_CAPACITY_OPTIONS, EQ_CONTACT_AUTHORITY } from "@/lib/constants";
+import { EQ_CAPACITY_LIMITS, Eq_CAPACITY_OPTIONS, EQ_CONTACT_AUTHORITY } from "@/lib/constants";
 import LocationPicker from "@/components/enquiries/LocationPicker";
+import EnquiryFacilityDetailsFields from "@/components/enquiries/EnquiryFacilityDetailsFields";
+import { sectorFieldValuesRecord, solutionDetailsRecord } from "@/lib/enquiries/catalogue";
 
 
 const priorityLevels = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"];
@@ -42,6 +44,20 @@ const enquirySchema = z.object({
     camp_name_request: z.string().optional(),
 
     camp_type: z.string().optional(),
+    project_sector: z.string().optional(),
+    facility_type: z.string().optional(),
+    facility_type_other: z.string().optional(),
+    facility_type_detail: z.string().optional(),
+    sector_field_values: z.record(z.string()).default({}),
+    hotel_classification: z.string().optional(),
+    capacity_unit: z.string().optional(),
+    project_stage: z.string().optional(),
+    ownership: z.string().optional(),
+    solutions_required: z.array(z.string()).default([]),
+    solution_other: z.string().optional(),
+    solution_details: z.record(z.string()).default({}),
+    primary_solution: z.string().optional(),
+    commercial_model: z.string().default("To Be Determined"),
     client_company: z.string().optional(),
     landlord: z.string().optional(),
     real_estate: z.string().optional(),
@@ -100,6 +116,10 @@ const enquirySchema = z.object({
 
 }).superRefine((values, ctx) => {
     const needsCampDetails = values.area_input_mode === "new" || values.camp_input_mode === "new";
+    if (needsCampDetails && !values.camp_name_request?.trim()) ctx.addIssue({ code: "custom", path: ["camp_name_request"], message: "Facility name is required" });
+    if (needsCampDetails && !values.project_sector) ctx.addIssue({ code: "custom", path: ["project_sector"], message: "Select a project sector" });
+    if (needsCampDetails && !values.facility_type) ctx.addIssue({ code: "custom", path: ["facility_type"], message: "Select a facility type" });
+    if (values.solutions_required.length && !values.solutions_required.includes(values.primary_solution || "")) ctx.addIssue({ code: "custom", path: ["primary_solution"], message: "Choose a primary solution from the selected services" });
 
     if (needsCampDetails && !values.camp_capacity) {
         ctx.addIssue({
@@ -156,7 +176,10 @@ export default function AddEnquiry() {
       expected_monthly_price: "",
       other_wifi_details: "",
       latitude: "",
-      longitude: ""
+      longitude: "",
+      project_sector: "", facility_type: "", facility_type_other: "", facility_type_detail: "", sector_field_values: {}, hotel_classification: "",
+      capacity_unit: "", project_stage: "", ownership: "", solutions_required: [],
+      solution_other: "", solution_details: {}, primary_solution: "", commercial_model: "To Be Determined"
     }
   });
 
@@ -165,12 +188,15 @@ export default function AddEnquiry() {
   const province_id = form.watch("province");
   const city_id = form.watch("city");
   const area_id = form.watch("area");
+  const camp_id = form.watch("camp");
+  const isExistingFacility = form.watch("area_input_mode") === "existing" && form.watch("camp_input_mode") === "existing";
 
   const { data: regions, isLoading: isRegionLoading } = useGetEqRegions(country_id);
   const { data: provinces, isLoading: isProvinceLoading } = useGetEqProvince(region_id);
   const { data: cities, isLoading: isCityLoading } = useGetEqCities(province_id);
   const { data: areas, isLoading: isAreaLoading } = useGetEqAreas(city_id);
   const { data: camps, isLoading: isCampLoading } = useGetEqCampsByArea(area_id);
+  const selectedFacility = camps?.camps?.find((camp: any) => String(camp._id) === String(camp_id));
 
 
   const { control, handleSubmit } = form;
@@ -188,6 +214,26 @@ export default function AddEnquiry() {
   useEffect(() => {
     fetchCountries();
   }, []);
+
+  useEffect(() => {
+    if (!isExistingFacility || !selectedFacility) return;
+    form.setValue("camp_capacity", selectedFacility.camp_capacity || "");
+    form.setValue("camp_occupancy", selectedFacility.camp_occupancy == null ? "" : String(selectedFacility.camp_occupancy));
+    form.setValue("project_sector", selectedFacility.project_sector || "");
+    form.setValue("facility_type", selectedFacility.facility_type || "");
+    form.setValue("facility_type_other", selectedFacility.facility_type_other || "");
+    form.setValue("facility_type_detail", selectedFacility.facility_type_detail || selectedFacility.facility_type_other || "");
+    form.setValue("sector_field_values", sectorFieldValuesRecord(selectedFacility.sector_field_values));
+    form.setValue("hotel_classification", selectedFacility.hotel_classification || "");
+    form.setValue("capacity_unit", selectedFacility.capacity_unit || "");
+    form.setValue("project_stage", selectedFacility.project_stage || "");
+    form.setValue("ownership", selectedFacility.ownership || "");
+    form.setValue("solutions_required", selectedFacility.solutions_required || []);
+    form.setValue("solution_other", selectedFacility.solution_other || "");
+    form.setValue("solution_details", solutionDetailsRecord(selectedFacility.solution_details, selectedFacility.solution_other));
+    form.setValue("primary_solution", selectedFacility.primary_solution || "");
+    form.setValue("commercial_model", selectedFacility.commercial_model || "To Be Determined");
+  }, [isExistingFacility, selectedFacility?._id]);
 
   useEffect(() => {
     console.log("regions: ", regions);
@@ -343,7 +389,7 @@ export default function AddEnquiry() {
                 name="camp_input_mode"
                 render={({ field }) => (
                   <FormItem className="mt-2 w-full">
-                    <FormLabel className="text-xs text-slate-300 font-semibold">Camp Selection</FormLabel>
+                    <FormLabel className="text-xs text-slate-300 font-semibold">Facility Selection</FormLabel>
 
                     <div className="flex gap-4 mt-1 text-sm">
                       <label className="flex items-center gap-1 cursor-pointer">
@@ -353,7 +399,7 @@ export default function AddEnquiry() {
                           checked={field.value === "existing"}
                           onChange={() => form.setValue("camp_input_mode", "existing")}
                         />
-                        <span className="text-slate-300">Select Existing Camp</span>
+                        <span className="text-slate-300">Select Existing Facility</span>
                       </label>
 
                       <label className="flex items-center gap-1 cursor-pointer">
@@ -363,7 +409,7 @@ export default function AddEnquiry() {
                           checked={field.value === "new"}
                           onChange={() => form.setValue("camp_input_mode", "new")}
                         />
-                        <span className="text-slate-300">Request New Camp</span>
+                        <span className="text-slate-300">Request New Facility</span>
                       </label>
                     </div>
 
@@ -380,11 +426,11 @@ export default function AddEnquiry() {
                 name="camp"
                 render={({ field }) => (
                   <FormItem className="w-full mt-3">
-                    <FormLabel className="text-xs text-slate-300 font-semibold">Camp Name</FormLabel>
+                    <FormLabel className="text-xs text-slate-300 font-semibold">Facility Name</FormLabel>
                     <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
                       <Select value={field.value} onValueChange={field.onChange}>
                         <SelectTrigger className={field.value ? "text-slate-200" : "text-slate-400"}>
-                          <SelectValue placeholder="Select Camp Name" />
+                          <SelectValue placeholder="Select Facility" />
                         </SelectTrigger>
                         <SelectContent>
                           {camps?.camps?.map((c: any) => (
@@ -409,39 +455,13 @@ export default function AddEnquiry() {
                   name="camp_name_request"
                   render={({ field }) => (
                     <FormItem className="mt-3 w-full">
-                      <FormLabel className="text-xs text-slate-300 font-semibold">Requested Camp Name</FormLabel>
+                      <FormLabel className="text-xs text-slate-300 font-semibold">Facility Name</FormLabel>
                       <FormControl>
-                        <Input placeholder="Enter camp name to request review" {...field} />
+                        <Input placeholder="Enter Facility name" {...field} />
                       </FormControl>
                       <p className="text-[10px] text-slate-400 mt-1">
                         This will be reviewed and added to the system if valid.
                       </p>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {/* CAMP TYPE */}
-                <FormField
-                  control={form.control}
-                  name="camp_type"
-                  render={({ field }) => (
-                    <FormItem className="w-full lg:w-[48%]">
-                      <FormLabel className="text-xs text-slate-300 font-semibold">Camp Type</FormLabel>
-                      <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
-                        <Select value={field.value} onValueChange={field.onChange}>
-                          <SelectTrigger className="text-slate-200">
-                            <SelectValue placeholder="Select Camp Type" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {EQ_CAMP_TYPES.map((c) => (
-                              <SelectItem key={c} value={c}>
-                                {c}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -519,12 +539,18 @@ export default function AddEnquiry() {
               </>
             )}
 
+            <EnquiryFacilityDetailsFields
+              form={form}
+              isNewFacility={!isExistingFacility}
+              selectedFacility={selectedFacility}
+            />
+
             {/* CAMP CAPACITY */}
                 <FormField control={form.control} name="camp_capacity" render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-xs text-slate-300">Camp Capacity</FormLabel>
+                    <FormLabel className="text-xs text-slate-300">Facility Capacity</FormLabel>
                     <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
-                      <Select value={field.value} onValueChange={field.onChange}>
+                      <Select disabled={isExistingFacility} value={field.value} onValueChange={field.onChange}>
                         <SelectTrigger><SelectValue placeholder="Select Capacity" /></SelectTrigger>
                         <SelectContent>{Eq_CAPACITY_OPTIONS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
                       </Select>
@@ -537,7 +563,7 @@ export default function AddEnquiry() {
                 <FormField control={form.control} name="camp_occupancy" render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-xs text-slate-300">Current Occupancy</FormLabel>
-                    <Input type="number" {...field} value={field.value || ""} />
+                    <Input disabled={isExistingFacility} type="number" {...field} value={field.value || ""} />
                     <FormMessage />
                   </FormItem>
                 )} />

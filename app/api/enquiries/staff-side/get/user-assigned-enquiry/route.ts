@@ -82,7 +82,7 @@ export async function GET(req: NextRequest) {
     -----------------------------------------------------*/
     const enquiries = await Eq_enquiry.find(filterQuery).populate({
         path: "camp_id",
-        select: "camp_name camp_occupancy"
+        select: "camp_name camp_occupancy project_sector facility_type facility_type_detail facility_type_other camp_type"
     }).lean();
 
     return NextResponse.json({ enquiries, status: 200 }, {status: 200});

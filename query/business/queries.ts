@@ -1,3 +1,5 @@
+import axios from "axios";
+import type { QueryClient } from "@tanstack/react-query";
 import { IBusiness_Project } from "@/models/business_project.model";
 import type { StaffTaskQueryParams } from "@/types/staff-tasks";
 import type { AdminTaskFilterOptionKind, AdminTaskQueryParams } from "@/types/admin-tasks";
@@ -916,22 +918,58 @@ export const useGetAllTasks = (queryParams: Record<string, string | undefined>) 
     })
 }
 
+const invalidateActivityTaskQueries = (queryClient: QueryClient) =>
+    queryClient.invalidateQueries({
+        predicate: query => [
+            "task", "tasks", "admin-task-overview", "project", "project-section",
+            "project-details", "project-tasks", "calendar-feed",
+        ].includes(String(query.queryKey[0])),
+    });
+
+export const useChangeActivityDeadline = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async ({ activity_id, ...body }: {
+            activity_id: string; end_date: string; expected_start_date: string; expected_end_date: string;
+        }) => (await axios.put(`/api/task/activities/${activity_id}/deadline`, body)).data,
+        onSuccess: () => invalidateActivityTaskQueries(queryClient),
+        onError: (error: any) => {
+            if (error?.response?.status === 409) void invalidateActivityTaskQueries(queryClient);
+        },
+    });
+};
+
 //Add Task-Activity
 export const useAddTaskActivity = () => {
+    const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: (payload: any) => AddTaskActivityFunc(payload)
+        mutationFn: (payload: any) => AddTaskActivityFunc(payload),
+        onSuccess: async (result) => {
+            if (![200, 201, 203].includes(result?.status ?? 0)) return;
+            await invalidateActivityTaskQueries(queryClient);
+        },
     })
 }
 
 export const useUpdateTaskActivity = () => {
+    const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: (payload:any) => UpdateTaskActivityFunc(payload)
+        mutationFn: (payload:any) => UpdateTaskActivityFunc(payload),
+        onSuccess: async (result) => {
+            if (![200, 201, 203].includes(result?.status ?? 0)) return;
+            await invalidateActivityTaskQueries(queryClient);
+        },
     })
 }
 
 export const useDeleteTaskActivity = () => {
+    const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: (payload: any) => DeleteTaskActivityFunc(payload)
+        mutationFn: (payload: any) => DeleteTaskActivityFunc(payload),
+        onSuccess: async (result) => {
+            if (![200, 201, 203].includes(result?.status ?? 0)) return;
+            await invalidateActivityTaskQueries(queryClient);
+        },
     })
 }
 

@@ -1,3 +1,5 @@
+import { activityScheduleSchema } from "@/lib/activity-schedule";
+import { recalculateTaskTimeline } from "@/app/api/helpers/task-timeline";
 import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import Business_Tasks from "@/models/business_tasks.model";
@@ -17,6 +19,8 @@ connectDB();
 interface Body {
     task_id: string,
     project_id: string | null,
+    start_date: string,
+    end_date: string,
     activity: string,
     description: string,
     assigned_to?: string | null,
@@ -85,6 +89,11 @@ export async function POST(req: NextRequest) {
             );
         }
 
+        const schedule = activityScheduleSchema.safeParse(body);
+        if (!schedule.success) {
+            return NextResponse.json({ message: schedule.error.issues[0].message, errors: schedule.error.flatten() }, { status: 400 });
+        }
+
         const assignedTo = task.is_project_task ? null : task.assigned_to;
         const assignedSkill = task.is_project_task ? null : body.assigned_skill || null;
         const projectId = body.project_id ?? task.project_id ?? null;
@@ -92,6 +101,7 @@ export async function POST(req: NextRequest) {
         const newActivity = new Task_Activities({
             task_id: body.task_id,
             project_id: projectId,
+            ...schedule.data,
             activity: body.activity,
             description: body.description,
             is_done: false,
@@ -107,6 +117,8 @@ export async function POST(req: NextRequest) {
         }, {new:true});
 
         if(updatedTask.status == "Completed") await Business_Tasks.findByIdAndUpdate(body.task_id, {$set:{status:"In Progress"}})
+
+        await recalculateTaskTimeline(body.task_id);
 
         if (actor?._id) {
             await notifyTaskActivityChange({

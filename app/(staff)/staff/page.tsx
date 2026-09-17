@@ -254,6 +254,12 @@ const StaffHome = () => {
         href: "/staff/profile",
         icon: Contact,
       },
+      {
+        label: "Personal Todo",
+        description: "Plan personal work and keep daily priorities clear.",
+        href: "/staff/todo",
+        icon: ListTodo,
+      },
     ];
 
     if (headRole) {

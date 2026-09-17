@@ -1,5 +1,5 @@
-import { useMutation, useQuery } from "@tanstack/react-query"
-import { AcceptEnquiryEdits, ActivateDeactivateEqAgents, ActivateEqCamp, AddEqCustomMapPin, AddEqUser, AddEnquiryComment, AddNewCampContact, AddNewContactAgent, AddNewEnquiry, AddNewEqArea, AddNewEqCamp, AddNewEqCity, AddNewEqCountry, AddNewEqHeadOffice, AddNewEqProvince, AddNewEqRegion, AddNewStaffEqHeadOffice, AssignEqCamptoEnquiry, CloseEqnuiry, DeleteEnquiryComment, DeleteEqCustomMapPin, EnquiryToProject, ForwardEnquiryByStaff, ForwardHistory, GetAccessEnquiriesForStaffs, GetAgentEnquiries, GetAgentsByBusiness, GetAllEnquiryHistoryForStaffs, GetEnquiriesWithFilters, GetEnquiryById, GetEnquiryByIdForStaffs, GetEnquiryComments, GetEnquiryContacts, GetEnquiryHistories, GetEnquiryHistoryById, GetEqAgentByID, GetEqAreaById, GetEqAreaProfile, GetEqAreasByCity,
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { AcceptEnquiryEdits, ActivateDeactivateEqAgents, ActivateEqCamp, AddEnquiryCatalogueItem, AddEqCustomMapPin, AddEqUser, AddEnquiryComment, AddNewCampContact, AddNewContactAgent, AddNewEnquiry, AddNewEqArea, AddNewEqCamp, AddNewEqCity, AddNewEqCountry, AddNewEqHeadOffice, AddNewEqProvince, AddNewEqRegion, AddNewStaffEqHeadOffice, AssignEqCamptoEnquiry, CloseEqnuiry, DeleteEnquiryComment, DeleteEqCustomMapPin, EnquiryToProject, ForwardEnquiryByStaff, ForwardHistory, GetAccessEnquiriesForStaffs, GetAgentEnquiries, GetAgentsByBusiness, GetAllEnquiryHistoryForStaffs, GetEnquiriesWithFilters, GetEnquiryById, GetEnquiryByIdForStaffs, GetEnquiryCatalogue, GetEnquiryComments, GetEnquiryContacts, GetEnquiryHistories, GetEnquiryHistoryById, GetEqAgentByID, GetEqAreaById, GetEqAreaProfile, GetEqAreasByCity,
      GetEqAreasFiltered,
      GetEqCampsByArea, 
      GetEqCampsByEnquiry, 
@@ -45,6 +45,7 @@ import { AcceptEnquiryEdits, ActivateDeactivateEqAgents, ActivateEqCamp, AddEqCu
      RemoveEqRegion,
      RemoveEqUsers,
      UpdateEnquiry,
+     UpdateEnquiryCatalogueItem,
      UpdateEnquiryComment,
      UpdateEqArea,
      UpdateEqCamp,
@@ -57,6 +58,22 @@ import { AcceptEnquiryEdits, ActivateDeactivateEqAgents, ActivateEqCamp, AddEqCu
      UpdateEqProvince,
      UpdateEqRegion
     } from "./function"
+
+export const useGetEnquiryCatalogue = () => useQuery({
+    queryKey: ["enquiry-catalogue"],
+    queryFn: GetEnquiryCatalogue,
+    staleTime: 60_000,
+});
+
+export const useAddEnquiryCatalogueItem = () => {
+    const queryClient = useQueryClient();
+    return useMutation({ mutationFn: AddEnquiryCatalogueItem, onSuccess: () => queryClient.invalidateQueries({ queryKey: ["enquiry-catalogue"] }) });
+};
+
+export const useUpdateEnquiryCatalogueItem = () => {
+    const queryClient = useQueryClient();
+    return useMutation({ mutationFn: UpdateEnquiryCatalogueItem, onSuccess: () => queryClient.invalidateQueries({ queryKey: ["enquiry-catalogue"] }) });
+};
 
 
 //Get Countries

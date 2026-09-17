@@ -10,7 +10,7 @@ export const TASK_STATUS_FILTERS: Record<StaffTaskStatusFilter, string> = {
 export const isTaskStatusFilter = (value: string): value is StaffTaskStatusFilter =>
   Object.hasOwn(TASK_STATUS_FILTERS, value);
 
-export const getTaskStatusAggregationStages = (todayStartUtc: Date) => [
+export const getTaskStatusAggregationStages = (now: Date) => [
   {
     $set: {
       __activityCount: { $max: [{ $ifNull: ["$activity_count", 0] }, 0] },
@@ -63,7 +63,7 @@ export const getTaskStatusAggregationStages = (todayStartUtc: Date) => [
               case: {
                 $and: [
                   { $ne: [{ $ifNull: ["$end_date", null] }, null] },
-                  { $lt: ["$end_date", todayStartUtc] },
+                  { $lt: ["$end_date", now] },
                 ],
               },
               then: "Pending",

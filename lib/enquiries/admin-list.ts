@@ -3,9 +3,11 @@ import Eq_enquiry from "@/models/eq_enquiries.model";
 import mongoose from "mongoose";
 import { matchesActionFilters, validateActionFilters } from "./completion";
 import { actionsForEnquiries } from "./completion-server";
+import { parseFacilityCatalogueFilters } from "./facility-list-filters";
 export async function filteredAdminEnquiries(searchParams: URLSearchParams, actorId = "") {
     const actionParams = Object.fromEntries(searchParams);
     validateActionFilters(actionParams);
+    const catalogueFilters = await parseFacilityCatalogueFilters(searchParams);
     const filter: any = {};
 
     // --- Location Filters ---
@@ -85,6 +87,13 @@ export async function filteredAdminEnquiries(searchParams: URLSearchParams, acto
         },
       },
     ];
+
+    if (catalogueFilters.project_sector) {
+      pipeline.push({ $match: { "campDetails.project_sector": catalogueFilters.project_sector } });
+    }
+    if (catalogueFilters.facility_type) {
+      pipeline.push({ $match: { "campDetails.facility_type": catalogueFilters.facility_type } });
+    }
 
     if (camp_capacity) {
       pipeline.push({ $match: { "campDetails.camp_capacity": camp_capacity } });

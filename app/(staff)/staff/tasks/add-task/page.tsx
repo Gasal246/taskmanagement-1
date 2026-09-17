@@ -23,17 +23,13 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { toast } from "sonner";
 import Cookies from "js-cookie";
 import { Avatar } from "antd";
-import { CalendarIcon, CalendarPlus, Check, ChevronRight, Users } from "lucide-react";
-import { format } from "date-fns";
-import type { DateRange } from "react-day-picker";
+import { CalendarPlus, Check, ChevronRight, Users } from "lucide-react";
 import { TASK_STATUS } from "@/lib/constants";
 import {
   useAddBusinessTask,
@@ -83,8 +79,6 @@ const formSchema = z.object({
   task_description: z.string().optional(),
   priority: z.string().optional(),
   comments: z.string().optional(),
-  start_date: z.string().min(1, "Start date is required"),
-  end_date: z.string().min(1, "End date is required"),
   assigned_user_id: z.string().min(1, "Assigned user is required"),
   status: z.enum(["To Do", "In Progress", "Completed", "Cancelled"]),
   business_id: z.string(),
@@ -130,24 +124,11 @@ const AddTask = () => {
       task_description: "",
       priority: "",
       comments: "",
-      start_date: "",
-      end_date: "",
       assigned_user_id: "",
       status: "To Do",
       business_id: "",
     },
   });
-  const selectedStartDate = form.watch("start_date");
-  const selectedEndDate = form.watch("end_date");
-  const todayDate = new Date().toISOString().split("T")[0];
-  const today = new Date(`${todayDate}T00:00:00`);
-  const selectedDateRange: DateRange | undefined = selectedStartDate
-    ? {
-        from: new Date(`${selectedStartDate}T00:00:00`),
-        to: selectedEndDate ? new Date(`${selectedEndDate}T00:00:00`) : undefined,
-      }
-    : undefined;
-
   useEffect(() => {
     const roleCookie = Cookies.get("user_role");
     const domainCookie = Cookies.get("user_domain");
@@ -166,16 +147,6 @@ const AddTask = () => {
       toast.error("Invalid cookies");
     }
   }, [form]);
-
-  useEffect(() => {
-    const endDate = form.getValues("end_date");
-    if (selectedStartDate && endDate && endDate < selectedStartDate) {
-      form.setValue("end_date", "");
-    }
-    if (!selectedStartDate && endDate) {
-      form.setValue("end_date", "");
-    }
-  }, [selectedStartDate, form]);
 
   const fetchDepartmentMeta = useCallback(async (departmentId: string) => {
     const response = await fetch(`/api/department/get-meta?department_id=${departmentId}`);
@@ -378,8 +349,6 @@ const AddTask = () => {
       task_description: data.task_description,
       priority: data.priority || undefined,
       comments: data.comments || undefined,
-      start_date: data.start_date,
-      end_date: data.end_date,
       status: data.status,
       business_id: data.business_id,
       is_project_task: false,
@@ -403,18 +372,6 @@ const AddTask = () => {
     }
   };
 
-  const handleTaskDateRangeChange = (range: DateRange | undefined) => {
-    if (!range?.from) {
-      form.setValue("start_date", "", { shouldValidate: true });
-      form.setValue("end_date", "", { shouldValidate: true });
-      return;
-    }
-
-    form.setValue("start_date", format(range.from, "yyyy-MM-dd"), { shouldValidate: true });
-    form.setValue("end_date", range.to ? format(range.to, "yyyy-MM-dd") : "", {
-      shouldValidate: true,
-    });
-  };
 
   const canContinueFromStep1 = assignScope === "my" || Boolean(selectedDepartmentId);
   const currentDepartmentName =
@@ -552,63 +509,9 @@ const AddTask = () => {
                     </FormItem>
                   )}
                 />
+                <p className="text-xs text-slate-400">The timeline will be calculated after you add activities.</p>
                 <div className="grid gap-3 md:grid-cols-4">
-                  <div className="md:col-span-2 space-y-2">
-                    <FormLabel className="text-xs text-slate-300 font-semibold">
-                      Task Duration (Start & End)
-                    </FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="w-full justify-between border-slate-700 bg-transparent text-slate-100 hover:bg-slate-900/60 hover:text-slate-100"
-                        >
-                          <span className="truncate text-left">
-                            {selectedDateRange?.from ? (
-                              selectedDateRange?.to ? (
-                                `${format(selectedDateRange.from, "PPP")} - ${format(
-                                  selectedDateRange.to,
-                                  "PPP"
-                                )}`
-                              ) : (
-                                `${format(selectedDateRange.from, "PPP")} - Select end date`
-                              )
-                            ) : (
-                              "Select start and end dates"
-                            )}
-                          </span>
-                          <CalendarIcon size={16} className="opacity-70" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent
-                        className="w-auto p-0 border-slate-800 bg-slate-950"
-                        align="start"
-                      >
-                        <Calendar
-                          mode="range"
-                          numberOfMonths={2}
-                          defaultMonth={selectedDateRange?.from || today}
-                          selected={selectedDateRange}
-                          onSelect={handleTaskDateRangeChange}
-                          disabled={(date) => date < today}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    <div className="space-y-1">
-                      {form.formState.errors.start_date && (
-                        <p className="text-[0.8rem] font-medium text-destructive">
-                          {form.formState.errors.start_date.message}
-                        </p>
-                      )}
-                      {form.formState.errors.end_date && (
-                        <p className="text-[0.8rem] font-medium text-destructive">
-                          {form.formState.errors.end_date.message}
-                        </p>
-                      )}
-                    </div>
-                  </div>
+
 
                   <FormField
                     control={form.control}

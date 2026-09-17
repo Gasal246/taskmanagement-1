@@ -1,0 +1,722 @@
+[
+  {
+    "code": "WFA",
+    "label": "Workforce Accommodation",
+    "facilities": [
+      {
+        "code": "WFA-01",
+        "label": "Labour Camp / Labour Accommodation"
+      },
+      {
+        "code": "WFA-02",
+        "label": "Staff Accommodation"
+      },
+      {
+        "code": "WFA-03",
+        "label": "Executive / Management Staff Housing"
+      },
+      {
+        "code": "WFA-04",
+        "label": "Bachelor Accommodation"
+      },
+      {
+        "code": "WFA-05",
+        "label": "Family Staff Housing"
+      },
+      {
+        "code": "WFA-06",
+        "label": "Construction Site Camp (Temporary)"
+      },
+      {
+        "code": "WFA-07",
+        "label": "Modular / Portable Camp"
+      },
+      {
+        "code": "WFA-08",
+        "label": "Remote Site Camp"
+      },
+      {
+        "code": "WFA-09",
+        "label": "Industrial City Worker Housing"
+      },
+      {
+        "code": "WFA-10",
+        "label": "Company Compound"
+      },
+      {
+        "code": "WFA-11",
+        "label": "Driver Accommodation"
+      },
+      {
+        "code": "WFA-12",
+        "label": "Domestic Worker Accommodation"
+      },
+      {
+        "code": "WFA-13",
+        "label": "Medical / Nursing Staff Housing"
+      },
+      {
+        "code": "WFA-14",
+        "label": "Airline & Aviation Crew Housing"
+      },
+      {
+        "code": "WFA-15",
+        "label": "Security Personnel Barracks"
+      },
+      {
+        "code": "WFA-99",
+        "label": "Other – Please Specify"
+      }
+    ]
+  },
+  {
+    "code": "HOS",
+    "label": "Hospitality",
+    "facilities": [
+      {
+        "code": "HOS-01",
+        "label": "City Hotel"
+      },
+      {
+        "code": "HOS-02",
+        "label": "Resort (Beach / Island / Desert / Mountain)"
+      },
+      {
+        "code": "HOS-03",
+        "label": "Hotel Apartments"
+      },
+      {
+        "code": "HOS-04",
+        "label": "Serviced Apartments"
+      },
+      {
+        "code": "HOS-05",
+        "label": "Branded Residences"
+      },
+      {
+        "code": "HOS-06",
+        "label": "Boutique Hotel"
+      },
+      {
+        "code": "HOS-07",
+        "label": "Business Hotel"
+      },
+      {
+        "code": "HOS-08",
+        "label": "Airport Hotel"
+      },
+      {
+        "code": "HOS-09",
+        "label": "Heritage Hotel"
+      },
+      {
+        "code": "HOS-10",
+        "label": "Budget / Economy Hotel"
+      },
+      {
+        "code": "HOS-11",
+        "label": "Motel / Highway Hotel"
+      },
+      {
+        "code": "HOS-12",
+        "label": "Holiday Homes / Short-Term Rentals"
+      },
+      {
+        "code": "HOS-13",
+        "label": "Chalets & Private Resorts (Istiraha)"
+      },
+      {
+        "code": "HOS-14",
+        "label": "Glamping / Desert Camp"
+      },
+      {
+        "code": "HOS-15",
+        "label": "Eco-Lodge"
+      },
+      {
+        "code": "HOS-16",
+        "label": "Hostel"
+      },
+      {
+        "code": "HOS-99",
+        "label": "Other – Please Specify"
+      }
+    ]
+  },
+  {
+    "code": "HLC",
+    "label": "Healthcare",
+    "facilities": [
+      {
+        "code": "HLC-01",
+        "label": "Government Hospital"
+      },
+      {
+        "code": "HLC-02",
+        "label": "Private Hospital"
+      },
+      {
+        "code": "HLC-03",
+        "label": "Medical City"
+      },
+      {
+        "code": "HLC-04",
+        "label": "Specialty Hospital (Cardiac, Oncology, Maternity, Paediatric, etc.)"
+      },
+      {
+        "code": "HLC-05",
+        "label": "Polyclinic / Medical Centre"
+      },
+      {
+        "code": "HLC-06",
+        "label": "Primary Healthcare Centre (PHC)"
+      },
+      {
+        "code": "HLC-07",
+        "label": "Day Surgery Centre"
+      },
+      {
+        "code": "HLC-08",
+        "label": "Rehabilitation Centre"
+      },
+      {
+        "code": "HLC-09",
+        "label": "Long-Term Care / Nursing Home"
+      },
+      {
+        "code": "HLC-10",
+        "label": "Psychiatric / Mental Health Facility"
+      },
+      {
+        "code": "HLC-11",
+        "label": "Dental Clinic"
+      },
+      {
+        "code": "HLC-12",
+        "label": "IVF / Fertility Centre"
+      },
+      {
+        "code": "HLC-13",
+        "label": "Diagnostic & Imaging Centre"
+      },
+      {
+        "code": "HLC-14",
+        "label": "Medical Laboratory"
+      },
+      {
+        "code": "HLC-15",
+        "label": "Pharmacy Chain / Warehouse"
+      },
+      {
+        "code": "HLC-99",
+        "label": "Other – Please Specify"
+      }
+    ]
+  },
+  {
+    "code": "RES",
+    "label": "Residential & Community Living",
+    "facilities": [
+      {
+        "code": "RES-01",
+        "label": "Gated Community"
+      },
+      {
+        "code": "RES-02",
+        "label": "Residential Compound"
+      },
+      {
+        "code": "RES-03",
+        "label": "Master-Planned Community"
+      },
+      {
+        "code": "RES-04",
+        "label": "Villa Community"
+      },
+      {
+        "code": "RES-05",
+        "label": "Residential Tower / Apartment Building"
+      },
+      {
+        "code": "RES-06",
+        "label": "Co-Living"
+      },
+      {
+        "code": "RES-07",
+        "label": "Student Housing"
+      },
+      {
+        "code": "RES-08",
+        "label": "Senior Living / Retirement Community"
+      },
+      {
+        "code": "RES-09",
+        "label": "Affordable / Social Housing"
+      },
+      {
+        "code": "RES-10",
+        "label": "Build-to-Rent Development"
+      },
+      {
+        "code": "RES-11",
+        "label": "Townhouse Development"
+      },
+      {
+        "code": "RES-12",
+        "label": "Smart Community"
+      },
+      {
+        "code": "RES-99",
+        "label": "Other – Please Specify"
+      }
+    ]
+  },
+  {
+    "code": "RTL",
+    "label": "Retail & Shopping Centres",
+    "facilities": [
+      {
+        "code": "RTL-01",
+        "label": "Super-Regional Mall"
+      },
+      {
+        "code": "RTL-02",
+        "label": "Regional Mall"
+      },
+      {
+        "code": "RTL-03",
+        "label": "Community Mall"
+      },
+      {
+        "code": "RTL-04",
+        "label": "Neighbourhood / Strip Mall"
+      },
+      {
+        "code": "RTL-05",
+        "label": "Outlet Mall"
+      },
+      {
+        "code": "RTL-06",
+        "label": "Lifestyle Centre"
+      },
+      {
+        "code": "RTL-07",
+        "label": "Hypermarket / Supermarket"
+      },
+      {
+        "code": "RTL-08",
+        "label": "Traditional Souq / Market"
+      },
+      {
+        "code": "RTL-09",
+        "label": "Retail Showroom"
+      },
+      {
+        "code": "RTL-10",
+        "label": "Food Court / F&B Complex"
+      },
+      {
+        "code": "RTL-11",
+        "label": "Automotive Showroom"
+      },
+      {
+        "code": "RTL-99",
+        "label": "Other – Please Specify"
+      }
+    ]
+  },
+  {
+    "code": "EVT",
+    "label": "Exhibitions, Events & MICE",
+    "facilities": [
+      {
+        "code": "EVT-01",
+        "label": "Exhibition Centre"
+      },
+      {
+        "code": "EVT-02",
+        "label": "Convention Centre"
+      },
+      {
+        "code": "EVT-03",
+        "label": "Conference Hall / Ballroom"
+      },
+      {
+        "code": "EVT-04",
+        "label": "Trade Show / Expo (Temporary)"
+      },
+      {
+        "code": "EVT-05",
+        "label": "Festival & Seasonal Event (e.g., Riyadh Season)"
+      },
+      {
+        "code": "EVT-06",
+        "label": "Concert & Live Entertainment"
+      },
+      {
+        "code": "EVT-07",
+        "label": "Sporting Event"
+      },
+      {
+        "code": "EVT-08",
+        "label": "Pop-Up Venue"
+      },
+      {
+        "code": "EVT-09",
+        "label": "Corporate Event / Summit"
+      },
+      {
+        "code": "EVT-99",
+        "label": "Other – Please Specify"
+      }
+    ]
+  },
+  {
+    "code": "COM",
+    "label": "Commercial & Office",
+    "facilities": [
+      {
+        "code": "COM-01",
+        "label": "Corporate Headquarters"
+      },
+      {
+        "code": "COM-02",
+        "label": "Grade A Office Tower"
+      },
+      {
+        "code": "COM-03",
+        "label": "Business Park"
+      },
+      {
+        "code": "COM-04",
+        "label": "Co-Working Space"
+      },
+      {
+        "code": "COM-05",
+        "label": "Free Zone Office Complex"
+      },
+      {
+        "code": "COM-06",
+        "label": "Bank / Financial Institution"
+      },
+      {
+        "code": "COM-07",
+        "label": "Business Centre"
+      },
+      {
+        "code": "COM-99",
+        "label": "Other – Please Specify"
+      }
+    ]
+  },
+  {
+    "code": "EDU",
+    "label": "Education",
+    "facilities": [
+      {
+        "code": "EDU-01",
+        "label": "K–12 School (Public)"
+      },
+      {
+        "code": "EDU-02",
+        "label": "K–12 School (Private / International)"
+      },
+      {
+        "code": "EDU-03",
+        "label": "University / College Campus"
+      },
+      {
+        "code": "EDU-04",
+        "label": "Vocational & Training Institute"
+      },
+      {
+        "code": "EDU-05",
+        "label": "Nursery / Early Learning Centre"
+      },
+      {
+        "code": "EDU-06",
+        "label": "Research Centre"
+      },
+      {
+        "code": "EDU-07",
+        "label": "Student Dormitory"
+      },
+      {
+        "code": "EDU-99",
+        "label": "Other – Please Specify"
+      }
+    ]
+  },
+  {
+    "code": "IND",
+    "label": "Industrial & Logistics",
+    "facilities": [
+      {
+        "code": "IND-01",
+        "label": "Industrial City (e.g., MODON)"
+      },
+      {
+        "code": "IND-02",
+        "label": "Manufacturing Facility / Factory"
+      },
+      {
+        "code": "IND-03",
+        "label": "Warehouse"
+      },
+      {
+        "code": "IND-04",
+        "label": "Logistics Park / Distribution Centre"
+      },
+      {
+        "code": "IND-05",
+        "label": "Cold Storage Facility"
+      },
+      {
+        "code": "IND-06",
+        "label": "Free Zone / Special Economic Zone"
+      },
+      {
+        "code": "IND-07",
+        "label": "Data Centre"
+      },
+      {
+        "code": "IND-08",
+        "label": "Laundry & Central Services Plant"
+      },
+      {
+        "code": "IND-99",
+        "label": "Other – Please Specify"
+      }
+    ]
+  },
+  {
+    "code": "ENR",
+    "label": "Energy, Oil & Gas & Mining",
+    "facilities": [
+      {
+        "code": "ENR-01",
+        "label": "Oil & Gas Field Camp"
+      },
+      {
+        "code": "ENR-02",
+        "label": "Refinery / Petrochemical Plant"
+      },
+      {
+        "code": "ENR-03",
+        "label": "Offshore Platform Accommodation"
+      },
+      {
+        "code": "ENR-04",
+        "label": "Mining Site"
+      },
+      {
+        "code": "ENR-05",
+        "label": "Solar / Wind Farm"
+      },
+      {
+        "code": "ENR-06",
+        "label": "Power & Desalination Plant"
+      },
+      {
+        "code": "ENR-07",
+        "label": "Utility Facility"
+      },
+      {
+        "code": "ENR-99",
+        "label": "Other – Please Specify"
+      }
+    ]
+  },
+  {
+    "code": "TRN",
+    "label": "Transportation & Infrastructure",
+    "facilities": [
+      {
+        "code": "TRN-01",
+        "label": "Airport"
+      },
+      {
+        "code": "TRN-02",
+        "label": "Seaport / Marine Terminal"
+      },
+      {
+        "code": "TRN-03",
+        "label": "Metro / Railway Station"
+      },
+      {
+        "code": "TRN-04",
+        "label": "Bus Terminal"
+      },
+      {
+        "code": "TRN-05",
+        "label": "Parking Structure"
+      },
+      {
+        "code": "TRN-06",
+        "label": "Highway Service Station"
+      },
+      {
+        "code": "TRN-07",
+        "label": "Rail & Road Construction Corridor"
+      },
+      {
+        "code": "TRN-99",
+        "label": "Other – Please Specify"
+      }
+    ]
+  },
+  {
+    "code": "LEI",
+    "label": "Sports, Leisure & Entertainment",
+    "facilities": [
+      {
+        "code": "LEI-01",
+        "label": "Stadium / Arena"
+      },
+      {
+        "code": "LEI-02",
+        "label": "Sports Complex / Academy"
+      },
+      {
+        "code": "LEI-03",
+        "label": "Theme Park / Water Park"
+      },
+      {
+        "code": "LEI-04",
+        "label": "Entertainment Centre / Family Entertainment Centre"
+      },
+      {
+        "code": "LEI-05",
+        "label": "Cinema Complex"
+      },
+      {
+        "code": "LEI-06",
+        "label": "Golf Club"
+      },
+      {
+        "code": "LEI-07",
+        "label": "Marina / Yacht Club"
+      },
+      {
+        "code": "LEI-08",
+        "label": "Fitness Club / Gym Chain"
+      },
+      {
+        "code": "LEI-09",
+        "label": "Beach Club"
+      },
+      {
+        "code": "LEI-99",
+        "label": "Other – Please Specify"
+      }
+    ]
+  },
+  {
+    "code": "REL",
+    "label": "Religious & Pilgrimage",
+    "facilities": [
+      {
+        "code": "REL-01",
+        "label": "Hajj Accommodation / Tent City"
+      },
+      {
+        "code": "REL-02",
+        "label": "Umrah Hotels & Accommodation"
+      },
+      {
+        "code": "REL-03",
+        "label": "Mosque / Religious Complex"
+      },
+      {
+        "code": "REL-04",
+        "label": "Pilgrim Transit Facility"
+      },
+      {
+        "code": "REL-99",
+        "label": "Other – Please Specify"
+      }
+    ]
+  },
+  {
+    "code": "GOV",
+    "label": "Government & Public Sector",
+    "facilities": [
+      {
+        "code": "GOV-01",
+        "label": "Ministry / Government Building"
+      },
+      {
+        "code": "GOV-02",
+        "label": "Municipality Facility"
+      },
+      {
+        "code": "GOV-03",
+        "label": "Military & Defence Housing"
+      },
+      {
+        "code": "GOV-04",
+        "label": "Police / Civil Defence Facility"
+      },
+      {
+        "code": "GOV-05",
+        "label": "Correctional Facility"
+      },
+      {
+        "code": "GOV-06",
+        "label": "Public Park & Civic Space"
+      },
+      {
+        "code": "GOV-07",
+        "label": "Embassy / Diplomatic Mission"
+      },
+      {
+        "code": "GOV-99",
+        "label": "Other – Please Specify"
+      }
+    ]
+  },
+  {
+    "code": "MXD",
+    "label": "Mixed-Use & Giga-Projects",
+    "facilities": [
+      {
+        "code": "MXD-01",
+        "label": "Mixed-Use Development"
+      },
+      {
+        "code": "MXD-02",
+        "label": "Smart City"
+      },
+      {
+        "code": "MXD-03",
+        "label": "Waterfront Development"
+      },
+      {
+        "code": "MXD-04",
+        "label": "Giga-Project (e.g., NEOM, Red Sea Global, Qiddiya, Diriyah, ROSHN)"
+      },
+      {
+        "code": "MXD-05",
+        "label": "Tourism Destination Development"
+      },
+      {
+        "code": "MXD-06",
+        "label": "Downtown / CBD Regeneration"
+      },
+      {
+        "code": "MXD-99",
+        "label": "Other – Please Specify"
+      }
+    ]
+  },
+  {
+    "code": "OTH",
+    "label": "Other",
+    "facilities": [
+      {
+        "code": "OTH-99",
+        "label": "Other – Please Specify"
+      }
+    ]
+  }
+]

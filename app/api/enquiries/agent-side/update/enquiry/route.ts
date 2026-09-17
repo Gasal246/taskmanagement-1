@@ -5,6 +5,13 @@ import Eq_Enquiry_External_Wifi_Edit from "@/models/eq_enquiry_external_wifi_edi
 import Eq_Enquiry_Personal_Wifi_Edit from "@/models/eq_enquriy_personal_wifi_edit.model";
 import { Decimal128 } from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
+import { canReadEnquiry, enquiryActor } from "@/lib/enquiries/completion-server";
+import { projectSupportingFieldsSchema } from "@/lib/enquiries/project-classification";
+import { CatalogueValidationError, validateDynamicClassification, validateDynamicSolutions } from "@/lib/enquiries/catalogue-server";
+import { saveEnquirySolutions, saveFacilitySolutions } from "@/app/api/helpers/enquiry-solutions";
+import Eq_camps from "@/models/eq_camps.model";
+import Eq_enquiry_solutions from "@/models/eq_enquiry_solutions.model";
+import { ZodError } from "zod";
 
 connectDB();
 
@@ -46,7 +53,27 @@ interface IBody {
 
 export async function PUT(req:NextRequest){
     try{
-        const body: IBody = await req.json();
+        const actor = await enquiryActor();
+        if (!actor) return NextResponse.json({ message: "Unauthorized", status: 401 }, { status: 401 });
+        const body: IBody & any = await req.json();
+        const enquiry: any = await Eq_enquiry.findById(body.enquiry_id);
+        if (!enquiry) return NextResponse.json({ message: "Enquiry not found", status: 404 }, { status: 404 });
+        if (!await canReadEnquiry(enquiry, actor)) return NextResponse.json({ message: "Forbidden", status: 403 }, { status: 403 });
+        const existingSolutions: any = await Eq_enquiry_solutions.findOne({ enquiry_id: enquiry._id }).lean();
+        const solutions = await validateDynamicSolutions({
+            solutions_required: body.solutions_required || [], solution_other: body.solution_other || "",
+            solution_details: body.solution_details || {},
+            primary_solution: body.primary_solution || "", commercial_model: body.commercial_model || "To Be Determined",
+        }, existingSolutions);
+        await saveEnquirySolutions(enquiry._id, solutions);
+        const camp: any = await Eq_camps.findById(enquiry.camp_id);
+        if (camp && !camp.is_active) {
+            const classification = await validateDynamicClassification(body, camp.toObject());
+            const supporting = projectSupportingFieldsSchema.parse(body);
+            Object.assign(camp, classification, supporting);
+            await camp.save();
+            await saveFacilitySolutions(camp._id, solutions);
+        }
         const wifiAvailability = body.wifi_available === "Yes"
             ? true
             : body.wifi_available === "No"
@@ -99,12 +126,13 @@ export async function PUT(req:NextRequest){
                 }
             }
 
-            await Eq_enquiry.findByIdAndUpdate(body.enquiry_id, {$set: {is_edit_req: true}});
-
-            return NextResponse.json({message: "Edit Requested", status: 200}, {status: 200});
         }
+        await Eq_enquiry.findByIdAndUpdate(body.enquiry_id, {$set: {is_edit_req: true}});
+        return NextResponse.json({message: "Edit Requested", status: 200}, {status: 200});
 
     }catch(err){
+        if (err instanceof CatalogueValidationError) return NextResponse.json({ message: err.message, status: 400 }, { status: 400 });
+        if (err instanceof ZodError) return NextResponse.json({ message: err.issues[0]?.message || "Invalid Facility details", status: 400 }, { status: 400 });
         console.log("Error while requesting for updation of Enquiry: ", err);
         return NextResponse.json({message: "Internal Server Error", status: 500}, {status: 500});
     }

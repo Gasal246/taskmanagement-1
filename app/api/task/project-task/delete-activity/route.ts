@@ -1,3 +1,4 @@
+import { recalculateTaskTimeline } from "@/app/api/helpers/task-timeline";
 import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import Business_Tasks from "@/models/business_tasks.model";
@@ -60,6 +61,8 @@ export async function DELETE(req:NextRequest){
             if(afterDel.activity_count == afterDel.completed_activity) await Business_Tasks.findByIdAndUpdate(afterDel._id, {$set:{status:"Completed"}})
         }
 
+
+        await recalculateTaskTimeline(activityToDelete.task_id);
 
         const taskId = activityToDelete?.task_id?.toString();
         if (actor?._id && taskId) {

@@ -8,6 +8,7 @@ import Eq_Enquiry_Personal_Wifi_Edit from "@/models/eq_enquriy_personal_wifi_edi
 import Eq_enquiry_histories from "@/models/eq_enquiry_histories";
 import Eq_enquiry_wifi_external from "@/models/eq_enquiry_wifi_external.model";
 import Eq_enquiry_wifi_personal from "@/models/eq_enquiry_wifi_personal.model";
+import Eq_enquiry_solutions from "@/models/eq_enquiry_solutions.model";
 import { NextRequest, NextResponse } from "next/server";
 
 connectDB();
@@ -34,6 +35,7 @@ export async function DELETE(req: NextRequest) {
         await Eq_Enquiry_Personal_Wifi_Edit.deleteMany({ enquiry_id });
         await Eq_Enquiry_Edit.deleteMany({ enquiry_id });
         await Eq_camp_contacts.deleteMany({ enquiry_id });
+        await Eq_enquiry_solutions.deleteOne({ enquiry_id });
         await Eq_enquiry.findByIdAndDelete(enquiry_id);
 
         return NextResponse.json({ message: "Enquiry deleted", status: 200 }, { status: 200 });

@@ -22,6 +22,7 @@ function fixture({ userId = 'participant', active = true, project = false, admin
     ? value.some(condition => matches(row, condition)) : value && typeof value === 'object' && '$in' in value ? value.$in.includes(row[key]) : row[key] === value);
   const chain = value => ({ populate() { return this; }, select() { return Promise.resolve(value); }, then(resolve, reject) { return Promise.resolve(value).then(resolve, reject); } });
   const mocks = {
+    '@/app/api/helpers/activity-schedule-access': { canEditActivitySchedule: async () => admin || userId === 'creator' },
     '@/app/api/helpers/activity-status-access': statusExports,
     '@/app/api/helpers/head-reassignment-scope': {
       resolveSelectedHeadContext: async () => active && supervised.length ? {} : null,
@@ -139,6 +140,11 @@ test('status API rejects supervisory viewers before writing, while allowing actu
         '@/models/admin_assign_business.model': { default: { exists: async () => false } },
         '@/models/business_staffs.model': { default: { exists: async () => true } },
         '@/app/api/helpers/activity-status-access': statusExports,
+        '@/app/api/helpers/activity-schedule-access': {},
+        '@/app/api/helpers/activity-schedule-update': {},
+        '@/lib/activity-schedule': {},
+        '@/app/api/helpers/task-timeline': {},
+        '@/app/api/helpers/staff-task-access': {},
         '@/models/Flow_Log.model': {},
         '@/app/api/helpers/task-activity-notifications': {},
         '@/app/api/helpers/head-reassignment-scope': {},

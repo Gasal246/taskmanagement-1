@@ -1,3 +1,6 @@
+import { activityScheduleSchema } from "@/lib/activity-schedule";
+import { canEditActivitySchedule } from "@/app/api/helpers/activity-schedule-access";
+import { updateActivitySchedule } from "@/app/api/helpers/activity-schedule-update";
 import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import Business_Tasks from "@/models/business_tasks.model";
@@ -24,6 +27,10 @@ connectDB();
 
 interface Body {
     activity_id: string,
+    start_date?: string,
+    end_date?: string,
+    expected_start_date?: string | null,
+    expected_end_date?: string | null,
     is_done?: boolean,
     activity?: string | null,
     description?: string | null,
@@ -51,7 +58,7 @@ export async function PUT(req: NextRequest) {
 
             const actorId = String(session?.user?.id || "");
             const task: any = await Business_Tasks.findById(currentActivity.task_id)
-                .select("business_id project_id creator is_project_task assigned_teams")
+                .select("business_id project_id creator assigned_to is_project_task assigned_teams")
                 .lean();
             if (task?.is_project_task) {
                 if (!(await canAssignProjectTaskActivities(task, actorId))) {
@@ -242,23 +249,32 @@ export async function PUT(req: NextRequest) {
             }, { status: 200 });
         } else {
             const updateFields: Record<string, any> = {};
+            const hasScheduleUpdates = Object.prototype.hasOwnProperty.call(body, "start_date") ||
+                Object.prototype.hasOwnProperty.call(body, "end_date");
+            if (hasScheduleUpdates) {
+                const schedule = activityScheduleSchema.safeParse(body);
+                if (!schedule.success) {
+                    return NextResponse.json({ message: schedule.error.issues[0].message, errors: schedule.error.flatten() }, { status: 400 });
+                }
+
+            }
             if (Object.prototype.hasOwnProperty.call(body, "activity")) updateFields.activity = body.activity;
             if (Object.prototype.hasOwnProperty.call(body, "description")) updateFields.description = body.description;
             if (Object.prototype.hasOwnProperty.call(body, "assigned_to")) updateFields.assigned_to = body.assigned_to;
             if (Object.prototype.hasOwnProperty.call(body, "assigned_skill")) updateFields.assigned_skill = body.assigned_skill;
 
-            if (!Object.keys(updateFields).length) {
+            if (!Object.keys(updateFields).length && !hasScheduleUpdates) {
                 return NextResponse.json({ message: "No updates provided", status: 400 }, { status: 400 });
             }
 
             const currentActivity: any = await Task_Activities.findById(body.activity_id)
-                .select("task_id")
+                .select("task_id start_date end_date is_done")
                 .lean();
             if (!currentActivity) {
                 return NextResponse.json({ message: "Activity not found", status: 404 }, { status: 404 });
             }
             const task: any = await Business_Tasks.findById(currentActivity.task_id)
-                .select("business_id project_id creator is_project_task assigned_teams")
+                .select("business_id project_id creator assigned_to is_project_task assigned_teams")
                 .lean();
             if (task?.is_project_task) {
                 const actorId = String(session?.user?.id || "");
@@ -289,6 +305,15 @@ export async function PUT(req: NextRequest) {
                         );
                     }
                 }
+            }
+
+            if (!task) return NextResponse.json({ message: "Task not found" }, { status: 404 });
+            if (hasScheduleUpdates) {
+                if (!(await canEditActivitySchedule(req, task, actor))) {
+                    return NextResponse.json({ message: "You cannot edit this activity schedule" }, { status: 403 });
+                }
+                const result = await updateActivitySchedule({ current: currentActivity, body, actor, contentUpdates: updateFields });
+                return NextResponse.json(result, { status: result.status });
             }
 
             await Task_Activities.findByIdAndUpdate(body.activity_id, {

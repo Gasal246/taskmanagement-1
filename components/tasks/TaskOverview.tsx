@@ -1,5 +1,6 @@
 "use client";
 
+import { formatScheduleDate } from "@/lib/activity-schedule";
 import { useRouter } from "next/navigation";
 import { Clock3, MessageCircle } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
@@ -213,7 +214,7 @@ export function TaskOverviewCard({
   const progress = Math.min(100, Math.max(0, task.progress));
   const priority = task.priority?.toLowerCase() || "";
   const createdDateLabel = formatTaskCardDate(task.created_at);
-  const endDateLabel = formatTaskCardDate(task.end_date);
+  const endDateLabel = formatScheduleDate(task.end_date);
 
   const openTask = () => router.push(href);
 

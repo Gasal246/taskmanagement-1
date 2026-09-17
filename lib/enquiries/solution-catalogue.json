@@ -1,0 +1,184 @@
+[
+  {
+    "code": "CON",
+    "label": "Connectivity & Network",
+    "solutions": [
+      {
+        "code": "CON-01",
+        "label": "Managed Wi-Fi (Resident / Community)"
+      },
+      {
+        "code": "CON-02",
+        "label": "Enterprise Wi-Fi (Office / Staff Areas)"
+      },
+      {
+        "code": "CON-03",
+        "label": "Wi-Fi Monetisation (BOO / Revenue Share)"
+      },
+      {
+        "code": "CON-04",
+        "label": "Guest / Hotspot Wi-Fi"
+      },
+      {
+        "code": "CON-05",
+        "label": "Structured Cabling & Fibre Infrastructure"
+      },
+      {
+        "code": "CON-06",
+        "label": "Network Infrastructure (Switches, Access Points, Routers)"
+      },
+      {
+        "code": "CON-07",
+        "label": "IPTV / Entertainment System"
+      }
+    ]
+  },
+  {
+    "code": "SWP",
+    "label": "Software Platforms",
+    "solutions": [
+      {
+        "code": "SWP-01",
+        "label": "SerchNGo – Staff Accommodation Management"
+      },
+      {
+        "code": "SWP-02",
+        "label": "Tekton FMS – Facility Management System"
+      },
+      {
+        "code": "SWP-03",
+        "label": "Property Management System"
+      },
+      {
+        "code": "SWP-04",
+        "label": "TekLife – Smart Community Platform"
+      },
+      {
+        "code": "SWP-05",
+        "label": "Inventory Management System"
+      },
+      {
+        "code": "SWP-06",
+        "label": "Visitor Management System"
+      },
+      {
+        "code": "SWP-07",
+        "label": "Resident / Tenant Mobile App"
+      }
+    ]
+  },
+  {
+    "code": "OPS",
+    "label": "Managed & Operational Services",
+    "solutions": [
+      {
+        "code": "OPS-01",
+        "label": "Property Management Services"
+      },
+      {
+        "code": "OPS-02",
+        "label": "Facility Management Services"
+      },
+      {
+        "code": "OPS-03",
+        "label": "Integrated On-Site Services (Fixed Rent Model)"
+      },
+      {
+        "code": "OPS-04",
+        "label": "Annual Maintenance Contract (AMC)"
+      },
+      {
+        "code": "OPS-05",
+        "label": "Technical Support & NOC Monitoring"
+      }
+    ]
+  },
+  {
+    "code": "SEC",
+    "label": "Security & Surveillance",
+    "solutions": [
+      {
+        "code": "SEC-01",
+        "label": "CCTV / IP Surveillance"
+      },
+      {
+        "code": "SEC-02",
+        "label": "Access Control & Biometrics"
+      },
+      {
+        "code": "SEC-03",
+        "label": "Turnstiles & Gate Barriers"
+      },
+      {
+        "code": "SEC-04",
+        "label": "Smart Locks"
+      },
+      {
+        "code": "SEC-05",
+        "label": "Video Intercom"
+      },
+      {
+        "code": "SEC-06",
+        "label": "Face Recognition / AI Video Analytics"
+      }
+    ]
+  },
+  {
+    "code": "SMD",
+    "label": "Smart Devices & Self-Service",
+    "solutions": [
+      {
+        "code": "SMD-01",
+        "label": "Self-Service Kiosk"
+      },
+      {
+        "code": "SMD-02",
+        "label": "Digital Signage"
+      },
+      {
+        "code": "SMD-03",
+        "label": "Smart Vending Machines"
+      },
+      {
+        "code": "SMD-04",
+        "label": "Smart Wash (Smart Laundry)"
+      },
+      {
+        "code": "SMD-05",
+        "label": "Smart Meters / Energy Management"
+      },
+      {
+        "code": "SMD-06",
+        "label": "IoT Sensors (Occupancy, Temperature, Water Leak)"
+      }
+    ]
+  },
+  {
+    "code": "HWS",
+    "label": "Hardware & Infrastructure Supply",
+    "solutions": [
+      {
+        "code": "HWS-01",
+        "label": "Hardware Supply Only"
+      },
+      {
+        "code": "HWS-02",
+        "label": "Server Rack, UPS & Data Room Equipment"
+      },
+      {
+        "code": "HWS-03",
+        "label": "Supply & Installation (Turnkey)"
+      }
+    ]
+  },
+  {
+    "code": "OTH",
+    "label": "Other",
+    "solutions": [
+      {
+        "code": "OTH-01",
+        "label": "Other – Please Specify"
+      }
+    ]
+  }
+]

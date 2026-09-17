@@ -9,8 +9,12 @@
     "lint": "next lint",
     "migrate:project-task-teams": "node scripts/migrate-project-task-teams.mjs",
     "migrate:enquiry-completion": "node scripts/migrate-enquiry-completion.mjs",
+    "migrate:task-activity-timelines": "node scripts/migrate-task-activity-timelines.mjs",
+    "test:tasks": "node --test tests/tasks/*.test.cjs",
     "test:enquiries": "node --test tests/enquiries/*.test.cjs",
-    "migrate:enquiry-actions": "node scripts/migrate-enquiry-actions.mjs"
+    "migrate:enquiry-actions": "node scripts/migrate-enquiry-actions.mjs",
+    "migrate:enquiry-catalogue": "node scripts/migrate-enquiry-catalogue.mjs",
+    "migrate:project-capacity-occupancy": "node scripts/migrate-project-capacity-occupancy.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.6.0",
