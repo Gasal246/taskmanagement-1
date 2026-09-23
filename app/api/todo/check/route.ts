@@ -25,7 +25,13 @@ export async function PUT(req: NextRequest) {
         }
 
         const todo = await Todos.findOneAndUpdate({ _id: body.todo_id, user_id: userId }, [
-            { $set: { is_completed: { $not: "$is_completed" } } },
+            {
+                $set: {
+                    is_completed: { $not: "$is_completed" },
+                    completed_at: { $cond: ["$is_completed", null, "$$NOW"] },
+                    updatedAt: "$$NOW",
+                },
+            },
         ], { new: true });
         if (!todo) return NextResponse.json({ message: "Task not found", status: 404 }, { status: 404 });
 

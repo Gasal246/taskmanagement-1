@@ -63,6 +63,7 @@ export type Todo = {
   is_completed: boolean;
   priority?: Priority;
   due_date?: string | null;
+  completed_at?: string | null;
   createdAt: string;
   updatedAt?: string;
 };
@@ -258,7 +259,12 @@ const TodoWorkspace = ({
         try {
           markPending(id, true);
           commitLocalTodos((current) =>
-            current.map((todo) => todo._id === id ? { ...todo, is_completed: !todo.is_completed } : todo)
+            current.map((todo) => todo._id === id ? {
+              ...todo,
+              is_completed: !todo.is_completed,
+              completed_at: todo.is_completed ? null : new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            } : todo)
           );
         } catch (error) {
           toast.error(getErrorMessage(error, "Could not update task on this device"));
@@ -270,7 +276,11 @@ const TodoWorkspace = ({
       markPending(id, true);
       setCachedTodos((current) =>
         current.map((todo) =>
-          todo._id === id ? { ...todo, is_completed: !todo.is_completed } : todo
+          todo._id === id ? {
+            ...todo,
+            is_completed: !todo.is_completed,
+            completed_at: todo.is_completed ? null : new Date().toISOString(),
+          } : todo
         )
       );
       try {
@@ -444,7 +454,12 @@ const TodoWorkspace = ({
   }, [priorityFilter, search, sort, status, todos]);
 
   const activeTodos = filteredTodos.filter((todo) => !todo.is_completed);
-  const completedTodos = filteredTodos.filter((todo) => todo.is_completed);
+  const completedTodos = filteredTodos
+    .filter((todo) => todo.is_completed)
+    .sort((a, b) =>
+      safeTime(b.completed_at || b.updatedAt || b.createdAt) -
+      safeTime(a.completed_at || a.updatedAt || a.createdAt)
+    );
   const hasFilters = Boolean(search || status !== "all" || priorityFilter !== "all" || sort !== "newest");
 
   if (isLoading) return <TodoWorkspaceSkeleton />;

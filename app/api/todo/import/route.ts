@@ -14,6 +14,8 @@ type ImportTodo = {
   priority?: "low" | "medium" | "high";
   due_date?: string | null;
   createdAt?: string;
+  updatedAt?: string;
+  completed_at?: string | null;
 };
 
 export async function POST(req: NextRequest) {
@@ -54,6 +56,13 @@ export async function POST(req: NextRequest) {
               client_id: item._id,
               content: item.content.trim(),
               is_completed: Boolean(item.is_completed),
+              completed_at: item.is_completed
+                ? item.completed_at && !Number.isNaN(new Date(item.completed_at).getTime())
+                  ? new Date(item.completed_at)
+                  : item.updatedAt && !Number.isNaN(new Date(item.updatedAt).getTime())
+                    ? new Date(item.updatedAt)
+                    : item.createdAt ? new Date(item.createdAt) : new Date()
+                : null,
               priority: ["low", "medium", "high"].includes(item.priority || "") ? item.priority : "low",
               due_date: item.due_date ? new Date(item.due_date) : null,
               createdAt: item.createdAt ? new Date(item.createdAt) : new Date(),

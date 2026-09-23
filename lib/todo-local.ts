@@ -34,6 +34,10 @@ export const readLocalTodos = (userId: string): Todo[] => {
           todo.due_date && !Number.isNaN(new Date(todo.due_date).getTime())
             ? todo.due_date
             : null,
+        completed_at:
+          todo.completed_at && !Number.isNaN(new Date(todo.completed_at).getTime())
+            ? todo.completed_at
+            : undefined,
         createdAt: todo.createdAt,
         updatedAt:
           todo.updatedAt && !Number.isNaN(new Date(todo.updatedAt).getTime())
