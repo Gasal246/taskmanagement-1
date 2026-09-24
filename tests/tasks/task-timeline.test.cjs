@@ -172,6 +172,7 @@ function routeFixture({ project = false, manager = true, admin = true } = {}) {
     '@/models/activity_comments.model': { default: { find: () => chain([]), deleteMany: async () => {} } },
     '@/models/activity_comment_reads.model': { default: { deleteMany: async () => {} } },
     '@/app/api/helpers/activity-comment-attachments': { deleteActivityCommentAttachments: async () => {} },
+    '@/app/api/helpers/activity-documents': { validateActivityDocuments: async value => value, deleteActivityDocuments: async () => {}, ActivityDocumentValidationError: class extends Error {} },
     'next/server': { NextResponse },
   };
   mocks['@/app/api/helpers/activity-schedule-access'] = load('app/api/helpers/activity-schedule-access.ts', mocks);

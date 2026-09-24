@@ -149,6 +149,7 @@ test('status API rejects supervisory viewers before writing, while allowing actu
         '@/app/api/helpers/task-activity-notifications': {},
         '@/app/api/helpers/head-reassignment-scope': {},
         '@/app/api/helpers/project-task-teams': {},
+        '@/app/api/helpers/activity-documents': { validateActivityDocuments: async value => value, deleteActivityDocuments: async () => {}, ActivityDocumentValidationError: class extends Error {} },
         'next/server': { NextResponse },
       };
       const exports = {};

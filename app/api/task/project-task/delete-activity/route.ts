@@ -10,6 +10,7 @@ import ActivityComments from "@/models/activity_comments.model";
 import ActivityCommentReads from "@/models/activity_comment_reads.model";
 import { deleteActivityCommentAttachments } from "@/app/api/helpers/activity-comment-attachments";
 import { canManageProjectTaskActivities } from "@/app/api/helpers/project-task-teams";
+import { deleteActivityDocuments } from "@/app/api/helpers/activity-documents";
 
 connectDB();
 
@@ -43,6 +44,7 @@ export async function DELETE(req:NextRequest){
             .lean();
         const commentIds = comments.map((comment: any) => comment._id);
         await deleteActivityCommentAttachments(comments);
+        await deleteActivityDocuments(activityToDelete.documents || []);
         await Promise.all([
             Task_Activities.findByIdAndDelete(activity_id),
             ActivityComments.deleteMany({ activity_id }),

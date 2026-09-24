@@ -13,6 +13,8 @@ import { hasStaffTaskAccess } from "@/app/api/helpers/staff-task-access";
 import {
     canManageProjectTaskActivities,
 } from "@/app/api/helpers/project-task-teams";
+import { ActivityDocumentValidationError, validateActivityDocuments } from "@/app/api/helpers/activity-documents";
+import type { ActivityDocument } from "@/lib/activityDocuments";
 
 connectDB();
 
@@ -25,6 +27,7 @@ interface Body {
     description: string,
     assigned_to?: string | null,
     assigned_skill?: string | null,
+    documents?: ActivityDocument[],
 };
 
 export async function POST(req: NextRequest) {
@@ -98,6 +101,7 @@ export async function POST(req: NextRequest) {
         const assignedSkill = task.is_project_task ? null : body.assigned_skill || null;
         const projectId = body.project_id ?? task.project_id ?? null;
 
+        const documents = await validateActivityDocuments(body.documents, { taskId: body.task_id });
         const newActivity = new Task_Activities({
             task_id: body.task_id,
             project_id: projectId,
@@ -109,6 +113,7 @@ export async function POST(req: NextRequest) {
             assigned_to: assignedTo || null,
             forwarded_to: null,
             assigned_skill: assignedSkill,
+            documents: documents || [],
         });
         const savedActivity = await newActivity.save();
 
@@ -137,6 +142,9 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ message: "Activity Added Successfully" }, { status: 201 });
 
     } catch (err) {
+        if (err instanceof ActivityDocumentValidationError) {
+            return NextResponse.json({ message: err.message }, { status: err.status });
+        }
         console.log("error while adding activity", err);
         return NextResponse.json({ message: "Internal Server Error" }, { status: 500 });
     }

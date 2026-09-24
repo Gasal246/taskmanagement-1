@@ -23,6 +23,8 @@ import {
 import AdminAssignBusiness from "@/models/admin_assign_business.model";
 import BusinessStaffs from "@/models/business_staffs.model";
 import { canChangeActivityStatus } from "@/app/api/helpers/activity-status-access";
+import { ActivityDocumentValidationError, deleteActivityDocuments, validateActivityDocuments } from "@/app/api/helpers/activity-documents";
+import type { ActivityDocument } from "@/lib/activityDocuments";
 connectDB();
 
 interface Body {
@@ -37,7 +39,8 @@ interface Body {
     assigned_to?: string | null,
     forwarded_to?: string | null,
     assigned_skill?: string | null,
-    is_status?: boolean
+    is_status?: boolean,
+    documents?: ActivityDocument[]
 }
 
 export async function PUT(req: NextRequest) {
@@ -263,12 +266,12 @@ export async function PUT(req: NextRequest) {
             if (Object.prototype.hasOwnProperty.call(body, "assigned_to")) updateFields.assigned_to = body.assigned_to;
             if (Object.prototype.hasOwnProperty.call(body, "assigned_skill")) updateFields.assigned_skill = body.assigned_skill;
 
-            if (!Object.keys(updateFields).length && !hasScheduleUpdates) {
+            if (!Object.keys(updateFields).length && !hasScheduleUpdates && !Object.prototype.hasOwnProperty.call(body, "documents")) {
                 return NextResponse.json({ message: "No updates provided", status: 400 }, { status: 400 });
             }
 
             const currentActivity: any = await Task_Activities.findById(body.activity_id)
-                .select("task_id start_date end_date is_done")
+                .select("task_id start_date end_date is_done documents")
                 .lean();
             if (!currentActivity) {
                 return NextResponse.json({ message: "Activity not found", status: 404 }, { status: 404 });
@@ -280,7 +283,8 @@ export async function PUT(req: NextRequest) {
                 const actorId = String(session?.user?.id || "");
                 const hasContentUpdates =
                     Object.prototype.hasOwnProperty.call(body, "activity") ||
-                    Object.prototype.hasOwnProperty.call(body, "description");
+                    Object.prototype.hasOwnProperty.call(body, "description") ||
+                    Object.prototype.hasOwnProperty.call(body, "documents");
                 const hasAssignmentUpdates =
                     Object.prototype.hasOwnProperty.call(body, "assigned_to") ||
                     Object.prototype.hasOwnProperty.call(body, "assigned_skill");
@@ -308,11 +312,18 @@ export async function PUT(req: NextRequest) {
             }
 
             if (!task) return NextResponse.json({ message: "Task not found" }, { status: 404 });
+            if (Object.prototype.hasOwnProperty.call(body, "documents")) {
+                updateFields.documents = await validateActivityDocuments(body.documents, { taskId: String(currentActivity.task_id) });
+            }
             if (hasScheduleUpdates) {
                 if (!(await canEditActivitySchedule(req, task, actor))) {
                     return NextResponse.json({ message: "You cannot edit this activity schedule" }, { status: 403 });
                 }
                 const result = await updateActivitySchedule({ current: currentActivity, body, actor, contentUpdates: updateFields });
+                if (result.status === 200 && updateFields.documents) {
+                    const retained = new Set(updateFields.documents.map((document: any) => document.storagePath));
+                    await deleteActivityDocuments((currentActivity.documents || []).filter((document: any) => !retained.has(document.storagePath)));
+                }
                 return NextResponse.json(result, { status: result.status });
             }
 
@@ -320,9 +331,18 @@ export async function PUT(req: NextRequest) {
                 $set: updateFields
             });
 
+            if (updateFields.documents) {
+                const retained = new Set(updateFields.documents.map((document: any) => document.storagePath));
+                const removed = (currentActivity.documents || []).filter((document: any) => !retained.has(document.storagePath));
+                await deleteActivityDocuments(removed);
+            }
+
             return NextResponse.json({ message: "Activity Updated", status: 200 }, { status: 200 });
         }
     } catch (err) {
+        if (err instanceof ActivityDocumentValidationError) {
+            return NextResponse.json({ message: err.message, status: err.status }, { status: err.status });
+        }
         console.log("error while updating task activity", err);
         return NextResponse.json({ message: "Internal Server Error" }, { status: 500 });
 

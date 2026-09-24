@@ -96,6 +96,7 @@ function fixture({ allowed = true, project = false, admin = true, creator = fals
     '@/app/api/helpers/project-task-teams': { canManageProjectTaskActivities: async () => allowed, canAssignProjectTaskActivities: async () => allowed },
     '@/app/api/helpers/task-timeline': { recalculateTaskTimeline: async () => state.recalculations++ },
     '@/app/api/helpers/task-activity-notifications': {},
+    '@/app/api/helpers/activity-documents': { validateActivityDocuments: async value => value, deleteActivityDocuments: async () => {}, ActivityDocumentValidationError: class extends Error {} },
   };
   mocks['@/app/api/helpers/activity-schedule-access'] = load('app/api/helpers/activity-schedule-access.ts', mocks);
   mocks['@/app/api/helpers/activity-schedule-update'] = load('app/api/helpers/activity-schedule-update.ts', mocks);

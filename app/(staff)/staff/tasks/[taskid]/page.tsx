@@ -81,6 +81,8 @@ import ActivityCommentsSheet from "@/components/task/ActivityCommentsSheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import axios from "axios";
 import ProjectTaskHeaderSummary from "@/components/tasks/ProjectTaskHeaderSummary";
+import ActivityDocuments from "@/components/task/ActivityDocuments";
+import type { ActivityDocument } from "@/lib/activityDocuments";
 
 const statusStyles: Record<string, string> = {
   Completed: "border-emerald-500/40 bg-emerald-500/15 text-emerald-200",
@@ -100,6 +102,12 @@ const getProgressClass = (value: number) => {
   if (value < 50) return "bg-yellow-500";
   if (value < 70) return "bg-blue-500";
   return "bg-emerald-500";
+};
+
+const resizeActivityDescription = (element: HTMLTextAreaElement | null) => {
+  if (!element) return;
+  element.style.height = "auto";
+  element.style.height = `${element.scrollHeight + 2}px`;
 };
 
 const resizeActivityTitle = (element: HTMLTextAreaElement | null) => {
@@ -190,6 +198,7 @@ const TaskDetails = () => {
   const [deleteTaskDialog, setDeleteTaskDialog] = useState(false);
   const [selectedActivityId, setSelectedActivityId] = useState<string | null>(null);
   const [editingActivity, setEditingActivity] = useState<any>(null);
+  const [activityDocuments, setActivityDocuments] = useState<ActivityDocument[]>([]);
 
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [assignTab, setAssignTab] = useState<"staffs" | "departments">("staffs");
@@ -454,6 +463,7 @@ const TaskDetails = () => {
           task_id: params.taskid,
           activity: values.activity_name,
           description: values.description,
+          documents: activityDocuments,
           ...schedule,
         });
         if (res?.status !== 201) {
@@ -466,6 +476,7 @@ const TaskDetails = () => {
           activity_id: editingActivity._id,
           activity: values.activity_name,
           description: values.description,
+          documents: activityDocuments,
           is_status: false,
           ...schedule,
         });
@@ -478,6 +489,7 @@ const TaskDetails = () => {
       setAddActivityDialog(false);
       setEditActivityDialog(false);
       setEditingActivity(null);
+      setActivityDocuments([]);
       activityForm.reset();
       refetch();
     } catch (error) {
@@ -761,6 +773,7 @@ const TaskDetails = () => {
               className="p-2 px-4 rounded-lg border border-slate-700 hover:border-slate-500 bg-gradient-to-tr from-slate-900 to-slate-800 cursor-pointer text-xs font-medium flex gap-1 items-center"
               onClick={() => {
                 activityForm.reset({ activity_name: "", description: "", start_date: "", end_date: "" });
+                setActivityDocuments([]);
                 setAddActivityDialog(true);
               }}
             >
@@ -828,6 +841,21 @@ const TaskDetails = () => {
                         taskId={params.taskid}
                         initiallyOpen={searchParams.get("comments") === "open" && searchParams.get("activityId") === String(activity._id)}
                       />
+                      {Array.isArray(activity.documents) && activity.documents.length > 0 && (
+                        <ActivityDocuments
+                          taskId={params.taskid}
+                          documents={activity.documents}
+                          variant="chip"
+                          editable={isCreator}
+                          onChange={async (documents) => {
+                            if (!isCreator) return;
+                            const res = await UpdateTaskActivity({ activity_id: activity._id, documents, is_status: false });
+                            if (res?.status !== 200) throw new Error(res?.message || "Failed to update documents");
+                            toast.success("Documents updated");
+                            await refetch();
+                          }}
+                        />
+                      )}
                       <motion.button
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
@@ -877,6 +905,7 @@ const TaskDetails = () => {
                             className="p-1 rounded-full hover:bg-slate-800 cursor-pointer flex items-center"
                             onClick={() => {
                               setEditingActivity(activity);
+                              setActivityDocuments(Array.isArray(activity.documents) ? activity.documents : []);
                               activityForm.reset({
                                 activity_name: activity.activity,
                                 description: activity.description || "",
@@ -1148,19 +1177,28 @@ const TaskDetails = () => {
                   control={activityForm.control}
                   name="description"
                   render={({ field }) => (
-                    <FormItem className="flex min-h-0 flex-1 flex-col">
+                    <FormItem className="shrink-0">
                       <FormLabel className="text-xs font-semibold text-slate-300">Description</FormLabel>
                       <FormControl>
                         <Textarea
                           placeholder="Write the activity description..."
-                          className="min-h-32 flex-1 resize-none border-slate-700 bg-slate-900/40 p-4 leading-relaxed text-slate-200 focus-visible:border-cyan-600 focus-visible:ring-cyan-700/40"
+                          className="min-h-32 resize-none overflow-hidden border-slate-700 bg-slate-900/40 p-4 leading-relaxed text-slate-200 focus-visible:border-cyan-600 focus-visible:ring-cyan-700/40"
                           {...field}
+                          ref={(element) => {
+                            field.ref(element);
+                            resizeActivityDescription(element);
+                          }}
+                          onChange={(event) => {
+                            field.onChange(event);
+                            resizeActivityDescription(event.currentTarget);
+                          }}
                         />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+                <ActivityDocuments taskId={params.taskid} documents={activityDocuments} onChange={setActivityDocuments} />
               </div>
               <div className="flex shrink-0 items-center justify-end gap-2 border-t border-slate-800 bg-slate-950/95 px-6 py-4">
                 <Button type="button" variant="ghost" onClick={() => setAddActivityDialog(false)} disabled={isAddingActivity}>
@@ -1245,19 +1283,28 @@ const TaskDetails = () => {
                   control={activityForm.control}
                   name="description"
                   render={({ field }) => (
-                    <FormItem className="flex min-h-0 flex-1 flex-col">
+                    <FormItem className="shrink-0">
                       <FormLabel className="text-xs font-semibold text-slate-300">Description</FormLabel>
                       <FormControl>
                         <Textarea
                           placeholder="Write the activity description..."
-                          className="min-h-32 flex-1 resize-none border-slate-700 bg-slate-900/40 p-4 leading-relaxed text-slate-200 focus-visible:border-cyan-600 focus-visible:ring-cyan-700/40"
+                          className="min-h-32 resize-none overflow-hidden border-slate-700 bg-slate-900/40 p-4 leading-relaxed text-slate-200 focus-visible:border-cyan-600 focus-visible:ring-cyan-700/40"
                           {...field}
+                          ref={(element) => {
+                            field.ref(element);
+                            resizeActivityDescription(element);
+                          }}
+                          onChange={(event) => {
+                            field.onChange(event);
+                            resizeActivityDescription(event.currentTarget);
+                          }}
                         />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+                <ActivityDocuments taskId={params.taskid} documents={activityDocuments} onChange={setActivityDocuments} />
               </div>
               <div className="flex shrink-0 items-center justify-end gap-2 border-t border-slate-800 bg-slate-950/95 px-6 py-4">
                 <Button type="button" variant="ghost" onClick={() => setEditActivityDialog(false)} disabled={isUpdatingActivity}>

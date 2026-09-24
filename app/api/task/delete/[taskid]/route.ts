@@ -4,6 +4,7 @@ import Task_Activities from "@/models/task_activities.model";
 import ActivityComments from "@/models/activity_comments.model";
 import ActivityCommentReads from "@/models/activity_comment_reads.model";
 import { deleteActivityCommentAttachments } from "@/app/api/helpers/activity-comment-attachments";
+import { deleteActivityDocuments } from "@/app/api/helpers/activity-documents";
 import { NextRequest, NextResponse } from "next/server";
 
 connectDB();
@@ -27,7 +28,9 @@ export async function DELETE(
       .select("_id attachment.storage_path")
       .lean();
     const commentIds = comments.map((comment: any) => comment._id);
+    const activities = await Task_Activities.find({ task_id: taskid }).select("documents").lean();
     await deleteActivityCommentAttachments(comments);
+    await deleteActivityDocuments(activities.flatMap((activity: any) => activity.documents || []));
     await Promise.all([
       Business_Tasks.findByIdAndDelete(taskid),
       Task_Activities.deleteMany({ task_id: taskid }),

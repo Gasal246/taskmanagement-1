@@ -23,6 +23,7 @@ interface ITask_Activities extends Document{
     start_date: Date | null,
     end_date: Date | null,
     completed_in: Number | null,
+    documents: Array<{ url: string, storagePath: string, name: string, mimeType: string, extension: string, size: number }>,
     createdAt: Date,
     updatedAt: Date
 }
@@ -60,6 +61,11 @@ const Task_ActivitiesSchema: Schema = new Schema({
     start_date: {type: Date, default: null},
     end_date: {type: Date, default: null},
     completed_in: {type: Number, default: null},
+    documents: { type: [{
+        url: { type: String, required: true }, storagePath: { type: String, required: true },
+        name: { type: String, required: true }, mimeType: { type: String, required: true },
+        extension: { type: String, required: true }, size: { type: Number, required: true },
+    }], default: [] },
 }, {timestamps:true})
 
 Task_ActivitiesSchema.index({ assigned_to: 1, task_id: 1 });
