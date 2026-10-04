@@ -209,7 +209,7 @@ const TasksPage = () => {
   }, [page, totalPages]);
 
   return (
-    <div className="space-y-3 p-4 pb-20">
+    <div className="min-w-0 w-full space-y-3 p-4 pb-20">
       <div className="rounded-xl border border-slate-800/70 bg-gradient-to-br from-slate-950/70 via-slate-900/50 to-slate-900/80 p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -237,8 +237,8 @@ const TasksPage = () => {
       </div>
 
       <div className="rounded-xl border border-slate-800/70 bg-gradient-to-br from-slate-950/60 to-slate-900/70 p-4">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div>
+        <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
             <p className="text-xs font-semibold text-slate-400">Task Filters</p>
             <Tabs
               value={activeTab}
@@ -248,15 +248,15 @@ const TasksPage = () => {
               }}
             >
               <TabsList className="mt-2 grid h-auto w-full grid-cols-2 gap-1 bg-slate-900/70 sm:grid-cols-4">
-                <TabsTrigger className="text-slate-400 data-[state=active]:bg-slate-200/10 data-[state=active]:text-slate-100" value="all">All Tasks</TabsTrigger>
-                <TabsTrigger className="text-slate-400 data-[state=active]:bg-slate-200/10 data-[state=active]:text-slate-100" value="single">Individual Tasks</TabsTrigger>
-                <TabsTrigger className="text-slate-400 data-[state=active]:bg-slate-200/10 data-[state=active]:text-slate-100" value="project">Project Tasks</TabsTrigger>
-                <TabsTrigger className="text-slate-400 data-[state=active]:bg-slate-200/10 data-[state=active]:text-slate-100" value="admin-created">Admin Created</TabsTrigger>
+                <TabsTrigger className="min-w-0 whitespace-normal text-slate-400 data-[state=active]:bg-slate-200/10 data-[state=active]:text-slate-100" value="all">All Tasks</TabsTrigger>
+                <TabsTrigger className="min-w-0 whitespace-normal text-slate-400 data-[state=active]:bg-slate-200/10 data-[state=active]:text-slate-100" value="single">Individual Tasks</TabsTrigger>
+                <TabsTrigger className="min-w-0 whitespace-normal text-slate-400 data-[state=active]:bg-slate-200/10 data-[state=active]:text-slate-100" value="project">Project Tasks</TabsTrigger>
+                <TabsTrigger className="min-w-0 whitespace-normal text-slate-400 data-[state=active]:bg-slate-200/10 data-[state=active]:text-slate-100" value="admin-created">Admin Created</TabsTrigger>
               </TabsList>
             </Tabs>
           </div>
 
-          <div className="flex flex-wrap items-end gap-2">
+          <div className="flex min-w-0 flex-wrap items-end gap-2">
             <Select
               value=""
               onValueChange={(value) => {
@@ -280,7 +280,7 @@ const TasksPage = () => {
             </Select>
 
             {showPriorityFilter && (
-              <div className="flex min-w-[190px] items-center gap-1 rounded-md border border-slate-700 bg-slate-900 pr-2">
+              <div className="flex min-w-0 w-full items-center sm:w-[190px] gap-1 rounded-md border border-slate-700 bg-slate-900 pr-2">
                 <Select
                   value={selectedPriority}
                   onValueChange={(value) => {
@@ -302,14 +302,14 @@ const TasksPage = () => {
             )}
 
             {showNameFilter && (
-              <div className="relative min-w-[230px]">
+              <div className="relative min-w-0 w-full sm:w-[230px]">
                 <Input value={nameSearch} onChange={(event) => setNameSearch(event.target.value)} placeholder="Task or activity name" className="border-slate-700 bg-slate-900 pr-9 text-slate-100" />
                 <button type="button" aria-label="Remove task or activity filter" onClick={() => { setShowNameFilter(false); setNameSearch(""); setAppliedNameSearch(""); setPage(1); }} className="absolute right-2 top-2 text-slate-400 hover:text-slate-100"><X size={16} /></button>
               </div>
             )}
 
             {showStaffFilter && (
-              <div className="relative min-w-[250px]">
+              <div className="relative min-w-0 w-full sm:w-[250px]">
                 <Input list="admin-task-staff-options" value={staffSearch} onChange={(event) => selectStaffFromLabel(event.target.value)} placeholder={staffOptionQuery.isLoading ? "Loading staff..." : staffOptionQuery.isError ? "Staff unavailable" : "Search staff"} disabled={staffOptionQuery.isError} className="border-slate-700 bg-slate-900 pr-9 text-slate-100" />
                 <datalist id="admin-task-staff-options">{staffOptions.map((staff) => <option key={staff.id} value={staff.label} />)}</datalist>
                 <button type="button" aria-label="Remove staff filter" onClick={() => { setShowStaffFilter(false); setStaffSearch(""); setSelectedStaffId(""); setPage(1); }} className="absolute right-2 top-2 text-slate-400 hover:text-slate-100"><X size={16} /></button>
@@ -317,7 +317,7 @@ const TasksPage = () => {
             )}
 
             {showAssignedByFilter && (
-              <div className="relative min-w-[250px]">
+              <div className="relative min-w-0 w-full sm:w-[250px]">
                 <Input list="admin-task-head-options" value={assignedBySearch} onChange={(event) => selectAssignedByFromLabel(event.target.value)} placeholder={headOptionQuery.isLoading ? "Loading heads..." : headOptionQuery.isError ? "Heads unavailable" : "Search assigned by head"} disabled={headOptionQuery.isError} className="border-slate-700 bg-slate-900 pr-9 text-slate-100" />
                 <datalist id="admin-task-head-options">{headOptions.map((head) => <option key={head.id} value={head.label} />)}</datalist>
                 <button type="button" aria-label="Remove assigned-by filter" onClick={() => { setShowAssignedByFilter(false); setAssignedBySearch(""); setSelectedAssignedById(""); setPage(1); }} className="absolute right-2 top-2 text-slate-400 hover:text-slate-100"><X size={16} /></button>
@@ -325,13 +325,13 @@ const TasksPage = () => {
             )}
 
             {showPeriodFilter && (
-              <div className="flex flex-wrap items-end gap-2 rounded-lg border border-slate-800/80 bg-slate-950/30 p-2">
-                <div className="min-w-[240px]">
+              <div className="flex min-w-0 max-w-full flex-wrap items-end gap-2 rounded-lg border border-slate-800/80 bg-slate-950/30 p-2">
+                <div className="min-w-0 w-full sm:w-[240px]">
                   <div className="mb-1 flex items-center justify-between">
                     <p className="text-[11px] text-slate-400">Within Period</p>
                     <button type="button" aria-label="Remove period filter" onClick={() => { setShowPeriodFilter(false); clearPeriod(); }} className="text-slate-400 hover:text-slate-100"><X size={14} /></button>
                   </div>
-                  <RangePicker onChange={handleDateChange} value={rangeValue} className="w-full text-slate-100" style={{ backgroundColor: "#111827", border: "1px solid #1f2937" }} />
+                  <RangePicker onChange={handleDateChange} value={rangeValue} className="min-w-0 w-full text-slate-100 [&_.ant-picker-input]:min-w-0 [&_.ant-picker-input>input]:min-w-0" style={{ backgroundColor: "#111827", border: "1px solid #1f2937" }} />
                 </div>
                 <Button size="sm" disabled={!draftRange.start || !draftRange.end} className="h-9 border border-slate-700/80 bg-slate-100/10 text-slate-100 hover:bg-slate-100/20" onClick={() => { setAppliedRange(draftRange); setPage(1); }}>Apply</Button>
                 <Button variant="ghost" size="sm" className="h-9 text-slate-400 hover:text-slate-200" onClick={clearPeriod}>Clear</Button>
@@ -368,7 +368,7 @@ const TasksPage = () => {
         )}
 
         {!isLoading && !isError && taskList.length > 0 && (
-          <div className={`grid gap-3 transition-opacity md:grid-cols-2 xl:grid-cols-3 ${isFetching ? "opacity-70" : "opacity-100"}`}>
+          <div className={`grid min-w-0 grid-cols-1 gap-3 transition-opacity md:grid-cols-2 xl:grid-cols-3 ${isFetching ? "opacity-70" : "opacity-100"}`}>
             {taskList.map((task: AdminTaskCard) => (
               <TaskOverviewCard
                 key={task._id}
@@ -387,7 +387,7 @@ const TasksPage = () => {
         {!isLoading && !isError && totalPages > 1 && (
           <div className="mt-4 flex justify-end">
             <Pagination>
-              <PaginationContent>
+              <PaginationContent className="flex-wrap justify-center">
                 <PaginationItem><PaginationPrevious href="#" onClick={(event) => { event.preventDefault(); setPage((current) => Math.max(1, current - 1)); }} className={page <= 1 ? "pointer-events-none opacity-50" : ""} /></PaginationItem>
                 {pageItems.map((item, index) => (
                   <PaginationItem key={`${item}-${index}`}>

@@ -166,7 +166,7 @@ export function TaskStatusSummaryBadges({
 
 export function TaskGridSkeleton({ count = 9 }: { count?: number }) {
   return (
-    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3" aria-label="Loading tasks">
+    <div className="grid min-w-0 grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3" aria-label="Loading tasks">
       {Array.from({ length: count }, (_, index) => (
         <div
           key={index}
@@ -186,8 +186,8 @@ export function TaskGridSkeleton({ count = 9 }: { count?: number }) {
             <Skeleton className="h-7 w-24 bg-slate-800" />
           </div>
           <div className="mt-4 space-y-2">
-            <Skeleton className="h-3 w-44 bg-slate-800" />
-            <Skeleton className="h-3 w-52 bg-slate-800" />
+            <Skeleton className="h-3 w-44 max-w-full bg-slate-800" />
+            <Skeleton className="h-3 w-52 max-w-full bg-slate-800" />
           </div>
           <Skeleton className="mt-4 h-2 w-full rounded-full bg-slate-800" />
         </div>
@@ -222,7 +222,7 @@ export function TaskOverviewCard({
     <article
       role="button"
       tabIndex={0}
-      className="group cursor-pointer rounded-xl border border-slate-800/70 bg-gradient-to-br from-slate-950/80 via-slate-950/60 to-slate-900/70 p-4 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:border-cyan-700/50 hover:shadow-lg hover:shadow-cyan-950/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/60"
+      className="group min-w-0 w-full max-w-full cursor-pointer [overflow-wrap:anywhere] rounded-xl border border-slate-800/70 bg-gradient-to-br from-slate-950/80 via-slate-950/60 to-slate-900/70 p-4 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:border-cyan-700/50 hover:shadow-lg hover:shadow-cyan-950/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/60"
       onClick={openTask}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
@@ -231,8 +231,8 @@ export function TaskOverviewCard({
         }
       }}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
+      <div className="flex min-w-0 flex-col items-start justify-between gap-3 sm:flex-row">
+        <div className="min-w-0 w-full flex-1">
           <h3 className="truncate text-base font-semibold text-slate-100">{task.task_name}</h3>
           <p
             className="mt-1 line-clamp-2 text-xs leading-5 text-slate-400"
@@ -246,7 +246,7 @@ export function TaskOverviewCard({
             </p>
           )}
         </div>
-        <div className="flex shrink-0 flex-col items-end gap-2">
+        <div className="flex max-w-full flex-wrap items-start gap-2 sm:shrink-0 sm:flex-col sm:items-end">
           <span className={`rounded-md border px-2 py-1 text-[10px] uppercase tracking-wide ${statusStyles[task.status] || "border-slate-600/40 bg-slate-700/30 text-slate-200"}`}>
             {task.status}
           </span>
@@ -275,9 +275,9 @@ export function TaskOverviewCard({
       </div>
 
       {(createdDateLabel || endDateLabel) && (
-        <div className="mt-2 flex items-center gap-4 text-[11px] text-slate-500">
-          {createdDateLabel && <p className="whitespace-nowrap">Created: {createdDateLabel}</p>}
-          {endDateLabel && <p className="whitespace-nowrap">Due: {endDateLabel}</p>}
+        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-500">
+          {createdDateLabel && <p className="min-w-0">Created: {createdDateLabel}</p>}
+          {endDateLabel && <p className="min-w-0">Due: {endDateLabel}</p>}
         </div>
       )}
       <div className="mt-3 space-y-1 text-xs text-slate-400">
@@ -301,7 +301,7 @@ export function TaskOverviewCard({
 
       <div className="mt-4 flex items-center gap-3">
         <div
-          className="relative h-2.5 flex-1 overflow-hidden rounded-full border border-slate-700/60 bg-slate-950/90 shadow-inner"
+          className="relative h-2.5 min-w-0 flex-1 overflow-hidden rounded-full border border-slate-700/60 bg-slate-950/90 shadow-inner"
           role="progressbar"
           aria-label={`${task.task_name} progress`}
           aria-valuemin={0}
@@ -317,7 +317,7 @@ export function TaskOverviewCard({
             <span className="absolute inset-0 bg-gradient-to-b from-white/25 to-transparent" />
           </motion.div>
         </div>
-        <span className="w-12 text-right text-xs font-semibold tabular-nums text-slate-200">{progress}%</span>
+        <span className="w-12 shrink-0 text-right text-xs font-semibold tabular-nums text-slate-200">{progress}%</span>
       </div>
     </article>
   );

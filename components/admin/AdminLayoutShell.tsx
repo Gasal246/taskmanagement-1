@@ -94,7 +94,7 @@ const AdminLayoutShell = ({ children }: AdminLayoutShellProps) => {
             </div>
           </aside>
 
-          <main className="relative z-0 flex-1 min-h-0 overflow-y-auto px-4 pb-10 pt-4 md:px-6">
+          <main className="relative z-0 flex-1 min-h-0 min-w-0 overflow-y-auto px-4 pb-10 pt-4 md:px-6">
             <div className="mx-auto w-full max-w-[1400px]">
               {children}
             </div>

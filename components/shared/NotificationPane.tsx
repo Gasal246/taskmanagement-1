@@ -257,7 +257,7 @@ const NotificationPane = ({ trigger }: { trigger: React.ReactNode }) => {
   const [errorMessage, setErrorMessage] = useState("");
 
   const { data: session } = useSession();
-  const [filter, setFilter] = useState("unread");
+  const [filter, setFilter] = useState("all");
   const [category, setCategory] = useState("");
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [snapshotAt, setSnapshotAt] = useState("");

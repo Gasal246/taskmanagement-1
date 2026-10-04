@@ -212,7 +212,7 @@ const StaffTasks = () => {
   }, [page, totalPages]);
 
   return (
-    <div className="space-y-3 p-4 pb-20">
+    <div className="min-w-0 w-full space-y-3 p-4 pb-20">
       <div className="rounded-xl border border-slate-800/70 bg-gradient-to-br from-slate-950/70 via-slate-900/50 to-slate-900/80 p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -246,8 +246,8 @@ const StaffTasks = () => {
       </div>
 
       <div className="rounded-xl border border-slate-800/70 bg-gradient-to-br from-slate-950/60 to-slate-900/70 p-4">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div>
+        <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
             <p className="text-xs font-semibold text-slate-400">Task Filters</p>
             <Tabs
               value={activeTab}
@@ -257,23 +257,23 @@ const StaffTasks = () => {
               }}
             >
               <TabsList className="mt-2 grid h-auto w-full grid-cols-2 gap-1 bg-slate-900/70 sm:grid-cols-4">
-                <TabsTrigger className="text-slate-400 data-[state=active]:bg-slate-200/10 data-[state=active]:text-slate-100" value="all">
+                <TabsTrigger className="min-w-0 whitespace-normal text-slate-400 data-[state=active]:bg-slate-200/10 data-[state=active]:text-slate-100" value="all">
                   All Tasks
                 </TabsTrigger>
-                <TabsTrigger className="text-slate-400 data-[state=active]:bg-slate-200/10 data-[state=active]:text-slate-100" value="single">
+                <TabsTrigger className="min-w-0 whitespace-normal text-slate-400 data-[state=active]:bg-slate-200/10 data-[state=active]:text-slate-100" value="single">
                   Individual Tasks
                 </TabsTrigger>
-                <TabsTrigger className="text-slate-400 data-[state=active]:bg-slate-200/10 data-[state=active]:text-slate-100" value="project">
+                <TabsTrigger className="min-w-0 whitespace-normal text-slate-400 data-[state=active]:bg-slate-200/10 data-[state=active]:text-slate-100" value="project">
                   Project Tasks
                 </TabsTrigger>
-                <TabsTrigger className="text-slate-400 data-[state=active]:bg-slate-200/10 data-[state=active]:text-slate-100" value="created">
+                <TabsTrigger className="min-w-0 whitespace-normal text-slate-400 data-[state=active]:bg-slate-200/10 data-[state=active]:text-slate-100" value="created">
                   Created By You
                 </TabsTrigger>
               </TabsList>
             </Tabs>
           </div>
 
-          <div className="flex flex-wrap items-end gap-2">
+          <div className="flex min-w-0 flex-wrap items-end gap-2">
             <Select
               value=""
               onValueChange={(value) => {
@@ -295,7 +295,7 @@ const StaffTasks = () => {
             </Select>
 
             {showPriorityFilter && (
-              <div className="flex min-w-[190px] items-center gap-1 rounded-md border border-slate-700 bg-slate-900 pr-2">
+              <div className="flex min-w-0 w-full items-center sm:w-[190px] gap-1 rounded-md border border-slate-700 bg-slate-900 pr-2">
                 <Select
                   value={selectedPriority}
                   onValueChange={(value) => {
@@ -317,7 +317,7 @@ const StaffTasks = () => {
             )}
 
             {showNameFilter && (
-              <div className="relative min-w-[230px]">
+              <div className="relative min-w-0 w-full sm:w-[230px]">
                 <Input
                   value={nameSearch}
                   onChange={(event) => setNameSearch(event.target.value)}
@@ -341,7 +341,7 @@ const StaffTasks = () => {
             )}
 
             {showStaffFilter && canAdd && (
-              <div className="relative min-w-[250px]">
+              <div className="relative min-w-0 w-full sm:w-[250px]">
                 <Input
                   list="staff-task-staff-options"
                   value={staffSearch}
@@ -371,8 +371,8 @@ const StaffTasks = () => {
             )}
 
             {showPeriodFilter && (
-              <div className="flex flex-wrap items-end gap-2 rounded-lg border border-slate-800/80 bg-slate-950/30 p-2">
-                <div className="min-w-[240px]">
+              <div className="flex min-w-0 max-w-full flex-wrap items-end gap-2 rounded-lg border border-slate-800/80 bg-slate-950/30 p-2">
+                <div className="min-w-0 w-full sm:w-[240px]">
                   <div className="mb-1 flex items-center justify-between">
                     <p className="text-[11px] text-slate-400">Within Period</p>
                     <button
@@ -390,7 +390,7 @@ const StaffTasks = () => {
                   <RangePicker
                     onChange={handleDateChange}
                     value={rangeValue}
-                    className="w-full text-slate-100"
+                    className="min-w-0 w-full text-slate-100 [&_.ant-picker-input]:min-w-0 [&_.ant-picker-input>input]:min-w-0"
                     style={{ backgroundColor: "#111827", border: "1px solid #1f2937" }}
                   />
                 </div>
@@ -464,7 +464,7 @@ const StaffTasks = () => {
         )}
 
         {!isLoading && !isError && taskList.length > 0 && (
-          <div className={`grid gap-3 transition-opacity md:grid-cols-2 xl:grid-cols-3 ${isFetching ? "opacity-70" : "opacity-100"}`}>
+          <div className={`grid min-w-0 grid-cols-1 gap-3 transition-opacity md:grid-cols-2 xl:grid-cols-3 ${isFetching ? "opacity-70" : "opacity-100"}`}>
             {taskList.map((task: StaffTaskCard) => (
               <TaskOverviewCard
                 key={task._id}
@@ -482,7 +482,7 @@ const StaffTasks = () => {
         {!isLoading && !isError && totalPages > 1 && (
           <div className="mt-4 flex justify-end">
             <Pagination>
-              <PaginationContent>
+              <PaginationContent className="flex-wrap justify-center">
                 <PaginationItem>
                   <PaginationPrevious
                     href="#"
