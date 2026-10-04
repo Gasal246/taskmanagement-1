@@ -164,7 +164,7 @@ export async function POST(req:NextRequest){
                     .filter(Boolean)
                     .join(" — ");
 
-                const data = { type: "task", taskId: taskId || "", link: "" };
+                const data = { type: "task", event: "assigned", actionRequired: "true", taskId: taskId || "", link: "" };
                 await enqueueNotifications([{
                     recipient_id: body.assigned_to, sender_id: session.user.id, kind: "task",
                     title: notificationTitle, body: notificationBody, data,

@@ -103,8 +103,8 @@ export default function EditHeadOfficePage() {
 
         const res = await UpdateHeadOffice(payload);
         if (res?.status == 200) {
-            toast.success(res?.message || "Head Office Updated");
-            return router.replace(`/staff/enquiry/head-quaters/${params.head_office_id}`);
+            toast.success(res?.message || "Head office change requested");
+            return router.replace("/staff/enquiry/head-quaters");
         }
         toast.error(res?.message || "Failed to update head office");
     };
@@ -142,6 +142,7 @@ export default function EditHeadOfficePage() {
             <div className="p-6 max-w-4xl mx-auto space-y-6">
                 <h1 className="text-lg font-semibold text-slate-200">Edit Head Office</h1>
 
+                <p className="text-xs text-slate-400">Submit the proposed details and facility links for admin approval. Existing details stay unchanged until approved.</p>
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                     <Input placeholder="Phone" {...register("phone")} />
                     <Input placeholder="Geo Location" {...register("geo_location")} />
@@ -236,7 +237,7 @@ export default function EditHeadOfficePage() {
                     )}
 
                     <Button type="submit" disabled={isUpdating} className="bg-cyan-700 hover:bg-cyan-600">
-                        {isUpdating ? "Saving..." : "Save Changes"}
+                        {isUpdating ? "Saving..." : "Submit Changes for Approval"}
                     </Button>
                 </form>
             </div>

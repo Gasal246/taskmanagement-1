@@ -1,4 +1,9 @@
-import { createHash, randomUUID } from "node:crypto";
+import { recordWorkerHeartbeat } from "./health";
+import { scheduleNotificationReminders } from "@/lib/notifications/reminders";
+import Preferences from "@/models/notification_preferences.model";
+import Users from "@/models/users.model";
+import { inboxId, persistInbox, unreadFilter } from "@/lib/notifications/inbox";
+import { randomUUID } from "node:crypto";
 import mongoose from "mongoose";
 import Jobs from "@/models/background_jobs.model";
 import Notifications from "@/models/notifications.model";
@@ -65,25 +70,22 @@ async function materializeNotification(job: any) {
     // A stale worker cannot create inbox rows or child jobs after losing its lease.
     const fence = await Jobs.updateOne(owned(job), { $set: { lease_until: new Date(Date.now() + LEASE_MS) } }, { session });
     if (!fence.matchedCount) throw new JobError("job/lease-lost");
-    await Notifications.bulkWrite(records.map((record: any, index: number) => ({ updateOne: {
-      filter: { _id: new mongoose.Types.ObjectId(createHash("sha256").update(`${job.dedupe_key}:${index}`).digest("hex").slice(0, 24)) },
-      update: { $setOnInsert: { ...record, createdAt: job.createdAt, updatedAt: job.createdAt } },
-      upsert: true, timestamps: false,
-    } })), { session });
-    // Stream devices; never load an unbounded device list or exceed FCM's multicast limit.
-    const cursor = FcmTokens.find({ user_id: { $in: recipientIds } }).select("user_id token").sort({ _id: 1 }).session(session).lean().cursor();
-    let devices: any[] = [];
-    let batch = 0;
-    try {
-      for await (const device of cursor) {
-        devices.push({ id: String(device._id), userId: String(device.user_id), token: device.token });
-        if (devices.length === BATCH_SIZE) {
-          await enqueueJob("push", `push:${job.dedupe_key}:${batch++}`, { devices, push }, session);
-          devices = [];
+    await persistInbox(records, job.dedupe_key, job.createdAt, session);
+    // Each recipient gets their own inbox ID and link on every registered device.
+    for (const userId of recipientIds) {
+      const index = records.findIndex((record: any) => String(record.recipient_id) === String(userId));
+      const notificationId = String(inboxId(job.dedupe_key, index));
+      const cursor = FcmTokens.find({ user_id: userId }).select("user_id token").sort({ _id: 1 }).session(session).lean().cursor();
+      let devices: any[] = []; let batch = 0;
+      const message = { ...push, data: { ...push.data, notificationId, recipientId: String(userId), link: `/notifications/${notificationId}` } };
+      try {
+        for await (const device of cursor) {
+          devices.push({ id: String(device._id), userId: String(device.user_id), token: device.token });
+          if (devices.length === BATCH_SIZE) { await enqueueJob("push", `push:${job.dedupe_key}:${userId}:${batch++}`, { devices, push: message }, session); devices = []; }
         }
-      }
-      if (devices.length) await enqueueJob("push", `push:${job.dedupe_key}:${batch}`, { devices, push }, session);
-    } finally { await cursor.close(); }
+        if (devices.length) await enqueueJob("push", `push:${job.dedupe_key}:${userId}:${batch}`, { devices, push: message }, session);
+      } finally { await cursor.close(); }
+    }
     // Parent and child writes commit together. Retrying the parent never resets read state.
     await Jobs.updateOne(owned(job), { $set: {
       status: "completed", completed_at: new Date(), purge_at: new Date(Date.now() + RETENTION_MS),
@@ -97,31 +99,54 @@ async function deliverPush(job: any, providers: Providers) {
   if (!Array.isArray(devices) || devices.length > BATCH_SIZE || !push?.notification || !push?.data) {
     throw new JobError("job/invalid-push", true);
   }
+  if (push.data.reminder === "true") {
+    const item = await Notifications.exists({ _id: push.data.notificationId, recipient_id: push.data.recipientId, read_at: null, archived_at: null, action_required: true, $or: [{ snoozed_until: null }, { snoozed_until: { $lte: new Date() } }] });
+    const prefs: any = await Preferences.findOne({ user_id: push.data.recipientId }).lean();
+    if (!item || prefs?.reminders_enabled === false) return;
+  }
   const current = await FcmTokens.find({ _id: { $in: devices.map((device: any) => device.id) } }).select("user_id token").lean();
   const currentKeys = new Set(current.map((doc: any) => `${doc._id}:${doc.user_id}:${doc.token}`));
   const active = devices.filter((device: any) => currentKeys.has(`${device.id}:${device.userId}:${device.token}`));
   if (!active.length) return;
-  const result = await providers.messaging().sendEachForMulticast({ tokens: active.map((device: any) => device.token), ...push });
+  // Legacy queued jobs may contain devices for several users. Keep account data
+  // and unread counts specific to each recipient during an upgrade too.
+  const responses: any[] = [];
+  const ordered: any[] = [];
+  for (const userId of [...new Set<string>(active.map((device: any) => device.userId))]) {
+    const group = active.filter((device: any) => device.userId === userId);
+    const badgeCount = await Notifications.countDocuments(unreadFilter(userId));
+    const result = await providers.messaging().sendEachForMulticast({ tokens: group.map((device: any) => device.token),
+      data: { ...push.data, recipientId: userId, title: push.notification.title, body: push.notification.body, deliveryId: `${job._id}:${userId}`, badgeCount: String(badgeCount) },
+      webpush: { headers: { TTL: "86400", Urgency: "normal" } },
+    });
+    ordered.push(...group); responses.push(...result.responses);
+  }
   const remaining: any[] = [];
+  const permanent: any[] = [];
   let permanentCode = "";
   let retryCode = "";
-  for (let index = 0; index < active.length; index++) {
-    const response = result.responses[index];
+  for (let index = 0; index < ordered.length; index++) {
+    const response = responses[index];
     if (response?.success) continue;
     const code = response?.error?.code || "messaging/unknown-error";
-    const device = active[index];
+    const device = ordered[index];
     if (invalidTokenCodes.has(code)) {
       await FcmTokens.deleteOne({ _id: device.id, user_id: device.userId, token: device.token });
     } else {
-      remaining.push(device);
-      if (transientCodes.has(code)) retryCode = code;
-      else permanentCode = code;
+      if (transientCodes.has(code)) { remaining.push(device); retryCode = code; }
+      else { permanent.push(device); permanentCode = code; }
     }
   }
+  // A permanent error on one device must not stop retries for other devices.
+  if (permanent.length && remaining.length) {
+    const key = `permanent:${job._id}`;
+    await Jobs.updateOne({ dedupe_key: key }, { $setOnInsert: { kind: "push", payload: { devices: permanent, push }, status: "failed", attempts: 1, last_error: errorCode({ code: permanentCode }), available_at: new Date() } }, { upsert: true });
+  }
+  if (permanent.length && !remaining.length) remaining.push(...permanent);
   // Save only unconfirmed devices before retrying; confirmed successes are not resent.
   const checkpoint = await Jobs.updateOne(owned(job), { $set: { "payload.devices": remaining } });
   if (!checkpoint.matchedCount) throw new JobError("job/lease-lost");
-  if (permanentCode) throw new JobError(errorCode({ code: permanentCode }), true);
+  if (permanentCode && !retryCode) throw new JobError(errorCode({ code: permanentCode }), true);
   if (remaining.length) throw new JobError(retryCode || "messaging/unknown-error");
 }
 async function deleteFile(job: any, providers: Providers) {
@@ -143,6 +168,20 @@ async function deleteFile(job: any, providers: Providers) {
     throw error;
   }
 }
+async function deliverEmail(job: any) {
+  const { notificationId, recipientId } = job.payload;
+  const item: any = await Notifications.findOne({ _id: notificationId, recipient_id: recipientId, read_at: null, archived_at: null, action_required: true, $or: [{ snoozed_until: null }, { snoozed_until: { $lte: new Date() } }] }).lean();
+  const prefs: any = await Preferences.findOne({ user_id: recipientId }).lean();
+  const user: any = await Users.findOne({ _id: recipientId, status: 1 }).select("email").lean();
+  if (!item || !prefs?.email_fallback || prefs.reminders_enabled === false || !user?.email) return;
+  if (!process.env.APP_URL || !process.env.NEXT_NODEMAILER_USER || !process.env.NEXT_NODEMAILER_PASS) throw new JobError("job/email-not-configured", true);
+  const url = new URL(`/notifications/${notificationId}`, process.env.APP_URL);
+  if (url.protocol !== "https:") throw new JobError("job/invalid-app-url", true);
+  const { transporter } = await import("@/lib/nodemailer");
+  await transporter.sendMail({ from: process.env.NEXT_NODEMAILER_USER, to: user.email, subject: "Taskmanager: unread notification needs attention", text: `You have an unread notification that needs attention. Sign in to review it: ${url}
+
+Manage reminder preferences in the notification panel.`, messageId: `<${job._id}@${url.hostname}>` });
+}
 export async function processJob(job: any, providers = defaultProviders) {
   if (!await Jobs.exists({ ...owned(job), lease_until: { $gt: new Date() } })) return;
   let lost = false;
@@ -157,6 +196,7 @@ export async function processJob(job: any, providers = defaultProviders) {
   try {
     if (job.kind === "notification") await materializeNotification(job);
     else if (job.kind === "push") await deliverPush(job, providers);
+    else if (job.kind === "notification-email") await deliverEmail(job);
     else if (job.kind === "storage-delete") await deleteFile(job, providers);
     else throw new JobError("job/unknown-kind", true);
     if (!lost && job.kind !== "notification") await finishJob(job);
@@ -168,6 +208,8 @@ export async function processJob(job: any, providers = defaultProviders) {
   }
 }
 export async function runJobBatch({ maxJobs = 20, timeBudgetMs = 35_000, providers = defaultProviders } = {}) {
+  await recordWorkerHeartbeat();
+  await scheduleNotificationReminders();
   const deadline = Date.now() + timeBudgetMs;
   let processed = 0;
   while (processed < maxJobs && Date.now() < deadline) {

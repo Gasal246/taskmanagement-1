@@ -1,4 +1,5 @@
 "use client";
+import { ENQUIRY_ACTIONS } from "@/lib/enquiries/action-types.mjs";
 
 import React, { useState, useMemo, useEffect } from "react";
 import { useParams } from "next/navigation";
@@ -37,7 +38,7 @@ export default function EscalatePage() {
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [assignedTo, setAssignedTo] = useState("");
   const [priority, setPriority] = useState("");
-  const [action, setAction] = useState(""); // Visit or Call
+  const [action, setAction] = useState(""); // Enquiry action
   const [feedback, setFeedback] = useState("");
   const [nextDate, setNextDate] = useState("");
   const [closureFeedback, setClosureFeedback] = useState("");
@@ -270,19 +271,11 @@ const filteredUsers = useMemo(() => {
         <h2 className="font-semibold mb-2 text-sm">Action</h2>
 
         <div className="flex gap-3">
-          <Button
-            variant={action === "Visit" ? "default" : "outline"}
-            onClick={() => setAction("Visit")}
-          >
-            Visit
-          </Button>
-
-          <Button
-            variant={action === "Call" ? "default" : "outline"}
-            onClick={() => setAction("Call")}
-          >
-            Call
-          </Button>
+          {ENQUIRY_ACTIONS.map(item => (
+            <Button key={item} type="button" variant={action === item ? "default" : "outline"} onClick={() => setAction(item)}>
+              {item}
+            </Button>
+          ))}
         </div>
       </div>
 

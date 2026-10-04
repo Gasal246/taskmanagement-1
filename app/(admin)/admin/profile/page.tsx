@@ -1,5 +1,6 @@
 "use client"
-import { signOut } from "next-auth/react";
+import {  } from "next-auth/react";
+import { notificationSignOut as signOut } from "@/lib/notifications/sign-out";
 import ProfilPageSkeleton from '@/components/skeletons/ProfilPageSkeleton'
 import { Edit2, Key, EyeOff, Eye } from 'lucide-react'
 import React, { useState, useEffect } from 'react'
@@ -235,13 +236,9 @@ const ProfilPage = () => {
         return;
       }
 
-      if ((result?.failureCount ?? 0) > 0 || (result?.missingRecipientIds?.length ?? 0) > 0) {
-        toast.warning("Push sent with warnings", {
-          description: `${result?.successCount ?? 0} device(s) succeeded, ${result?.failureCount ?? 0} failed.`,
-        });
-      } else {
-        toast.success(`Push notification sent to ${selectedStaff?.user_id?.name || "staff"}.`);
-      }
+      toast.success(`Notification saved for ${selectedStaff?.user_id?.name || "staff"}.`, {
+        description: "Device delivery is queued. The notification is available in their inbox now.",
+      });
 
       setSendPushOpen(false);
       sendPushForm.reset();

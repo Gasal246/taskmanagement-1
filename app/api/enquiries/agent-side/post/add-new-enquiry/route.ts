@@ -1,4 +1,5 @@
-import { enquiryActor, resolveEnquiryCreationBusiness } from "@/lib/enquiries/access";
+import { HeadOfficeError, enquiryOfficeInput, submitOfficeRequest, officeInBusiness } from "@/lib/enquiries/head-office-requests";
+import { enquiryActor, canAdministerEnquiry, resolveEnquiryCreationBusiness } from "@/lib/enquiries/access";
 import { reserveEnquiryUuid } from "@/lib/enquiries/sequence";
 import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
@@ -104,14 +105,14 @@ export async function POST(req: NextRequest) {
         const clientCompanyId = facility.client_company ? await findOrCreate(Eq_camp_client_company, { client_company_name: normalize(facility.client_company) }, { client_company_name: normalize(facility.client_company) }, dbSession) : null;
 
         let headOfficeId: any = null;
-        if (facility.selected_head_office_id && mongoose.isValidObjectId(facility.selected_head_office_id)) {
+        if (canAdministerEnquiry({ business_id: businessId }, actor!) && facility.selected_head_office_id && mongoose.isValidObjectId(facility.selected_head_office_id)) {
           const selected: any = await Eq_camp_headoffice.findOne({
             _id: facility.selected_head_office_id,
             $or: [{ created_by: sessionData.user.id }, { createdBy: sessionData.user.id }],
           }).session(dbSession).lean();
           if (selected) headOfficeId = selected._id;
         }
-        if (!headOfficeId && (facility.head_office_address || facility.head_office_contact || facility.head_office_location || facility.head_office_details)) {
+        if (canAdministerEnquiry({ business_id: businessId }, actor!) && !headOfficeId && (facility.head_office_address || facility.head_office_contact || facility.head_office_location || facility.head_office_details)) {
           const [office] = await Eq_camp_headoffice.create([{
             business_id: assignment?.business_id || null, created_by: sessionData.user.id, createdBy: sessionData.user.id,
             phone: facility.head_office_contact, address: facility.head_office_address,
@@ -159,6 +160,12 @@ export async function POST(req: NextRequest) {
         enquiry_user_notes: body.enquiry_user_notes || null,
       }], { session: dbSession });
       savedEnquiryId = String(enquiry._id);
+      if (!canAdministerEnquiry({ business_id: businessId }, actor!) || (body.head_office_request && body.head_office_request.operation !== "keep")) {
+        const camp: any = await Eq_camps.findById(campId).session(dbSession).lean();
+        const office = camp?.headoffice_id ? await Eq_camp_headoffice.findById(camp.headoffice_id).session(dbSession).lean() : null;
+        const input = enquiryOfficeInput(body, camp, office);
+        if (input) await submitOfficeRequest(actor!, businessId, { ...input, enquiry_id: enquiry._id, camp_ids: [campId] }, dbSession);
+      }
       await saveEnquirySolutions(enquiry._id, solutions, dbSession);
       await preserveInitialAction(enquiry, dbSession);
 
@@ -187,7 +194,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ message: "Enquiry created successfully", enquiry_id: savedEnquiryId, status: 201 }, { status: 201 });
   } catch (error: any) {
-    if (error instanceof RequestError) return NextResponse.json({ message: error.message, status: error.status }, { status: error.status });
+    if (error instanceof RequestError || error instanceof HeadOfficeError) return NextResponse.json({ message: error.message, status: error.status }, { status: error.status });
     if (error instanceof CatalogueValidationError) return NextResponse.json({ message: error.message, status: 400 }, { status: 400 });
     if (error instanceof ZodError) return NextResponse.json({ message: error.issues[0]?.message || "Invalid Facility details", errors: error.flatten().fieldErrors, status: 400 }, { status: 400 });
     console.error("Error while adding new enquiry:", error);

@@ -3,7 +3,7 @@ import connectDB from "@/lib/mongo";
 import Notifications from "@/models/notifications.model";
 import { resolveSessionUserId } from "@/lib/utils";
 import { NextResponse } from "next/server";
-import { NOTIFICATION_RETENTION_MS } from "@/lib/constants";
+import { unreadFilter } from "@/lib/notifications/inbox";
 
 export async function GET() {
   try {
@@ -17,13 +17,7 @@ export async function GET() {
       );
     }
 
-    const cutoff = new Date(Date.now() - NOTIFICATION_RETENTION_MS);
-
-    const unreadCount = await Notifications.countDocuments({
-      recipient_id: userId,
-      read_at: null,
-      createdAt: { $gte: cutoff },
-    });
+    const unreadCount = await Notifications.countDocuments(unreadFilter(userId));
 
     return NextResponse.json(
       { status: 200, unreadCount },

@@ -9,8 +9,9 @@ import TaskActivities from "@/models/task_activities.model";
 import Users from "@/models/users.model";
 import { normalizeProjectTaskTeamIds, resolveProjectTaskStaffAccess } from "@/app/api/helpers/project-task-teams";
 import mongoose from "mongoose";
+import { resolveSelectedHeadContext, getSelectedHeadDirectStaffIds } from "@/app/api/helpers/head-reassignment-scope";
 
-export async function authorizeActivityViewer(userId: string, activityId: string) {
+export async function authorizeActivityViewer(userId: string, activityId: string, req: Request) {
   const activity: any = await TaskActivities.findById(activityId).lean();
   if (!activity) return { status: 404 as const, activity: null, task: null, isAdmin: false };
 
@@ -29,9 +30,18 @@ export async function authorizeActivityViewer(userId: string, activityId: string
   const projectTaskAccess = task.is_project_task
     ? await resolveProjectTaskStaffAccess(task, userId)
     : null;
-  const canViewProjectActivity = Boolean(projectTaskAccess?.canViewAllActivities);
+  const canViewProjectActivity = Boolean(activeUser && projectTaskAccess?.canViewAllActivities);
+  // Match the task detail page: personal task owners/creators see every activity,
+  // and heads see activities within their verified selected reporting scope.
+  const isTaskViewer = Boolean(activeUser && staffAssignment && !task.is_project_task &&
+    [task.assigned_to, task.creator].some((id) => String(id || "") === userId));
+  const headContext = !isAdmin && !isAssignedStaff && !canViewProjectActivity && !isTaskViewer && activeUser && staffAssignment
+    ? await resolveSelectedHeadContext(req, userId, String(task.business_id)) : null;
+  const supervisedIds = headContext ? await getSelectedHeadDirectStaffIds(headContext) : [];
+  const isSupervisedViewer = (!task.is_project_task && supervisedIds.includes(String(task.assigned_to))) ||
+    [activity.assigned_to, activity.forwarded_to].some((id) => supervisedIds.includes(String(id || "")));
 
-  if (!isAdmin && !isAssignedStaff && !canViewProjectActivity) {
+  if (!isAdmin && !isAssignedStaff && !canViewProjectActivity && !isTaskViewer && !isSupervisedViewer) {
     return { status: 403 as const, activity: null, task: null, isAdmin: false };
   }
   return { status: 200 as const, activity, task, isAdmin };
@@ -45,7 +55,8 @@ export async function getActivityViewerIds(task: any, activity: any) {
   const adminIds = new Set(admins.map((row: any) => String(row.user_id || "")).filter(Boolean));
   const staffCandidateIds = new Set<string>();
 
-  const activityStaffIds = [activity.assigned_to, activity.forwarded_to]
+  const activityStaffIds = [activity.assigned_to, activity.forwarded_to,
+    ...(!task.is_project_task ? [task.assigned_to, task.creator] : [])]
     .map((userId) => String(userId || ""))
     .filter(Boolean);
   if (activityStaffIds.length) {

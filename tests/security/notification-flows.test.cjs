@@ -83,7 +83,7 @@ for (const [name, route, field] of [['head', heads, 'project_heads'], ['supervis
     assert.equal((await Projects.findById(f.project._id))[field].length, 0);
     assert.equal(await Jobs.countDocuments({}), 2);
     assert.equal(await Logs.countDocuments({}), 2);
-    assert.equal(await Inbox.countDocuments({}), 0);
+    assert.ok(await Inbox.countDocuments({}) > 0, 'inbox is saved with the transaction');
   });
 }
 

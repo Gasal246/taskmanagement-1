@@ -29,7 +29,7 @@ const serialize = (comment: any, seenIds: Set<string>, userId: string) => ({
   depth: comment.depth,
   body: comment.deleted_at ? "" : comment.body,
   attachment: comment.deleted_at || !comment.attachment ? null : {
-    url: comment.attachment.url,
+    url: `/api/task/activity-files?commentId=${comment._id}`,
     name: comment.attachment.name,
     mimeType: comment.attachment.mime_type,
     extension: comment.attachment.extension,
@@ -48,7 +48,7 @@ const serialize = (comment: any, seenIds: Set<string>, userId: string) => ({
 });
 
 export async function GET(
-  _req: Request,
+  req: Request,
   context: { params: Promise<{ activityId: string }> }
 ) {
   const session = await auth();
@@ -58,7 +58,7 @@ export async function GET(
   if (!mongoose.isValidObjectId(activityId)) return NextResponse.json({ message: "Invalid activity" }, { status: 400 });
 
   await connectDB();
-  const access = await authorizeActivityViewer(userId, activityId);
+  const access = await authorizeActivityViewer(userId, activityId, req);
   if (access.status !== 200) return unauthorized(access.status);
 
   const comments: any[] = await ActivityComments.find({ activity_id: activityId })
@@ -84,7 +84,7 @@ export async function POST(
   if (!mongoose.isValidObjectId(activityId)) return NextResponse.json({ message: "Invalid activity" }, { status: 400 });
 
   await connectDB();
-  const access = await authorizeActivityViewer(userId, activityId);
+  const access = await authorizeActivityViewer(userId, activityId, req);
   if (access.status !== 200) return unauthorized(access.status);
   const payload = await req.json();
   const body = String(payload?.body || "").trim();

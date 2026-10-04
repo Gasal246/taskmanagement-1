@@ -1,3 +1,4 @@
+import { ENQUIRY_ACTIONS } from "./action-types.mjs";
 import mongoose from "mongoose";
 import Histories from "@/models/eq_enquiry_histories";
 import { actionHistoryFilter, validateActionFilters } from "./completion";
@@ -42,7 +43,7 @@ export function actionFilterStages(params: Record<string, any>, actorId: string,
       { $project: { action: 1, assigned_to: 1, action_assignments: 1, action_origin: 1, next_step_date: 1 } },
     ], as: "_actionRecords" } },
     { $set: { _actionRecords: { $concatArrays: ["$_actionRecords", { $cond: [
-      { $and: [{ $in: ["$next_action", ["Call", "Visit"]] }, { $not: [{ $in: ["initial", "$_actionRecords.action_origin"] }] }] },
+      { $and: [{ $in: ["$next_action", ENQUIRY_ACTIONS] }, { $not: [{ $in: ["initial", "$_actionRecords.action_origin"] }] }] },
       [{ action: "$next_action", assigned_to: { $cond: [{ $ne: [{ $ifNull: ["$createdBy", null] }, null] }, ["$createdBy"], []] }, next_step_date: "$next_action_due" }], [],
     ] }] } } },
     { $set: { _normalizedActions: { $map: { input: "$_actionRecords", as: "candidate", in: {

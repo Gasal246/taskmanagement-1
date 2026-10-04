@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { signOut } from "next-auth/react";
+import {  } from "next-auth/react";
+import { notificationSignOut as signOut } from "@/lib/notifications/sign-out";
 import { RotateCcw } from "lucide-react";
 
 import { cn } from "@/lib/utils";

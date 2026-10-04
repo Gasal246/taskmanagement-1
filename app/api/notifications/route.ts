@@ -1,71 +1,36 @@
 import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import Notifications from "@/models/notifications.model";
+import "@/models/users.model";
 import { resolveSessionUserId } from "@/lib/utils";
 import { NextResponse } from "next/server";
-import { NOTIFICATION_RETENTION_MS } from "@/lib/constants";
-
+import mongoose from "mongoose";
+import { serializeNotification, unreadFilter } from "@/lib/notifications/inbox";
 export async function GET(req: Request) {
   try {
-        await connectDB();
-    const session = await auth();
-    const userId = resolveSessionUserId(session);
-    if (!userId) {
-      return NextResponse.json(
-        { message: "Unauthorized", status: 401 },
-        { status: 401 }
-      );
+    await connectDB(); const userId = resolveSessionUserId(await auth());
+    if (!userId) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    const params = new URL(req.url).searchParams;
+    const limit = Math.min(50, Math.max(1, Number(params.get("limit")) || 30));
+    const filter: any = { recipient_id: userId, archived_at: null };
+    if (params.get("filter") === "unread") filter.read_at = null;
+    const category = params.get("category");
+    const groups: Record<string, string[]> = { task: ["task", "task-activity", "task-activity-comment"], enquiry: ["enquiry", "head-office-request"], project: ["project", "project-head", "account-manager", "site-operational-head", "project-supervisor", "project-team"], calendar: ["calendar"] };
+    if (category && groups[category]) filter.kind = { $in: groups[category] };
+    const cursor = params.get("cursor");
+    if (cursor) {
+      const [date, id] = cursor.split("|");
+      if (!Number.isFinite(Date.parse(date)) || !mongoose.isValidObjectId(id)) return NextResponse.json({ message: "Invalid cursor" }, { status: 400 });
+      filter.$or = [{ createdAt: { $lt: new Date(date) } }, { createdAt: new Date(date), _id: { $lt: id } }];
     }
-
-    const { searchParams } = new URL(req.url);
-    const limitParam = Number(searchParams.get("limit") || 30);
-    const limit = Number.isFinite(limitParam) ? Math.min(Math.max(limitParam, 1), 50) : 30;
-
-    const cutoff = new Date(Date.now() - NOTIFICATION_RETENTION_MS);
-
-    const [notifications, unreadCount] = await Promise.all([
-      Notifications.find({ recipient_id: userId, createdAt: { $gte: cutoff } })
-        .sort({ createdAt: -1 })
-        .limit(limit)
-        .populate("sender_id", "name email avatar_url")
-        .lean(),
-      Notifications.countDocuments({
-        recipient_id: userId,
-        read_at: null,
-        createdAt: { $gte: cutoff },
-      }),
+    const snapshotAt = new Date().toISOString();
+    const [rows, unreadCount] = await Promise.all([
+      Notifications.find(filter).sort({ createdAt: -1, _id: -1 }).limit(limit + 1).populate("sender_id", "name email avatar_url").lean(),
+      Notifications.countDocuments(unreadFilter(userId)),
     ]);
-
-    const payload = notifications.map((notification: any) => ({
-      id: String(notification._id),
-      kind: notification.kind || "general",
-      title: notification.title,
-      body: notification.body,
-      data: notification.data || {},
-      meta: notification.meta || {},
-      createdAt: notification.createdAt,
-      readAt: notification.read_at ?? null,
-      sender: notification.sender_id
-        ? {
-            id: String(notification.sender_id._id),
-            name: notification.sender_id.name ?? "",
-            email: notification.sender_id.email ?? "",
-            avatar_url: notification.sender_id.avatar_url ?? "",
-          }
-        : null,
-    }));
-
-    return NextResponse.json(
-      { status: 200, notifications: payload, unreadCount },
-      { status: 200 }
-    );
-  } catch (error) {
-    console.error("Failed to fetch notifications", error);
-    return NextResponse.json(
-      { message: "Internal Server Error", status: 500 },
-      { status: 500 }
-    );
-  }
+    const items = rows.slice(0, limit); const last: any = items[items.length - 1];
+    return NextResponse.json({ notifications: items.map(serializeNotification), unreadCount, snapshotAt,
+      nextCursor: rows.length > limit && last ? `${new Date(last.createdAt).toISOString()}|${last._id}` : null }, { headers: { "Cache-Control": "private, no-store" } });
+  } catch { return NextResponse.json({ message: "Unable to load notifications" }, { status: 500 }); }
 }
-
 export const dynamic = "force-dynamic";

@@ -1,4 +1,5 @@
 "use client";
+import { ENQUIRY_ACTIONS } from "@/lib/enquiries/action-types.mjs";
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -86,7 +87,7 @@ function ActionsContent({ enquiry, basePath, onClose }: { enquiry: any; basePath
     {selected ? <div className="space-y-3 rounded-xl border border-slate-700 p-4">
       <h3 className="font-semibold">{selected.operation === 'record' ? 'Record completed action' : selected.operation === 'complete' ? 'Complete my action' : selected.operation === 'cancel' ? 'Cancel assignment' : 'Reopen assignment'}</h3>
       {selected.action && <div className="space-y-1 text-sm text-slate-300"><p>Planned: {selected.action.action} · Due: {enquiryDate(selected.action.next_step_date)}</p><p>Assignee: {userName(selected.part.user_id)}</p><p className="whitespace-pre-wrap break-words">Previous notes: {selected.action.feedback || 'None'}</p></div>}
-      {['complete', 'record'].includes(selected.operation) && <label className="block space-y-1 text-sm">Performed action<select aria-label="Performed action" value={performed} onChange={e => setPerformed(e.target.value)} disabled={saving} className="w-full rounded-lg border border-slate-700 bg-slate-900 p-2"><option>Call</option><option>Visit</option></select></label>}
+      {['complete', 'record'].includes(selected.operation) && <label className="block space-y-1 text-sm">Performed action<select aria-label="Performed action" value={performed} onChange={e => setPerformed(e.target.value)} disabled={saving} className="w-full rounded-lg border border-slate-700 bg-slate-900 p-2">{ENQUIRY_ACTIONS.map(action => <option key={action}>{action}</option>)}</select></label>}
       <label className="block space-y-1 text-sm">{['complete', 'record'].includes(selected.operation) ? 'Completion notes' : 'Reason'}<textarea aria-label="Action notes" value={notes} onChange={e => setNotes(e.target.value)} disabled={saving} maxLength={5000} rows={4} className="w-full rounded-lg border border-slate-700 bg-slate-900 p-3" /></label>
       {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
       <div className="flex flex-wrap gap-2"><Button disabled={saving || !notes.trim()} onClick={() => save()}>{saving ? 'Saving…' : 'Save action'}</Button>{['complete', 'record'].includes(selected.operation) && enquiry.canScheduleAction && <Button variant="outline" disabled={saving || !notes.trim()} onClick={() => save(true)}>Complete & schedule next</Button>}<Button variant="ghost" disabled={saving} onClick={() => setSelected(null)}>Back to actions</Button></div>

@@ -13,25 +13,15 @@ export default function EnquiryFacilityDetailsFields({
   form,
   isNewFacility,
   selectedFacility,
+  editable = isNewFacility,
 }: {
   form: UseFormReturn<any>;
   isNewFacility: boolean;
   selectedFacility?: any;
+  editable?: boolean;
 }) {
   const { data: catalogueData } = useGetEnquiryCatalogue();
   const catalogue = catalogueData?.catalogue || { project_sectors: [], solution_categories: [] };
-  const option = (name: string, label: string, values: readonly string[]) => (
-    <FormField control={form.control} name={name} render={({ field }) => (
-      <FormItem>
-        <FormLabel className="text-xs font-semibold text-slate-300">{label}</FormLabel>
-        <Select value={field.value || ""} onValueChange={field.onChange}>
-          <FormControl><SelectTrigger className="border-slate-800 bg-slate-950/40"><SelectValue placeholder={`Select ${label.toLowerCase()}`} /></SelectTrigger></FormControl>
-          <SelectContent>{values.map(value => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent>
-        </Select>
-        <FormMessage />
-      </FormItem>
-    )} />
-  );
 
   const labels = selectedFacility ? getCatalogueClassificationLabels(catalogue, selectedFacility) : null;
 
@@ -41,18 +31,11 @@ export default function EnquiryFacilityDetailsFields({
         <span className="rounded-xl border border-cyan-900/70 bg-cyan-950/30 p-2 text-cyan-300"><Building2 size={18} /></span>
         <div>
           <h3 className="text-sm font-semibold text-slate-100">Facility Details</h3>
-          <p className="mt-1 text-xs text-slate-400">{isNewFacility ? "Describe the Facility for administrator review and approval." : "Facility information is managed centrally. Solutions below apply to this enquiry."}</p>
+          <p className="mt-1 text-xs text-slate-400">{editable && !isNewFacility ? "Update the Facility details associated with this enquiry." : isNewFacility ? "Describe the Facility for administrator review and approval." : "Facility information is managed centrally. Solutions below apply to this enquiry."}</p>
         </div>
       </div>
 
-      {isNewFacility ? <div className="space-y-4">
-        <CampClassificationFields control={form.control} watch={form.watch} setValue={form.setValue} />
-        <div className="grid gap-4 md:grid-cols-3">
-          {option("project_stage", "Project Stage", PROJECT_STAGES)}
-          {option("ownership", "Ownership", OWNERSHIP_OPTIONS)}
-          {option("capacity_unit", "Capacity Unit", CAPACITY_UNITS)}
-        </div>
-      </div> : selectedFacility ? <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {editable ? <EnquiryFacilityClassificationFields form={form} /> : selectedFacility ? <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <Summary label="Facility" value={selectedFacility.camp_name} />
         <Summary label="Project Sector" value={labels?.sector || selectedFacility.camp_type} />
         <Summary label="Facility Type" value={`${labels?.facility || selectedFacility.camp_type || "Not provided"}${selectedFacility.facility_type_detail ? ` — ${selectedFacility.facility_type_detail}` : ""}`} />
@@ -66,10 +49,7 @@ export default function EnquiryFacilityDetailsFields({
       </div> : <div className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-950/40 p-4 text-xs text-slate-400"><Clock3 size={14} /> Select a Facility to view its details.</div>}
     </div>
 
-    <div className="rounded-2xl border border-slate-800/80 bg-slate-950/40 p-4 sm:p-5">
-      <CampSolutionsFields control={form.control} watch={form.watch} setValue={form.setValue} />
-      {!isNewFacility && <p className="mt-4 rounded-lg border border-slate-800 bg-slate-900/40 p-3 text-[11px] text-slate-400">These selections are saved for this enquiry. Changes do not alter the Facility baseline.</p>}
-    </div>
+    <EnquirySolutionsFields form={form} isNewFacility={isNewFacility} />
   </div>;
 }
 
@@ -78,4 +58,37 @@ function Summary({ label, value }: { label: string; value?: unknown }) {
     <p className="text-[10px] uppercase tracking-wide text-slate-500">{label}</p>
     <p className="mt-1 text-xs font-medium text-slate-200">{value === null || value === undefined || value === "" ? "Not provided" : String(value)}</p>
   </div>;
+}
+
+export function EnquiryFacilityClassificationFields({ form }: { form: UseFormReturn<any> }) {
+  const option = (name: string, label: string, values: readonly string[]) => (
+    <FormField control={form.control} name={name} render={({ field }) => (
+      <FormItem>
+        <FormLabel className="text-xs font-semibold text-slate-300">{label}</FormLabel>
+        <Select value={field.value || ""} onValueChange={value => { if (value) field.onChange(value); }}>
+          <FormControl><SelectTrigger className="border-slate-800 bg-slate-950/40"><SelectValue placeholder={`Select ${label.toLowerCase()}`} /></SelectTrigger></FormControl>
+          <SelectContent>{values.map(value => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent>
+        </Select>
+        <FormMessage />
+      </FormItem>
+    )} />
+  );
+
+  return <div className="space-y-4">
+    <CampClassificationFields control={form.control} watch={form.watch} setValue={form.setValue} />
+    <div className="grid gap-4 md:grid-cols-3">
+      {option("project_stage", "Project Stage", PROJECT_STAGES)}
+      {option("ownership", "Ownership", OWNERSHIP_OPTIONS)}
+      {option("capacity_unit", "Capacity Unit", CAPACITY_UNITS)}
+    </div>
+  </div>;
+}
+
+export function EnquirySolutionsFields({ form, isNewFacility = false }: { form: UseFormReturn<any>; isNewFacility?: boolean }) {
+  return (
+    <div className="rounded-2xl border border-slate-800/80 bg-slate-950/40 p-4 sm:p-5">
+      <CampSolutionsFields control={form.control} watch={form.watch} setValue={form.setValue} />
+      {!isNewFacility && <p className="mt-4 rounded-lg border border-slate-800 bg-slate-900/40 p-3 text-[11px] text-slate-400">These selections are saved for this enquiry. Changes do not alter the Facility baseline.</p>}
+    </div>
+  );
 }

@@ -1,8 +1,9 @@
+import { ENQUIRY_ACTIONS } from "./action-types.mjs";
 import { assignmentsFor, idOf } from './action-records.mjs';
 export { actionHistoryFilter, assignmentsFor, idOf, initialActionFor } from './action-records.mjs';
 export const forwardHistoryFilter = {
   $or: [{ change_type: 'FORWARD' }, { change_type: { $exists: false } }, { change_type: null }],
-  action: { $in: ['Call', 'Visit'] },
+  action: { $in: ENQUIRY_ACTIONS },
 };
 export const historyOrder = { step_number: -1, createdAt: -1, _id: -1 } as const;
 export function actionProgress(action: any, now = new Date()) {

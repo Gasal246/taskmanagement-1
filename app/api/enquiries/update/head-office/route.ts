@@ -1,3 +1,5 @@
+import { enquiryActor } from "@/lib/enquiries/access";
+import { authorizeOfficeAdministration, HeadOfficeError } from "@/lib/enquiries/head-office-requests";
 import connectDB from "@/lib/mongo";
 import Eq_camp_headoffice from "@/models/eq_camp_headoffice.model";
 import Eq_camps from "@/models/eq_camps.model";
@@ -16,6 +18,7 @@ export async function PUT(req: NextRequest) {
   try {
         await connectDB();
     const body: Body = await req.json();
+    const authorizedBusinessId = await authorizeOfficeAdministration(req, await enquiryActor(), body);
 
     if (!body.head_office_id) {
       return NextResponse.json(
@@ -76,6 +79,7 @@ export async function PUT(req: NextRequest) {
       { status: 200 }
     );
   } catch (err) {
+    if (err instanceof HeadOfficeError) return NextResponse.json({ message: err.message }, { status: err.status });
     console.log("Error while updating head office: ", err);
     return NextResponse.json(
       { message: "Internal server error", status: 500 },

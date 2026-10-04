@@ -1,3 +1,4 @@
+import { ENQUIRY_ACTIONS } from "@/lib/enquiries/action-types.mjs";
 import mongoose from "mongoose";
 import Tasks from "@/models/business_tasks.model";
 import Events from "@/models/calendar_events.model";
@@ -60,7 +61,7 @@ export async function calendarFeedPage(options: {
       { $match: { $expr: { $and: [{ $gte: [{ $ifNull: ["$next_step_date", "$createdAt"] }, options.start] },
         { $eq: [{ $ifNull: [{ $getField: { field: "status", input: { $arrayElemAt: [{ $filter: { input: { $ifNull: ["$action_assignments", []] }, as: "part", cond: { $eq: ["$$part.user_id", actorId] } } }, 0] } } }, "pending"] }, "pending"] },
       ] } } }];
-    const legacy: any[] = [{ $match: { createdBy: actorId, next_action: { $in: ["Call", "Visit"] }, createdAt: { $lte: options.end } } },
+    const legacy: any[] = [{ $match: { createdBy: actorId, next_action: { $in: ENQUIRY_ACTIONS }, createdAt: { $lte: options.end } } },
       { $match: { $expr: { $gte: [{ $ifNull: ["$next_action_due", "$createdAt"] }, options.start] } } },
       { $lookup: { from: Histories.collection.name, localField: "_id", foreignField: "enquiry_id", pipeline: [{ $match: { ...actionHistoryFilter, action_origin: "initial" } }, { $limit: 1 }, { $project: { _id: 1 } }], as: "_initial" } },
       { $match: { "_initial.0": { $exists: false } } },

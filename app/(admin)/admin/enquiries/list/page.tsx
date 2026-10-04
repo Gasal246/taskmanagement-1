@@ -1,4 +1,5 @@
 "use client";
+import { ENQUIRY_ACTIONS } from "@/lib/enquiries/action-types.mjs";
 import { periodBounds } from "@/lib/enquiries/period";
 import EnquiryCard from "@/components/enquiries/EnquiryCard";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
@@ -33,8 +34,7 @@ const { RangePicker } = DatePicker;
 
 const NEXT_ACTION_OPTIONS = [
   { _id: "all", name: "All" },
-  { _id: "Call", name: "Call" },
-  { _id: "Visit", name: "Visit" },
+  ...ENQUIRY_ACTIONS.map(action => ({ _id: action, name: action })),
 ];
 
 const STATUS_OPTIONS = [

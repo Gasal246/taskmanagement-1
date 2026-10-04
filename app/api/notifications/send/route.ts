@@ -1,10 +1,10 @@
+import mongoose from "mongoose";
+import { enqueueNotifications } from "@/lib/jobs/enqueue";
 import { canManageUsers } from "@/lib/server-access";
 import { auth } from "@/auth";
 import { NextResponse } from "next/server";
-import { getAdminMessaging } from "@/lib/firebaseAdmin";
 import connectDB from "@/lib/mongo";
 import FcmTokens from "@/models/fcm_tokens.model";
-import Notifications from "@/models/notifications.model";
 
 type Body = {
   token?: string;
@@ -19,28 +19,6 @@ type Body = {
   meta?: Record<string, any>;
 };
 
-function resolveLink(
-  body: Body,
-  data: Record<string, string> | undefined,
-  req: Request
-): string {
-  const rawValue =
-    (typeof data?.link === "string" && data.link) ||
-    (typeof data?.url === "string" && data.url) ||
-    (typeof body.meta?.link === "string" && body.meta.link) ||
-    (typeof body.meta?.url === "string" && body.meta.url) ||
-    "/";
-
-  const trimmed = rawValue.trim();
-  if (!trimmed) return new URL("/", req.url).toString();
-
-  try {
-    return new URL(trimmed).toString();
-  } catch (_error) {
-    return new URL(trimmed.startsWith("/") ? trimmed : `/${trimmed}`, req.url).toString();
-  }
-}
-
 function normalizeData(
   data?: Record<string, string | number | boolean>
 ): Record<string, string> | undefined {
@@ -50,17 +28,9 @@ function normalizeData(
   );
 }
 
-function isTokenInvalid(error: any): boolean {
-  const code = error?.code || "";
-  return (
-    code === "messaging/registration-token-not-registered" ||
-    code === "messaging/invalid-registration-token"
-  );
-}
-
 export async function POST(req: Request) {
   try {
-        await connectDB();
+    await connectDB();
     const apiKey = process.env.FCM_API_KEY;
     const headerKey = req.headers.get("x-api-key");
     const session: any = await auth();
@@ -100,14 +70,12 @@ export async function POST(req: Request) {
       );
     }
 
-    const messaging = getAdminMessaging();
     const title =
       notification?.title ||
       data?.title ||
       data?.heading ||
       "Notification";
     const bodyText = notification?.body || data?.body || "";
-    const webpushLink = resolveLink(body, data, req);
     const senderId =
       sessionUserId ||
       (hasValidApiKey ? body.senderId?.trim() : "") ||
@@ -123,180 +91,14 @@ export async function POST(req: Request) {
         : "general");
     const meta = body.meta ?? {};
 
-    const resolveRecipients = async (tokenList: string[]) => {
-      if (tokenList.length === 0) return [];
-      const tokenDocs = await FcmTokens.find(
-        { token: { $in: tokenList } },
-        { user_id: 1 }
-      ).lean();
-      return tokenDocs.map((doc: any) => String(doc.user_id));
-    };
-
-    const saveNotifications = async (resolvedIds: string[]) => {
-      const uniqueIds = Array.from(
-        new Set([
-          ...resolvedIds,
-          ...recipientIds.map((id) => id.trim()).filter(Boolean),
-        ])
-      );
-      if (uniqueIds.length === 0) return;
-      const documents = uniqueIds.map((recipientId) => ({
-        recipient_id: recipientId,
-        sender_id: senderId || null,
-        kind,
-        title,
-        body: bodyText,
-        data: body.data ?? {},
-        meta,
-        read_at: null,
-      }));
-      await Notifications.insertMany(documents);
-    };
-
-    let targetTokens = Array.from(new Set(tokens));
-    let missingRecipientIds: string[] = [];
-
-    const baseMessagePayload = {
-      notification,
-      data,
-      webpush: {
-        headers: {
-          Urgency: "high",
-        },
-        notification: notification
-          ? {
-              title: notification.title || title,
-              body: notification.body || bodyText,
-              icon: "/logo.png",
-              badge: "/logo.png",
-            }
-          : undefined,
-        data,
-        fcmOptions: {
-          link: webpushLink,
-        },
-      },
-    };
-
-    if (targetTokens.length === 0 && recipientIds.length > 0) {
-      const recipientTokenDocs = await FcmTokens.find(
-        { user_id: { $in: recipientIds } },
-        { token: 1, user_id: 1 }
-      ).lean();
-
-      targetTokens = Array.from(
-        new Set(
-          recipientTokenDocs
-            .map((doc: any) => doc?.token?.trim())
-            .filter(Boolean)
-        )
-      );
-
-      const resolvedRecipientIds = new Set(
-        recipientTokenDocs.map((doc: any) => String(doc.user_id))
-      );
-      missingRecipientIds = recipientIds.filter(
-        (recipientId) => !resolvedRecipientIds.has(recipientId)
-      );
-
-      if (targetTokens.length === 0) {
-        return NextResponse.json(
-          {
-            message: "No active push token found for the selected recipient(s)",
-            status: 404,
-            missingRecipientIds,
-          },
-          { status: 404 }
-        );
-      }
-    }
-
-    if (targetTokens.length > 0) {
-      const response = await messaging.sendEachForMulticast(
-        {
-          tokens: targetTokens,
-          ...baseMessagePayload,
-        }
-      );
-      const invalidTokens = response.responses
-        .map((res, idx) =>
-          isTokenInvalid(res.error) ? targetTokens[idx] : null
-        )
-        .filter(Boolean) as string[];
-      if (invalidTokens.length > 0) {
-        await FcmTokens.deleteMany({ token: { $in: invalidTokens } });
-      }
-      const successTokens = targetTokens.filter(
-        (_token, index) => response.responses[index]?.success
-      );
-      const resolvedIds = await resolveRecipients(successTokens);
-      await saveNotifications(resolvedIds);
-      return NextResponse.json(
-        {
-          message: "Multicast sent",
-          status: 200,
-          successCount: response.successCount,
-          failureCount: response.failureCount,
-          missingRecipientIds,
-          responses: response.responses.map((res, idx) => ({
-            token: targetTokens[idx],
-            success: res.success,
-            messageId: res.messageId || null,
-            error: res.error?.message || null,
-          })),
-        },
-        { status: 200 }
-      );
-    }
-
-    if (token) {
-      let messageId = "";
-      try {
-        messageId = await messaging.send(
-          {
-            token,
-            ...baseMessagePayload,
-          }
-        );
-      } catch (error: any) {
-        if (isTokenInvalid(error)) {
-          await FcmTokens.deleteOne({ token });
-          return NextResponse.json(
-            { message: "Token not registered", status: 410 },
-            { status: 410 }
-          );
-        }
-        throw error;
-      }
-      const resolvedIds = await resolveRecipients([token]);
-      await saveNotifications(resolvedIds);
-      return NextResponse.json(
-        { message: "Sent", status: 200, messageId },
-        { status: 200 }
-      );
-    }
-
-    if (topic) {
-      const messageId = await messaging.send(
-        {
-          topic,
-          ...baseMessagePayload,
-        }
-      );
-      await saveNotifications([]);
-      return NextResponse.json(
-        { message: "Sent", status: 200, messageId },
-        { status: 200 }
-      );
-    }
-
-    return NextResponse.json(
-      {
-        message: "Provide token, tokens, or topic",
-        status: 400,
-      },
-      { status: 400 }
-    );
+    if (topic) return NextResponse.json({ message: "Use explicit recipient IDs so every notification has a recoverable inbox entry" }, { status: 400 });
+    const suppliedTokens = [...new Set([token, ...tokens].filter(Boolean))];
+    const devices = suppliedTokens.length ? await FcmTokens.find({ token: { $in: suppliedTokens } }).select("user_id").lean() : [];
+    const recipients = [...new Set([...recipientIds, ...devices.map((device: any) => String(device.user_id))])];
+    if (!recipients.length || recipients.some(id => !mongoose.isValidObjectId(id))) return NextResponse.json({ message: "Provide valid recipients or registered devices" }, { status: 400 });
+    const payloadData = { ...(data || {}), ...(typeof body.data?.link === "string" ? { link: body.data.link } : {}) };
+    await enqueueNotifications(recipients.map(recipient_id => ({ recipient_id, sender_id: senderId || null, kind, title, body: bodyText, data: payloadData, meta, read_at: null })), { notification: { title, body: bodyText }, data: payloadData });
+    return NextResponse.json({ message: "Notification saved and delivery queued", status: 202, recipientCount: recipients.length }, { status: 202 });
   } catch (error: any) {
     console.error("FCM send error", error);
     return NextResponse.json(

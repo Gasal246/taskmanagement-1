@@ -18,7 +18,7 @@ export async function POST(
   if (!userId) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   const { activityId } = await context.params;
   if (!mongoose.isValidObjectId(activityId)) return NextResponse.json({ message: "Invalid activity" }, { status: 400 });
-  const access = await authorizeActivityViewer(userId, activityId);
+  const access = await authorizeActivityViewer(userId, activityId, req);
   if (access.status !== 200) return NextResponse.json({ message: "Forbidden" }, { status: access.status });
 
   const payload = await req.json();

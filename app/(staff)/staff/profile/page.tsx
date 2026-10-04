@@ -1,5 +1,6 @@
 "use client"
-import { signOut } from "next-auth/react";
+import {  } from "next-auth/react";
+import { notificationSignOut as signOut } from "@/lib/notifications/sign-out";
 import ProfilPageSkeleton from '@/components/skeletons/ProfilPageSkeleton'
 import { Edit2, Key, EyeOff, Eye } from 'lucide-react'
 import NextImage from 'next/image'

@@ -1,0 +1,15 @@
+services:
+  notifications:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.notifications
+    env_file: ../.env.production
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 45s
+    healthcheck:
+      test: ["CMD", "node", "scripts/notification-worker-health.mjs"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 30s

@@ -1,3 +1,4 @@
+import { notificationWorkerHealth } from "@/lib/jobs/health";
 import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import Jobs from "@/models/background_jobs.model";
@@ -21,7 +22,7 @@ export async function GET(request: Request) {
       Jobs.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }]).hint({ status: 1, createdAt: -1, _id: -1 }),
       Jobs.findOne({ status: "pending" }).sort({ createdAt: 1 }).select("createdAt").lean(),
     ]);
-    return NextResponse.json({ jobs, total, page, counts, oldestPendingAt: (oldest as any)?.createdAt || null }, { headers: { "Cache-Control": "private, no-store" } });
+    return NextResponse.json({ health: await notificationWorkerHealth(), jobs, total, page, counts, oldestPendingAt: (oldest as any)?.createdAt || null }, { headers: { "Cache-Control": "private, no-store" } });
   } catch { return NextResponse.json({ message: "Could not load background jobs" }, { status: 503 }); }
 }
 export async function POST(request: Request) {

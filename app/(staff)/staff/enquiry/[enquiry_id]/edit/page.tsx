@@ -1,9 +1,12 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 "use client";
+import HeadOfficeManager from "@/components/enquiries/HeadOfficeManager";
+import EnquiryActionChoices from "@/components/enquiries/EnquiryActionChoices";
+import EnquiryCapacityFields from "@/components/enquiries/EnquiryCapacityFields";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
-import { Building2, FileText, Loader2, Plus, Trash2, Upload, Wifi, PhoneCall, X, Info } from "lucide-react";
+import { Building2, FileText, Loader2, Plus, Trash2, Upload, Wifi, PhoneCall, X } from "lucide-react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -18,6 +21,7 @@ import {
     useDeleteEnquiryComment,
     useGetEnquiryByIdForStaffs,
     useGetEnquiryComments,
+    useGetEnquiryCatalogue,
     useGetEnquiryContacts,
     useGetEqAreas,
     useGetEqCampsByArea,
@@ -37,9 +41,9 @@ import Image from "next/image";
 import { deleteObject, getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { storage } from "@/firebase/config";
 import { Button } from "@/components/ui/button";
-import { Avatar, Tooltip } from "antd";
+import { Avatar } from "antd";
 import { useQueryClient } from "@tanstack/react-query";
-import EnquiryFacilityDetailsFields from "@/components/enquiries/EnquiryFacilityDetailsFields";
+import { EnquiryFacilityClassificationFields, EnquirySolutionsFields } from "@/components/enquiries/EnquiryFacilityDetailsFields";
 import { sectorFieldValuesRecord, solutionDetailsRecord } from "@/lib/enquiries/catalogue";
 
 const priorityLevels = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"];
@@ -163,7 +167,9 @@ export default function EditEnquiry() {
     const params = useParams<{ enquiry_id: string }>();
     const { data: session } = useSession();
     const queryClient = useQueryClient();
-    const [showHeadOffice, setShowHeadOffice] = useState(false);
+    const { isLoading: isCatalogueLoading } = useGetEnquiryCatalogue();
+    const loadedFormKey = useRef("");
+    const [readyFormKey, setReadyFormKey] = useState("");
     const [countries, setCountries] = useState([]);
     const [docFile, setDocFile] = useState<File | null>(null);
     const [docPreview, setDocPreview] = useState<string | null>(null);
@@ -175,17 +181,11 @@ export default function EditEnquiry() {
     const [uploadedDoc, setUploadedDoc] = useState<{ url: string; name: string; type?: string; storagePath?: string } | null>(null);
     const [removingDoc, setRemovingDoc] = useState(false);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-    const priorityCapacityMap = Eq_CAPACITY_OPTIONS.map((capacity, index) => ({
-        value: `${index + 1}`,
-        priority: `${index + 1}`,
-        capacity,
-        capacityLabel: capacity,
-    }));
 
     const { mutateAsync: GetCountries } = useGetEqCountries();
     const { mutateAsync: UpdateEnquiry, isPending: isUpdating } = useUpdateEnquiry();
     const { data: enquiry, isLoading: isEnquiryLoading } = useGetEnquiryByIdForStaffs(params.enquiry_id);
-    const { data: contactsData } = useGetEnquiryContacts(params.enquiry_id);
+    const { data: contactsData, isLoading: isContactsLoading } = useGetEnquiryContacts(params.enquiry_id);
     const { data: commentsData, isLoading: isCommentsLoading } = useGetEnquiryComments(params.enquiry_id);
     const { mutateAsync: AddEnquiryComment, isPending: isAddingComment } = useAddEnquiryComment();
     const { mutateAsync: UpdateEnquiryComment, isPending: isCommentUpdating } = useUpdateEnquiryComment();
@@ -274,7 +274,8 @@ export default function EditEnquiry() {
     const baseCampId = (enquiry?.enquiry?.camp_id?._id ?? enquiry?.enquiry?.camp_id) || "";
     const activeCampId = selectedCampId || baseCampId;
     const { data: campData, isLoading: isCampDetailsLoading } = useGetEqCampsById(activeCampId);
-    const selectedCamp = campData?.camp;
+    const selectedCamp = campData?.camp || (typeof enquiry?.enquiry?.camp_id === "object" ? enquiry.enquiry.camp_id : null);
+    const formKey = `${params.enquiry_id}:${activeCampId}`;
 
     const country_id = form.watch("country");
     const region_id = form.watch("region");
@@ -296,18 +297,9 @@ export default function EditEnquiry() {
     const { data: cities, isLoading: isCityLoading } = useGetEqCities(province_id);
     const { data: areas, isLoading: isAreaLoading } = useGetEqAreas(city_id);
     const { data: camps, isLoading: isCampListLoading } = useGetEqCampsByArea(area_id);
-    const campCapacityMissing = isExistingCampMode
-        && !!camp_id
-        && !!selectedCamp
-        && (selectedCamp?.camp_capacity === null || selectedCamp?.camp_capacity === undefined || selectedCamp?.camp_capacity === "");
-    const campOccupancyMissing = isExistingCampMode
-        && !!camp_id
-        && !!selectedCamp
-        && (selectedCamp?.camp_occupancy === null || selectedCamp?.camp_occupancy === undefined || selectedCamp?.camp_occupancy === "");
-
 
     const { control, handleSubmit } = form;
-    const { fields, append, remove, replace } = useFieldArray<z.infer<typeof enquirySchema>, "contacts">({ control, name: "contacts" });
+    const { fields, append, remove } = useFieldArray<z.infer<typeof enquirySchema>, "contacts">({ control, name: "contacts" });
     const selectClassName = "w-full rounded-md border border-slate-700 bg-slate-900 text-slate-200 p-2 focus:border-slate-500 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0";
 
     const formatDate = (dateString?: string | null) => {
@@ -356,16 +348,16 @@ export default function EditEnquiry() {
     }, []);
 
     useEffect(() => {
-        if (!enquiry?.enquiry) return;
+        if (!enquiry?.enquiry || isCampDetailsLoading || isContactsLoading || isCatalogueLoading || loadedFormKey.current === formKey) return;
 
-        const camp = campData?.camp;
-        const isApprovedEnquiry = Boolean(enquiry?.enquiry?.is_active);
+        const camp = selectedCamp;
+
         const initialLatitudeRaw = camp?.latitude ?? enquiry?.enquiry?.latitude ?? "";
         const initialLongitudeRaw = camp?.longitude ?? enquiry?.enquiry?.longitude ?? "";
         const initialLatitude = initialLatitudeRaw === "" ? "" : String(initialLatitudeRaw);
         const initialLongitude = initialLongitudeRaw === "" ? "" : String(initialLongitudeRaw);
-        const headOffice = camp?.headoffice_id;
-        const mappedContacts = (contactsData?.contacts || campData?.contacts || []).map((contact: any) => ({
+        const headOffice = camp?.headoffice_id && typeof camp.headoffice_id === "object" ? camp.headoffice_id : enquiry?.head_office;
+        const mappedContacts = (contactsData?.contacts ?? enquiry?.contacts ?? campData?.contacts ?? []).map((contact: any) => ({
             name: contact?.contact_name || "",
             phone: contact?.contact_phone || "",
             email: contact?.contact_email || "",
@@ -373,15 +365,6 @@ export default function EditEnquiry() {
             is_decision_maker: contact?.is_decision_maker ? "Yes" : "No",
             authority_level: contact?.contact_authorization || "",
         }));
-
-        const hasHeadOffice = Boolean(
-            headOffice?.phone ||
-            headOffice?.address ||
-            headOffice?.geo_location ||
-            headOffice?.other_details
-        );
-
-        setShowHeadOffice(hasHeadOffice);
 
         form.reset({
             enquiry_id: params.enquiry_id,
@@ -391,8 +374,8 @@ export default function EditEnquiry() {
             city: normalizeId(enquiry?.enquiry?.city_id),
             area_input_mode: "existing",
             area: normalizeId(enquiry?.enquiry?.area_id),
-            camp_input_mode: isApprovedEnquiry ? "existing" : "new",
-            camp: isApprovedEnquiry ? normalizeId(enquiry?.enquiry?.camp_id) : "",
+            camp_input_mode: "existing",
+            camp: String(activeCampId),
             camp_name_request: camp?.camp_name || "",
             camp_type: camp?.camp_type || "",
             project_sector: camp?.project_sector || "",
@@ -416,7 +399,7 @@ export default function EditEnquiry() {
             longitude: initialLongitude,
             coordinates: (initialLatitude || initialLongitude) ? `${initialLatitude}, ${initialLongitude}` : "",
             camp_capacity: camp?.camp_capacity || "",
-            camp_occupancy: camp?.camp_occupancy ? String(camp?.camp_occupancy) : "",
+            camp_occupancy: camp?.camp_occupancy == null ? "" : String(camp.camp_occupancy),
             contacts: mappedContacts,
             wifi_available:
                 enquiry?.enquiry?.wifi_available === true
@@ -431,7 +414,7 @@ export default function EditEnquiry() {
             contract_start: formatDate(enquiry?.external_provider?.contract_start_date) || "",
             contract_expiry: formatDate(enquiry?.external_provider?.contract_end_date) || "",
             wifi_plan: enquiry?.external_provider?.contract_package || "",
-            speed_mbps: enquiry?.external_provider?.contract_speed || "",
+            speed_mbps: normalizeDecimal(enquiry?.external_provider?.contract_speed),
             pain_points: enquiry?.external_provider?.plain_points || enquiry?.external_provider?.pain_points || "",
             provider_plan: enquiry?.personal_provider?.personal_plan || "",
             personal_wifi_start: formatDate(enquiry?.personal_provider?.personal_start_date) || "",
@@ -443,7 +426,7 @@ export default function EditEnquiry() {
             head_office_details: headOffice?.other_details || "",
             lease_expiry_due: formatDate(enquiry?.enquiry?.lease_expiry_due) || "",
             rent_terms: enquiry?.enquiry?.rent_terms || "",
-            competition_status: enquiry?.enquiry?.competition_status ? "Yes" : "No",
+            competition_status: enquiry?.enquiry?.competition_status === true ? "Yes" : enquiry?.enquiry?.competition_status === false ? "No" : "not-specified",
             competition_notes: enquiry?.enquiry?.competition_notes || "",
             priority: enquiry?.enquiry?.priority ? String(enquiry?.enquiry?.priority) : undefined,
             followup_status: enquiry?.enquiry?.status || ENQUIRY_STATUS_OPTIONS[0],
@@ -456,30 +439,10 @@ export default function EditEnquiry() {
             project_closed_by: normalizeUserIds(enquiry?.enquiry?.project_closed_by),
             project_managed_by: normalizeUserIds(enquiry?.enquiry?.project_managed_by),
             enquiry_user_notes: enquiry?.enquiry?.enquiry_user_notes || ""
-        });
-
-        replace(mappedContacts);
-    }, [enquiry, campData, contactsData]);
-
-    useEffect(() => {
-        if (isExistingCampMode) {
-            return;
-        }
-        form.setValue("camp_capacity", "");
-        form.setValue("camp_occupancy", "");
-    }, [isExistingCampMode]);
-
-    useEffect(() => {
-        if (!isExistingCampMode) {
-            return;
-        }
-
-        const capacityValue = selectedCamp?.camp_capacity;
-        const occupancyValue = selectedCamp?.camp_occupancy;
-
-        form.setValue("camp_capacity", capacityValue === null || capacityValue === undefined ? "" : String(capacityValue));
-        form.setValue("camp_occupancy", occupancyValue === null || occupancyValue === undefined ? "" : String(occupancyValue));
-    }, [activeCampId, isExistingCampMode, selectedCamp?.camp_capacity, selectedCamp?.camp_occupancy]);
+        }, { keepDirtyValues: Boolean(loadedFormKey.current) });
+        loadedFormKey.current = formKey;
+        setReadyFormKey(formKey);
+    }, [enquiry, campData, contactsData, isCampDetailsLoading, isContactsLoading, isCatalogueLoading, formKey]);
 
     const isPdf = (type: string) => type?.toLowerCase().includes('pdf');
     const isImage = (type: string) => type?.startsWith('image/');
@@ -583,7 +546,7 @@ export default function EditEnquiry() {
                 return toast.error("Camp occupancy cannot exceed Camp Capacity");
             }
         }
-        const payload = { ...data, enquiry_id: params.enquiry_id };
+        const payload = { ...data, enquiry_id: params.enquiry_id, head_office_request: { operation: "keep" } };
         if (payload.coordinates) {
             const { latitude, longitude } = parseCoordinates(payload.coordinates);
             payload.latitude = latitude;
@@ -749,7 +712,7 @@ export default function EditEnquiry() {
         );
     };
 
-    if (isEnquiryLoading || isCampDetailsLoading) {
+    if (isEnquiryLoading || isCampDetailsLoading || isContactsLoading || isCatalogueLoading || (Boolean(enquiry?.enquiry) && readyFormKey !== formKey)) {
         return (
             <div className="flex items-center justify-center h-40">
                 <div className="animate-spin rounded-full h-8 w-8 border-4 border-slate-700 border-t-cyan-400" />
@@ -810,7 +773,7 @@ export default function EditEnquiry() {
                                     <FormLabel className="text-xs text-slate-300 font-semibold">Country</FormLabel>
                                     <FormControl>
                                         <select
-                                            disabled={Boolean(enquiry?.enquiry?.is_active)}
+
                                             value={field.value ?? ""}
                                             onChange={field.onChange}
                                             className={selectClassName}
@@ -935,7 +898,6 @@ export default function EditEnquiry() {
                             </div>
                         </div>
 
-
                         {/* CAMP INPUT MODE TOGGLE */}
                         {areaInputMode == "existing" && (
                             <FormField
@@ -1007,11 +969,11 @@ export default function EditEnquiry() {
                         )}
 
                         {/* REQUEST NEW CAMP TEXT INPUT + LANDLORD/RE DETAILS/CLIENT */}
-                        {(campInputMode === "new" || areaInputMode == "new") && (
+                        {(campInputMode === "new" || areaInputMode == "new" || Boolean(activeCampId)) && (
                             <div className="rounded-2xl border border-slate-800/80 bg-gradient-to-br from-slate-900/45 via-slate-950/45 to-cyan-950/10 p-4 space-y-3">
                                 <div>
-                                    <p className="text-xs font-semibold text-slate-200">Camp Request Details</p>
-                                    <p className="text-[11px] text-slate-400">Capture new camp details with enough context for review and follow-up.</p>
+                                    <p className="text-xs font-semibold text-slate-200">Facility Details</p>
+                                    <p className="text-[11px] text-slate-400">Update the facility name and related details.</p>
                                 </div>
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                                 <FormField
@@ -1019,12 +981,12 @@ export default function EditEnquiry() {
                                     name="camp_name_request"
                                     render={({ field }) => (
                                         <FormItem className="w-full lg:col-span-2">
-                                            <FormLabel className="text-xs text-slate-300 font-semibold">Requested Camp Name</FormLabel>
+                                            <FormLabel className="text-xs text-slate-300 font-semibold">Facility Name</FormLabel>
                                             <FormControl>
-                                                <Input placeholder="Enter camp name to request review" {...field} value={field.value ?? ""} className="bg-slate-950/40" />
+                                                <Input placeholder="Enter facility name" {...field} value={field.value ?? ""} className="bg-slate-950/40" />
                                             </FormControl>
                                             <p className="text-[10px] text-slate-400 mt-1">
-                                                This will be reviewed and added to the system if valid.
+                                                New facility requests are reviewed before approval.
                                             </p>
                                             <FormMessage />
                                         </FormItem>
@@ -1064,97 +1026,17 @@ export default function EditEnquiry() {
                                     )}
                                 />
 
-
-                                {/* HEAD OFFICE */}
-                                {!showHeadOffice && (
-                                    <button type="button" className="inline-flex items-center rounded-lg border border-cyan-800/60 bg-cyan-950/20 px-3 py-2 text-cyan-200 text-xs hover:bg-cyan-950/30 transition" onClick={() => setShowHeadOffice(true)}>
-                                        + Add Head Office Details
-                                    </button>
-                                )}
-
-                                {showHeadOffice && (
-                                    <div className="lg:col-span-2 border border-slate-700/80 p-4 rounded-xl space-y-3 bg-slate-900/50">
-                                        <div className="flex justify-between items-center">
-                                            <h1 className="text-xs font-semibold text-slate-300">Head Office</h1>
-                                            <button type="button" className="text-red-400 text-xs underline" onClick={() => setShowHeadOffice(false)}>
-                                                Remove
-                                            </button>
-                                        </div>
-
-                                        <FormField control={form.control} name="head_office_address" render={({ field }) => (
-                                            <FormItem><FormLabel className="text-xs text-slate-300">Address</FormLabel><FormControl><Input {...field} value={field.value ?? ""} /></FormControl></FormItem>
-                                        )} />
-
-                                        <FormField control={form.control} name="head_office_contact" render={({ field }) => (
-                                            <FormItem><FormLabel className="text-xs text-slate-300">Contact Number</FormLabel><FormControl><Input {...field} value={field.value ?? ""} /></FormControl></FormItem>
-                                        )} />
-
-                                        <FormField control={form.control} name="head_office_location" render={({ field }) => (
-                                            <FormItem><FormLabel className="text-xs text-slate-300">Location</FormLabel><FormControl><Input {...field} value={field.value ?? ""} /></FormControl></FormItem>
-                                        )} />
-
-                                        <FormField control={form.control} name="head_office_details" render={({ field }) => (
-                                            <FormItem><FormLabel className="text-xs text-slate-300">Other Details</FormLabel><FormControl><Textarea {...field} value={field.value ?? ""} /></FormControl></FormItem>
-                                        )} />
-
-                                    </div>
-                                )}
-
                                 </div>
+                                {String(activeCampId) === String(baseCampId) && !isNewCamp
+                                    ? <HeadOfficeManager enquiryId={params.enquiry_id} />
+                                    : <p className="text-xs text-slate-400">Save the new facility selection before requesting head office changes.</p>}
+                                <EnquiryFacilityClassificationFields form={form} />
                             </div>
                         )}
 
-                        <EnquiryFacilityDetailsFields
-                            form={form}
-                            isNewFacility={!Boolean(enquiry?.enquiry?.is_active)}
-                            selectedFacility={selectedCamp}
-                        />
+                        <EnquirySolutionsFields form={form} isNewFacility={!Boolean(enquiry?.enquiry?.is_active)} />
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {/* CAMP CAPACITY */}
-                            <FormField control={form.control} name="camp_capacity" render={({ field }) => (
-                                <FormItem className="rounded-xl border border-slate-800/70 bg-slate-950/25 p-3">
-                                    <FormLabel className="text-xs text-slate-300">Camp Capacity</FormLabel>
-                                    <FormControl>
-                                        <select
-                                            value={field.value ?? ""}
-                                            onChange={(event) => {
-                                                const value = event.target.value;
-                                                field.onChange(value);
-                                                const matchedPriority = priorityCapacityMap.find((item) => item.capacity === value)?.priority;
-                                                if (matchedPriority) {
-                                                    form.setValue("priority", matchedPriority, { shouldDirty: true, shouldValidate: true });
-                                                }
-                                            }}
-                                            className={selectClassName}
-                                        >
-                                            <option value="">Select Capacity</option>
-                                            {priorityCapacityMap.map((item) => (
-                                                <option key={item.capacity} value={item.capacity}>
-                                                    {item.capacityLabel} (Priority {item.priority})
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </FormControl>
-                                    {campCapacityMissing && (
-                                        <p className="text-xs text-red-400 mt-1">Please add the camp capacity</p>
-                                    )}
-                                    <FormMessage />
-                                </FormItem>
-                            )} />
-
-                            {/* OCCUPANCY */}
-                            <FormField control={form.control} name="camp_occupancy" render={({ field }) => (
-                                <FormItem className="rounded-xl border border-slate-800/70 bg-slate-950/25 p-3">
-                                    <FormLabel className="text-xs text-slate-300">Current Occupancy</FormLabel>
-                                    <Input disabled={Boolean(enquiry?.enquiry?.is_active)} type="number" {...field} value={field.value || ""} placeholder="Enter in numbers" className="bg-slate-950/40" />
-                                    {campOccupancyMissing && (
-                                        <p className="text-xs text-red-400 mt-1">Please add the camp occupancy</p>
-                                    )}
-                                    <FormMessage />
-                                </FormItem>
-                            )} />
-                        </div>
+                        <EnquiryCapacityFields form={form as any} />
 
                         {/* CONTACTS */}
                         <div className="rounded-xl border border-slate-800/80 bg-gradient-to-r from-slate-900/50 to-slate-950/40 p-3 space-y-3">
@@ -1414,7 +1296,7 @@ export default function EditEnquiry() {
                                                 onChange={field.onChange}
                                                 className={selectClassName}
                                             >
-                                                <option value="">Competition Status</option>
+                                                <option value="not-specified">Not specified</option>
                                                 <option value="Yes">Yes</option>
                                                 <option value="No">No</option>
                                             </select>
@@ -1426,53 +1308,6 @@ export default function EditEnquiry() {
                                     <Textarea {...form.register("competition_notes")} placeholder="Competition Notes" className="bg-slate-950/40 min-h-[86px]" />
                                 </div>
                             </div>
-                        </div>
-
-                        <div className="rounded-xl border border-slate-800/80 bg-gradient-to-r from-slate-900/45 to-slate-950/35 p-3">
-                            <FormField control={form.control} name="priority" render={({ field }) => (
-                                <FormItem>
-                                    <Tooltip
-                                        placement="topLeft"
-                                        rootClassName="w-[360px]"
-                                        className="w-[360px]"
-                                        title={
-                                            <div className="w-[360px] rounded-lg border border-slate-700/70 bg-slate-900/95 p-3 shadow-lg">
-                                                <div className="grid grid-cols-2 gap-x-4 text-[11px] font-semibold uppercase tracking-wide text-slate-300">
-                                                    <span>Priority</span>
-                                                    <span>Capacity</span>
-                                                </div>
-                                                <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-slate-200">
-                                                    {priorityCapacityMap.map((item) => (
-                                                        <React.Fragment key={item.value}>
-                                                            <span className="tabular-nums">{item.priority}</span>
-                                                            <span className="whitespace-nowrap">{item.capacityLabel}</span>
-                                                        </React.Fragment>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        }
-                                    >
-                                        <FormLabel className="text-xs text-slate-300 font-semibold flex gap-1 items-center">
-                                            <Info size={14} color="white" />
-                                            Priority (1 - Low, 10 - High)
-                                        </FormLabel>
-                                    </Tooltip>
-                                    <FormControl>
-                                        <select
-                                            value={field.value ?? ""}
-                                            onChange={field.onChange}
-                                            className={selectClassName}
-                                        >
-                                            <option value="">Priority</option>
-                                            {priorityCapacityMap.map((item) => (
-                                                <option key={item.value} value={item.value}>
-                                                    {item.value} - {item.capacityLabel}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </FormControl>
-                                </FormItem>
-                            )} />
                         </div>
 
                         <div className="rounded-xl border border-slate-800/80 bg-gradient-to-r from-slate-900/45 to-slate-950/35 p-3">
@@ -1511,6 +1346,7 @@ export default function EditEnquiry() {
                                 )} />
                                 <div className="lg:col-span-2 rounded-lg border border-slate-800/70 bg-slate-950/25 p-3">
                                     <label className="text-xs text-slate-300 font-semibold block mb-2">Next Action</label>
+                                    <EnquiryActionChoices value={form.watch("next_action")} onChange={value => form.setValue("next_action", value, { shouldDirty: true, shouldValidate: true })} />
                                     <Textarea {...form.register("next_action")} placeholder="Next Action" className="bg-slate-950/40 min-h-[92px]" />
                                 </div>
                             </div>

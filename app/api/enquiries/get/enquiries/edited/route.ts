@@ -1,3 +1,5 @@
+import Eq_enquiry from "@/models/eq_enquiries.model";
+import Eq_camps from "@/models/eq_camps.model";
 import { authorizeEnquiry } from "@/lib/enquiries/access";
 import connectDB from "@/lib/mongo";
 import Eq_Enquiry_Edit from "@/models/eq_enquiry_edit.model";
@@ -16,23 +18,25 @@ export async function GET(req:NextRequest){
         if (denied) return denied;
 
         const edited_enquiry:any = await Eq_Enquiry_Edit.findOne({enquiry_id: enquiry_id}).lean();
+        const enquiry: any = await Eq_enquiry.findById(enquiry_id).select("camp_id").lean();
+        const camp = enquiry?.camp_id ? await Eq_camps.findById(enquiry.camp_id).select("camp_capacity camp_occupancy").lean() : null;
         if(edited_enquiry?.wifi_available){
             switch(edited_enquiry?.wifi_type){
                 case "Existing Contractor": {
                     const existing_contractor = await Eq_Enquiry_External_Wifi_Edit.findOne({enquiry_edit_id: edited_enquiry._id}).lean();
-                    return NextResponse.json({edited_enquiry, existing_contractor, status: 200}, {status: 200});
+                    return NextResponse.json({edited_enquiry, camp, existing_contractor, status: 200}, {status: 200});
                     break;
                 }
 
                 case "Personal WiFi": {
                     const personal_wifi = await Eq_Enquiry_Personal_Wifi_Edit.findOne({enquiry_edit_id: edited_enquiry._id}).lean();
-                    return NextResponse.json({edited_enquiry, personal_wifi, status: 200}, {status: 200});
+                    return NextResponse.json({edited_enquiry, camp, personal_wifi, status: 200}, {status: 200});
                     break;
                 }
             }
         }
 
-        return NextResponse.json({edited_enquiry, status: 200}, {status: 200});
+        return NextResponse.json({edited_enquiry, camp, status: 200}, {status: 200});
         
     }catch(err){
         console.log("Error while getting the edited request: ", err);

@@ -5,8 +5,7 @@ import Image from "next/image";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { Avatar } from "antd";
-import { deleteObject, getDownloadURL, ref, uploadBytes } from "firebase/storage";
-import { FileSpreadsheet, FileText, Loader2, MessageCircle, MessagesSquare, Paperclip, Reply, Send, Trash2, X } from "lucide-react";
+import { Download, FileSpreadsheet, FileText, Loader2, MessageCircle, MessagesSquare, Paperclip, Reply, Send, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -37,7 +36,6 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
-import { storage } from "@/firebase/config";
 import {
   ACTIVITY_COMMENT_ATTACHMENT_ACCEPT,
   ACTIVITY_COMMENT_ATTACHMENT_MAX_BYTES,
@@ -51,7 +49,6 @@ import {
   isMimeTypeAllowedForExtension,
   isPdfAttachment,
   isWordAttachment,
-  sanitizeAttachmentFileName,
 } from "@/lib/activityCommentAttachments";
 
 export type ActivityComment = {
@@ -364,61 +361,22 @@ export default function ActivityCommentsSheet({
 
   const addComment = useMutation({
     mutationFn: async (variables: { body: string; parent: ActivityComment | null; pending: PendingAttachment | null }) => {
-      const userId = String(session?.user?.id || "");
-      let uploadedRef: ReturnType<typeof ref> | null = null;
-      let uploaded = false;
       let attachment: ActivityCommentAttachmentPayload | null = null;
-
-      try {
-        if (variables.pending) {
-          if (!userId) throw new Error("Your session could not be verified. Please sign in again.");
-          const { file } = variables.pending;
-          const extension = getAttachmentExtension(file.name);
-          const mimeType = getCanonicalAttachmentMimeType(extension);
-          const uniqueId = typeof crypto.randomUUID === "function"
-            ? crypto.randomUUID()
-            : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-          const storagePath = `task-activity-comments/${taskId}/${activityId}/${userId}/${uniqueId}-${sanitizeAttachmentFileName(file.name)}`;
-          uploadedRef = ref(storage, storagePath);
-          await uploadBytes(uploadedRef, file, {
-            contentType: mimeType,
-            customMetadata: {
-              taskId,
-              activityId,
-              uploaderId: userId,
-              originalName: file.name,
-            },
-          });
-          uploaded = true;
-          attachment = {
-            url: await getDownloadURL(uploadedRef),
-            storagePath,
-            name: file.name,
-            mimeType,
-            extension,
-            size: file.size,
-          };
-        }
-
-        return await requestJson(`/api/task/activities/${activityId}/comments`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            body: variables.body,
-            parentId: variables.parent?.id || null,
-            attachment,
-          }),
+      if (variables.pending) {
+        const form = new FormData();
+        form.append("file", variables.pending.file);
+        const result = await requestJson(`/api/task/activity-files?taskId=${taskId}&activityId=${activityId}`, {
+          method: "POST", body: form,
         });
-      } catch (error) {
-        if (uploaded && uploadedRef) {
-          try {
-            await deleteObject(uploadedRef);
-          } catch (cleanupError) {
-            console.log("Failed to roll back activity comment attachment", cleanupError);
-          }
-        }
-        throw error;
+        attachment = result.file;
       }
+      // Do not delete on a failed response: the server may already have committed
+      // the comment, and deleting here would leave it with a broken attachment.
+      return requestJson(`/api/task/activities/${activityId}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body: variables.body, parentId: variables.parent?.id || null, attachment }),
+      });
     },
     onMutate: async ({ body, parent, pending }) => {
       await queryClient.cancelQueries({ queryKey });
@@ -775,8 +733,11 @@ export default function ActivityCommentsSheet({
                 {isPdfAttachment(viewerAttachment) ? "PDF preview" : "Image preview"}
               </DialogDescription>
             </DialogHeader>
+            <Button type="button" variant="outline" className="w-fit" onClick={() => void downloadAttachment(viewerAttachment)}>
+              <Download className="mr-2 size-4" />Download
+            </Button>
             {isImageAttachment(viewerAttachment) ? (
-              <div className="relative h-[76vh] min-h-[240px] overflow-hidden rounded-xl bg-black/40">
+              <div className="relative h-[68vh] min-h-[240px] overflow-hidden rounded-xl bg-black/40">
                 <Image
                   src={viewerAttachment.url}
                   alt={viewerAttachment.name}
@@ -790,7 +751,7 @@ export default function ActivityCommentsSheet({
               <iframe
                 src={`${viewerAttachment.url}#toolbar=1&navpanes=0`}
                 title={viewerAttachment.name}
-                className="h-[76vh] min-h-[420px] w-full rounded-xl border border-slate-800 bg-white"
+                className="h-[68vh] min-h-[420px] w-full rounded-xl border border-slate-800 bg-white"
               />
             )}
           </>

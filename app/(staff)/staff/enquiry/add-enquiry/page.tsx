@@ -1,9 +1,12 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 "use client";
+import HeadOfficeManager from "@/components/enquiries/HeadOfficeManager";
+import EnquiryActionChoices from "@/components/enquiries/EnquiryActionChoices";
+import EnquiryCapacityFields from "@/components/enquiries/EnquiryCapacityFields";
 
 import React, { useEffect, useState } from "react";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
-import { Building2, FileText, Loader2, Plus, Trash2, Upload, Wifi, PhoneCall, X, Info } from "lucide-react";
+import { Building2, FileText, Loader2, Plus, Trash2, Upload, Wifi, PhoneCall, X } from "lucide-react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -13,7 +16,7 @@ import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@
 import { motion } from "framer-motion";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useAddNewEnquiry, useGetEqAreas, useGetEqCampsByArea, useGetEqCities, useGetEqCountries, useGetEqProvince, useGetEqRegions, useGetStaffEqHeadOfficesFiltered } from "@/query/enquirymanager/queries";
+import { useAddNewEnquiry, useGetEqAreas, useGetEqCampsByArea, useGetEqCities, useGetEqCountries, useGetEqProvince, useGetEqRegions } from "@/query/enquirymanager/queries";
 import { toast } from "sonner";
 import { EQ_CAPACITY_LIMITS } from "@/lib/constants";
 import { useRouter } from "next/navigation";
@@ -22,7 +25,6 @@ import Image from "next/image";
 import { deleteObject, getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { storage } from "@/firebase/config";
 import { Button } from "@/components/ui/button";
-import { Tooltip } from "antd";
 import { useSelector } from "react-redux";
 import { RootState } from "@/redux/store";
 import EnquiryFacilityDetailsFields from "@/components/enquiries/EnquiryFacilityDetailsFields";
@@ -158,10 +160,7 @@ const enquirySchema = z.object({
 export default function AddEnquiry() {
     const router = useRouter();
     const { currentUser } = useSelector((state: RootState) => state.user);
-    const [showHeadOffice, setShowHeadOffice] = useState(false);
-    const [headOfficeMode, setHeadOfficeMode] = useState<"manual" | "existing">("manual");
-    const [selectedHeadOfficeId, setSelectedHeadOfficeId] = useState("");
-    const [headOfficeSearch, setHeadOfficeSearch] = useState("");
+    const [headOfficeDraft, setHeadOfficeDraft] = useState<any>({ operation: "keep" });
     const [countries, setCountries] = useState([]);
     const [docFile, setDocFile] = useState<File | null>(null);
     const [docPreview, setDocPreview] = useState<string | null>(null);
@@ -173,18 +172,6 @@ export default function AddEnquiry() {
     const [uploadedDoc, setUploadedDoc] = useState<{ url: string; name: string; type?: string; storagePath?: string } | null>(null);
     const [removingDoc, setRemovingDoc] = useState(false);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-    const priorityCapacityMap = [
-        { value: "1", priority: "1", capacity: "<500", capacityLabel: "<500" },
-        { value: "2", priority: "2", capacity: "500-1000", capacityLabel: "500-1,000" },
-        { value: "3", priority: "3", capacity: "1000-2000", capacityLabel: "1,000-2,000" },
-        { value: "4", priority: "4", capacity: "2000-3000", capacityLabel: "2,000-3,000" },
-        { value: "5", priority: "5", capacity: "3000-5000", capacityLabel: "3,000-5,000" },
-        { value: "6", priority: "6", capacity: "5000-10000", capacityLabel: "5,000-10,000" },
-        { value: "7", priority: "7", capacity: "10000-20000", capacityLabel: "10,000-20,000" },
-        { value: "8", priority: "8", capacity: "20000-35000", capacityLabel: "20,000-35,000" },
-        { value: "9", priority: "9", capacity: "35000-50000", capacityLabel: "35,000-50,000" },
-        { value: "10", priority: "10", capacity: "50000+", capacityLabel: "50,000+" },
-    ];
 
     const { mutateAsync: GetCountries, isPending: isCountryLoading } = useGetEqCountries();
     const { mutateAsync: AddNewEnquiry, isPending: isEqAdding } = useAddNewEnquiry();
@@ -242,11 +229,6 @@ export default function AddEnquiry() {
     const { data: areas, isLoading: isAreaLoading } = useGetEqAreas(city_id);
     const { data: camps, isLoading: isCampLoading } = useGetEqCampsByArea(area_id);
     const selectedFacility = camps?.camps?.find((camp: any) => String(camp._id) === String(campId));
-    const { data: staffHeadOfficesData, isLoading: isStaffHeadOfficesLoading } = useGetStaffEqHeadOfficesFiltered({
-        search: headOfficeSearch,
-        page: 1,
-        limit: 15
-    });
     const { control, handleSubmit } = form;
     const { fields, append, remove } = useFieldArray<z.infer<typeof enquirySchema>, "contacts">({ control, name: "contacts" });
 
@@ -406,19 +388,7 @@ export default function AddEnquiry() {
         }
     };
 
-    const fillHeadOfficeFields = (office: any) => {
-        form.setValue("head_office_address", office?.address || "", { shouldDirty: true });
-        form.setValue("head_office_contact", office?.phone || "", { shouldDirty: true });
-        form.setValue("head_office_location", office?.geo_location || "", { shouldDirty: true });
-        form.setValue("head_office_details", office?.other_details || "", { shouldDirty: true });
-    };
-
-    const clearHeadOfficeFields = () => {
-        form.setValue("head_office_address", "", { shouldDirty: true });
-        form.setValue("head_office_contact", "", { shouldDirty: true });
-        form.setValue("head_office_location", "", { shouldDirty: true });
-        form.setValue("head_office_details", "", { shouldDirty: true });
-    };
+    useEffect(() => { setHeadOfficeDraft({ operation: "keep" }); }, [campId, isExistingFacility]);
 
     const onSubmit = async (data: any) => {
         if (data.camp_capacity && data.camp_occupancy) {
@@ -427,7 +397,7 @@ export default function AddEnquiry() {
                 return toast.error("Camp occupancy cannot exceed Camp Capacity");
             }
         }
-        const payload = { ...data };
+        const payload = { ...data, head_office_request: headOfficeDraft };
         payload.contacts = Array.isArray(payload.contacts) ? payload.contacts : [];
         payload.area_name_request = payload.area_name_request?.trim?.() || "";
         payload.camp_name_request = payload.camp_name_request?.trim?.() || "";
@@ -444,9 +414,6 @@ export default function AddEnquiry() {
         delete payload.coordinates;
         if (uploadedDoc?.url) {
             payload.images = [uploadedDoc.url];
-        }
-        if (showHeadOffice && headOfficeMode === "existing" && selectedHeadOfficeId) {
-            payload.selected_head_office_id = selectedHeadOfficeId;
         }
         const res = await AddNewEnquiry(payload);
         if (res?.status == 201) {
@@ -712,226 +679,16 @@ export default function AddEnquiry() {
                                     )}
                                 />
 
-
-                                {/* HEAD OFFICE */}
-                                {!showHeadOffice && (
-                                    <button type="button" className="inline-flex items-center rounded-lg border border-cyan-800/60 bg-cyan-950/20 px-3 py-2 text-cyan-200 text-xs hover:bg-cyan-950/30 transition" onClick={() => setShowHeadOffice(true)}>
-                                        + Add Head Office Details
-                                    </button>
-                                )}
-
-                                {showHeadOffice && (
-                                    <div className="lg:col-span-2 border border-slate-700/80 p-4 rounded-xl space-y-3 bg-slate-900/50">
-                                        <div className="flex justify-between items-center">
-                                            <h1 className="text-xs font-semibold text-slate-300">Head Office</h1>
-                                            <button type="button" className="text-red-400 text-xs underline" onClick={() => {
-                                                setShowHeadOffice(false);
-                                                setHeadOfficeMode("manual");
-                                                setSelectedHeadOfficeId("");
-                                                setHeadOfficeSearch("");
-                                                clearHeadOfficeFields();
-                                            }}>
-                                                Remove
-                                            </button>
-                                        </div>
-
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                            <div>
-                                                <FormLabel className="text-xs text-slate-300">Head Office Source</FormLabel>
-                                                <Select
-                                                    value={headOfficeMode}
-                                                    onValueChange={(value: "manual" | "existing") => {
-                                                        setHeadOfficeMode(value);
-                                                        if (value === "manual") {
-                                                            setSelectedHeadOfficeId("");
-                                                        }
-                                                    }}
-                                                >
-                                                    <SelectTrigger>
-                                                        <SelectValue />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="manual">Enter Manually</SelectItem>
-                                                        <SelectItem value="existing">Select Existing</SelectItem>
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
-
-                                            {headOfficeMode === "existing" && (
-                                                <div>
-                                                    <FormLabel className="text-xs text-slate-300">Search Existing Head Offices</FormLabel>
-                                                    <Input
-                                                        value={headOfficeSearch}
-                                                        onChange={(e) => setHeadOfficeSearch(e.target.value)}
-                                                        placeholder="Search by phone/address..."
-                                                    />
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {headOfficeMode === "existing" && (
-                                            <div className="space-y-2">
-                                                <FormLabel className="text-xs text-slate-300">Select From Your Head Offices</FormLabel>
-                                                <Select
-                                                    value={selectedHeadOfficeId || undefined}
-                                                    onValueChange={(value) => {
-                                                        setSelectedHeadOfficeId(value);
-                                                        const office = staffHeadOfficesData?.head_offices?.find((x: any) => x._id === value);
-                                                        if (office) fillHeadOfficeFields(office);
-                                                    }}
-                                                >
-                                                    <SelectTrigger>
-                                                        <SelectValue placeholder={isStaffHeadOfficesLoading ? "Loading head offices..." : "Choose a saved head office"} />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        {(staffHeadOfficesData?.head_offices || []).map((office: any) => (
-                                                            <SelectItem key={office._id} value={office._id}>
-                                                                {office.address || "No address"}
-                                                            </SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
-                                                {!isStaffHeadOfficesLoading && (staffHeadOfficesData?.head_offices || []).length === 0 && (
-                                                    <p className="text-[11px] text-slate-400">No saved head offices found for your account. You can enter details manually.</p>
-                                                )}
-                                                <p className="text-[11px] text-slate-400">
-                                                    Selected head office details are shown below as read-only.
-                                                </p>
-                                            </div>
-                                        )}
-
-                                        {headOfficeMode === "existing" ? (
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                <HeadOfficeReadOnlyBox
-                                                    label="Address"
-                                                    value={form.watch("head_office_address") || "N/A"}
-                                                />
-                                                <HeadOfficeReadOnlyBox
-                                                    label="Contact Number"
-                                                    value={form.watch("head_office_contact") || "N/A"}
-                                                />
-                                                <HeadOfficeReadOnlyBox
-                                                    label="Location"
-                                                    value={form.watch("head_office_location") || "N/A"}
-                                                />
-                                                <HeadOfficeReadOnlyBox
-                                                    label="Other Details"
-                                                    value={form.watch("head_office_details") || "N/A"}
-                                                />
-                                            </div>
-                                        ) : (
-                                            <>
-                                                <FormField control={form.control} name="head_office_address" render={({ field }) => (
-                                                    <FormItem><FormLabel className="text-xs text-slate-300">Address</FormLabel><FormControl><Input {...field} value={field.value ?? ""} /></FormControl></FormItem>
-                                                )} />
-
-                                                <FormField control={form.control} name="head_office_contact" render={({ field }) => (
-                                                    <FormItem><FormLabel className="text-xs text-slate-300">Contact Number</FormLabel><FormControl><Input {...field} value={field.value ?? ""} /></FormControl></FormItem>
-                                                )} />
-
-                                                <FormField control={form.control} name="head_office_location" render={({ field }) => (
-                                                    <FormItem><FormLabel className="text-xs text-slate-300">Location</FormLabel><FormControl><Input {...field} value={field.value ?? ""} /></FormControl></FormItem>
-                                                )} />
-
-                                                <FormField control={form.control} name="head_office_details" render={({ field }) => (
-                                                    <FormItem><FormLabel className="text-xs text-slate-300">Other Details</FormLabel><FormControl><Textarea {...field} value={field.value ?? ""} /></FormControl></FormItem>
-                                                )} />
-                                            </>
-                                        )}
-
-                                    </div>
-                                )}
                             </div>
                         </div>}
 
+                        <HeadOfficeManager key={isExistingFacility ? campId : "new"} campId={isExistingFacility ? campId : undefined} draft onChange={setHeadOfficeDraft} />
+
                         <EnquiryFacilityDetailsFields form={form} isNewFacility={!isExistingFacility} selectedFacility={selectedFacility} />
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {/* CAMP CAPACITY */}
-                            <FormField control={form.control} name="camp_capacity" render={({ field }) => (
-                                <FormItem className="rounded-xl border border-slate-800/70 bg-slate-950/25 p-3">
-                                    <FormLabel className="text-xs text-slate-300">Facility Capacity</FormLabel>
-                                    <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
-                                        <Select
-                                            disabled={isExistingFacility}
-                                            value={field.value}
-                                            onValueChange={(value) => {
-                                                field.onChange(value);
-                                                const matchedPriority = priorityCapacityMap.find((item) => item.capacity === value)?.priority;
-                                                if (matchedPriority) {
-                                                    form.setValue("priority", matchedPriority, { shouldDirty: true, shouldValidate: true });
-                                                }
-                                            }}
-                                        >
-                                            <SelectTrigger><SelectValue placeholder="Select Capacity" /></SelectTrigger>
-                                            <SelectContent>
-                                                {priorityCapacityMap.map((item) => (
-                                                    <SelectItem key={item.capacity} value={item.capacity}>
-                                                        {item.capacityLabel} (Priority {item.priority})
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <FormMessage />
-                                </FormItem>
-                            )} />
-
-                            {/* OCCUPANCY */}
-                            <FormField control={form.control} name="camp_occupancy" render={({ field }) => (
-                                <FormItem className="rounded-xl border border-slate-800/70 bg-slate-950/25 p-3">
-                                    <FormLabel className="text-xs text-slate-300">Current Occupancy</FormLabel>
-                                    <Input disabled={isExistingFacility} type="number" {...field} value={field.value || ""} placeholder="Enter in numbers" className="bg-slate-950/40" />
-                                    <FormMessage />
-                                </FormItem>
-                            )} />
-                        </div>
+                        <EnquiryCapacityFields form={form as any} facilityReadOnly={isExistingFacility} />
 
                         {/* PRIORITY */}
-                        <div className="rounded-xl border border-slate-800/80 bg-gradient-to-r from-slate-900/45 to-slate-950/35 p-3">
-                            <FormField control={form.control} name="priority" render={({ field }) => (
-                                <FormItem>
-                                    <Tooltip
-                                        placement="topLeft"
-                                        rootClassName="w-[360px]"
-                                        className="w-[360px]"
-                                        title={
-                                            <div className="w-[360px] rounded-lg border border-slate-700/70 bg-slate-900/95 p-3 shadow-lg">
-                                                <div className="grid grid-cols-2 gap-x-4 text-[11px] font-semibold uppercase tracking-wide text-slate-300">
-                                                    <span>Priority</span>
-                                                    <span>Capacity</span>
-                                                </div>
-                                                <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-slate-200">
-                                                    {priorityCapacityMap.map((item) => (
-                                                        <React.Fragment key={item.priority}>
-                                                            <span className="tabular-nums">{item.priority}</span>
-                                                            <span className="whitespace-nowrap">{item.capacityLabel}</span>
-                                                        </React.Fragment>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        }
-                                    >
-                                        <FormLabel className="text-xs text-slate-300 font-semibold flex gap-1 items-center">
-                                            <Info size={14} color="white" />
-                                            Priority (1 - Low, 10 - High)
-                                        </FormLabel>
-                                    </Tooltip>
-                                    <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
-                                        <Select value={field.value} onValueChange={field.onChange}>
-                                            <SelectTrigger><SelectValue placeholder="Priority" /></SelectTrigger>
-                                            <SelectContent>
-                                                {priorityCapacityMap.map((item) => (
-                                                    <SelectItem key={item.value} value={item.value}>
-                                                        {item.value} - {item.capacityLabel}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                </FormItem>
-                            )} />
-                        </div>
 
                         {/* CONTACTS */}
                         <div className="rounded-xl border border-slate-800/80 bg-gradient-to-r from-slate-900/50 to-slate-950/40 p-3 space-y-3">
@@ -1260,6 +1017,7 @@ export default function AddEnquiry() {
 
                                 <div className="lg:col-span-2 rounded-lg border border-slate-800/70 bg-slate-950/25 p-3">
                                     <label className="text-xs text-slate-300 font-semibold block mb-2">Next Action</label>
+                                    <EnquiryActionChoices value={form.watch("next_action")} onChange={value => form.setValue("next_action", value, { shouldDirty: true, shouldValidate: true })} />
                                     <Textarea {...form.register("next_action")} placeholder="Next Action" className="bg-slate-950/40 min-h-[92px]" />
                                 </div>
                             </div>
@@ -1423,15 +1181,6 @@ export default function AddEnquiry() {
                 </Form>
 
             </div>
-        </div>
-    );
-}
-
-function HeadOfficeReadOnlyBox({ label, value }: { label: string; value: string }) {
-    return (
-        <div className="rounded-lg border border-slate-700/80 bg-slate-950/40 p-3">
-            <div className="text-xs text-slate-400">{label}</div>
-            <div className="mt-1 text-sm text-slate-200 whitespace-pre-wrap break-words">{value}</div>
         </div>
     );
 }

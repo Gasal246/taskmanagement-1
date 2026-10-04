@@ -242,3 +242,100 @@ test('migration preserves timestamps and legacy completions, initializes each as
   assert.equal((await Eq.findById(e._id)).is_completed, true); assert.ok(await Histories.findById(legacy._id));
   assert.equal((await run(['--apply'])).written, 0);
 });
+
+test('Email can be scheduled, filtered, completed and recorded in enquiry history', async () => {
+  const e = await fixture();
+  global.enquiryTestSession = { user: { id: actor.actorId } };
+  const route = require('../../app/api/enquiries/staff-side/post/forward-enquiry/route.ts');
+  try {
+    const response = await route.POST(new NextRequest('http://localhost/api/enquiries/forward', { method: 'POST', body: JSON.stringify({ enquiry_id: String(e._id), action: 'Email', assigned_to: [String(creator)], priority: 5, feedback: 'Send proposal by email', next_date: null }) }));
+    assert.equal(response.status, 201);
+  } finally { global.enquiryTestSession = null; }
+  const [scheduled] = await service.enrichEnquiries([e.toObject()], actor);
+  assert.equal(scheduled.actions.length, 1);
+  const action = scheduled.actions[0];
+  assert.equal(action.action, 'Email');
+  assert.equal(rules.matchesActionFilters(scheduled.actions, { next_action: 'Email', action_state: 'pending' }), true);
+  assert.equal(rules.matchesActionFilters(scheduled.actions, { next_action: 'Call' }), false);
+  await service.transitionAction(payload(e, action, creator, { performed_action: 'Email' }), actor);
+  const saved = await Histories.findById(action._id).lean();
+  assert.equal(saved.action_assignments[0].performed_action, 'Email');
+  assert.equal(rules.actionProgress(saved).status, 'completed');
+  const [completed] = await service.enrichEnquiries([e.toObject()], actor);
+  assert.equal(completed.last_completed_action.action, 'Email');
+});
+
+test('Email initial actions and unscheduled completions appear in lists and history', async () => {
+  const tag = `email-${Date.now()}`;
+  const e = await fixture({ next_action: 'Email', enquiry_uuid: tag });
+  const [initial] = await service.enrichEnquiries([e.toObject()], actor);
+  assert.equal(initial.actions[0].action, 'Email');
+  const filtered = await filteredAdminEnquiries(new URLSearchParams({ enquiry_uuid: tag, next_action: 'Email', action_state: 'pending' }), actor.actorId);
+  assert.equal(filtered.pagination.totalRecords, 1);
+  assert.equal(String(filtered.data[0]._id), String(e._id));
+  const other = await fixture();
+  await service.recordCompletedAction({ enquiry_id: String(other._id), request_id: String(new mongoose.Types.ObjectId()), performed_action: 'Email', notes: 'Sent the proposal.' }, actor);
+  const [recorded] = await service.enrichEnquiries([other.toObject()], actor);
+  assert.equal(recorded.last_completed_action.action, 'Email');
+});
+
+test('approved enquiry edits persist capacity, zero occupancy, priority, location and facility details', async () => {
+  require('./catalogue-fixture.cjs').installCatalogueFixture();
+  const Camps = require('../../models/eq_camps.model.ts').default;
+  const business = new mongoose.Types.ObjectId();
+  const country = new mongoose.Types.ObjectId();
+  const camp = await Camps.create({ business_id: business, camp_name: 'Original facility', is_active: true, camp_capacity: '500-1000', camp_occupancy: 600, project_sector: 'WFA', facility_type: 'WFA-01' });
+  const e = await fixture({ business_id: business, camp_id: camp._id, priority: 2 });
+  const route = require('../../app/api/enquiries/update/enquiry/route.ts');
+  global.enquiryTestSession = { user: { id: actor.actorId } };
+  try {
+    const body = { enquiry_id: String(e._id), area_input_mode: 'existing', camp_input_mode: 'existing', camp: String(camp._id), country: String(country),
+      camp_name_request: 'Updated facility', camp_capacity: '1000-2000', camp_occupancy: '0', priority: '3',
+      project_sector: 'WFA', facility_type: 'WFA-01', project_stage: 'Operational', ownership: 'Private', capacity_unit: 'Beds',
+      solutions_required: [], solution_details: {}, commercial_model: 'To Be Determined', followup_status: 'Lead Received', contacts: [] };
+    const response = await route.PUT(new NextRequest('http://localhost/api/enquiries/update/enquiry', { method: 'PUT', body: JSON.stringify(body) }));
+    assert.equal(response.status, 200, JSON.stringify(await response.json()));
+    const savedCamp = await Camps.findById(camp._id).lean();
+    const savedEnquiry = await Eq.findById(e._id).lean();
+    assert.equal(savedCamp.camp_capacity, '1000-2000');
+    assert.equal(savedCamp.camp_occupancy, 0);
+    assert.equal(savedCamp.camp_name, 'Updated facility');
+    assert.equal(String(savedCamp.country_id), String(country));
+    assert.equal(String(savedEnquiry.country_id), String(country));
+    assert.equal(String(savedEnquiry.priority), '3');
+    assert.equal(savedCamp.is_active, true);
+    const rejected = await route.PUT(new NextRequest('http://localhost/api/enquiries/update/enquiry', { method: 'PUT', body: JSON.stringify({ ...body, camp_occupancy: '2001' }) }));
+    assert.equal(rejected.status, 400);
+    assert.equal((await Camps.findById(camp._id)).camp_occupancy, 0);
+  } finally { global.enquiryTestSession = null; }
+});
+
+test('legacy facility capacity edits survive the edit-request and approval flow', async () => {
+  const Camps = require('../../models/eq_camps.model.ts').default;
+  const Edits = require('../../models/eq_enquiry_edit.model.ts').default;
+  const camp = await Camps.create({ business_id: new mongoose.Types.ObjectId(), camp_name: 'Legacy facility', is_active: true, camp_capacity: '500-1000', camp_occupancy: 600 });
+  const e = await fixture({ business_id: camp.business_id, camp_id: camp._id });
+  const requestRoute = require('../../app/api/enquiries/agent-side/update/enquiry/route.ts');
+  const approveRoute = require('../../app/api/enquiries/update/enquiry/accept-edits/route.ts');
+  const body = { enquiry_id: String(e._id), camp_capacity: '1000-2000', camp_occupancy: '750', priority: '3', wifi_available: 'No', solutions_required: [], solution_details: {}, commercial_model: 'To Be Determined' };
+  global.enquiryTestSession = { user: { id: actor.actorId } };
+  try {
+    const response = await requestRoute.PUT(new NextRequest('http://localhost', { method: 'PUT', body: JSON.stringify(body) }));
+    assert.equal(response.status, 200, JSON.stringify(await response.json()));
+    const edit = await Edits.findOne({ enquiry_id: e._id });
+    assert.equal(edit.camp_capacity, '1000-2000');
+    assert.equal(edit.camp_occupancy, 750);
+    assert.equal((await Camps.findById(camp._id)).camp_occupancy, 600);
+    global.enquiryTestSession = { user: { id: actor.actorId, is_super: true } };
+    const approved = await approveRoute.PUT(new NextRequest('http://localhost', { method: 'PUT', body: JSON.stringify({ ...body, enquiry_edit_id: String(edit._id) }) }));
+    assert.equal(approved.status, 200, JSON.stringify(await approved.json()));
+    assert.equal((await Camps.findById(camp._id)).camp_occupancy, 750);
+    assert.equal((await Camps.findById(camp._id)).camp_capacity, '1000-2000');
+  } finally { global.enquiryTestSession = null; }
+});
+
+test('capacity validation preserves omitted values and rejects invalid occupancy', () => {
+  const { enquiryCapacity } = require('../../lib/enquiries/capacity.ts');
+  assert.deepEqual(enquiryCapacity({}, { camp_capacity: '500-1000', camp_occupancy: 0 }), { camp_capacity: '500-1000', camp_occupancy: 0 });
+  for (const camp_occupancy of ['-1', '1.5', 'NaN', '1001']) assert.throws(() => enquiryCapacity({ camp_capacity: '500-1000', camp_occupancy }));
+});

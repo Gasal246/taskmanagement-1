@@ -1,3 +1,5 @@
+import { enquiryActor } from "@/lib/enquiries/access";
+import { authorizeOfficeAdministration, HeadOfficeError } from "@/lib/enquiries/head-office-requests";
 import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import Admin_assign_business from "@/models/admin_assign_business.model";
@@ -19,6 +21,7 @@ export async function POST(req: NextRequest) {
         await connectDB();
     const session: any = await auth();
     const body: Body = await req.json();
+    const authorizedBusinessId = await authorizeOfficeAdministration(req, await enquiryActor(), body);
 
     const phone = body.phone?.trim() || "";
     const geo_location = body.geo_location?.trim() || "";
@@ -47,7 +50,7 @@ export async function POST(req: NextRequest) {
         : null);
 
     const newHeadOffice = new Eq_camp_headoffice({
-      business_id: businessAssignment?.business_id || null,
+      business_id: authorizedBusinessId,
       phone,
       geo_location,
       other_details,
@@ -68,6 +71,7 @@ export async function POST(req: NextRequest) {
       { status: 201 }
     );
   } catch (err) {
+    if (err instanceof HeadOfficeError) return NextResponse.json({ message: err.message }, { status: err.status });
     console.log("Error while adding head office: ", err);
     return NextResponse.json(
       { message: "Internal server error", status: 500 },

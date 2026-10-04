@@ -27,7 +27,8 @@ const LoginPage = () => {
 
   useEffect(() => {
     if (session?.status == "authenticated") {
-      router.replace("/");
+      const destination = new URLSearchParams(window.location.search).get("callbackUrl") || "";
+      router.replace(/^\/notifications\/[a-f0-9]{24}$/i.test(destination) ? destination : "/");
     }
   }, [session, router]);
 

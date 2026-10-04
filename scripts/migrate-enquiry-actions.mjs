@@ -1,3 +1,4 @@
+import { ENQUIRY_ACTIONS } from "../lib/enquiries/action-types.mjs";
 import mongoose from 'mongoose';
 import { createRequire } from 'node:module';
 import { actionHistoryFilter, assignmentsFor, initialActionFor } from '../lib/enquiries/action-records.mjs';
@@ -18,7 +19,7 @@ try {
     if (!parts.length) summary.unassignedActions++;
     if (apply) summary.written += (await histories.updateOne({ _id: action._id, action_assignments: { $exists: false } }, { $set: { action_assignments: parts } })).modifiedCount;
   }
-  for await (const enquiry of enquiries.find({ next_action: { $in: ['Call', 'Visit'] } })) {
+  for await (const enquiry of enquiries.find({ next_action: { $in: ENQUIRY_ACTIONS } })) {
     if (await histories.findOne({ _id: enquiry._id })) continue;
     const initial = initialActionFor(enquiry);
     summary.initialActions++; summary.assignments += initial.action_assignments.length;

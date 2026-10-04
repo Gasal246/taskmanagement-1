@@ -1,4 +1,5 @@
 "use client";
+import HeadOfficeManager from "@/components/enquiries/HeadOfficeManager";
 
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -68,6 +69,7 @@ export default function HeadOfficesListPage() {
 
     return (
         <div className="p-5 pb-10">
+<HeadOfficeManager queueOnly />
             <Breadcrumb>
                 <BreadcrumbList>
                     <BreadcrumbItem>

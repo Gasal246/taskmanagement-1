@@ -1,6 +1,7 @@
+import { ENQUIRY_ACTIONS } from "@/lib/enquiries/action-types.mjs";
 import { actionProgress, assignmentsFor, idOf } from '@/lib/enquiries/completion';
 export default function EnquiryActionProgress({ action }: { action: any }) {
-  if (!['Call', 'Visit'].includes(action?.action)) return null;
+  if (!ENQUIRY_ACTIONS.includes(action?.action)) return null;
   const progress = actionProgress(action);
   return <div className="mb-3 rounded-lg border border-slate-700 bg-slate-950/40 p-3 text-sm">
     <p className="font-medium text-cyan-200">{progress.completed} of {progress.total} assignees completed{progress.overdue ? ' · Overdue' : ''}</p>

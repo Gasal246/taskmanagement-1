@@ -1,3 +1,4 @@
+import { ENQUIRY_ACTIONS } from "@/lib/enquiries/action-types.mjs";
 import mongoose, { Document, Types, Schema } from "mongoose";
 
 export interface IEq_enquiry_histories extends Document {
@@ -43,7 +44,7 @@ const Eq_enquiry_historiesSchema: Schema = new Schema({
         user_id: { type: Schema.Types.ObjectId, ref: "users", required: true },
         status: { type: String, enum: ["pending", "completed", "cancelled"], default: "pending" },
         revision: { type: Number, default: 0 },
-        performed_action: { type: String, enum: ["Call", "Visit"] },
+        performed_action: { type: String, enum: ENQUIRY_ACTIONS },
         completion_notes: String,
         completed_at: Date,
         completed_by: { type: Schema.Types.ObjectId, ref: "users" },

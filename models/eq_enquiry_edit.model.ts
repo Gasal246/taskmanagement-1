@@ -7,6 +7,8 @@ export interface IEq_Enquiry_edit extends Document{
     next_action_date: Date,
     alert_date: Date,
     priority: Number,
+    camp_capacity?: string | null,
+    camp_occupancy?: number | null,
     wifi_type: String,
     wifi_expected_cost: Decimal128,
     latitude: String,
@@ -23,6 +25,8 @@ const Eq_Enquiry_editSchema: Schema = new Schema({
     next_action_date: {type: Date},
     alert_date: {type: Date},
     priority: {type: Number},
+    camp_capacity: {type: String},
+    camp_occupancy: {type: Number},
     wifi_type: {type: String},
     wifi_expected_cost: {type: Schema.Types.Decimal128},
     latitude: {type: String},
@@ -30,6 +34,8 @@ const Eq_Enquiry_editSchema: Schema = new Schema({
     wifi_available: {type: Boolean, default: false},
     wifi_setup: {type: String}
 }, {timestamps: true});
+
+if (mongoose.models.eq_enquiry_edit && !mongoose.models.eq_enquiry_edit.schema.path("camp_occupancy")) mongoose.deleteModel("eq_enquiry_edit");
 
 const Eq_Enquiry_Edit = mongoose.models?.eq_enquiry_edit || mongoose.model<IEq_Enquiry_edit>("eq_enquiry_edit", Eq_Enquiry_editSchema);
 

@@ -9,7 +9,7 @@ import mongoose from "mongoose";
 import { NextResponse } from "next/server";
 
 export async function DELETE(
-  _req: Request,
+  req: Request,
   context: { params: Promise<{ commentId: string }> }
 ) {
   const session = await auth();
@@ -20,7 +20,7 @@ export async function DELETE(
   await connectDB();
   const comment: any = await ActivityComments.findById(commentId);
   if (!comment) return NextResponse.json({ message: "Comment not found" }, { status: 404 });
-  const access = await authorizeActivityViewer(userId, String(comment.activity_id));
+  const access = await authorizeActivityViewer(userId, String(comment.activity_id), req);
   if (access.status !== 200) return NextResponse.json({ message: "Forbidden" }, { status: access.status });
   if (String(comment.author_id) !== userId) return NextResponse.json({ message: "You can only delete your own comments" }, { status: 403 });
   try {

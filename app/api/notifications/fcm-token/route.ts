@@ -48,7 +48,7 @@ export async function POST(req: Request) {
     );
 
     return NextResponse.json(
-      { message: "Token saved", status: 200 },
+      { message: "Token saved", status: 200, userId },
       { status: 200 }
     );
   } catch (error) {
@@ -58,4 +58,13 @@ export async function POST(req: Request) {
       { status: 500 }
     );
   }
+}
+
+export async function DELETE(req: Request) {
+  await connectDB(); const session = await auth();
+  if (!session?.user?.id) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  const { token } = await req.json();
+  if (typeof token !== "string") return NextResponse.json({ message: "Invalid token" }, { status: 400 });
+  await FcmTokens.deleteOne({ token, user_id: session.user.id });
+  return NextResponse.json({ status: 200 });
 }

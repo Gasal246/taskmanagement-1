@@ -1,3 +1,4 @@
+import { enquiryCapacity, EnquiryCapacityError } from "@/lib/enquiries/capacity";
 import { canEditEnquiry, canChangeEnquiryFacility } from "@/lib/enquiries/access";
 import connectDB from "@/lib/mongo";
 import Eq_enquiry from "@/models/eq_enquiries.model";
@@ -61,7 +62,8 @@ export async function PUT(req:NextRequest){
         if (!enquiry) return NextResponse.json({ message: "Enquiry not found", status: 404 }, { status: 404 });
         if (!await canEditEnquiry(enquiry, actor)) return NextResponse.json({ message: "Forbidden", status: 403 }, { status: 403 });
         const camp: any = await Eq_camps.findById(enquiry.camp_id);
-        if (camp && !camp.is_active && !await canChangeEnquiryFacility(enquiry, camp, actor)) return NextResponse.json({ message: "This Facility belongs to or is used by another business" }, { status: 403 });
+        if (camp && !await canChangeEnquiryFacility(enquiry, camp, actor)) return NextResponse.json({ message: "This Facility belongs to or is used by another business" }, { status: 403 });
+        const capacity = enquiryCapacity(body, camp);
         const existingSolutions: any = await Eq_enquiry_solutions.findOne({ enquiry_id: enquiry._id }).lean();
         const solutions = await validateDynamicSolutions({
             solutions_required: body.solutions_required || [], solution_other: body.solution_other || "",
@@ -69,12 +71,13 @@ export async function PUT(req:NextRequest){
             primary_solution: body.primary_solution || "", commercial_model: body.commercial_model || "To Be Determined",
         }, existingSolutions);
         await saveEnquirySolutions(enquiry._id, solutions);
-        if (camp && !camp.is_active) {
-            const classification = await validateDynamicClassification(body, camp.toObject());
+        if (camp) {
+            const classification = body.project_sector || body.facility_type || camp.project_sector || camp.facility_type
+                ? await validateDynamicClassification(body, camp.toObject()) : {};
             const supporting = projectSupportingFieldsSchema.parse(body);
             Object.assign(camp, classification, supporting);
             await camp.save();
-            await saveFacilitySolutions(camp._id, solutions);
+            if (!camp.is_active) await saveFacilitySolutions(camp._id, solutions);
         }
         const wifiAvailability = body.wifi_available === "Yes"
             ? true
@@ -86,6 +89,7 @@ export async function PUT(req:NextRequest){
             next_action: body.next_action,
             next_action_date: body.next_action_due,
             priority: body.priority,
+            ...capacity,
             wifi_available: wifiAvailability,
             wifi_type: wifiAvailability === true ? body.wifi_type : null,
             wifi_expected_cost: wifiAvailability === false ? body.expected_monhtly_price : null,
@@ -133,7 +137,7 @@ export async function PUT(req:NextRequest){
         return NextResponse.json({message: "Edit Requested", status: 200}, {status: 200});
 
     }catch(err){
-        if (err instanceof CatalogueValidationError) return NextResponse.json({ message: err.message, status: 400 }, { status: 400 });
+        if (err instanceof EnquiryCapacityError || err instanceof CatalogueValidationError) return NextResponse.json({ message: err.message, status: 400 }, { status: 400 });
         if (err instanceof ZodError) return NextResponse.json({ message: err.issues[0]?.message || "Invalid Facility details", status: 400 }, { status: 400 });
         console.log("Error while requesting for updation of Enquiry: ", err);
         return NextResponse.json({message: "Internal Server Error", status: 500}, {status: 500});

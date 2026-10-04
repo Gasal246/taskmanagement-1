@@ -3,7 +3,7 @@
 import { useCursorPaging } from "@/hooks/use-cursor-paging";
 
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   addDays,
   addHours,
@@ -426,6 +426,16 @@ const CalendarWorkspace = ({ mode }: CalendarWorkspaceProps) => {
   const [createStart, setCreateStart] = useState(new Date());
   const [pendingDate, setPendingDate] = useState<Date | null>(null);
   const [selectedItem, setSelectedItem] = useState<CalendarItem | null>(null);
+  const notificationEvent = useRef<string | null>(null);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    notificationEvent.current = params.get("eventId");
+    const date = new Date(params.get("date") || "");
+    if (notificationEvent.current && Number.isFinite(date.getTime())) {
+      setWeekStart(startOfWeek(date, { weekStartsOn: WEEK_STARTS_ON }));
+      setSelectedDate(date);
+    }
+  }, []);
   const [selectedGroupItems, setSelectedGroupItems] = useState<CalendarItem[]>([]);
   const [roleName, setRoleName] = useState("");
   const [roleId, setRoleId] = useState("");
@@ -528,6 +538,12 @@ const CalendarWorkspace = ({ mode }: CalendarWorkspaceProps) => {
     () => (Array.isArray(data?.items) ? data.items : []),
     [data?.items]
   );
+
+  useEffect(() => {
+    if (!notificationEvent.current) return;
+    const event = items.find(item => item.sourceId === notificationEvent.current);
+    if (event) { setSelectedItem(event); notificationEvent.current = null; }
+  }, [items]);
 
   const pendingItems = useMemo(
     () => items.filter((item) => isPendingItem(item)),

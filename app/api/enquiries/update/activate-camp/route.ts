@@ -1,3 +1,4 @@
+import { approveEnquiryFacility } from "@/lib/enquiries/approve-facility";
 import connectDB from "@/lib/mongo";
 import { canChangeEnquiryFacility } from "@/lib/enquiries/access";
 import { enquiryActor, canAdministerEnquiry } from "@/lib/enquiries/completion-server";
@@ -22,38 +23,7 @@ export async function PUT(req: NextRequest) {
   const dbSession = await mongoose.startSession();
   try {
     await dbSession.withTransaction(async () => {
-      const enquiry: any = await Eq_enquiry.findOne({ _id: body.enquiry_id, camp_id: body.camp_id }).session(dbSession);
-      if (!enquiry) throw Object.assign(new Error("Enquiry and Facility do not match"), { status: 404 });
-      if (!canAdministerEnquiry(enquiry, actor)) throw Object.assign(new Error("You cannot approve another business’s enquiry"), { status: 403 });
-      const camp: any = await Eq_camps.findById(body.camp_id).session(dbSession);
-      if (!camp) throw Object.assign(new Error("Facility not found"), { status: 404 });
-      if (!await canChangeEnquiryFacility(enquiry, camp, actor, dbSession)) throw Object.assign(new Error("This Facility belongs to or is used by another business"), { status: 403 });
-
-      let classification;
-      try { classification = await validateDynamicClassification({
-        project_sector: camp.project_sector || "",
-        facility_type: camp.facility_type || "",
-        facility_type_other: camp.facility_type_other || "",
-        facility_type_detail: camp.facility_type_detail || camp.facility_type_other || "",
-        sector_field_values: camp.sector_field_values || [],
-        hotel_classification: camp.hotel_classification || "",
-      }); } catch (error) {
-        if (error instanceof CatalogueValidationError) throw Object.assign(error, { status: 400 });
-        throw error;
-      }
-      if (!String(camp.camp_name || "").trim()) throw Object.assign(new Error("Facility name is required before approval"), { status: 400 });
-      Object.assign(camp, classification);
-
-      camp.is_active = true;
-      camp.visited_status = getCampVisitedStatusFromEnquiryStatus(enquiry.status) || "Just Added";
-      camp.country_id = enquiry.country_id;
-      camp.region_id = enquiry.region_id;
-      camp.province_id = enquiry.province_id;
-      camp.city_id = enquiry.city_id;
-      camp.area_id = enquiry.area_id;
-      enquiry.is_active = true;
-      await camp.save({ session: dbSession });
-      await enquiry.save({ session: dbSession });
+      await approveEnquiryFacility(actor, body, dbSession);
     });
     return NextResponse.json({ message: "Facility and enquiry approved", status: 200 }, { status: 200 });
   } catch (error: any) {

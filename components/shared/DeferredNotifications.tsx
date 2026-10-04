@@ -11,7 +11,6 @@ export default function DeferredNotifications() {
   const [ready, setReady] = useState(false);
   useEffect(() => {
     if (status !== "authenticated" || !session?.user?.id) return;
-    if (!("Notification" in window) || !("serviceWorker" in navigator)) return;
     if ("requestIdleCallback" in window) {
       const handle = window.requestIdleCallback(() => setReady(true), { timeout: 2_000 });
       return () => window.cancelIdleCallback(handle);

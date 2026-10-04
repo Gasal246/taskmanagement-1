@@ -1,4 +1,5 @@
 "use client";
+import HeadOfficeManager from "@/components/enquiries/HeadOfficeManager";
 
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
@@ -121,6 +122,7 @@ export default function ActivateCampPage() {
 
   return (
     <div className="p-4 md:p-6 text-slate-100 space-y-4">
+<HeadOfficeManager enquiryId={params.enquiry_id} queueOnly />
       <div className="rounded-2xl border border-slate-800 bg-gradient-to-r from-slate-950 via-slate-900 to-cyan-950/40 p-5">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>

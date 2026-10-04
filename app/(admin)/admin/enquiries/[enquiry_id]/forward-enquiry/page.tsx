@@ -1,4 +1,6 @@
 "use client";
+import { ENQUIRY_ACTIONS } from "@/lib/enquiries/action-types.mjs";
+
 import EnquiryCompletionActions from "@/components/enquiries/EnquiryCompletionActions";
 
 import React, { useMemo, useState } from "react";
@@ -439,7 +441,7 @@ export default function EscalatePage() {
                   Action
                 </p>
                 <div className="flex flex-wrap gap-3">
-                  {["Visit", "Call"].map((item) => (
+                  {ENQUIRY_ACTIONS.map((item) => (
                     <Button
                       key={item}
                       type="button"

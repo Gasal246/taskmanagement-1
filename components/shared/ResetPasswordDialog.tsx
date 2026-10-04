@@ -7,7 +7,8 @@ import { z } from "zod"
 import { Button } from "@/components/ui/button"
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage, } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
-import { signOut } from 'next-auth/react'
+import {  } from 'next-auth/react';
+import { notificationSignOut as signOut } from "@/lib/notifications/sign-out";
 import { ConfigProvider, Popconfirm, Tooltip } from 'antd'
 import { useResetPassword } from '@/query/client/userQueries'
 import { toast } from 'sonner'

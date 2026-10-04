@@ -23,10 +23,10 @@ export default function HeadOfficeDetailsPage() {
   const handleDeleteHeadOffice = async () => {
     const res = await RemoveHeadOffice(params.head_office_id);
     if (res?.status === 200) {
-      toast.success(res?.message || "Head office deleted");
+      toast.success(res?.message || "Head office unlink request submitted");
       return router.replace("/staff/enquiry/head-quaters");
     }
-    toast.error(res?.message || "Failed to delete head office");
+    toast.error(res?.message || "Failed to request removal");
   };
 
   return (
@@ -63,7 +63,7 @@ export default function HeadOfficeDetailsPage() {
             className="flex items-center gap-1"
             onClick={() => setDeleteDialogOpen(true)}
           >
-            <Trash2 size={14} /> Delete
+            <Trash2 size={14} /> Request Unlink
           </Button>
         </div>
       </div>
@@ -110,9 +110,9 @@ export default function HeadOfficeDetailsPage() {
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Delete this head office?</DialogTitle>
+            <DialogTitle>Request removal of head office links?</DialogTitle>
             <DialogDescription>
-              Attached camps will be detached from this head office.
+              An admin must approve before the linked facilities are detached. The head office record will be retained.
             </DialogDescription>
           </DialogHeader>
           <div className="flex justify-end gap-2">
@@ -122,7 +122,7 @@ export default function HeadOfficeDetailsPage() {
               disabled={isDeleting}
               onClick={handleDeleteHeadOffice}
             >
-              {isDeleting ? "Deleting..." : "Delete"}
+              {isDeleting ? "Submitting..." : "Submit Request"}
             </Button>
           </div>
         </DialogContent>

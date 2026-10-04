@@ -68,7 +68,6 @@ export async function notifyEnquiryForward({
   const priorityLabel = typeof priority === "number" ? `${priority}` : `${priority || ""}`;
   const actionLabel = action || "Action";
   const forwardTitle = `Enquiry Forwarded to ${actionLabel}`;
-  const viewTitle = "Enquiry View Access";
   const bodyText = priorityLabel ? `Priority: ${priorityLabel}` : "Priority updated";
 
   const metaBase = {
@@ -92,28 +91,10 @@ export async function notifyEnquiryForward({
     byLine,
   };
 
-  const notificationsPayload = recipients.flatMap((recipientId) => [
-    {
-      recipient_id: recipientId,
-      sender_id: actorId,
-      kind: "enquiry",
-      title: viewTitle,
-      body: bodyText,
-      data: { ...dataBase, event: "view-access" },
-      meta: { ...metaBase, event: "view-access" },
-      read_at: null,
-    },
-    {
-      recipient_id: recipientId,
-      sender_id: actorId,
-      kind: "enquiry",
-      title: forwardTitle,
-      body: bodyText,
-      data: { ...dataBase, event: "forward" },
-      meta: { ...metaBase, event: "forward" },
-      read_at: null,
-    },
-  ]);
+  const notificationsPayload = recipients.map((recipientId) => ({
+    recipient_id: recipientId, sender_id: actorId, kind: "enquiry", title: forwardTitle,
+    body: bodyText, data: { ...dataBase, event: "forward", actionRequired: "true" }, meta: { ...metaBase, event: "forward" }, read_at: null,
+  }));
 
   await enqueueNotifications(notificationsPayload, {
     notification: { title: forwardTitle, body: bodyText }, data: dataBase,

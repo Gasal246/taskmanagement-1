@@ -1,11 +1,13 @@
 "use client"
+import NotificationBell from "@/components/shared/NotificationBell";
 import React, { useEffect } from 'react'
 import { Popover, PopoverContent, PopoverTrigger, } from "@/components/ui/popover"
 import Image from 'next/image'
 import { CircleUser } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { ExitIcon } from '@radix-ui/react-icons'
-import { signOut, useSession } from 'next-auth/react'
+import {  useSession } from 'next-auth/react';
+import { notificationSignOut as signOut } from "@/lib/notifications/sign-out";
 import { useGetSuperAdminById } from '@/query/superadmin/query'
 import LoaderSpin from '../shared/LoaderSpin'
 import { useDispatch } from 'react-redux'
@@ -33,6 +35,7 @@ const SuperTopbar = () => {
                 </div>
             </div>
             <div className="w-full flex justify-end">
+                <NotificationBell />
                 {superAdminDataLoading && <LoaderSpin size={20} />}
                 {superAdmin &&
                     <Popover>

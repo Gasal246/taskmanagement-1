@@ -85,7 +85,7 @@ export default function AddHeadOfficePage() {
 
         const res = await AddHeadOffice(payload);
         if (res?.status == 201) {
-            toast.success(res?.message || "Head Office Added");
+            toast.success(res?.message || "Head office request submitted");
             reset();
             setSelectedCamps([]);
             return;
@@ -118,6 +118,7 @@ export default function AddHeadOfficePage() {
             <div className="p-6 max-w-4xl mx-auto space-y-6">
                 <h1 className="text-lg font-semibold text-slate-200">Add New Head Office</h1>
 
+                <p className="text-xs text-slate-400">Submit the proposed details and facility links for admin approval. Existing details stay unchanged until approved.</p>
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                     <Input placeholder="Phone" {...register("phone")} />
                     <Input placeholder="Geo Location" {...register("geo_location")} />
@@ -212,7 +213,7 @@ export default function AddHeadOfficePage() {
                     )}
 
                     <Button type="submit" disabled={isAdding} className="bg-cyan-700 hover:bg-cyan-600">
-                        {isAdding ? "Saving..." : "Save Head Office"}
+                        {isAdding ? "Saving..." : "Submit for Approval"}
                     </Button>
                 </form>
             </div>

@@ -2,7 +2,7 @@ import mongoose, { Schema } from "mongoose";
 
 const schema = new Schema({
   dedupe_key: { type: String, required: true, unique: true },
-  kind: { type: String, required: true, enum: ["notification", "push", "storage-delete"] },
+  kind: { type: String, required: true, enum: ["notification", "push", "storage-delete", "notification-email"] },
   payload: { type: Schema.Types.Mixed, required: true },
   status: { type: String, enum: ["pending", "processing", "completed", "failed"], default: "pending" },
   attempts: { type: Number, default: 0 },

@@ -1,7 +1,8 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 "use client"
 import { Button } from '@/components/ui/button'
-import { signOut, useSession } from 'next-auth/react'
+import {  useSession } from 'next-auth/react';
+import { notificationSignOut as signOut } from "@/lib/notifications/sign-out";
 import { useRouter } from 'next/navigation'
 import React, { useEffect } from 'react'
 

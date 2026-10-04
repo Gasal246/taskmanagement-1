@@ -25,6 +25,7 @@ export default function CampClassificationFields({ control, watch, setValue, dis
       <div className="min-w-0 space-y-2">
         <label htmlFor={name} className="text-xs font-semibold text-slate-300">{label} *</label>
         <Select value={field.value || ""} disabled={disabled || optionDisabled || isLoading} onValueChange={(value) => {
+          if (!value || value === field.value) return;
           field.onChange(value);
           if (name === "project_sector") {
             setValue("facility_type", ""); setValue("facility_type_detail", ""); setValue("facility_type_other", ""); setValue("sector_field_values", {});
@@ -56,7 +57,7 @@ export default function CampClassificationFields({ control, watch, setValue, dis
         maxLength: special.input_type === "text" ? { value: 500, message: "Use 500 characters or fewer" } : undefined,
       }} render={({ field, fieldState }) => <div className="min-w-0 space-y-2">
         <label htmlFor={`sector_field_${special.key}`} className="text-xs font-semibold text-slate-300">{special.name}{special.is_required ? " *" : ""}{!special.is_active ? " (Archived)" : ""}</label>
-        {special.input_type === "select" ? <Select value={field.value || ""} disabled={disabled || !sector?.is_active || !special.is_active} onValueChange={field.onChange}>
+        {special.input_type === "select" ? <Select value={field.value || ""} disabled={disabled || !sector?.is_active || !special.is_active} onValueChange={value => { if (value) field.onChange(value); }}>
           <SelectTrigger id={`sector_field_${special.key}`} ref={field.ref} onBlur={field.onBlur} className="border-slate-800 bg-slate-950/40"><SelectValue placeholder={`Select ${special.name.toLowerCase()}`} /></SelectTrigger>
           <SelectContent>{special.options.filter((option: any) => option.is_active || option.key === field.value).map((option: any) => <SelectItem key={option.key} value={option.key}>{option.name}{!option.is_active ? " (Archived)" : ""}</SelectItem>)}</SelectContent>
         </Select> : <Input {...field} disabled={disabled || !sector?.is_active || !special.is_active} value={field.value || ""} id={`sector_field_${special.key}`} maxLength={500} className="border-slate-800 bg-slate-950/40" />}

@@ -26,8 +26,8 @@ export const getActivityDocumentExtension = (name: string) => {
   const parts = name.trim().toLowerCase().split(".");
   return parts.length > 1 ? parts.pop() || "" : "";
 };
-export const isAllowedActivityDocument = (extension: string) => Boolean(MIME_TYPES[extension.toLowerCase()]);
+export const isAllowedActivityDocument = (extension: string) => Object.prototype.hasOwnProperty.call(MIME_TYPES, extension.toLowerCase());
 export const getActivityDocumentMimeType = (extension: string) => MIME_TYPES[extension.toLowerCase()] || "application/octet-stream";
 export const sanitizeActivityDocumentName = (name: string) =>
-  (name.normalize("NFKD").replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/-+/g, "-").replace(/^[-.]+|[-.]+$/g, "") || "document").slice(-180);
+  (name.normalize("NFKD").replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/-+/g, "-").replace(/\.{2,}/g, ".").replace(/^[-.]+|[-.]+$/g, "") || "document").slice(-180);
 

@@ -1,3 +1,4 @@
+import { ENQUIRY_ACTIONS } from "@/lib/enquiries/action-types.mjs";
 import { forwardHistoryFilter, historyOrder } from "@/lib/enquiries/completion";
 import { enquiryActor, canScheduleAction, preserveInitialAction } from "@/lib/enquiries/completion-server";
 import { auth } from "@/auth";
@@ -28,7 +29,7 @@ const forwardEnquirySchema = z
       z.array(objectIdSchema).min(1).max(100),
     ]),
     priority: z.coerce.number().int().min(1).max(10),
-    action: z.enum(["Visit", "Call"]),
+    action: z.enum(ENQUIRY_ACTIONS),
     feedback: z.string().max(5000).optional().default(""),
     next_date: z.preprocess(
       (value) => (value === "" || value === undefined ? null : value),

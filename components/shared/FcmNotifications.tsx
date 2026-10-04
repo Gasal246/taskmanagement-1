@@ -1,413 +1,64 @@
 "use client";
-
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
+import { useQuery } from "@tanstack/react-query";
+import { useDispatch } from "react-redux";
+import { setUnreadCount } from "@/redux/slices/notifications";
+import { onForegroundMessage } from "@/firebase/messaging";
+import { registerNotificationDevice, setNotificationAccount } from "@/lib/notifications/device";
+import { announceNotificationChange } from "@/lib/notifications/client";
 import { toast } from "sonner";
-import {
-  onForegroundMessage,
-  requestFcmToken,
-} from "@/firebase/messaging";
-import { useDispatch, useSelector } from "react-redux";
-import type { AppDispatch, RootState } from "@/redux/store";
-import {
-  setUnreadCount,
-} from "@/redux/slices/notifications";
 import { Button } from "@/components/ui/button";
 
-const tokenStorageKey = "fcm-token";
-const notificationPromptKey = "notification-permission-dismissed-until";
-const refreshAttemptKey = "fcm-token-refresh-attempted";
-const badgeCacheName = "taskmanager-meta-v1";
-const badgeCountCacheKey = "/__badge_count__";
-
-type BadgeNavigator = Navigator & {
-  setAppBadge?: (contents?: number) => Promise<void>;
-  clearAppBadge?: () => Promise<void>;
-};
-
-async function persistBadgeCount(count: number) {
-  if (typeof window === "undefined") return;
-  if (!("caches" in window)) return;
-
-  const cache = await window.caches.open(badgeCacheName);
-  await cache.put(
-    badgeCountCacheKey,
-    new Response(JSON.stringify({ count: Math.max(0, count) }), {
-      headers: {
-        "Content-Type": "application/json",
-      },
-    })
-  );
-}
-
-async function syncAppBadge(count: number) {
-  if (typeof window === "undefined") return;
-
-  await persistBadgeCount(count);
-
-  const badgeNavigator = navigator as BadgeNavigator;
-  if (count > 0 && typeof badgeNavigator.setAppBadge === "function") {
-    await badgeNavigator.setAppBadge(count);
-    return;
-  }
-
-  if (typeof badgeNavigator.clearAppBadge === "function") {
-    await badgeNavigator.clearAppBadge();
-  }
-}
-
-function getTokenStorageKeys(userId?: string | null) {
-  return userId
-    ? [`${tokenStorageKey}:${userId}`, tokenStorageKey]
-    : [tokenStorageKey];
-}
-
-function getStoredToken(userId?: string | null) {
-  if (typeof window === "undefined") return null;
-
-  const keys = getTokenStorageKeys(userId);
-  for (const key of keys) {
-    const value = window.localStorage.getItem(key);
-    if (value) return value;
-  }
-
-  return null;
-}
-
-function getUserScopedToken(userId?: string | null) {
-  if (typeof window === "undefined" || !userId) return null;
-  return window.localStorage.getItem(`${tokenStorageKey}:${userId}`);
-}
-
-function hasAttemptedRefresh() {
-  if (typeof window === "undefined") return false;
-  return window.sessionStorage.getItem(refreshAttemptKey) === "1";
-}
-
-function markRefreshAttempt() {
-  if (typeof window === "undefined") return;
-  window.sessionStorage.setItem(refreshAttemptKey, "1");
-}
-
-function clearRefreshAttempt() {
-  if (typeof window === "undefined") return;
-  window.sessionStorage.removeItem(refreshAttemptKey);
-}
-
-function setStoredToken(userId: string | null | undefined, token: string) {
-  if (typeof window === "undefined") return;
-
-  const keys = getTokenStorageKeys(userId);
-  keys.forEach((key) => {
-    window.localStorage.setItem(key, token);
-  });
-}
-
-function formatNotification(payload: {
-  notification?: { title?: string; body?: string };
-  data?: Record<string, string>;
-}) {
-  const title =
-    payload.notification?.title || payload.data?.title || "New notification";
-  const body = payload.notification?.body || payload.data?.body || "";
-  return { title, body };
-}
-
-const FcmNotifications = () => {
-  const { data: session } = useSession();
-  const dispatch = useDispatch<AppDispatch>();
-  const unreadCount = useSelector(
-    (state: RootState) => state.notifications.unreadCount
-  );
-  const [showPermissionPrompt, setShowPermissionPrompt] = useState(false);
-  const [showRefreshPrompt, setShowRefreshPrompt] = useState(false);
-  const [permissionState, setPermissionState] = useState<NotificationPermission>(
-    "default"
-  );
-
-  const userId = useMemo(() => session?.user?.id, [session?.user?.id]);
-
-  const refreshUnreadCount = useCallback(async () => {
-    try {
-      const response = await fetch("/api/notifications/unread-count");
-      if (!response.ok) return;
-      const data = await response.json();
-      if (typeof data?.unreadCount === "number") {
-        dispatch(setUnreadCount(data.unreadCount));
-      }
-    } catch (error) {
-      console.error("Failed to refresh unread notification count", error);
-    }
-  }, [dispatch]);
-
-  const storeToken = useCallback(async () => {
-    if (typeof window === "undefined") return false;
-    const token = await requestFcmToken();
-    if (!token) return false;
-
-    const userScopedToken = getUserScopedToken(userId);
-    if (userScopedToken === token) {
-      setStoredToken(userId, token);
-      clearRefreshAttempt();
-      return true;
-    }
-
-    const response = await fetch("/api/notifications/fcm-token", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        token,
-        platform: navigator.platform || null,
-        device: navigator.userAgent || null,
-      }),
-    });
-
-    if (response.ok) {
-      setStoredToken(userId, token);
-      clearRefreshAttempt();
-      return true;
-    }
-
-    let message = "Failed to store FCM token.";
-    try {
-      const data = await response.json();
-      if (data?.message) message = data.message;
-    } catch (error) {
-      console.error("Failed to parse FCM token response", error);
-    }
-    console.error(message);
-    return false;
+export default function FcmNotifications() {
+  const { data: session } = useSession(); const userId = session?.user?.id; const dispatch = useDispatch();
+  const [prompt, setPrompt] = useState(false); const seen = useRef(new Set<string>());
+  const count = useQuery({ queryKey: ["notification-count", userId], enabled: Boolean(userId), refetchInterval: 30_000, refetchIntervalInBackground: false, refetchOnWindowFocus: true, refetchOnReconnect: true,
+    queryFn: async () => { const response = await fetch("/api/notifications/unread-count", { cache: "no-store" }); if (!response.ok) throw new Error("Unable to refresh notification count"); return response.json(); } });
+  const refetchCount = count.refetch;
+  useEffect(() => {
+    const refresh = () => { if (userId) void refetchCount(); };
+    const storage = (event: StorageEvent) => { if (event.key === "notifications-updated") refresh(); };
+    window.addEventListener("notifications-changed", refresh); window.addEventListener("storage", storage);
+    return () => { window.removeEventListener("notifications-changed", refresh); window.removeEventListener("storage", storage); };
+  }, [userId, refetchCount]);
+  useEffect(() => {
+    const value = userId ? count.data?.unreadCount : 0;
+    if (typeof value !== "number") return;
+    dispatch(setUnreadCount(value));
+    const nav = navigator as Navigator & { setAppBadge?: (value: number) => Promise<void>; clearAppBadge?: () => Promise<void> };
+    (value ? nav.setAppBadge?.(value) : nav.clearAppBadge?.())?.catch(() => {});
+    if ("caches" in window) void caches.open("taskmanager-meta-v1").then(cache => cache.put("/__badge_count__", new Response(JSON.stringify({ count: value })))).catch(() => {});
+    window.dispatchEvent(new Event("notifications-refreshed"));
+  }, [count.data?.unreadCount, userId, dispatch]);
+  useEffect(() => {
+    dispatch(setUnreadCount(0)); seen.current.clear();
+    if (userId) setNotificationAccount(userId);
+    if (!userId || !("Notification" in window) || !("serviceWorker" in navigator)) return;
+    const check = () => {
+      if (Notification.permission === "granted") { setPrompt(false); void registerNotificationDevice().catch(() => {}); }
+      else setPrompt(Notification.permission === "default" && Date.now() > Number(localStorage.getItem("notification-prompt-until") || 0));
+    };
+    check(); window.addEventListener("focus", check); window.addEventListener("online", check);
+    return () => { window.removeEventListener("focus", check); window.removeEventListener("online", check); };
+  }, [userId, dispatch]);
+  useEffect(() => {
+    if (!userId) return;
+    let active = true; let unsubscribe: (() => void) | undefined;
+    const receive = (payload: any) => {
+      if (!active || (payload.data?.recipientId && payload.data.recipientId !== userId)) return;
+      const id = payload.data?.deliveryId || payload.data?.notificationId || payload.messageId;
+      if (id && seen.current.has(id)) return;
+      if (id) { seen.current.add(id); if (seen.current.size > 200) seen.current.delete(seen.current.values().next().value!); }
+      announceNotificationChange();
+      if (document.visibilityState === "visible") toast(payload.data?.title || payload.notification?.title || "New notification", { description: payload.data?.body || payload.notification?.body,
+        action: payload.data?.notificationId ? { label: "Open", onClick: () => { window.location.href = `/notifications/${payload.data.notificationId}`; } } : undefined });
+    };
+    if ("Notification" in window && "serviceWorker" in navigator) void onForegroundMessage(receive).then(fn => { if (active) unsubscribe = fn; else fn(); }).catch(() => {});
+    const workerMessage = (event: MessageEvent) => { if (event.data?.type === "fcm-background-message") receive(event.data.payload); };
+    navigator.serviceWorker?.addEventListener("message", workerMessage);
+    return () => { active = false; unsubscribe?.(); navigator.serviceWorker?.removeEventListener("message", workerMessage); };
   }, [userId]);
-
-  const ensureClientToken = useCallback(
-    async (permission: NotificationPermission) => {
-      if (typeof window === "undefined") return;
-
-      const userScopedToken = getUserScopedToken(userId);
-      if (userScopedToken) {
-        clearRefreshAttempt();
-        setShowRefreshPrompt(false);
-        if (permission !== "denied") {
-          setShowPermissionPrompt(false);
-        }
-        return;
-      }
-
-      setShowRefreshPrompt(false);
-
-      const legacyToken = getStoredToken();
-      if (legacyToken && userId) {
-        window.localStorage.removeItem(tokenStorageKey);
-      }
-
-      if (permission === "granted") {
-        const stored = await storeToken();
-        if (stored) {
-          setShowPermissionPrompt(false);
-        } else if (!hasAttemptedRefresh()) {
-          setShowRefreshPrompt(true);
-        }
-        return;
-      }
-
-      // Browsers do not allow silent token creation without notification permission.
-      // If the local token cache is missing, surface the prompt again for this client.
-      window.localStorage.removeItem(notificationPromptKey);
-      setShowPermissionPrompt(true);
-    },
-    [storeToken, userId]
-  );
-
-  const handleRequestPermission = async () => {
-    if (typeof window === "undefined") return;
-    if (!("Notification" in window)) return;
-
-    try {
-      const permission = await Notification.requestPermission();
-      setPermissionState(permission);
-      if (permission === "granted") {
-        setShowRefreshPrompt(false);
-        setShowPermissionPrompt(false);
-        await storeToken();
-      }
-    } catch (error) {
-      console.error("Failed to request notification permission", error);
-    }
-  };
-
-  const handleDismissPrompt = () => {
-    if (typeof window === "undefined") return;
-    const nextDismissUntil = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    window.localStorage.setItem(
-      notificationPromptKey,
-      nextDismissUntil.toISOString()
-    );
-    setShowPermissionPrompt(false);
-  };
-
-  const handleRefreshApp = async () => {
-    if (typeof window === "undefined") return;
-
-    markRefreshAttempt();
-
-    try {
-      if ("serviceWorker" in navigator) {
-        const registration = await navigator.serviceWorker.getRegistration("/");
-        await registration?.update();
-      }
-    } catch (error) {
-      console.error("Failed to update service worker before refresh", error);
-    } finally {
-      window.location.reload();
-    }
-  };
-
-  useEffect(() => {
-    let unsubscribe: (() => void) | undefined;
-    let active = true;
-
-    onForegroundMessage((payload) => {
-      const { title, body } = formatNotification(payload);
-      toast(title, { description: body || undefined });
-      refreshUnreadCount();
-    }).then((unsub) => {
-      if (!active) {
-        unsub();
-        return;
-      }
-      unsubscribe = unsub;
-    });
-
-    return () => {
-      active = false;
-      if (unsubscribe) unsubscribe();
-    };
-  }, [dispatch, refreshUnreadCount]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (!("serviceWorker" in navigator)) return;
-
-    const handleServiceWorkerMessage = (event: MessageEvent) => {
-      if (event.data?.type !== "fcm-background-message") return;
-
-      const payload = event.data?.payload || {};
-      const { title, body } = formatNotification(payload);
-
-      refreshUnreadCount();
-
-      if (document.visibilityState === "visible") {
-        toast(title, { description: body || undefined });
-      }
-    };
-
-    navigator.serviceWorker.addEventListener("message", handleServiceWorkerMessage);
-
-    return () => {
-      navigator.serviceWorker.removeEventListener(
-        "message",
-        handleServiceWorkerMessage
-      );
-    };
-  }, [refreshUnreadCount]);
-
-  useEffect(() => {
-    if (!userId) return;
-    if (typeof window === "undefined") return;
-    if (!("Notification" in window)) return;
-
-    const permission = Notification.permission;
-    setPermissionState(permission);
-
-    const dismissedUntil = window.localStorage.getItem(notificationPromptKey);
-    const dismissedUntilDate = dismissedUntil ? new Date(dismissedUntil) : null;
-    const isDismissed =
-      dismissedUntilDate && dismissedUntilDate.getTime() > Date.now();
-
-    if (permission !== "granted" && !isDismissed) {
-      setShowPermissionPrompt(true);
-    }
-
-    ensureClientToken(permission).catch((error) => {
-      console.error("Failed to initialize FCM", error);
-    });
-  }, [ensureClientToken, userId]);
-
-  useEffect(() => {
-    if (!userId) return;
-    refreshUnreadCount();
-    const handleFocus = () => {
-      refreshUnreadCount();
-      if (typeof window === "undefined" || !("Notification" in window)) return;
-      ensureClientToken(Notification.permission).catch((error) => {
-        console.error("Failed to re-check FCM token", error);
-      });
-    };
-    window.addEventListener("focus", handleFocus);
-    return () => window.removeEventListener("focus", handleFocus);
-  }, [ensureClientToken, refreshUnreadCount, userId]);
-
-  useEffect(() => {
-    if (!userId) return;
-    syncAppBadge(unreadCount).catch((error) => {
-      console.error("Failed to sync app badge", error);
-    });
-  }, [unreadCount, userId]);
-
-  if (!userId || (!showPermissionPrompt && !showRefreshPrompt)) {
-    return null;
-  }
-
-  const blocked = permissionState === "denied";
-  const title = showRefreshPrompt ? "Notification setup incomplete" : "Enable notifications";
-  const description = showRefreshPrompt
-    ? "We could not finish setting up notifications on this device. You can try refreshing when you have saved your work."
-    : blocked
-      ? "Notifications are blocked in your browser settings. Enable them to receive updates even when you are away."
-      : "Stay updated even when this tab is closed. Allow notifications to receive task updates and alerts.";
-
-  return (
-    <div className="fixed inset-0 z-[9999]">
-      <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm" />
-      <div className="relative z-10 flex min-h-screen items-center justify-center p-4">
-        <div className="w-full max-w-md space-y-4 rounded-2xl border border-slate-800/70 bg-slate-950/95 p-6 shadow-2xl">
-          <div className="space-y-2">
-            <h2 className="text-lg font-semibold text-slate-100">
-              {title}
-            </h2>
-            <p className="text-sm text-slate-400">
-              {description}
-            </p>
-          </div>
-          <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-            {showRefreshPrompt ? (
-              <>
-                <Button type="button" variant="secondary" onClick={() => { markRefreshAttempt(); setShowRefreshPrompt(false); }}>Not now</Button>
-                <Button type="button" onClick={handleRefreshApp}>Refresh now</Button>
-              </>
-            ) : (
-              <>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={handleDismissPrompt}
-                >
-                  Not now
-                </Button>
-                <Button
-                  type="button"
-                  onClick={handleRequestPermission}
-                  disabled={blocked}
-                >
-                  {blocked ? "Blocked in browser" : "Allow notifications"}
-                </Button>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default FcmNotifications;
+  if (!userId || !prompt) return null;
+  return <aside className="fixed bottom-4 right-4 z-50 max-w-sm space-y-3 rounded-xl border border-slate-700 bg-slate-950 p-4 shadow-xl" aria-label="Enable notifications"><p className="text-sm">Enable device notifications for updates when you are away. Your in-app inbox works either way.</p><div className="flex gap-2"><Button size="sm" onClick={async () => { const result = await Notification.requestPermission(); setPrompt(false); if (result === "granted") void registerNotificationDevice(true).catch(() => toast.error("Setup incomplete. Reconnect in notification settings.")); }}>Enable notifications</Button><Button size="sm" variant="ghost" onClick={() => { localStorage.setItem("notification-prompt-until", String(Date.now() + 7 * 86400_000)); setPrompt(false); }}>Not now</Button></div></aside>;
+}

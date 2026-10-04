@@ -1,5 +1,5 @@
 "use client";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Sheet,
   SheetContent,
@@ -14,7 +14,11 @@ import { Button } from "@/components/ui/button";
 import { useDispatch, useSelector } from "react-redux";
 import type { AppDispatch, RootState } from "@/redux/store";
 import { setUnreadCount } from "@/redux/slices/notifications";
-import Cookies from "js-cookie";
+import { updateNotification } from "@/lib/notifications/client";
+import NotificationSettings from "./NotificationSettings";
+import { toast } from "sonner";
+import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 
 type NotificationItem = {
   id: string;
@@ -25,6 +29,7 @@ type NotificationItem = {
   meta?: Record<string, any>;
   createdAt: string;
   readAt: string | null;
+  actionRequired: boolean;
   sender: {
     id: string;
     name: string;
@@ -91,6 +96,7 @@ const NotificationCard = ({
     <button
       type="button"
       onClick={() => onOpenLink(notification)}
+      aria-label={`${isUnread ? "Unread" : "Read"}: ${notification.title}`}
       className={cn(
         "flex w-full flex-col gap-3 rounded-2xl border p-4 text-left transition",
         isUnread
@@ -250,139 +256,54 @@ const NotificationPane = ({ trigger }: { trigger: React.ReactNode }) => {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [errorMessage, setErrorMessage] = useState("");
 
-  const descriptionText = useMemo(() => {
-    if (unreadCount > 0) {
-      return `${unreadCount} unread notification${unreadCount > 1 ? "s" : ""}`;
-    }
-    if (notifications.length > 0) {
-      return "You're all caught up.";
-    }
-    return "You have no notifications yet.";
-  }, [notifications.length, unreadCount]);
-
-  const fetchNotifications = useCallback(async () => {
-    setLoading(true);
-    setErrorMessage("");
+  const { data: session } = useSession();
+  const [filter, setFilter] = useState("unread");
+  const [category, setCategory] = useState("");
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [snapshotAt, setSnapshotAt] = useState("");
+  const router = useRouter();
+  const pendingRequest = useRef<AbortController | null>(null);
+  const [mutating, setMutating] = useState(false);
+  const descriptionText = `${unreadCount} unread notification${unreadCount === 1 ? "" : "s"}`;
+  const fetchNotifications = useCallback(async (cursor?: string) => {
+    pendingRequest.current?.abort();
+    const controller = new AbortController(); pendingRequest.current = controller;
+    setLoading(true); setErrorMessage("");
     try {
-      const response = await fetch("/api/notifications?limit=40");
-      if (!response.ok) {
-        setErrorMessage("Unable to load notifications.");
-        return null;
-      }
+      const params = new URLSearchParams({ limit: "30", filter, category }); if (cursor) params.set("cursor", cursor);
+      const response = await fetch(`/api/notifications?${params}`, { cache: "no-store", signal: controller.signal });
+      if (!response.ok) throw new Error("Unable to load notifications");
       const data = await response.json();
-      const items = Array.isArray(data?.notifications) ? data.notifications : [];
-      setNotifications(items);
-      if (typeof data?.unreadCount === "number") {
-        dispatch(setUnreadCount(data.unreadCount));
-        return data.unreadCount as number;
-      }
-      return null;
-    } catch (error) {
-      console.error("Failed to fetch notifications", error);
-      setErrorMessage("Unable to load notifications.");
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  }, [dispatch]);
-
-  const markAllRead = useCallback(async (countOverride?: number) => {
-    if ((countOverride ?? unreadCount) <= 0) return;
-    try {
-      const response = await fetch("/api/notifications/mark-read", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ all: true }),
-      });
-      if (!response.ok) return;
-      const data = await response.json();
-      if (typeof data?.unreadCount === "number") {
-        dispatch(setUnreadCount(data.unreadCount));
-      } else {
-        dispatch(setUnreadCount(0));
-      }
-      setNotifications((prev) =>
-        prev.map((item) => ({ ...item, readAt: item.readAt ?? new Date().toISOString() }))
-      );
-    } catch (error) {
-      console.error("Failed to mark notifications read", error);
-    }
-  }, [dispatch, unreadCount]);
-
+      if (controller.signal.aborted) return;
+      setNotifications(previous => cursor ? [...previous, ...data.notifications.filter((item: NotificationItem) => !previous.some(old => old.id === item.id))] : data.notifications);
+      setNextCursor(data.nextCursor); if (!cursor) setSnapshotAt(data.snapshotAt);
+      dispatch(setUnreadCount(data.unreadCount));
+    } catch (error: any) { if (!controller.signal.aborted) setErrorMessage(error.message); } finally { if (!controller.signal.aborted) setLoading(false); }
+  }, [filter, category, dispatch]);
+  useEffect(() => { setNotifications([]); setSnapshotAt(""); setNextCursor(null); if (open && session?.user?.id) void fetchNotifications(); return () => pendingRequest.current?.abort(); }, [open, fetchNotifications, session?.user?.id]);
   useEffect(() => {
     if (!open) return;
-    fetchNotifications().then((freshUnread) => {
-      const countToUse = freshUnread ?? unreadCount;
-      if (countToUse > 0) {
-        markAllRead(countToUse);
-      }
-    });
-  }, [open, fetchNotifications, markAllRead, unreadCount]);
-
+    const refresh = () => { if (document.visibilityState === "visible") void fetchNotifications(); };
+    const storage = (event: StorageEvent) => { if (event.key === "notifications-updated") refresh(); };
+    window.addEventListener("notifications-refreshed", refresh); window.addEventListener("notifications-changed", refresh); window.addEventListener("storage", storage);
+    window.addEventListener("online", refresh); window.addEventListener("focus", refresh);
+    return () => { window.removeEventListener("notifications-refreshed", refresh); window.removeEventListener("notifications-changed", refresh); window.removeEventListener("storage", storage); window.removeEventListener("online", refresh); window.removeEventListener("focus", refresh); };
+  }, [open, fetchNotifications]);
+  const changeState = async (body: Record<string, unknown>) => {
+    setMutating(true);
+    try { const data = await updateNotification(body); dispatch(setUnreadCount(data.unreadCount)); await fetchNotifications(); }
+    catch (error: any) { toast.error(error.message); } finally { setMutating(false); }
+  };
+  const markAllRead = () => changeState({ all: true, before: snapshotAt, operation: "read" });
   const handleOpenLink = (notification: NotificationItem) => {
-    const resolveTaskLink = (taskId: string) => {
-      const roleCookie = Cookies.get("user_role");
-      if (!roleCookie) return `/staff/tasks/${taskId}`;
-      try {
-        const parsedRole = JSON.parse(roleCookie);
-        const roleName = parsedRole?.role_name || parsedRole?.role || "";
-        if (
-          roleName === "BUSINESS_ADMIN" ||
-          roleName === "SUPER_ADMIN" ||
-          roleName.toUpperCase().includes("ADMIN")
-        ) {
-          return `/admin/tasks/${taskId}`;
-        }
-      } catch (error) {
-        return `/staff/tasks/${taskId}`;
-      }
-      return `/staff/tasks/${taskId}`;
-    };
-    const resolveEnquiryLink = (enquiryId: string) => {
-      const roleCookie = Cookies.get("user_role");
-      if (!roleCookie) return `/staff/enquiry/${enquiryId}`;
-      try {
-        const parsedRole = JSON.parse(roleCookie);
-        const roleName = parsedRole?.role_name || parsedRole?.role || "";
-        if (
-          roleName === "BUSINESS_ADMIN" ||
-          roleName === "SUPER_ADMIN" ||
-          roleName.toUpperCase().includes("ADMIN")
-        ) {
-          return `/admin/enquiries/${enquiryId}`;
-        }
-      } catch (error) {
-        return `/staff/enquiry/${enquiryId}`;
-      }
-      return `/staff/enquiry/${enquiryId}`;
-    };
-
-    const taskId = notification.data?.taskId || notification.meta?.taskId || "";
-    const enquiryId =
-      notification.data?.enquiryId || notification.meta?.enquiryId || "";
-    const taskLink = taskId
-      ? `${resolveTaskLink(taskId)}${notification.data?.linkSuffix || notification.meta?.linkSuffix || ""}`
-      : "";
-    const link =
-      notification.data?.link ||
-      notification.data?.url ||
-      (taskId
-        ? taskLink
-        : enquiryId
-        ? resolveEnquiryLink(enquiryId)
-        : "");
-    if (!link) return;
-    if (link.startsWith("/")) {
-      window.location.href = link;
-      return;
-    }
-    window.open(link, "_blank", "noopener,noreferrer");
+    setOpen(false);
+    router.push(`/notifications/${notification.id}`);
   };
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>{trigger}</SheetTrigger>
-      <SheetContent className="w-[420px] sm:w-[560px] border border-slate-800/70 bg-slate-950/95">
+      <SheetContent className="flex w-full max-w-[560px] flex-col border border-slate-800/70 bg-slate-950/95">
         <SheetHeader className="gap-3 border-b border-slate-800/80 pb-4">
           <div className="flex items-center justify-between">
             <div>
@@ -392,14 +313,17 @@ const NotificationPane = ({ trigger }: { trigger: React.ReactNode }) => {
               </SheetDescription>
             </div>
             {unreadCount > 0 && (
-              <Button variant="secondary" size="sm" onClick={() => void markAllRead()}>
+              <Button variant="secondary" size="sm" disabled={mutating || !snapshotAt} onClick={() => void markAllRead()}>
                 Mark all read
               </Button>
             )}
           </div>
         </SheetHeader>
-        <div className="flex h-full flex-col gap-3 overflow-y-auto py-4 pr-2">
-          {loading && (
+        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto py-4 pr-2">
+          <div className="flex gap-2"><select aria-label="Notification filter" className="rounded border border-slate-700 bg-slate-900 p-2 text-sm" value={filter} onChange={event => setFilter(event.target.value)}><option value="unread">Unread</option><option value="all">All notifications</option></select><select aria-label="Notification category" className="min-w-0 rounded border border-slate-700 bg-slate-900 p-2 text-sm" value={category} onChange={event => setCategory(event.target.value)}><option value="">All categories</option><option value="task">Tasks & activities</option><option value="enquiry">Enquiries & approvals</option><option value="project">Projects</option><option value="calendar">Calendar</option></select></div>
+          <NotificationSettings />
+
+          {loading && notifications.length === 0 && (
             <div className="space-y-3 text-sm text-slate-500">
               <div className="h-16 rounded-2xl bg-slate-900/70 animate-pulse" />
               <div className="h-16 rounded-2xl bg-slate-900/70 animate-pulse" />
@@ -416,14 +340,14 @@ const NotificationPane = ({ trigger }: { trigger: React.ReactNode }) => {
               No notifications yet. You will see updates here as they arrive.
             </div>
           )}
-          {!loading &&
-            notifications.map((notification) => (
-              <NotificationCard
+          {notifications.map((notification) => (
+              <div key={notification.id} className="space-y-1"><NotificationCard
                 key={notification.id}
                 notification={notification}
                 onOpenLink={handleOpenLink}
-              />
+              /><div className="flex flex-wrap gap-3 px-3 text-xs text-slate-400"><button disabled={mutating} onClick={() => changeState({ ids: [notification.id], operation: notification.readAt ? "unread" : "read" })}>{notification.readAt ? "Mark unread" : "Mark read"}</button><button disabled={mutating} onClick={() => changeState({ ids: [notification.id], operation: "archive" })}>Archive</button>{notification.actionRequired && !notification.readAt && <button disabled={mutating} onClick={() => changeState({ ids: [notification.id], operation: "snooze", hours: 24 })}>Snooze reminders for 24h</button>}</div></div>
             ))}
+          {nextCursor && <Button variant="outline" disabled={loading} onClick={() => fetchNotifications(nextCursor)}>Load more</Button>}
         </div>
       </SheetContent>
     </Sheet>

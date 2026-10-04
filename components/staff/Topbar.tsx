@@ -1,14 +1,15 @@
 "use client"
 // import { useFindUserById, useGetAllNotifications } from '@/query/client/userQueries';
-import { Avatar, Badge, Popconfirm, Tooltip } from 'antd';
-import { signOut } from 'next-auth/react'
+import { Avatar, Popconfirm } from 'antd';
+import {  } from 'next-auth/react';
+import { notificationSignOut as signOut } from "@/lib/notifications/sign-out";
 import { useRouter } from 'next/navigation';
+import NotificationBell from "@/components/shared/NotificationBell";
 import React, { useEffect, useState } from 'react'
 import { Popover, PopoverContent, PopoverTrigger, } from "@/components/ui/popover";
 import { motion } from 'framer-motion';
-import { Bell, CircleUser, ListTodo } from 'lucide-react';
+import { CircleUser, ListTodo } from 'lucide-react';
 import { ExitIcon } from '@radix-ui/react-icons';
-import NotificationPane from '../shared/NotificationPane';
 import Cookies from "js-cookie";
 import Image from 'next/image';
 import GoogleTranslate from '../shared/GoogleTranslate';
@@ -29,7 +30,6 @@ const StaffTopbar = () => {
     const domainText = domainLabel ? `${formattedDomainLabel}` : "";
     const roleDomainText = [roleText, domainText].filter(Boolean).join(" ▸ ");
 
-    const unreadCount = useSelector((state: RootState) => state.notifications.unreadCount);
 
     useEffect(() => {
         const roleCookie = Cookies.get("user_role");
@@ -98,15 +98,7 @@ const StaffTopbar = () => {
                 </div>
             </div>
             <div className='flex gap-3 items-center'>
-                <NotificationPane trigger={
-                    <div className='cursor-pointer rounded-xl  transition-colors hover:bg-slate-800/60'>
-                        <Tooltip title={unreadCount <= 0 ? 'no new notifications.' : `${unreadCount} new notifications`}>
-                            <Badge count={unreadCount} size='small'>
-                                <Bell className='text-primary' size={20} />
-                            </Badge>
-                        </Tooltip>
-                    </div>
-                } />
+                <NotificationBell />
                 {userData && <Popover>
                     <PopoverTrigger>
                         <div className='flex gap-2 items-center cursor-pointer rounded-2xl px-1 py-1 md:px-3 md:py-2 transition-colors hover:bg-slate-800/60'>

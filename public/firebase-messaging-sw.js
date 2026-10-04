@@ -144,44 +144,47 @@ async function broadcastToClients(payload) {
   });
 }
 
-messaging.onBackgroundMessage((payload) => {
-  const title =
-    payload?.notification?.title ||
-    payload?.data?.title ||
-    "New notification";
-  const body = payload?.notification?.body || payload?.data?.body || "";
-
-  const options = {
-    body,
-    icon: "/logo.png",
-    data: payload?.data || {},
-  };
-
-  Promise.all([
-    self.registration.showNotification(title, options),
-    broadcastToClients(payload),
-    incrementAppBadge(payload),
-  ]).catch(() => undefined);
+self.addEventListener("message", event => {
+  if (event.data?.type !== "notification-account") return;
+  event.waitUntil((async () => {
+    const cache = await caches.open(BADGE_CACHE_NAME);
+    const previous = await cache.match("/__notification_account__");
+    if (previous && (await previous.json()).userId === (event.data.userId || null)) return;
+    await cache.put("/__notification_account__", new Response(JSON.stringify({ userId: event.data.userId || null })));
+    await syncAppBadge(0);
+    const notifications = await self.registration.getNotifications();
+    notifications.forEach(notification => notification.close());
+  })());
 });
 
-self.addEventListener("notificationclick", (event) => {
+messaging.onBackgroundMessage(async payload => {
+  const data = payload.data || {};
+  const cache = await caches.open(BADGE_CACHE_NAME);
+  const accountResponse = await cache.match("/__notification_account__");
+  const account = accountResponse ? await accountResponse.json() : null;
+  if (!account?.userId || (data.recipientId && account.userId !== data.recipientId)) return;
+  const deliveryId = data.deliveryId || payload.messageId;
+  const seenResponse = await cache.match("/__notification_deliveries__");
+  const seen = seenResponse ? await seenResponse.json() : [];
+  if (deliveryId && seen.includes(deliveryId)) return;
+  const notificationId = data.notificationId;
+  await self.registration.showNotification(data.title || payload.notification?.title || "New notification", {
+    body: data.body || payload.notification?.body || "", icon: "/logo.png", badge: "/logo.png",
+    tag: notificationId || deliveryId, data: { ...data, link: notificationId ? `/notifications/${notificationId}` : data.link || "/" },
+  });
+  if (deliveryId) await cache.put("/__notification_deliveries__", new Response(JSON.stringify([...seen, deliveryId].slice(-200))));
+  await Promise.all([broadcastToClients(payload), incrementAppBadge(payload)]);
+});
+
+self.addEventListener("notificationclick", event => {
   event.notification.close();
   const data = event.notification?.data || {};
-  const relativeUrl = data.link || data.url || "/";
-  const requestedUrl = new URL(relativeUrl, self.location.origin);
+  const requestedUrl = new URL(data.link || "/", self.location.origin);
   const targetUrl = requestedUrl.origin === self.location.origin ? requestedUrl.href : self.location.origin + "/";
-
-  event.waitUntil(
-    clients
-      .matchAll({ type: "window", includeUncontrolled: true })
-      .then((windowClients) => {
-        const matchedClient = windowClients.find(
-          (client) => client.url === targetUrl
-        );
-        if (matchedClient && "focus" in matchedClient) {
-          return matchedClient.focus();
-        }
-        return clients.openWindow(targetUrl);
-      })
-  );
+  event.waitUntil((async () => {
+    const windows = await clients.matchAll({ type: "window", includeUncontrolled: true });
+    const current = windows.find(client => new URL(client.url).origin === self.location.origin);
+    if (current && "navigate" in current) { await current.navigate(targetUrl); return current.focus(); }
+    return clients.openWindow(targetUrl);
+  })());
 });

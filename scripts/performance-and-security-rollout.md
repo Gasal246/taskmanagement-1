@@ -192,7 +192,7 @@ Final validation passed: **170 isolated automated tests, 40 browser fixture chec
 
 - Review the remaining common geographic/company/head-office catalogue mutation and data-relationship policies separately. This authorization stage protects enquiry records and organizational dashboard selections; it is not a certification of every API or complete tenant isolation for all reference data.
 - Continue remaining large-list/table and form/navigation accessibility work; bound individual activity schedule/reassignment histories and the action-management dialog separately. Main task activity and enquiry history pages are now paginated.
-- Review abandoned-upload retention separately. The explicit manual `/api/notifications/send` endpoint still performs immediate delivery to preserve its delivery-count response contract; automated project/calendar/assignment producers now use the outbox.
+- Review abandoned-upload retention separately. The manual `/api/notifications/send` endpoint now also saves the inbox and delivery job atomically and responds with HTTP 202; see `deploy/NOTIFICATIONS.md`.
 - Audit and deduplicate legacy camp/enquiry UUID, conversion and membership data before enforcing new uniqueness constraints. Existing scalar/legacy scope references need a coordinated migration.
 - Reduce remaining large dashboard counts/read waterfalls and deep offset pagination. The map location list uses bounded offset pages; personal custom-pin list reads remain separate from the viewport API.
 - Provide a separate bounded overdue backlog. Busy calendar feeds now have cursor pages; the workspace keeps week results distinct from a global overdue backlog.
@@ -220,7 +220,7 @@ The following flows now commit their business writes and jobs in the same MongoD
 - The legacy task creation endpoint commits non-project assignment notifications with task creation. It checks the assignee's active business membership and restricts staff/head assignment scope. Existing project-task creation behavior is preserved.
 - Facility matching commits duplicate-enquiry cleanup and its recipient notification together; queue failure rolls back the cascade instead of losing the notification.
 
-These automated routes never call Firebase messaging directly; they wait only for transactional database writes. `/api/notifications/send` remains an explicit immediate-delivery endpoint with its existing response contract. Repeating create requests can still create distinct records; outbox deduplication does not provide client request idempotency. Failed comment submissions retain their upload for a retry; abandoned uploads are not swept by this worker.
+These automated routes never call Firebase messaging directly; they wait only for transactional database writes. `/api/notifications/send` uses the same durable inbox/outbox and returns HTTP 202 with the recipient count. Repeating create requests can still create distinct records; outbox deduplication does not provide client request idempotency. Failed comment submissions retain their upload for a retry; abandoned uploads are not swept by this worker.
 
 `tests/security/notification-flows.test.cjs` exercises the real routes with an isolated replica set, including queue-failure rollback, concurrent assignment/approval requests, team recipient changes and cascades, sender exclusion, foreign/inactive recipients, forged role cookies, valid/revoked head scopes and facility cleanup. Provider calls are intercepted and forbidden in the business-route tests; production Firebase delivery still requires a staging smoke test.
 

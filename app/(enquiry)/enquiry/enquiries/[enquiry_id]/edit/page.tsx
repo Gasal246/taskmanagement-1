@@ -1,4 +1,7 @@
 "use client"
+import HeadOfficeManager from "@/components/enquiries/HeadOfficeManager";
+import EnquiryActionChoices from "@/components/enquiries/EnquiryActionChoices";
+import EnquiryCapacityFields from "@/components/enquiries/EnquiryCapacityFields";
 import { Button } from '@/components/ui/button';
 import { Form, FormField, FormItem, FormLabel } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
@@ -52,6 +55,8 @@ const Page = () => {
         competition_status: z.enum(["Yes", "No"]),
         competition_notes: z.string().optional(),
 
+        camp_capacity: z.string().optional(),
+        camp_occupancy: z.string().optional(),
         priority: z.enum(priorityLevels as [string, ...string[]]).optional(),
 
         alert_date: z.string().optional(),
@@ -102,6 +107,8 @@ const Page = () => {
                 competition_status: enquiry?.enquiry?.competition_status ? "Yes" : "No",
                 competition_notes: enquiry?.enquiry?.competition_notes ?? "",
 
+                camp_capacity: enquiry?.enquiry?.camp_id?.camp_capacity ?? "",
+                camp_occupancy: String(enquiry?.enquiry?.camp_id?.camp_occupancy ?? ""),
                 priority: enquiry?.enquiry?.priority ? String(enquiry?.enquiry?.priority) : undefined,
 
                 alert_date: formatDate(enquiry?.enquiry?.alert_date) ?? "",
@@ -158,11 +165,13 @@ const Page = () => {
                     <Building2 size={16} /> Edit Enquiry
                 </h1>
             </div>
+            <HeadOfficeManager enquiryId={params.enquiry_id} />
             <Form {...form}>
                 <form onSubmit={handleSubmit(onFormSubmit)} className='space-y-8'>
                     <EnquiryFacilityDetailsFields
                         form={form as any}
                         isNewFacility={!Boolean(enquiry?.enquiry?.is_active)}
+                        editable
                         selectedFacility={enquiry?.enquiry?.camp_id}
                     />
                     {/* <FormField
@@ -360,22 +369,14 @@ const Page = () => {
                     <Textarea {...form.register("competition_notes")} placeholder='Competition Notes' />
 
                     {/* Priority */}
-                    <FormField control={form.control} name="priority" render={({ field }) => (
-                        <FormItem>
-                            <FormLabel className="text-xs text-slate-300 font-semibold">Priority (1 - Low, 10 - High)</FormLabel>
-                            <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
-                                <Select key={field.value} value={field.value} onValueChange={field.onChange}>
-                                    <SelectTrigger><SelectValue placeholder="Priority" /></SelectTrigger>
-                                    <SelectContent>{priorityLevels.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
-                                </Select>
-                            </div>
-                        </FormItem>
-                    )} />
+                    <EnquiryCapacityFields form={form as any} />
 
                     {/* Dates + Notes */}
                     <FormField control={form.control} name="alert_date" render={({ field }) => (
                         <FormItem><FormLabel className="text-xs text-slate-300">Alert Date</FormLabel><Input type="date" {...field} /></FormItem>
                     )} />
+
+                    <EnquiryActionChoices value={form.watch("next_action")} onChange={value => form.setValue("next_action", value, { shouldDirty: true, shouldValidate: true })} />
 
                     <Textarea {...form.register("next_action")} placeholder="Next Action" />
 

@@ -1,5 +1,7 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 "use client";
+import EnquiryActionChoices from "@/components/enquiries/EnquiryActionChoices";
+import EnquiryCapacityFields from "@/components/enquiries/EnquiryCapacityFields";
 
 import React, { useEffect, useState } from "react";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
@@ -24,7 +26,6 @@ import { EQ_CAPACITY_LIMITS, Eq_CAPACITY_OPTIONS, EQ_CONTACT_AUTHORITY } from "@
 import LocationPicker from "@/components/enquiries/LocationPicker";
 import EnquiryFacilityDetailsFields from "@/components/enquiries/EnquiryFacilityDetailsFields";
 import { sectorFieldValuesRecord, solutionDetailsRecord } from "@/lib/enquiries/catalogue";
-
 
 const priorityLevels = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"];
 
@@ -197,7 +198,6 @@ export default function AddEnquiry() {
   const { data: areas, isLoading: isAreaLoading } = useGetEqAreas(city_id);
   const { data: camps, isLoading: isCampLoading } = useGetEqCampsByArea(area_id);
   const selectedFacility = camps?.camps?.find((camp: any) => String(camp._id) === String(camp_id));
-
 
   const { control, handleSubmit } = form;
   const { fields, append, remove } = useFieldArray<z.infer<typeof enquirySchema>, "contacts">({ control, name: "contacts" });
@@ -381,7 +381,6 @@ export default function AddEnquiry() {
 
             </div>
 
-
             {/* CAMP INPUT MODE TOGGLE */}
             {form.watch("area_input_mode") == "existing" && (
               <FormField
@@ -500,7 +499,6 @@ export default function AddEnquiry() {
                   )}
                 />
 
-
                 {/* HEAD OFFICE */}
                 {!showHeadOffice && (
                   <button type="button" className="text-cyan-400 text-xs underline" onClick={() => setShowHeadOffice(true)}>
@@ -546,27 +544,9 @@ export default function AddEnquiry() {
             />
 
             {/* CAMP CAPACITY */}
-                <FormField control={form.control} name="camp_capacity" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs text-slate-300">Facility Capacity</FormLabel>
-                    <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
-                      <Select disabled={isExistingFacility} value={field.value} onValueChange={field.onChange}>
-                        <SelectTrigger><SelectValue placeholder="Select Capacity" /></SelectTrigger>
-                        <SelectContent>{Eq_CAPACITY_OPTIONS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-                      </Select>
-                    </div>
-                    <FormMessage />
-                  </FormItem>
-                )} />
+                <EnquiryCapacityFields form={form as any} facilityReadOnly={isExistingFacility} />
 
                 {/* OCCUPANCY */}
-                <FormField control={form.control} name="camp_occupancy" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs text-slate-300">Current Occupancy</FormLabel>
-                    <Input disabled={isExistingFacility} type="number" {...field} value={field.value || ""} />
-                    <FormMessage />
-                  </FormItem>
-                )} />
 
             {/* CONTACTS */}
             <div className="text-xs text-slate-400 font-semibold flex items-center gap-1">
@@ -764,17 +744,6 @@ export default function AddEnquiry() {
             <Textarea {...form.register("competition_notes")} placeholder="Competition Notes" />
 
             {/* PRIORITY */}
-            <FormField control={form.control} name="priority" render={({ field }) => (
-              <FormItem>
-                <FormLabel className="text-xs text-slate-300 font-semibold">Priority (1 - Low, 10 - High)</FormLabel>
-                <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <SelectTrigger><SelectValue placeholder="Priority" /></SelectTrigger>
-                    <SelectContent>{priorityLevels.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
-              </FormItem>
-            )} />
 
             {/* FOLLOW-UP */}
             <FormField control={form.control} name="followup_status" render={({ field }) => (
@@ -793,6 +762,7 @@ export default function AddEnquiry() {
             <FormField control={form.control} name="alert_date" render={({ field }) => (
               <FormItem><FormLabel className="text-xs text-slate-300">Alert Date</FormLabel><Input type="date" {...field} /></FormItem>
             )} />
+            <EnquiryActionChoices value={form.watch("next_action")} onChange={value => form.setValue("next_action", value, { shouldDirty: true, shouldValidate: true })} />
             <Textarea {...form.register("next_action")} placeholder="Next Action" />
             <FormField control={form.control} name="next_action_due" render={({ field }) => (
               <FormItem><FormLabel className="text-xs text-slate-300">Next Action Due Date</FormLabel>

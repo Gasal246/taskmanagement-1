@@ -1,10 +1,12 @@
+import { persistInbox } from "@/lib/notifications/inbox";
+import { inTransaction } from "./transaction";
 import { createHash, randomUUID } from "node:crypto";
 import type { ClientSession } from "mongoose";
 import Jobs from "@/models/background_jobs.model";
 
 export const MAX_ATTEMPTS = 8;
 export const BATCH_SIZE = 100;
-export type JobKind = "notification" | "push" | "storage-delete";
+export type JobKind = "notification" | "push" | "storage-delete" | "notification-email";
 export type InboxRecord = {
   recipient_id: unknown; sender_id: unknown; kind: string; title: string; body: string;
   data: Record<string, string>; meta: Record<string, unknown>; read_at: null;
@@ -25,12 +27,16 @@ export async function enqueueJob(kind: JobKind, key: string, payload: unknown, s
   } }, { upsert: true, session });
 }
 export async function enqueueNotifications(records: InboxRecord[], push: PushMessage, key: string = randomUUID(), session?: ClientSession) {
-  for (let offset = 0; offset < records.length; offset += BATCH_SIZE) {
-    const batch = records.slice(offset, offset + BATCH_SIZE);
-    await enqueueJob("notification", `notification:${key}:${offset / BATCH_SIZE}`, {
-      records: batch, push, recipientIds: [...new Set(batch.map(record => String(record.recipient_id)))],
-    }, session);
-  }
+  const write = async (dbSession: ClientSession) => {
+    const now = new Date();
+    for (let offset = 0; offset < records.length; offset += BATCH_SIZE) {
+      const batch = records.slice(offset, offset + BATCH_SIZE); const batchKey = `notification:${key}:${offset / BATCH_SIZE}`;
+      await enqueueJob("notification", batchKey, { records: batch, push, recipientIds: [...new Set(batch.map(record => String(record.recipient_id)))] }, dbSession);
+      await persistInbox(batch, batchKey, now, dbSession);
+    }
+    return true;
+  };
+  if (session) await write(session); else await inTransaction(write);
 }
 export async function enqueueFileCleanup(paths: Array<string | null | undefined>, session?: ClientSession) {
   const unique = [...new Set(paths.filter((value): value is string => Boolean(value)))];

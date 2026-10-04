@@ -2,14 +2,14 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ArrowLeft, Calendar, PhoneCall, MapPin, MessageCircle } from "lucide-react";
+import { ArrowLeft, Calendar, PhoneCall, Mail, MapPin, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { useGetEqLatestActionForStaff } from "@/query/enquirymanager/queries";
 
 // Sample fetched data (replace with real API later)
 const sampleEnquiryHistory = {
-  action: "Visit", // or "Call"
+  action: "Visit", // or "Call" / "Email"
   priority: 6,
   assignedTo: "Ahmed Khan",
   feedback: "Customer wants us to visit after 5PM.",
@@ -71,6 +71,8 @@ export default function StaffEnquiryActionPage() {
         <div className="flex items-center gap-3 p-3 bg-slate-900/50 rounded-lg border border-slate-700">
           {action?.action?.action === "Visit" ? (
             <MapPin className="text-green-400" size={20} />
+          ) : action?.action?.action === "Email" ? (
+            <Mail className="text-cyan-400" size={20} />
           ) : (
             <PhoneCall className="text-blue-400" size={20} />
           )}

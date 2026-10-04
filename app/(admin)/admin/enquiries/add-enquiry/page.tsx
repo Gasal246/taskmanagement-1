@@ -1,9 +1,11 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 "use client";
+import EnquiryActionChoices from "@/components/enquiries/EnquiryActionChoices";
+import EnquiryCapacityFields from "@/components/enquiries/EnquiryCapacityFields";
 
 import React, { useEffect, useMemo, useState } from "react";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
-import { Building2, FileText, Loader2, Plus, Trash2, Upload, Wifi, PhoneCall, X, Info } from "lucide-react";
+import { Building2, FileText, Loader2, Plus, Trash2, Upload, Wifi, PhoneCall, X } from "lucide-react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -23,7 +25,6 @@ import Image from "next/image";
 import { deleteObject, getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { storage } from "@/firebase/config";
 import { Button } from "@/components/ui/button";
-import { Tooltip } from "antd";
 import { useSelector } from "react-redux";
 import { RootState } from "@/redux/store";
 import EnquiryFacilityDetailsFields from "@/components/enquiries/EnquiryFacilityDetailsFields";
@@ -171,18 +172,6 @@ export default function AddEnquiry() {
     const [uploadedDoc, setUploadedDoc] = useState<{ url: string; name: string; type?: string; storagePath?: string } | null>(null);
     const [removingDoc, setRemovingDoc] = useState(false);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-    const priorityCapacityMap = [
-        { value: "1", priority: "1", capacity: "<500", capacityLabel: "<500" },
-        { value: "2", priority: "2", capacity: "500-1000", capacityLabel: "500-1,000" },
-        { value: "3", priority: "3", capacity: "1000-2000", capacityLabel: "1,000-2,000" },
-        { value: "4", priority: "4", capacity: "2000-3000", capacityLabel: "2,000-3,000" },
-        { value: "5", priority: "5", capacity: "3000-5000", capacityLabel: "3,000-5,000" },
-        { value: "6", priority: "6", capacity: "5000-10000", capacityLabel: "5,000-10,000" },
-        { value: "7", priority: "7", capacity: "10000-20000", capacityLabel: "10,000-20,000" },
-        { value: "8", priority: "8", capacity: "20000-35000", capacityLabel: "20,000-35,000" },
-        { value: "9", priority: "9", capacity: "35000-50000", capacityLabel: "35,000-50,000" },
-        { value: "10", priority: "10", capacity: "50000+", capacityLabel: "50,000+" },
-    ];
 
     const { mutateAsync: GetCountries, isPending: isCountryLoading } = useGetEqCountries();
     const { mutateAsync: AddNewEnquiry, isPending: isEqAdding } = useAddNewEnquiry();
@@ -254,15 +243,6 @@ export default function AddEnquiry() {
             })
             .filter(Boolean);
     }, [eqUsers?.users]);
-    const campCapacityMissing = isExistingCampMode
-        && !!camp_id
-        && !!selectedCamp
-        && (selectedCamp?.camp_capacity === null || selectedCamp?.camp_capacity === undefined || selectedCamp?.camp_capacity === "");
-    const campOccupancyMissing = isExistingCampMode
-        && !!camp_id
-        && !!selectedCamp
-        && (selectedCamp?.camp_occupancy === null || selectedCamp?.camp_occupancy === undefined || selectedCamp?.camp_occupancy === "");
-
 
     const { control, handleSubmit } = form;
     const { fields, append, remove } = useFieldArray<z.infer<typeof enquirySchema>, "contacts">({ control, name: "contacts" });
@@ -609,7 +589,6 @@ export default function AddEnquiry() {
                             </div>
                         </div>
 
-
                         {/* CAMP INPUT MODE TOGGLE */}
                         {areaInputMode == "existing" && (
                             <FormField
@@ -738,7 +717,6 @@ export default function AddEnquiry() {
                                     )}
                                 />
 
-
                                 {/* HEAD OFFICE */}
                                 {!showHeadOffice && (
                                     <button type="button" className="inline-flex items-center rounded-lg border border-cyan-800/60 bg-cyan-950/20 px-3 py-2 text-cyan-200 text-xs hover:bg-cyan-950/30 transition" onClick={() => setShowHeadOffice(true)}>
@@ -784,52 +762,7 @@ export default function AddEnquiry() {
                             selectedFacility={selectedCamp}
                         />
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {/* CAMP CAPACITY */}
-                            <FormField control={form.control} name="camp_capacity" render={({ field }) => (
-                                <FormItem className="rounded-xl border border-slate-800/70 bg-slate-950/25 p-3">
-                                    <FormLabel className="text-xs text-slate-300">Facility Capacity</FormLabel>
-                                    <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
-                                        <Select
-                                            disabled={isExistingCampMode}
-                                            value={field.value}
-                                            onValueChange={(value) => {
-                                                field.onChange(value);
-                                                const matchedPriority = priorityCapacityMap.find((item) => item.capacity === value)?.priority;
-                                                if (matchedPriority) {
-                                                    form.setValue("priority", matchedPriority, { shouldDirty: true, shouldValidate: true });
-                                                }
-                                            }}
-                                        >
-                                            <SelectTrigger><SelectValue placeholder="Select Capacity" /></SelectTrigger>
-                                            <SelectContent>
-                                                {priorityCapacityMap.map((item) => (
-                                                    <SelectItem key={item.capacity} value={item.capacity}>
-                                                        {item.capacityLabel} (Priority {item.priority})
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    {campCapacityMissing && (
-                                        <p className="text-xs text-red-400 mt-1">Please add the camp capacity</p>
-                                    )}
-                                    <FormMessage />
-                                </FormItem>
-                            )} />
-
-                            {/* OCCUPANCY */}
-                            <FormField control={form.control} name="camp_occupancy" render={({ field }) => (
-                                <FormItem className="rounded-xl border border-slate-800/70 bg-slate-950/25 p-3">
-                                    <FormLabel className="text-xs text-slate-300">Current Occupancy</FormLabel>
-                                    <Input disabled={isExistingCampMode} type="number" {...field} value={field.value || ""} placeholder="Enter in numbers" className="bg-slate-950/40" />
-                                    {campOccupancyMissing && (
-                                        <p className="text-xs text-red-400 mt-1">Please add the camp occupancy</p>
-                                    )}
-                                    <FormMessage />
-                                </FormItem>
-                            )} />
-                        </div>
+                        <EnquiryCapacityFields form={form as any} facilityReadOnly={isExistingCampMode} />
 
                         {/* CONTACTS */}
                         <div className="rounded-xl border border-slate-800/80 bg-gradient-to-r from-slate-900/50 to-slate-950/40 p-3 space-y-3">
@@ -1089,51 +1022,6 @@ export default function AddEnquiry() {
                         </div>
 
                         <div className="rounded-xl border border-slate-800/80 bg-gradient-to-r from-slate-900/45 to-slate-950/35 p-3">
-                            <FormField control={form.control} name="priority" render={({ field }) => (
-                                <FormItem>
-                                    <Tooltip
-                                        placement="topLeft"
-                                        rootClassName="w-[360px]"
-                                        className="w-[360px]"
-                                        title={
-                                            <div className="w-[360px] rounded-lg border border-slate-700/70 bg-slate-900/95 p-3 shadow-lg">
-                                                <div className="grid grid-cols-2 gap-x-4 text-[11px] font-semibold uppercase tracking-wide text-slate-300">
-                                                    <span>Priority</span>
-                                                    <span>Capacity</span>
-                                                </div>
-                                                <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-slate-200">
-                                                    {priorityCapacityMap.map((item) => (
-                                                        <React.Fragment key={item.value}>
-                                                            <span className="tabular-nums">{item.priority}</span>
-                                                            <span className="whitespace-nowrap">{item.capacityLabel}</span>
-                                                        </React.Fragment>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        }
-                                    >
-                                        <FormLabel className="text-xs text-slate-300 font-semibold flex gap-1 items-center">
-                                            <Info size={14} color="white" />
-                                            Priority (1 - Low, 10 - High)
-                                        </FormLabel>
-                                    </Tooltip>
-                                    <div className="bg-gradient-to-br from-slate-950/50 to-slate-900/50 rounded-lg">
-                                        <Select value={field.value} onValueChange={field.onChange}>
-                                            <SelectTrigger><SelectValue placeholder="Priority" /></SelectTrigger>
-                                            <SelectContent>
-                                                {priorityCapacityMap.map((item) => (
-                                                    <SelectItem key={item.value} value={item.value}>
-                                                        {item.value} - {item.capacityLabel}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                </FormItem>
-                            )} />
-                        </div>
-
-                        <div className="rounded-xl border border-slate-800/80 bg-gradient-to-r from-slate-900/45 to-slate-950/35 p-3">
                             <FormField control={form.control} name="followup_status" render={({ field }) => (
                                 <FormItem className="rounded-lg border border-slate-800/70 bg-slate-950/25 p-3">
                                     <FormLabel className="text-xs text-slate-300 font-semibold">Follow-up Status</FormLabel>
@@ -1167,6 +1055,7 @@ export default function AddEnquiry() {
                                 )} />
                                 <div className="lg:col-span-2 rounded-lg border border-slate-800/70 bg-slate-950/25 p-3">
                                     <label className="text-xs text-slate-300 font-semibold block mb-2">Next Action</label>
+                                    <EnquiryActionChoices value={form.watch("next_action")} onChange={value => form.setValue("next_action", value, { shouldDirty: true, shouldValidate: true })} />
                                     <Textarea {...form.register("next_action")} placeholder="Next Action" className="bg-slate-950/40 min-h-[92px]" />
                                 </div>
                             </div>

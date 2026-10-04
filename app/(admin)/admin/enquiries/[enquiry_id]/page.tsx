@@ -1,4 +1,5 @@
 "use client";
+import HeadOfficeManager from "@/components/enquiries/HeadOfficeManager";
 import EnquiryCompletionActions from "@/components/enquiries/EnquiryCompletionActions";
 import React, { useMemo, useState } from "react";
 import { motion } from "framer-motion";
@@ -192,6 +193,7 @@ export default function SingleEnquiryPage() {
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
+<HeadOfficeManager enquiryId={params.enquiry_id} queueOnly hideWithoutPending />
       <div className="p-4 pb-10 text-slate-100">
         {/* HEADER */}
         <div className="mb-4 space-y-2">

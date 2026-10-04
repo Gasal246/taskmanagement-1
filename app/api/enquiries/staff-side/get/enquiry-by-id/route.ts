@@ -49,7 +49,7 @@ export async function GET(req:NextRequest){
             getFacilitySolutions(enquiry?.camp_id?._id || enquiry?.camp_id),
         ]);
 
-        const contacts = await Eq_camp_contacts.find({enquiry_id: enquiry_id}).limit(1);
+        const contacts = await Eq_camp_contacts.find({enquiry_id: enquiry_id});
         const head_office = await Eq_camp_headoffice.findById(enquiry?.camp_id?.headoffice_id).limit(1);
 
         let external_provider = null;

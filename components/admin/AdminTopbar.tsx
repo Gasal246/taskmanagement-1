@@ -1,15 +1,16 @@
 "use client"
+import NotificationBell from "@/components/shared/NotificationBell";
 import React, { useEffect, useState } from 'react'
 import { Popover, PopoverContent, PopoverTrigger, } from "@/components/ui/popover"
 import Image from 'next/image'
-import { Bell, ListTodo, Menu } from 'lucide-react'
+import { ListTodo, Menu } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { ExitIcon } from '@radix-ui/react-icons'
-import { signOut } from 'next-auth/react'
-import { Avatar, Badge, Tooltip } from 'antd'
+import {  } from 'next-auth/react';
+import { notificationSignOut as signOut } from "@/lib/notifications/sign-out";
+import { Avatar } from 'antd'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger, } from "@/components/ui/alert-dialog"
 import { useRouter } from 'next/navigation'
-import NotificationPane from '../shared/NotificationPane'
 import { useDispatch, useSelector } from 'react-redux'
 import { AppDispatch, RootState } from '@/redux/store'
 import Cookies from "js-cookie";
@@ -24,7 +25,6 @@ const AdminTopbar = ({ onMobileMenuClick }: AdminTopbarProps) => {
     const router = useRouter();
     const dispatch = useDispatch<AppDispatch>();
     const { businessData } = useSelector((state: RootState) => state.user);
-    const unreadCount = useSelector((state: RootState) => state.notifications.unreadCount);
     const [isHydrated, setIsHydrated] = useState(false);
     const [roleLabel, setRoleLabel] = useState("");
     const [domainLabel, setDomainLabel] = useState("");
@@ -116,15 +116,7 @@ const AdminTopbar = ({ onMobileMenuClick }: AdminTopbarProps) => {
                 </div>
             </div>
             <div className="flex items-center gap-3">
-                <NotificationPane trigger={
-                    <div className="cursor-pointer rounded-xl p-2 transition-colors hover:bg-slate-800/60">
-                        <Tooltip title={unreadCount <= 0 ? 'no new notifications.' : `${unreadCount} new notifications`}>
-                            <Badge count={unreadCount} size='small'>
-                                <Bell className='text-primary' size={20} />
-                            </Badge>
-                        </Tooltip>
-                    </div>
-                } />
+                <NotificationBell />
                 {
                     businessData &&
                     <Popover>

@@ -1,3 +1,8 @@
+import { canAdministerEnquiry } from "@/lib/enquiries/access";
+import { HeadOfficeError, enquiryOfficeInput, submitOfficeRequest, requestBusiness, officeInBusiness } from "@/lib/enquiries/head-office-requests";
+import { ZodError } from "zod";
+import { enquiryCapacity, EnquiryCapacityError } from "@/lib/enquiries/capacity";
+import { ENQUIRY_ACTIONS } from "@/lib/enquiries/action-types.mjs";
 import { enquiryActor, canEditEnquiry, canChangeEnquiryFacility } from "@/lib/enquiries/access";
 import { preserveInitialAction, canScheduleAction } from "@/lib/enquiries/completion-server";
 import { forwardHistoryFilter, historyOrder } from "@/lib/enquiries/completion";
@@ -385,7 +390,7 @@ export async function PUT(req: NextRequest) {
             return NextResponse.json({ message: "Unauthorized Access", status: 401 }, { status: 401 });
         }
 
-        const body: Body = await req.json();
+        const body: Body & { head_office_request?: any } = await req.json();
         const enquiryId = toIdOrNull(body.enquiry_id);
         let areaInputMode = body.area_input_mode === "new" ? "new" : "existing";
         let campInputMode = body.camp_input_mode === "new" ? "new" : "existing";
@@ -414,13 +419,15 @@ export async function PUT(req: NextRequest) {
         const actor = await enquiryActor();
         if (!actor || !await canEditEnquiry(enquiry, actor)) return NextResponse.json({ message: "You are not allowed to edit this enquiry" }, { status: 403 });
 
-        const facilityId = enquiry.camp_id || (campInputMode === "existing" ? toIdOrNull(body.camp) : null);
+        const facilityId = campInputMode === "existing" && body.camp ? toIdOrNull(body.camp) : enquiry.camp_id;
         const existingFacility = facilityId ? await Eq_camps.findById(facilityId) : null;
         const mayChangeFacility = existingFacility && await canChangeEnquiryFacility(enquiry, existingFacility, actor);
-        if (existingFacility && !existingFacility.is_active && !mayChangeFacility) return NextResponse.json({ message: "This Facility belongs to or is used by another business" }, { status: 403 });
+        if (existingFacility && !mayChangeFacility) return NextResponse.json({ message: "This Facility belongs to or is used by another business" }, { status: 403 });
         if (!enquiry.business_id && (areaInputMode === "new" || campInputMode === "new")) return NextResponse.json({ message: "Review this enquiry’s business ownership before requesting a new Facility or area" }, { status: 403 });
 
-        if (toTextOrNull(body.followup_status) === "Closed" && enquiry.status !== "Closed") return NextResponse.json({ message: "Use Follow-up actions to record completed calls and visits", status: 400 }, { status: 400 });
+        if (toTextOrNull(body.followup_status) === "Closed" && enquiry.status !== "Closed") return NextResponse.json({ message: "Use Follow-up actions to record completed calls, visits and emails", status: 400 }, { status: 400 });
+
+        const capacity = enquiryCapacity(body, existingFacility);
 
         const existingSolutionSnapshot: any = await Eq_enquiry_solutions.findOne({ enquiry_id: enquiry._id }).lean();
         const solutionsResult = await validateDynamicSolutions({
@@ -443,27 +450,10 @@ export async function PUT(req: NextRequest) {
         let areaId = toIdOrNull(body.area);
         let campId = toIdOrNull(body.camp);
 
-        if (enquiry.is_active) {
-            campId = String(enquiry.camp_id || "");
-            areaId = String(enquiry.area_id || "");
-            countryId = String(enquiry.country_id || "");
-            regionId = String(enquiry.region_id || "");
-            provinceId = enquiry.province_id ? String(enquiry.province_id) : null;
-            cityId = enquiry.city_id ? String(enquiry.city_id) : null;
-            areaInputMode = "existing";
-            campInputMode = "existing";
-        }
-
         // A pending enquiry already owns its requested Facility. Edit that same record.
-        if (!enquiry.is_active && enquiry.camp_id) {
+        if (!enquiry.is_active && enquiry.camp_id && (!body.camp || String(body.camp) === String(enquiry.camp_id))) {
             campId = String(enquiry.camp_id);
             campInputMode = "existing";
-            if (enquiry.area_id) {
-                areaId = String(enquiry.area_id);
-                areaInputMode = "existing";
-            }
-        } else if (enquiry.is_active && campInputMode === "new") {
-            return NextResponse.json({ message: "An approved enquiry cannot request a replacement Facility", status: 400 }, { status: 400 });
         }
 
         if (areaInputMode === "new" && !isBlank(body.area_name_request)) {
@@ -543,8 +533,9 @@ export async function PUT(req: NextRequest) {
                 body.head_office_details
             ].some((value) => !isBlank(value));
 
-            if (hasHeadOfficePayload) {
+            if (canAdministerEnquiry(enquiry, actor) && hasHeadOfficePayload) {
                 const newHeadOffice = new Eq_camp_headoffice({
+                    business_id: enquiry.business_id,
                     phone: toTextOrNull(body.head_office_contact),
                     geo_location: toTextOrNull(body.head_office_location),
                     other_details: toTextOrNull(body.head_office_details),
@@ -569,8 +560,8 @@ export async function PUT(req: NextRequest) {
                 ...classificationResult,
                 ...supportingResult,
                 camp_name: toTextOrNull(body.camp_name_request),
-                camp_capacity: toTextOrNull(body.camp_capacity),
-                camp_occupancy: toNumberOrNull(body.camp_occupancy),
+                camp_capacity: capacity.camp_capacity,
+                camp_occupancy: capacity.camp_occupancy,
                 is_active: false,
                 visited_status: "Just Added",
                 latitude: toTextOrNull(body.latitude),
@@ -579,6 +570,7 @@ export async function PUT(req: NextRequest) {
 
             const savedCamp = await newCamp.save();
             campId = savedCamp._id;
+            enquiry.is_active = false;
             await saveFacilitySolutions(savedCamp._id, solutionsResult);
         } else if (campId) {
             const campToEdit = await Eq_camps.findById(campId);
@@ -586,15 +578,10 @@ export async function PUT(req: NextRequest) {
                 return NextResponse.json({ message: "Camp not found", status: 404 }, { status: 404 });
             }
 
-            if (campToEdit.is_active) {
-                const mappedVisitedStatus = getCampVisitedStatusFromEnquiryStatus(body.followup_status);
-                if (mayChangeFacility && mappedVisitedStatus && campToEdit.visited_status !== mappedVisitedStatus) {
-                    campToEdit.visited_status = mappedVisitedStatus;
-                    await campToEdit.save();
-                }
-            } else {
-
-            const classificationResult = await validateDynamicClassification(body, campToEdit.toObject());
+            // Older Facilities may have no catalogue classification yet. Capacity-only
+            // edits must not require unrelated new metadata.
+            const classificationResult = body.project_sector || body.facility_type || campToEdit.project_sector || campToEdit.facility_type
+                ? await validateDynamicClassification(body, campToEdit.toObject()) : {};
             const supportingResult = projectSupportingFieldsSchema.parse(body);
 
             const hasHeadOfficePayload = [
@@ -604,8 +591,9 @@ export async function PUT(req: NextRequest) {
                 body.head_office_details
             ].some((value) => !isBlank(value));
 
-            if (hasHeadOfficePayload) {
+            if (canAdministerEnquiry(enquiry, actor) && hasHeadOfficePayload) {
                 if (campToEdit.headoffice_id) {
+                    await officeInBusiness(campToEdit.headoffice_id, String(enquiry.business_id));
                     const headoffice = await Eq_camp_headoffice.findById(campToEdit.headoffice_id);
                     if (headoffice) {
                         headoffice.phone = toTextOrNull(body.head_office_contact);
@@ -616,6 +604,7 @@ export async function PUT(req: NextRequest) {
                     }
                 } else {
                     const newHeadOffice = new Eq_camp_headoffice({
+                    business_id: enquiry.business_id,
                         phone: toTextOrNull(body.head_office_contact),
                         geo_location: toTextOrNull(body.head_office_location),
                         other_details: toTextOrNull(body.head_office_details),
@@ -624,8 +613,7 @@ export async function PUT(req: NextRequest) {
                     const savedHeadoffice = await newHeadOffice.save();
                     campToEdit.headoffice_id = savedHeadoffice._id;
                 }
-            } else if (campToEdit.headoffice_id) {
-                await Eq_camp_headoffice.findByIdAndDelete(campToEdit.headoffice_id);
+            } else if (canAdministerEnquiry(enquiry, actor) && campToEdit.headoffice_id && body.head_office_address !== undefined) {
                 campToEdit.headoffice_id = null;
             }
 
@@ -675,13 +663,13 @@ export async function PUT(req: NextRequest) {
             }
 
             campToEdit.camp_name = toTextOrNull(body.camp_name_request);
-            campToEdit.camp_capacity = toTextOrNull(body.camp_capacity);
+            campToEdit.camp_capacity = capacity.camp_capacity;
             campToEdit.camp_type = toTextOrNull(body.camp_type);
             Object.assign(campToEdit, classificationResult);
             campToEdit.capacity_unit = supportingResult.capacity_unit;
             campToEdit.project_stage = supportingResult.project_stage;
             campToEdit.ownership = supportingResult.ownership;
-            campToEdit.camp_occupancy = toNumberOrNull(body.camp_occupancy);
+            campToEdit.camp_occupancy = capacity.camp_occupancy;
             campToEdit.country_id = countryId;
             campToEdit.region_id = regionId;
             campToEdit.province_id = provinceId;
@@ -699,8 +687,7 @@ export async function PUT(req: NextRequest) {
             }
 
             await campToEdit.save();
-            await saveFacilitySolutions(campToEdit._id, solutionsResult);
-            }
+            if (!campToEdit.is_active) await saveFacilitySolutions(campToEdit._id, solutionsResult);
         }
 
         enquiry.country_id = countryId;
@@ -748,7 +735,7 @@ export async function PUT(req: NextRequest) {
 
         await enquiry.save();
         await saveEnquirySolutions(enquiry._id, solutionsResult);
-        if (["Call", "Visit"].includes(String(enquiry.next_action)) &&
+        if (ENQUIRY_ACTIONS.some(action => action === String(enquiry.next_action)) &&
             (String(previousAction || "") !== String(enquiry.next_action) || String(previousActionDue || "") !== String(enquiry.next_action_due || ""))) {
             const initialExists = await Eq_enquiry_histories.exists({ _id: enquiry._id, action_origin: "initial" });
             if (!initialExists) {
@@ -894,9 +881,20 @@ export async function PUT(req: NextRequest) {
             }
         }
 
+        if (!canAdministerEnquiry(enquiry, actor)) {
+            const currentCamp: any = await Eq_camps.findById(campId).lean();
+            const currentOffice = currentCamp?.headoffice_id ? await Eq_camp_headoffice.findById(currentCamp.headoffice_id).lean() : null;
+            const input = enquiryOfficeInput(body, currentCamp, currentOffice);
+            if (input) {
+                await requestBusiness(req, actor, { enquiry_id: String(enquiry._id) });
+                await submitOfficeRequest(actor, String(enquiry.business_id), { ...input, enquiry_id: enquiry._id, camp_ids: [campId] });
+            }
+        }
         return NextResponse.json({ message: "Enquiry updated", status: 200 }, { status: 200 });
     } catch (err) {
-        if (err instanceof CatalogueValidationError) return NextResponse.json({ message: err.message, status: 400 }, { status: 400 });
+        if (err instanceof HeadOfficeError) return NextResponse.json({ message: err.message, status: err.status }, { status: err.status });
+        if (err instanceof EnquiryCapacityError || err instanceof CatalogueValidationError) return NextResponse.json({ message: err.message, status: 400 }, { status: 400 });
+        if (err instanceof ZodError) return NextResponse.json({ message: err.issues[0]?.message || "Invalid Facility details", status: 400 }, { status: 400 });
         console.log("Error while updating enquiry: ", err);
         return NextResponse.json({ message: "Internal Server Error", status: 500 }, { status: 500 });
     }

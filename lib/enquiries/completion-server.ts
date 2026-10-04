@@ -1,3 +1,4 @@
+import { ENQUIRY_ACTIONS } from "./action-types.mjs";
 import mongoose from 'mongoose';
 import Eq_enquiry from '@/models/eq_enquiries.model';
 import Histories from '@/models/eq_enquiry_histories';
@@ -83,7 +84,7 @@ export async function transitionAction(body: any, actor: EnquiryActor) {
   if (!body || !mongoose.isValidObjectId(body.enquiry_id) || !mongoose.isValidObjectId(body.action_id)) throw new EnquiryRequestError(400, 'Invalid enquiry or action ID');
   if (!['complete', 'cancel', 'reopen'].includes(body.operation)) throw new EnquiryRequestError(400, 'Invalid action operation');
   if (typeof body.notes !== 'string' || !body.notes.trim() || body.notes.length > 5000) throw new EnquiryRequestError(400, 'Add notes of up to 5,000 characters');
-  if (body.operation === 'complete' && !['Call', 'Visit'].includes(body.performed_action)) throw new EnquiryRequestError(400, 'Select the action you performed');
+  if (body.operation === 'complete' && !ENQUIRY_ACTIONS.includes(body.performed_action)) throw new EnquiryRequestError(400, 'Select the action you performed');
   const targetId = body.assignee_id || actor.actorId;
   if (!mongoose.isValidObjectId(targetId) || !Number.isInteger(body.expected_revision) || body.expected_revision < 0) throw new EnquiryRequestError(400, 'Refresh the action before continuing');
   if (body.operation === 'complete' && targetId !== actor.actorId) throw new EnquiryRequestError(403, 'Each assignee must complete their own part');
@@ -126,7 +127,7 @@ export async function transitionAction(body: any, actor: EnquiryActor) {
   } finally { await session.endSession(); }
 }
 export async function recordCompletedAction(body: any, actor: EnquiryActor) {
-  if (!mongoose.isValidObjectId(body?.enquiry_id) || !mongoose.isValidObjectId(body?.request_id) || !['Call', 'Visit'].includes(body?.performed_action) || typeof body.notes !== 'string' || !body.notes.trim() || body.notes.length > 5000) throw new EnquiryRequestError(400, 'Select Call or Visit and add completion notes');
+  if (!mongoose.isValidObjectId(body?.enquiry_id) || !mongoose.isValidObjectId(body?.request_id) || !ENQUIRY_ACTIONS.includes(body?.performed_action) || typeof body.notes !== 'string' || !body.notes.trim() || body.notes.length > 5000) throw new EnquiryRequestError(400, 'Select Call, Visit or Email and add completion notes');
   const session = await mongoose.startSession();
   try {
     await session.withTransaction(async () => {

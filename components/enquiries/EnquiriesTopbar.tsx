@@ -1,7 +1,8 @@
 "use client"
 import { Avatar } from 'antd';
-import { signOut } from 'next-auth/react'
+import { notificationSignOut as signOut } from "@/lib/notifications/sign-out";
 import { useRouter } from 'next/navigation';
+import NotificationBell from "@/components/shared/NotificationBell";
 import React from 'react'
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { motion } from 'framer-motion';
@@ -22,6 +23,7 @@ const StaffTopbar = () => {
 
   return (
     <div className='w-full bg-slate-900 p-1 flex justify-end items-center px-3'>
+      <NotificationBell />
       <Popover>
         <PopoverTrigger>
           <div className='flex gap-1 items-center cursor-pointer'>

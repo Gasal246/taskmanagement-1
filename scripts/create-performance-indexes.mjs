@@ -27,9 +27,9 @@ const modelFiles = [
   "location_dep_staffs.model", "department_heads.model", "department_staffs.model", "department_regions.model",
   "department_areas.model", "business_regions.model", "business_departments.model",
   "users.model", "password_reset.model", "auth_rate_limit.model", "enquiry_counter.model",
-  "eq_enquiries.model", "eq_camps.model", "eq_users_log.model", "eq_enquiry_histories", "eq_enquiry_access.model", "admin_assign_business.model",
+  "eq_head_office_request.model", "eq_enquiries.model", "eq_camps.model", "eq_users_log.model", "eq_enquiry_histories", "eq_enquiry_access.model", "admin_assign_business.model",
   "business_staffs.model", "user_roles.model", "business_tasks.model", "task_activities.model",
-  "business_project.model", "project_team_members.model", "notifications.model", "calendar_events.model", "Flow_Log.model", "project_team.model", "project_departments.model", "background_jobs.model", "fcm_tokens.model", "activity_comments.model", "activity_comment_reads.model",
+  "business_project.model", "project_team_members.model", "notifications.model", "notification_preferences.model", "worker_heartbeats.model", "calendar_events.model", "Flow_Log.model", "project_team.model", "project_departments.model", "background_jobs.model", "fcm_tokens.model", "activity_comments.model", "activity_comment_reads.model",
 ];
 const models = modelFiles.map(file => require(path.resolve(`models/${file}.ts`)).default);
 const apply = process.argv.includes("--apply");

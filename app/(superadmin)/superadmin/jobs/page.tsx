@@ -31,6 +31,7 @@ export default function BackgroundJobsPage() {
         onClick={() => { setStatus(value); setPage(1); retry.reset(); }} className={`border rounded px-3 py-2 capitalize ${status === value ? "bg-primary text-primary-foreground" : ""}`}>
         {value} ({counts[value] || 0})</button>)}
     </div>
+    {query.data?.health && (!query.data.health.healthy || query.data.health.failedNotifications > 0) && <div role="alert" className="rounded border border-amber-500 bg-amber-950/30 p-4 text-sm">{!query.data.health.workerAlive ? "Notification worker is not reporting a heartbeat. Start or check the VPS worker service." : query.data.health.queueDelayed ? "Notifications are delayed. Check worker capacity and provider connectivity." : "Notification delivery failures need review."} {query.data.health.failedNotifications} failed notification jobs. Inbox messages remain available even when push delivery fails.</div>}
     {query.data?.oldestPendingAt && <p className="text-sm">Oldest queued job: {new Date(query.data.oldestPendingAt).toLocaleString()}. A growing queue can indicate a stopped worker.</p>}
     {query.isPending && <p role="status">Loading jobs…</p>}
     {query.isError && <p role="alert">{query.error.message} <button className="underline" onClick={() => query.refetch()}>Try again</button></p>}

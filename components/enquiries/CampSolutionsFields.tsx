@@ -69,7 +69,7 @@ export default function CampSolutionsFields({ control, watch, setValue, disabled
     <div className="grid gap-4 sm:grid-cols-2">
       <Controller control={control} name="primary_solution" rules={{ validate: (value) => !selected.length || selected.includes(value) || "Choose a primary solution from the selected services" }} render={({ field, fieldState }) => <div className="min-w-0 space-y-2">
         <label htmlFor="primary_solution" className="text-xs font-semibold text-slate-300">Primary Solution{selected.length > 0 && " *"}</label>
-        <Select disabled={disabled || !selected.length} value={field.value || ""} onValueChange={field.onChange}>
+        <Select disabled={disabled || !selected.length} value={field.value || ""} onValueChange={value => { if (value) field.onChange(value); }}>
           <SelectTrigger id="primary_solution" ref={field.ref} className={`${inputClass} h-auto min-h-10 text-left [&>span]:line-clamp-2`}><SelectValue placeholder={selected.length ? "Select main service" : "Select a solution first"} /></SelectTrigger>
           <SelectContent>{services.filter((service: any) => selected.includes(service.key)).map((service: any) => <SelectItem key={service.key} value={service.key} disabled={!serviceIsSelectable(service.key)}>{service.name}{!serviceIsSelectable(service.key) ? " (Archived)" : ""}</SelectItem>)}</SelectContent>
         </Select>
@@ -77,7 +77,7 @@ export default function CampSolutionsFields({ control, watch, setValue, disabled
       </div>} />
       <Controller control={control} name="commercial_model" render={({ field }) => <div className="space-y-2">
         <label htmlFor="commercial_model" className="text-xs font-semibold text-slate-300">Commercial Model</label>
-        <Select disabled={disabled} value={field.value || "To Be Determined"} onValueChange={field.onChange}>
+        <Select disabled={disabled} value={field.value || "To Be Determined"} onValueChange={value => { if (value) field.onChange(value); }}>
           <SelectTrigger id="commercial_model" className={inputClass}><SelectValue /></SelectTrigger>
           <SelectContent>{COMMERCIAL_MODELS.map((model) => <SelectItem key={model} value={model}>{model}</SelectItem>)}</SelectContent>
         </Select>

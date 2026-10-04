@@ -23,7 +23,7 @@ export default function middleware(request: NextRequest, event: NextFetchEvent) 
   const path = request.nextUrl.pathname;
   // These handlers own their authentication; a stale browser session must not
   // prevent recovery, worker authentication or an explicit sign-out during an outage.
-  if (path.startsWith("/api/auth/") || publicRecoveryPaths.has(path) || path === "/api/internal/jobs/run" ||
+  if (path.startsWith("/api/auth/") || publicRecoveryPaths.has(path) || path === "/api/internal/jobs/run" || path === "/api/internal/jobs/health" ||
     (path === "/api/notifications/send" && process.env.FCM_API_KEY && request.headers.get("x-api-key") === process.env.FCM_API_KEY)) return NextResponse.next();
   return authenticatedMiddleware(request, event);
 }

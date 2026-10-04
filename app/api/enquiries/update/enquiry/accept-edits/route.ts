@@ -1,3 +1,6 @@
+import { enquiryCapacity, EnquiryCapacityError } from "@/lib/enquiries/capacity";
+import Eq_camps from "@/models/eq_camps.model";
+import { enquiryActor, canChangeEnquiryFacility } from "@/lib/enquiries/access";
 import { authorizeEnquiry } from "@/lib/enquiries/access";
 import connectDB from "@/lib/mongo";
 import Eq_enquiry from "@/models/eq_enquiries.model";
@@ -40,6 +43,8 @@ interface IBody {
     competition_notes: string,
     
     priority: number,
+    camp_capacity?: string,
+    camp_occupancy?: string,
     
     alert_date: Date,
     next_action: string,
@@ -60,6 +65,14 @@ export async function PUT(req:NextRequest){
                 : null;
 
         const enquiry = await Eq_enquiry.findById(body.enquiry_id);
+        if (!enquiry) return NextResponse.json({ message: "Enquiry not found" }, { status: 404 });
+        const camp = enquiry.camp_id ? await Eq_camps.findById(enquiry.camp_id) : null;
+        const capacity = enquiryCapacity(body, camp);
+        const hasCapacityUpdates = body.camp_capacity !== undefined || body.camp_occupancy !== undefined;
+        if (camp && hasCapacityUpdates) {
+            const actor = await enquiryActor();
+            if (!actor || !await canChangeEnquiryFacility(enquiry, camp, actor)) return NextResponse.json({ message: "This Facility belongs to or is used by another business" }, { status: 403 });
+        }
         enquiry.latitude = body.latitude;
         enquiry.longitude = body.longitude;
 
@@ -130,6 +143,7 @@ export async function PUT(req:NextRequest){
             }
         }
 
+        if (camp && hasCapacityUpdates) { Object.assign(camp, capacity); await camp.save(); }
         enquiry.is_edit_req = false;
         await enquiry.save();
 
@@ -137,6 +151,7 @@ export async function PUT(req:NextRequest){
         return NextResponse.json({message: "Edits Reflected", status: 200}, {status: 200});
 
     }catch(err){
+        if (err instanceof EnquiryCapacityError) return NextResponse.json({ message: err.message }, { status: 400 });
         console.log("Error while accepting the enquiry changes: ", err);
         return NextResponse.json({message: "Internal Server Error", status: 500}, {status: 500});
     }

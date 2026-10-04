@@ -21,12 +21,17 @@ let wake;
 for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => { stopping = true; wake?.(); });
 try {
   await require("@/lib/mongo").default({ throwOnError: true });
+  const { recordWorkerHeartbeat } = require("@/lib/jobs/health");
+  const { scheduleNotificationReminders } = require("@/lib/notifications/reminders");
+  let lastMaintenance = 0;
   const { claimJob, processJob } = require("@/lib/jobs/worker");
   if (process.argv.includes("--once")) {
     console.log(JSON.stringify(await require("@/lib/jobs/worker").runJobBatch()));
   } else {
     console.log("Background worker started; polling every two seconds when idle.");
     while (!stopping) {
+      await recordWorkerHeartbeat();
+      if (Date.now() - lastMaintenance > 60_000) { await scheduleNotificationReminders(); lastMaintenance = Date.now(); }
       const job = await claimJob();
       if (job) await processJob(job);
       else await new Promise(resolve => {
