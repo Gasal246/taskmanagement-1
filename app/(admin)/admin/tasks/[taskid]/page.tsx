@@ -1,5 +1,8 @@
 "use client";
 
+import ListPagination from "@/components/shared/ListPagination";
+import { useActivityPaging } from "@/hooks/use-activity-paging";
+
 import ActivityHistorySheet from "@/components/task/ActivityHistorySheet";
 import ChangeActivityDeadlineDialog from "@/components/task/ChangeActivityDeadlineDialog";
 
@@ -144,7 +147,8 @@ const TaskDetailPage = () => {
   const params = useParams<{ taskid: string }>();
   const searchParams = useSearchParams();
   const { businessData } = useSelector((state: RootState) => state.user);
-  const { data: task, isLoading, isError, error, isFetching, refetch } = useGetTaskById(params.taskid);
+  const paging = useActivityPaging(params.taskid, searchParams.get("activityId"));
+  const { data: task, isLoading, isError, error, isFetching, isPlaceholderData, refetch } = useGetTaskById(params.taskid, undefined, paging.query);
   const { mutateAsync: AddTaskActivity, isPending: isAddingActivity } = useAddTaskActivity();
   const { mutateAsync: UpdateTaskActivity, isPending: isUpdatingActivity } = useUpdateTaskActivity();
   const { mutateAsync: DeleteTaskActivity, isPending: isDeletingActivity } = useDeleteTaskActivity();
@@ -166,8 +170,8 @@ const TaskDetailPage = () => {
   const [editingActivity, setEditingActivity] = useState<any>(null);
   const [activityDocuments, setActivityDocuments] = useState<ActivityDocument[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [activitySearch, setActivitySearch] = useState("");
-  const [activityFilter, setActivityFilter] = useState<"pending" | "completed" | null>(null);
+  const activitySearch = paging.search;
+  const activityFilter = paging.status;
   const [filteredUsers, setFilteredUsers] = useState<any[]>([]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<any>(null);
@@ -192,8 +196,8 @@ const TaskDetailPage = () => {
   const historyActivity = taskData?.activities?.find((activity: any) => String(activity._id) === historyActivityId) || null;
   const isProjectTask = Boolean(taskData?.is_project_task);
   const progress = getProgressValue(
-    Number(taskData?.completed_activity || 0),
-    Number(taskData?.activity_count || 0)
+    Number(taskData?.activitySummary?.completed || 0),
+    Number(taskData?.activitySummary?.total || 0)
   );
 
 
@@ -399,7 +403,7 @@ const TaskDetailPage = () => {
     if (res?.status === 200) {
       toast.success(res?.message || "Activity assigned successfully.");
       handleCloseAssignDialog();
-      refetch();
+
     } else {
       toast.error(res?.message || "Failed to assign activity.");
     }
@@ -451,7 +455,7 @@ const TaskDetailPage = () => {
       setEditingActivity(null);
       setActivityDocuments([]);
       activityForm.reset();
-      refetch();
+
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to save activity");
     }
@@ -491,7 +495,7 @@ const TaskDetailPage = () => {
     }
     setDeleteActivityDialog(false);
     setSelectedActivityId(null);
-    refetch();
+
   };
 
   const onDeleteTaskConfirm = async () => {
@@ -536,7 +540,7 @@ const TaskDetailPage = () => {
     setStatusConfirmOpen(false);
     setPendingStatusActivity(null);
     setPendingStatusValue(null);
-    refetch();
+
   };
 
   const formatDuration = (ms: number) => {
@@ -599,29 +603,13 @@ const TaskDetailPage = () => {
   });
   const priority = typeof taskData?.priority === "string" ? taskData.priority.toLowerCase() : "";
   const activities = Array.isArray(taskData.activities) ? taskData.activities : [];
-  const normalizedActivitySearch = activitySearch.trim().toLowerCase();
-  const searchedActivities = activities
-    .filter((activity: any) => {
-      if (!normalizedActivitySearch) return true;
-      return [
-        activity?.activity,
-        activity?.description,
-        activity?.assigned_skill?.skill_name,
-        activity?.assigned_to?.name,
-      ].some((value) => String(value || "").toLowerCase().includes(normalizedActivitySearch));
-    })
-    .sort((a: any, b: any) => {
-      const aUpdatedAt = new Date(a?.updatedAt || a?.createdAt || 0).getTime();
-      const bUpdatedAt = new Date(b?.updatedAt || b?.createdAt || 0).getTime();
-      return bUpdatedAt - aUpdatedAt;
-    });
-  const pendingCount = activities.filter((activity: any) => !activity?.is_done).length;
-  const completedCount = activities.filter((activity: any) => activity?.is_done).length;
-  const pendingActivities = searchedActivities.filter((activity: any) => !activity?.is_done);
-  const completedActivities = searchedActivities.filter((activity: any) => activity?.is_done);
+  const pendingCount = taskData.activitySummary?.pending || 0;
+  const completedCount = taskData.activitySummary?.completed || 0;
+  const pendingActivities = activities.filter((activity: any) => !activity?.is_done);
+  const completedActivities = activities.filter((activity: any) => activity?.is_done);
 
   const renderActivityCard = (activity: any) => (
-    <div key={activity._id} className="w-full py-1">
+    <div key={activity._id} className="w-full py-1" style={{ contentVisibility: "auto", containIntrinsicSize: "auto 350px" }}>
       <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg border border-slate-700 hover:border-cyan-800">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -666,7 +654,7 @@ const TaskDetailPage = () => {
                   const res = await UpdateTaskActivity({ activity_id: activity._id, documents, is_status: false });
                   if (res?.status !== 200) throw new Error(res?.message || "Failed to update documents");
                   toast.success("Documents updated");
-                  await refetch();
+
                 }}
               />
             )}
@@ -818,8 +806,8 @@ const TaskDetailPage = () => {
 
         {isProjectTask ? (
           <ProjectTaskHeaderSummary
-            activityCount={Number(taskData.activity_count || 0)}
-            completedActivityCount={Number(taskData.completed_activity || 0)}
+            activityCount={Number(taskData.activitySummary?.total || 0)}
+            completedActivityCount={Number(taskData.activitySummary?.completed || 0)}
             teams={Array.isArray(taskData.assigned_teams) ? taskData.assigned_teams : []}
             projectName={taskData.project_details?.project_name}
             startDate={taskData.start_date}
@@ -830,10 +818,10 @@ const TaskDetailPage = () => {
             <div className="rounded-lg border border-slate-800/70 bg-slate-900/60 p-3">
               <p className="text-[11px] uppercase tracking-wide text-slate-500">Activities</p>
               <p className="text-base font-semibold text-slate-100 mt-1">
-                {taskData.activity_count || 0}
+                {taskData.activitySummary?.total || 0}
               </p>
               <p className="text-xs text-slate-400">
-                Completed {taskData.completed_activity || 0}
+                Completed {taskData.activitySummary?.completed || 0}
               </p>
             </div>
             <div className="rounded-lg border border-slate-800/70 bg-slate-900/60 p-3">
@@ -894,8 +882,9 @@ const TaskDetailPage = () => {
             />
             <Input
               value={activitySearch}
-              onChange={(event) => setActivitySearch(event.target.value)}
+              onChange={(event) => paging.setSearch(event.target.value)}
               placeholder="Search activities..."
+              maxLength={200}
               aria-label="Search activities"
               className="h-9 border-slate-700 bg-slate-950/60 pl-9 text-xs"
             />
@@ -905,7 +894,7 @@ const TaskDetailPage = () => {
               type="button"
               aria-pressed={activityFilter === "pending"}
               onClick={() =>
-                setActivityFilter((current) => (current === "pending" ? null : "pending"))
+                paging.setStatus(activityFilter === "pending" ? "" : "pending")
               }
               className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
                 activityFilter === "pending"
@@ -919,7 +908,7 @@ const TaskDetailPage = () => {
               type="button"
               aria-pressed={activityFilter === "completed"}
               onClick={() =>
-                setActivityFilter((current) => (current === "completed" ? null : "completed"))
+                paging.setStatus(activityFilter === "completed" ? "" : "completed")
               }
               className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
                 activityFilter === "completed"
@@ -932,6 +921,8 @@ const TaskDetailPage = () => {
           </div>
         </div>
 
+        <ListPagination pagination={taskData.activityPagination} busy={isFetching || paging.isChanging || isPlaceholderData} onPage={paging.setPage} label="activities" />
+        {taskData.activityPagination?.focusFound === false && <p role="status" className="mb-3 text-sm text-slate-400">The linked activity is unavailable or outside your current scope.</p>}
         {activities.length > 0 ? (
           <div className="space-y-5">
             {activityFilter !== "completed" && (
@@ -942,7 +933,7 @@ const TaskDetailPage = () => {
                 {pendingActivities.length > 0 ? (
                   pendingActivities.map(renderActivityCard)
                 ) : (
-                  <p className="py-2 text-xs text-slate-500">No pending activities found.</p>
+                  <p className="py-2 text-xs text-slate-500">No pending activities on this page.</p>
                 )}
               </section>
             )}
@@ -955,13 +946,13 @@ const TaskDetailPage = () => {
                 {completedActivities.length > 0 ? (
                   completedActivities.map(renderActivityCard)
                 ) : (
-                  <p className="py-2 text-xs text-slate-500">No completed activities found.</p>
+                  <p className="py-2 text-xs text-slate-500">No completed activities on this page.</p>
                 )}
               </section>
             )}
           </div>
         ) : (
-          <p className="text-xs text-slate-400">No activities</p>
+          <p className="text-xs text-slate-400">No matching activities</p>
         )}
       </div>
 

@@ -1,8 +1,7 @@
+import { authorizeAreaMutation } from "@/lib/enquiries/access";
 import connectDB from "@/lib/mongo";
 import Eq_area from "@/models/eq_area.model";
 import { NextRequest, NextResponse } from "next/server";
-
-connectDB();
 
 interface IBody {
     area_id: string,
@@ -15,9 +14,12 @@ interface IBody {
 
 export async function PUT(req:NextRequest){
     try{
+        await connectDB();
         const body:IBody = await req.json();
         if(!body.area_id) return NextResponse.json({message: "Please pass area_id", status: 400}, {status: 400})
         
+        const denied = await authorizeAreaMutation(body.area_id);
+        if (denied) return denied;
         const updatePayload: Record<string, any> = { is_active: true };
 
         if (body.area_name !== undefined) updatePayload.area_name = body.area_name;

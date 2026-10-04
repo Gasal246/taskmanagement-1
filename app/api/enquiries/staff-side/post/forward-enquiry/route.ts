@@ -196,25 +196,11 @@ export async function POST(req: NextRequest) {
         await enquiry.save({ session: dbSession });
 
         actorName = String(actor.name || "User");
+        await notifyEnquiryForward({ req, recipientIds, enquiryId, action, priority,
+          actorId, actorName, dbSession, eventKey: `forward:${savedHistory._id}` });
       });
     } finally {
       await dbSession.endSession();
-    }
-
-    // Notifications are secondary: a notification outage must not roll back a
-    // successfully committed forward operation or invite duplicate retries.
-    try {
-      await notifyEnquiryForward({
-        req,
-        recipientIds,
-        enquiryId,
-        action,
-        priority,
-        actorId,
-        actorName,
-      });
-    } catch (error) {
-      console.error("Enquiry forwarded, but notifications failed:", error);
     }
 
     return jsonResponse("Enquiry Forwarded", 201);

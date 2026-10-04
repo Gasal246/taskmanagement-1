@@ -1,11 +1,10 @@
+import { authorizeEnquiryBusiness } from "@/lib/enquiries/access";
 import connectDB from "@/lib/mongo";
 import Eq_agents_details from "@/models/eq_agents_details.model";
 import Roles from "@/models/roles.model";
 import User_roles from "@/models/user_roles.model";
 import Users from "@/models/users.model";
 import { NextRequest, NextResponse } from "next/server";
-
-connectDB();
 
 interface IBody {
     name: string,
@@ -25,9 +24,12 @@ interface IBody {
 
 export async function POST(req:NextRequest){
     try{
+        await connectDB();
 
         const body:IBody = await req.json();
 
+        const denied = await authorizeEnquiryBusiness(body.business_id, true);
+        if (denied) return denied;
         const agentRole = await Roles.findOne({role_name: "AGENT"});
         if(!agentRole) return NextResponse.json({message: "Please Add AGENT role first", status: 400}, {status: 400});
 

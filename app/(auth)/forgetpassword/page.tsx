@@ -52,12 +52,12 @@ const ForgetPassword = () => {
                                     <FormControl>
                                         <Input placeholder="enter email address." {...field} />
                                     </FormControl>
-                                    <FormDescription>You will be getting a email magic link for resetting your password</FormDescription>
+                                    <FormDescription>We will email a link to reset your password.</FormDescription>
                                     <FormMessage />
                                 </FormItem>
                             )}
                         />
-                        <Button type="submit" className="rounded-full">{sendingEmail ? 'Getting You..' : 'Send Email'}</Button>
+                        <Button type="submit" disabled={sendingEmail} className="rounded-full">{sendingEmail ? 'Sending…' : 'Send Email'}</Button>
                     </form>
                 </Form>
             </div>

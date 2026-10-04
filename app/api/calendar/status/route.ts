@@ -4,8 +4,6 @@ import Business_Tasks from "@/models/business_tasks.model";
 import Calendar_Events from "@/models/calendar_events.model";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 const ALLOWED_STATUS = new Set(["To Do", "In Progress", "Completed", "Cancelled"]);
 
 const getRoleName = (req: NextRequest) => {
@@ -20,6 +18,7 @@ const getRoleName = (req: NextRequest) => {
 
 export async function PATCH(req: NextRequest) {
   try {
+        await connectDB();
     const session: any = await auth();
     if (!session) {
       return NextResponse.json({ message: "Unauthorized Access" }, { status: 401 });

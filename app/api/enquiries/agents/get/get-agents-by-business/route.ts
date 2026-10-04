@@ -1,3 +1,4 @@
+import { authorizeEnquiryBusiness } from "@/lib/enquiries/access";
 import connectDB from "@/lib/mongo";
 import Roles from "@/models/roles.model";
 import User_roles from "@/models/user_roles.model";
@@ -5,13 +6,15 @@ import Users from "@/models/users.model";
 import { NextRequest, NextResponse } from "next/server";
 
 
-connectDB();
-
 export async function GET(req: NextRequest) {
   try {
+        await connectDB();
     const { searchParams } = new URL(req.url);
     const business_id = searchParams.get("business_id");
     const search = searchParams.get("search")?.trim() || "";
+
+        const denied = await authorizeEnquiryBusiness(business_id);
+        if (denied) return denied;
 
     const role:any = await Roles.findOne({ role_name: "AGENT" }).lean();
     if (!role)

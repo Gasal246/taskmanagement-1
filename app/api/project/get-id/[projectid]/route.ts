@@ -6,13 +6,12 @@ import { resolveSessionUserId } from "@/lib/utils";
 import mongoose from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function GET(
   _req: NextRequest,
   context: { params: Promise<{ projectid: string }> }
 ) {
   try {
+        await connectDB();
     const { projectid } = await context.params;
     if (!mongoose.Types.ObjectId.isValid(projectid)) {
       return NextResponse.json({ message: "Invalid project id" }, { status: 400 });

@@ -1,12 +1,14 @@
+import { requireSuperadmin } from "@/lib/server-access";
 import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import Admin_assign_business from "@/models/admin_assign_business.model";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function POST (req: NextRequest) {
     try {
+        await connectDB();
+        const accessDenied = await requireSuperadmin();
+        if (accessDenied) return accessDenied;
         const session = await auth();
         if(!session){
             return new NextResponse("Unauthorized", { status: 401 });

@@ -1,12 +1,12 @@
-import mongoose, { Document, ObjectId, Schema } from "mongoose";
+import mongoose, { Document, Types, Schema } from "mongoose";
 
 export interface IActivityComment extends Document {
-  _id: ObjectId;
-  task_id: ObjectId;
-  activity_id: ObjectId;
-  author_id: ObjectId;
-  parent_id: ObjectId | null;
-  root_id: ObjectId | null;
+  _id: Types.ObjectId;
+  task_id: Types.ObjectId;
+  activity_id: Types.ObjectId;
+  author_id: Types.ObjectId;
+  parent_id: Types.ObjectId | null;
+  root_id: Types.ObjectId | null;
   depth: number;
   body: string;
   attachment: {
@@ -52,6 +52,7 @@ const ActivityCommentSchema = new Schema<IActivityComment>(
 ActivityCommentSchema.index({ activity_id: 1, createdAt: 1 });
 ActivityCommentSchema.index({ task_id: 1 });
 ActivityCommentSchema.index({ parent_id: 1 });
+ActivityCommentSchema.index({ "attachment.storage_path": 1 }, { sparse: true });
 
 const ActivityComments =
   mongoose.models?.activity_comments ||

@@ -1,10 +1,10 @@
-import mongoose, { ObjectId, Schema } from "mongoose";
+import mongoose, { Document, Types, Schema } from "mongoose";
 
 
 interface ITeam_Members extends Document{
-    _id: ObjectId,
-    team_id: ObjectId,
-    user_id: ObjectId,
+    _id: Types.ObjectId,
+    team_id: Types.ObjectId,
+    user_id: Types.ObjectId,
     createdAt: Date,
     updatedAt: Date
 }

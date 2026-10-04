@@ -1,9 +1,9 @@
-import mongoose, { ObjectId, Schema } from "mongoose";
+import mongoose, { Document, Types, Schema } from "mongoose";
 
 interface IProject_Departments extends Document {
-    _id: ObjectId,
-    project_id: ObjectId,
-    department_id: ObjectId,
+    _id: Types.ObjectId,
+    project_id: Types.ObjectId,
+    department_id: Types.ObjectId,
     department_name: string,
     is_active: boolean,
     createdAt: Date,

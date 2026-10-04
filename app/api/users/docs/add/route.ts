@@ -1,9 +1,8 @@
+import { authorizeUserProfile } from "@/lib/server-access";
 import connectDB from "@/lib/mongo";
 import User_docs from "@/models/user_docs.model";
 import Users from "@/models/users.model";
 import { NextRequest, NextResponse } from "next/server";
-
-connectDB();
 
 interface Body {
     user_id: string;
@@ -16,9 +15,14 @@ interface Body {
 
 export async function POST (req: NextRequest) {
     try {
+        await connectDB();
         const formdata = await req.formData();
         const formData: any = Object.fromEntries(formdata);
         const body = JSON.parse(formData?.body);
+
+        const denied = await authorizeUserProfile(body.user_id);
+        if (denied) return denied;
+
 
         const user = await Users.findOne({ _id: body.user_id });
         if(!user){

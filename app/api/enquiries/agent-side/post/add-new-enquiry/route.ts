@@ -1,11 +1,10 @@
+import { enquiryActor, resolveEnquiryCreationBusiness } from "@/lib/enquiries/access";
+import { reserveEnquiryUuid } from "@/lib/enquiries/sequence";
 import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import { preserveInitialAction } from "@/lib/enquiries/completion-server";
 import { validateEnquiryFacilityPayload, solutionFields } from "@/lib/enquiries/facility-payload";
 import { CatalogueValidationError } from "@/lib/enquiries/catalogue-server";
-import { formatEnquiryUuid } from "@/lib/enquiries/enquiry-uuid";
-import Admin_assign_business from "@/models/admin_assign_business.model";
-import Business_staffs from "@/models/business_staffs.model";
 import Eq_area from "@/models/eq_area.model";
 import Eq_camp_client_company from "@/models/eq_camp_client_company.model";
 import Eq_camp_contacts from "@/models/eq_camp_contacts.model";
@@ -24,8 +23,6 @@ import mongoose from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
 import { ZodError } from "zod";
 
-connectDB();
-
 class RequestError extends Error {
   constructor(public status: number, message: string) { super(message); }
 }
@@ -43,10 +40,8 @@ async function findOrCreate(model: any, query: any, create: any, session: mongoo
 
 async function createUuid(body: any, projectSectorKey: string, session: mongoose.ClientSession) {
   const now = new Date();
-  const [country, region]: any[] = await Promise.all([
-    Eq_Countries.findById(body.country).select("country_name").session(session).lean(),
-    Eq_region.findById(body.region).select("region_name").session(session).lean(),
-  ]);
+  const country: any = await Eq_Countries.findById(body.country).select("country_name").session(session).lean();
+  const region: any = await Eq_region.findById(body.region).select("region_name").session(session).lean();
   let prefix = country?.country_name === "KSA" ? "KSA" : country?.country_name === "UAE" ? "UAE" : country?.country_name === "Oman" ? "OMN" : "EQ";
   if (prefix === "KSA") {
     const regionCode: Record<string, string> = {
@@ -55,19 +50,20 @@ async function createUuid(body: any, projectSectorKey: string, session: mongoose
     const code = regionCode[String(region?.region_name || "").toLowerCase()];
     if (code) prefix += `-${code}`;
   }
-  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
-  const count = await Eq_enquiry.countDocuments({ createdAt: { $gte: start, $lte: end }, country_id: body.country, region_id: body.region }).session(session);
-  return formatEnquiryUuid(prefix, projectSectorKey, now, count + 1);
+  return reserveEnquiryUuid(prefix, projectSectorKey, now, session);
 }
 
 export async function POST(req: NextRequest) {
   const sessionData: any = await auth();
   if (!sessionData?.user?.id) return NextResponse.json({ message: "Unauthorized Access", status: 401 }, { status: 401 });
 
+  await connectDB();
   const dbSession = await mongoose.startSession();
   try {
     const body: any = await req.json();
+    const actor = await enquiryActor();
+    const businessId = actor && await resolveEnquiryCreationBusiness(req, actor, body.business_id);
+    if (!businessId) throw new RequestError(403, "Select an active business you belong to before creating an enquiry");
     if (body.followup_status === "Closed") throw new RequestError(400, "Create the enquiry first, then record completed actions");
     const facility = await validateEnquiryFacilityPayload(body);
     const solutions = solutionFields(facility);
@@ -82,7 +78,7 @@ export async function POST(req: NextRequest) {
       if (campId) {
         const existingCamp: any = await Eq_camps.findOne({ _id: campId, is_active: true }).session(dbSession).lean();
         if (!existingCamp) throw new RequestError(400, "Select an active Facility");
-        if (await Eq_enquiry.exists({ camp_id: campId }).session(dbSession)) throw new RequestError(409, "Enquiry already added for this Facility");
+        if (await Eq_enquiry.exists({ camp_id: campId, business_id: businessId }).session(dbSession)) throw new RequestError(409, "Enquiry already added for this Facility");
         areaId = existingCamp.area_id;
         body.country = String(existingCamp.country_id || body.country || "");
         body.region = String(existingCamp.region_id || body.region || "");
@@ -94,15 +90,14 @@ export async function POST(req: NextRequest) {
       if (facility.area_input_mode === "new") {
         if (!text(facility.area_name_request)) throw new RequestError(400, "New area name is required");
         const [area] = await Eq_area.create([{
-          country_id: body.country, region_id: body.region, province_id: body.province || null,
+          business_id: businessId, country_id: body.country, region_id: body.region, province_id: body.province || null,
           city_id: body.city || null, area_name: facility.area_name_request, is_active: false,
         }], { session: dbSession });
         areaId = area._id;
       }
 
       if (requestingFacility) {
-        const assignment: any = await Business_staffs.findOne({ user_id: sessionData.user.id, status: 1 }).select("business_id").session(dbSession).lean()
-          || await Admin_assign_business.findOne({ user_id: sessionData.user.id, status: 1 }).select("business_id").session(dbSession).lean();
+        const assignment = { business_id: businessId };
         const normalize = (value: string) => value.toLowerCase().trim();
         const landlordId = facility.landlord ? await findOrCreate(Eq_camp_landlord, { landlord_name: normalize(facility.landlord) }, { landlord_name: normalize(facility.landlord) }, dbSession) : null;
         const realestateId = facility.real_estate ? await findOrCreate(Eq_camp_realestate, { company_name: normalize(facility.real_estate) }, { company_name: normalize(facility.real_estate) }, dbSession) : null;
@@ -129,7 +124,7 @@ export async function POST(req: NextRequest) {
           country_id: body.country, region_id: body.region, province_id: body.province || null,
           city_id: body.city || null, area_id: areaId, landlord_id: landlordId,
           realestate_id: realestateId, client_company_id: clientCompanyId, headoffice_id: headOfficeId,
-          camp_name: facility.camp_name_request, project_sector: facility.project_sector,
+          business_id: businessId, camp_name: facility.camp_name_request, project_sector: facility.project_sector,
           facility_type: facility.facility_type, facility_type_other: facility.facility_type_other,
           facility_type_detail: facility.facility_type_detail, sector_field_values: facility.sector_field_values,
           capacity_unit: facility.capacity_unit,
@@ -146,7 +141,7 @@ export async function POST(req: NextRequest) {
       const uuid = await createUuid(body, projectSectorKey, dbSession);
       const wifiAvailable = body.wifi_available === "Yes" ? true : body.wifi_available === "No" ? false : null;
       const [enquiry] = await Eq_enquiry.create([{
-        country_id: body.country, region_id: body.region, province_id: body.province || null,
+        business_id: businessId, country_id: body.country, region_id: body.region, province_id: body.province || null,
         city_id: body.city || null, area_id: areaId, camp_id: campId, createdBy: sessionData.user.id,
         enquiry_uuid: uuid, is_active: !requestingFacility, status: body.followup_status,
         priority: body.priority || null, alert_date: body.alert_date || null, due_date: body.next_action_due || null,

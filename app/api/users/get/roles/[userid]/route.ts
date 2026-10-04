@@ -1,27 +1,29 @@
+import { authorizeUserProfile } from "@/lib/server-access";
 import connectDB from "@/lib/mongo";
-import Roles from "@/models/roles.model";
+import "@/models/roles.model";
 import User_roles from "@/models/user_roles.model";
 import Users from "@/models/users.model";
 import { isValidObjectId } from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
-
-connectDB();
 
 export async function GET (
     req: NextRequest,
     { params }: { params: Promise<{ userid: string }> }
 ) {
     try {
+        await connectDB();
         const { userid } = await params;
         if (!userid || !isValidObjectId(userid)) {
             return NextResponse.json({ error: "Invalid user id" }, { status: 400 });
         }
+        const denied = await authorizeUserProfile(userid);
+        if (denied) return denied;
+
         const user = await Users.findById(userid);
         if (!user) {
             return NextResponse.json({ error: "User not found" }, { status: 404 });
         }
 
-        await Roles.find({}).limit(1); // JUST REFRESING THE SCHEMA FOR POPULATING IT
         const userRoles = await User_roles.find({ user_id: userid, status: 1})
             .populate({
                 path: "role_id",

@@ -1,3 +1,5 @@
+import mongoose from "mongoose";
+import { canAdministerEnquiry, enquiryManagementFilter } from "@/lib/enquiries/access";
 import { filteredAdminEnquiries } from "@/lib/enquiries/admin-list";
 import { enquiryActor } from "@/lib/enquiries/completion-server";
 import { FacilityCatalogueFilterError } from "@/lib/enquiries/facility-list-filters";
@@ -11,15 +13,15 @@ import "@/models/eq_city.model";
 import "@/models/eq_area.model";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 const MAX_EXPORT_RECORDS = 200;
 
 export async function POST(req: NextRequest) {
   try {
+        await connectDB();
     const body = await req.json();
     const enquiryIds: string[] = Array.isArray(body?.enquiry_ids) ? body.enquiry_ids : [];
     const filters = body?.filters ?? null;
+    if (enquiryIds.some(id => typeof id !== "string" || !mongoose.isValidObjectId(id))) return NextResponse.json({ message: "Select valid enquiry IDs" }, { status: 400 });
 
     if (!enquiryIds.length && !filters) {
       return NextResponse.json(
@@ -31,12 +33,16 @@ export async function POST(req: NextRequest) {
     const actor = await enquiryActor();
     if (!actor) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     if (!actor.admin) return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+    if (enquiryIds.length > MAX_EXPORT_RECORDS) return NextResponse.json({ message: `Select at most ${MAX_EXPORT_RECORDS} enquiries per export`, status: 400 }, { status: 400 });
     let selectedIds = enquiryIds;
+    let totalMatching = enquiryIds.length;
     if (!selectedIds.length) {
       const params = new URLSearchParams();
       for (const [key, value] of Object.entries(filters || {})) if (value !== "" && value != null) params.set(key, String(value));
       params.set("page", "1"); params.set("limit", String(MAX_EXPORT_RECORDS));
-      selectedIds = (await filteredAdminEnquiries(params, actor.actorId)).data.map((entry: any) => entry._id);
+      const result = await filteredAdminEnquiries(params, actor.actorId, MAX_EXPORT_RECORDS, enquiryManagementFilter(actor));
+      totalMatching = result.pagination.totalRecords;
+      selectedIds = result.data.map((entry: any) => entry._id);
     }
     const enquiries: any[] = await Eq_enquiry.find({ _id: { $in: selectedIds } })
       .populate({ path: "city_id", select: "city_name" })
@@ -47,6 +53,8 @@ export async function POST(req: NextRequest) {
     if (!enquiries.length) {
       return NextResponse.json({ status: 200, data: [] }, { status: 200 });
     }
+
+    if (enquiries.some(entry => !canAdministerEnquiry(entry, actor))) return NextResponse.json({ message: "You cannot export another business’s enquiries" }, { status: 403 });
 
     const enquiryIdList = enquiries.map((entry) => entry._id);
     const contacts = await Eq_camp_contacts.find({ enquiry_id: { $in: enquiryIdList } }).lean();
@@ -64,9 +72,9 @@ export async function POST(req: NextRequest) {
       contacts: contactsByEnquiry.get(String(entry._id)) ?? [],
     }));
 
-    return NextResponse.json({ status: 200, data: payload }, { status: 200 });
+    return NextResponse.json({ status: 200, data: payload, export: { totalMatching, exported: payload.length, limit: MAX_EXPORT_RECORDS, truncated: totalMatching > payload.length } }, { status: 200 });
   } catch (err) {
-    if (err instanceof FacilityCatalogueFilterError || (err instanceof Error && /Invalid (action filter|action scope|period range)/.test(err.message))) return NextResponse.json({ message: err.message, status: 400 }, { status: 400 });
+    if (err instanceof FacilityCatalogueFilterError || (err instanceof Error && /Invalid (action filter|action scope|period range|search|pagination|enquiry filter ID)/.test(err.message))) return NextResponse.json({ message: err.message, status: 400 }, { status: 400 });
     console.error("Error exporting enquiries:", err);
     return NextResponse.json(
       { message: "Internal Server Error", status: 500 },

@@ -45,7 +45,7 @@ declare type StaffStatus = 'active' | 'blocked' | 'unverified'
 
 declare type TaskTypes = 'created' | 'new' | 'accepted' | 'completed' | 'ongoing' | 'direct' | 'assigned' | 'self'
 
-declare module 'formidable-serverless';
+
 
 declare type UserActivities = 'task_adding' | 'project_adding';
 

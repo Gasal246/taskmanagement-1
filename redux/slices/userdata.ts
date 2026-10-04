@@ -18,6 +18,7 @@ const userDataSlice = createSlice({
     name: "user",
     initialState,
     reducers: {
+        resetUserData: () => initialState,
         loadSuperAdmin: (state, action: PayloadAction<any>) => {
             state.superAdmin = action.payload
         },
@@ -33,5 +34,5 @@ const userDataSlice = createSlice({
     }
 })
 
-export const { loadSuperAdmin, loadUserRole, loadCurrentUser, loadBusinessData } = userDataSlice.actions
+export const { loadSuperAdmin, loadUserRole, loadCurrentUser, loadBusinessData, resetUserData } = userDataSlice.actions
 export default userDataSlice.reducer

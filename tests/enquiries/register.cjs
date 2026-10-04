@@ -15,6 +15,6 @@ const originalLoad = Module._load;
 global.enquiryTestSession = null;
 Module._load = function (request, parent, ...rest) {
   if (request === '@/auth') return { auth: async () => global.enquiryTestSession };
-  if (request === '@/app/api/helpers/enquiry-notifications') return { notifyEnquiryForward: async () => {} };
+  if (request === '@/app/api/helpers/enquiry-notifications' && !global.testRealJobs) return { notifyEnquiryForward: async () => {} };
   return originalLoad.call(this, request, parent, ...rest);
 };

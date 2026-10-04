@@ -1,10 +1,9 @@
+import { authorizeOrganizationMutation } from "@/lib/organization-access";
 import connectDB from "@/lib/mongo";
 import Business_departments from "@/models/business_departments.model";
 import Business_regions from "@/models/business_regions.model";
 import Department_regions from "@/models/department_regions.model";
 import { NextRequest, NextResponse } from "next/server";
-
-connectDB();
 
 interface Body {
     dep_id: string;
@@ -14,6 +13,9 @@ interface Body {
 
 export async function POST ( req: NextRequest ) {
     try {
+        await connectDB();
+        const accessDenied = await authorizeOrganizationMutation(req);
+        if (accessDenied) return accessDenied;
         const formdata = await req.formData();
         const formData: any = Object.fromEntries(formdata);
         const body = JSON.parse(formData?.body) as Body;
@@ -35,6 +37,7 @@ export async function POST ( req: NextRequest ) {
             await Department_regions.findByIdAndUpdate(dep_reg?._id, { status: 1 });
             return NextResponse.json({ message: "Region Re-Activated", status: 200 }, { status: 200 });
         }
+        if (dep_reg) return NextResponse.json({ error: "Department region already exists", status: 409 }, { status: 409 });
         
         const newRegion = new Department_regions({
             department_id: body?.dep_id,

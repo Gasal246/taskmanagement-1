@@ -3,10 +3,9 @@ import Business_Tasks from "@/models/business_tasks.model";
 import { NextRequest, NextResponse } from "next/server";
 import '@/models/project_team.model';
 
-connectDB();
-
 export async function GET(req:NextRequest){
     try{
+        await connectDB();
         const {searchParams} = new URL(req.url);
         const project_id = searchParams.get("project_id");  
         if(!project_id) return NextResponse.json({message: "Please provide Project_id"}, {status:500});

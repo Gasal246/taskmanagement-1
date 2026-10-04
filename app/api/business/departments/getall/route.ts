@@ -1,13 +1,15 @@
+import { authorizeOrganizationRead } from "@/lib/organization-access";
 import connectDB from "@/lib/mongo";
 import Business_assined_plans from "@/models/business_assigned_plan.model";
 import Business_departments from "@/models/business_departments.model";
-import Superadmin_plans from "@/models/super_admin_plans.model";
+import "@/models/super_admin_plans.model";
 import { NextRequest, NextResponse } from "next/server";
-
-connectDB();
 
 export async function GET ( req: NextRequest ) {
     try {
+        await connectDB();
+        const denied = await authorizeOrganizationRead(req);
+        if (denied) return denied;
         const searchParams = req.nextUrl.searchParams;
         const business_id = searchParams.get("business_id");
         
@@ -15,7 +17,6 @@ export async function GET ( req: NextRequest ) {
             return NextResponse.json({ error: "Business ID is required" }, { status: 400 });
         }
 
-        await Superadmin_plans.findOne({}).limit(1); // schema refresh
         const businessPlan = await Business_assined_plans.findOne({ business_id, status: 1 })
             .populate({
                 path: "plan_id"

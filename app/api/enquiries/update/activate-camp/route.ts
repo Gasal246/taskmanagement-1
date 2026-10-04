@@ -1,5 +1,6 @@
 import connectDB from "@/lib/mongo";
-import { enquiryActor } from "@/lib/enquiries/completion-server";
+import { canChangeEnquiryFacility } from "@/lib/enquiries/access";
+import { enquiryActor, canAdministerEnquiry } from "@/lib/enquiries/completion-server";
 import { CatalogueValidationError, validateDynamicClassification } from "@/lib/enquiries/catalogue-server";
 import { getCampVisitedStatusFromEnquiryStatus } from "@/lib/enquiries/camp-visited-status";
 import Eq_camps from "@/models/eq_camps.model";
@@ -7,9 +8,8 @@ import Eq_enquiry from "@/models/eq_enquiries.model";
 import mongoose from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function PUT(req: NextRequest) {
+  await connectDB();
   const actor = await enquiryActor();
   if (!actor) return NextResponse.json({ message: "Unauthorized", status: 401 }, { status: 401 });
   if (!actor.admin) return NextResponse.json({ message: "Only an administrator can approve a Facility", status: 403 }, { status: 403 });
@@ -24,8 +24,10 @@ export async function PUT(req: NextRequest) {
     await dbSession.withTransaction(async () => {
       const enquiry: any = await Eq_enquiry.findOne({ _id: body.enquiry_id, camp_id: body.camp_id }).session(dbSession);
       if (!enquiry) throw Object.assign(new Error("Enquiry and Facility do not match"), { status: 404 });
+      if (!canAdministerEnquiry(enquiry, actor)) throw Object.assign(new Error("You cannot approve another business’s enquiry"), { status: 403 });
       const camp: any = await Eq_camps.findById(body.camp_id).session(dbSession);
       if (!camp) throw Object.assign(new Error("Facility not found"), { status: 404 });
+      if (!await canChangeEnquiryFacility(enquiry, camp, actor, dbSession)) throw Object.assign(new Error("This Facility belongs to or is used by another business"), { status: 403 });
 
       let classification;
       try { classification = await validateDynamicClassification({
@@ -50,7 +52,8 @@ export async function PUT(req: NextRequest) {
       camp.city_id = enquiry.city_id;
       camp.area_id = enquiry.area_id;
       enquiry.is_active = true;
-      await Promise.all([camp.save({ session: dbSession }), enquiry.save({ session: dbSession })]);
+      await camp.save({ session: dbSession });
+      await enquiry.save({ session: dbSession });
     });
     return NextResponse.json({ message: "Facility and enquiry approved", status: 200 }, { status: 200 });
   } catch (error: any) {

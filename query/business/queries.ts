@@ -1,4 +1,6 @@
 import axios from "axios";
+import { useSession } from "next-auth/react";
+import Cookies from "js-cookie";
 import type { QueryClient } from "@tanstack/react-query";
 import { IBusiness_Project } from "@/models/business_project.model";
 import type { StaffTaskQueryParams } from "@/types/staff-tasks";
@@ -58,8 +60,6 @@ import {
     GetAllTasks,
     GetAdminTaskFilterOptions,
     GetAdminTaskOverview,
-    getAreaCompleteDataFunc,
-    getAreaDepartmentCompleteDataFunc,
     getAreaLocationsFunc,
     GetAreasandDeptsUnderRegion,
     GetAreasForHeads,
@@ -75,21 +75,16 @@ import {
     GetBusinessStaffsWithSkills,
     GetBusinessStaffsBySkill,
     GetBusinessTasks,
-    getCompleteDepartmentDataFunc,
     GetDepartmentsforHeads,
     GetDepartmentsforLocations,
     GetDepartmentsForStaffs,
     GetFlowsByProjectFunc,
-    getLocationCompleteDataFunc,
-    getLocationDepartmentCompleteDataFunc,
     GetLocationsandDeptsUnderArea,
     getLocationUsersFunc,
     GetProjectByIdForStaffs,
     getProjectByIdFunc,
     getProjectsFunc,
     getRegionAreasFunc,
-    getRegionCompleteFunc,
-    getRegionDepartmentCompleteDataFunc,
     getRegionHeadsFunc,
     getRegionUsersFunc,
     GetSingleStaffbyId,
@@ -348,12 +343,6 @@ export const useRemoveBusinessDepartment = () => {
     })
 }
 
-export const useGetCompleteDepartmentData = () => {
-    return useMutation({
-        mutationFn: (department_id: string) => getCompleteDepartmentDataFunc(department_id)
-    })
-}
-
 export const useAddDepartmentHead = () => {
     return useMutation({
         mutationFn: (payload: any) => addDepartmenHeadFunc(payload)
@@ -399,12 +388,6 @@ export const useAddDepartmentStaff = () => {
 export const useRemoveDepartmentStaff = () => {
     return useMutation({
         mutationFn: (DepStaffId: string) => removeDepartmentStaffFunc(DepStaffId)
-    })
-}
-
-export const useGetRegionComplete = () => {
-    return useMutation({
-        mutationFn: (region_id: string) => getRegionCompleteFunc(region_id)
     })
 }
 
@@ -508,12 +491,6 @@ export const useRemoveBusinessClientContact = () => {
 
 // Region Departments
 
-export const useGetRegionDepartmentCompleteData = () => {
-    return useMutation({
-        mutationFn: (reg_dep_id: string) => getRegionDepartmentCompleteDataFunc(reg_dep_id)
-    })
-}
-
 export const useAddRegionDepartmentHead = () => {
     return useMutation({
         mutationFn: (payload: any) => addRegionDepartmentHeadFunc(payload)
@@ -554,12 +531,6 @@ export const useAddAreaStaff = () => {
 export const useRemoveAreaStaff = () => {
     return useMutation({
         mutationFn: (AreaStaffId: string) => removeAreaStaff(AreaStaffId)
-    })
-}
-
-export const useGetAreaCompleteData = () => {
-    return useMutation({
-        mutationFn: (area_id: string) => getAreaCompleteDataFunc(area_id)
     })
 }
 
@@ -619,12 +590,6 @@ export const useRemoveLocationDepartment = () => {
     })
 }
 
-export const useGetLocationCompleteData = () => {
-    return useMutation({
-        mutationFn: (loc_id: string) => getLocationCompleteDataFunc(loc_id)
-    })
-}
-
 export const useGetLocationUsers = () => {
     return useMutation({
         mutationFn: (loc_id: string) => getLocationUsersFunc(loc_id)
@@ -644,12 +609,6 @@ export const useRemoveLocationStaff = () => {
 }
 
 // Area Departments
-
-export const useGetAreaDepartmentCompleteData = () => {
-    return useMutation({
-        mutationFn: (area_dep_id: string) => getAreaDepartmentCompleteDataFunc(area_dep_id)
-    })
-}
 
 export const useAddAreaDepartmentHead = () => {
     return useMutation({
@@ -676,12 +635,6 @@ export const useRemoveAreaDepartmentStaff = () => {
 }
 
 // Location Departments
-
-export const useGetLocationDepartmentCompleteData = () => {
-    return useMutation({
-        mutationFn: (location_dep_id: string) => getLocationDepartmentCompleteDataFunc(location_dep_id)
-    })
-}
 
 export const useAddLocationDepartmentHead = () => {
     return useMutation({
@@ -901,11 +854,16 @@ export const useDeleteBusinessTask = () => {
     })
 }
 
-export const useGetTaskById = (taskid:string, activityScope?: "assigned") => {
+export const useGetTaskById = (taskid:string, activityScope?: "assigned", options: Record<string, string | number | undefined> = {}) => {
+    const { data: session, status } = useSession();
+    const domain = Cookies.get("user_domain");
+    const role = Cookies.get("user_role");
     return useQuery({
-        queryKey: ["task", taskid, activityScope],
-        queryFn: ()=> GetTaskByIdFunc(taskid, activityScope),
-        enabled: !!taskid
+        queryKey: ["task", taskid, activityScope, session?.user?.id, role, domain, options],
+        queryFn: ({ signal })=> GetTaskByIdFunc(taskid, activityScope, options, signal),
+        placeholderData: (previous, previousQuery) => previousQuery?.queryKey.slice(0, 6).every((key, index) => key === ["task", taskid, activityScope, session?.user?.id, role, domain][index]) ? previous : undefined,
+        gcTime: 60_000,
+        enabled: !!taskid && status === "authenticated",
     })
 }
 
@@ -1017,7 +975,6 @@ export const useGetUserDetails = () => {
     })
 }
 
-
 //Get Staff-tasks by filter
 export const useGetAllStaffTasks = (queryParams: StaffTaskQueryParams) => {
     return useQuery({
@@ -1054,7 +1011,6 @@ export const useGetAdminTaskFilterOptions = (
         staleTime: 5 * 60_000,
     })
 }
-
 
 //Get Staff-Projects by filter
 export const useGetStaffProjects = (queryParams: Record<string, string | undefined>) => {

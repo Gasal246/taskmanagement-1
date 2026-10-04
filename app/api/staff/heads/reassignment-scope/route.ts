@@ -7,10 +7,9 @@ import connectDB from "@/lib/mongo";
 import Users from "@/models/users.model";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function GET(req: NextRequest) {
   try {
+        await connectDB();
     const session: any = await auth();
     const userId = String(session?.user?.id || "");
     if (!userId) {

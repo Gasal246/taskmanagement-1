@@ -1,12 +1,14 @@
 "use client";
 
-import { loadUserInfo } from "@/redux/slices/application";
-import { loadBusinessData, loadCurrentUser, loadUserRole } from "@/redux/slices/userdata";
+import { loadUserInfo, resetApplication } from "@/redux/slices/application";
+import { loadBusinessData, loadCurrentUser, loadUserRole, resetUserData } from "@/redux/slices/userdata";
 import type { RootState } from "@/redux/store";
 import { useSession } from "next-auth/react";
 import { useEffect, useMemo, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import Cookies from "js-cookie";
+import { useQueryClient } from "@tanstack/react-query";
+import { clearClientAuthCleanup } from "@/lib/client-auth-cleanup";
 
 type CookieRecord = Record<string, any> | null;
 
@@ -34,6 +36,8 @@ const resolveBusinessId = (domainCookie: CookieRecord) => {
 
 const AppBootstrap = () => {
   const dispatch = useDispatch();
+  const queryClient = useQueryClient();
+  const previousUser = useRef<string | null>(null);
   const { data: session, status } = useSession();
   const { businessData } = useSelector((state: RootState) => state.user);
   const { user_info } = useSelector((state: RootState) => state.application);
@@ -44,6 +48,20 @@ const AppBootstrap = () => {
   const domainCookie = useMemo(() => parseCookie("user_domain"), []);
   const businessId = resolveBusinessId(domainCookie);
   const roleLabel = roleCookie?.role_name || roleCookie?.role || "";
+
+  useEffect(() => {
+    if (status === "loading") return;
+    const userId = session?.user?.id || null;
+    if (previousUser.current && previousUser.current !== userId) {
+      queryClient.clear();
+      dispatch(resetApplication());
+      dispatch(resetUserData());
+      fetchedBusinessIdRef.current = null;
+      fetchedUserIdRef.current = null;
+      void clearClientAuthCleanup();
+    }
+    previousUser.current = userId;
+  }, [dispatch, queryClient, session?.user?.id, status]);
 
   useEffect(() => {
     dispatch(loadUserRole(roleCookie));
@@ -75,7 +93,7 @@ const AppBootstrap = () => {
 
     const fetchBusinessData = async () => {
       try {
-        const response = await fetch(`/api/business/get-id/${businessId}`);
+        const response = await fetch(`/api/business/get-id/${businessId}?summary=true`);
         if (!response.ok) return;
         const payload = await response.json();
         if (active && payload?.data?.info) {

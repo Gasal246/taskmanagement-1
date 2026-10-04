@@ -3,11 +3,11 @@ import connectDB from "@/lib/mongo";
 import User_details from "@/models/user_details.model";
 import Users from "@/models/users.model";
 import { NextRequest, NextResponse } from "next/server";
-
-connectDB();
+import { canManageUser } from "@/lib/server-access";
 
 export async function POST ( req: NextRequest ) {
     try {
+        await connectDB();
         const session:any = await auth();
         if(!session) return NextResponse.json({message: "Un-Authorized Access", status: 401}, {status: 401});
 
@@ -26,6 +26,7 @@ export async function POST ( req: NextRequest ) {
         }
 
         if(!body?.user_id) return NextResponse.json({message: "User ID is required", status: 400}, {status: 400});
+        if (!session.user.is_super && session.user.id !== body.user_id && !await canManageUser(session.user.id, body.user_id)) return NextResponse.json({ message: "Forbidden", status: 403 }, { status: 403 });
 
         const user = await Users.findById(body?.user_id);
         if(!user) return NextResponse.json({message: "User Not Found", status: 404}, {status: 404});

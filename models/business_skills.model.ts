@@ -1,10 +1,10 @@
-import mongoose, { Schema, Document, ObjectId } from 'mongoose';
+import mongoose, { Schema, Document, Types } from 'mongoose';
 
 export interface IBusiness_skills extends Document {
-  business_id: ObjectId | null;
+  business_id: Types.ObjectId | null;
   skill_name: String | null;
   status: Number | null;
-  _id: ObjectId;
+  _id: Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }

@@ -1,20 +1,21 @@
+import { inTransaction } from "@/lib/jobs/transaction";
+import { assertUploadNotRetired } from "@/lib/jobs/enqueue";
+import BusinessTasks from "@/models/business_tasks.model";
+import TaskActivities from "@/models/task_activities.model";
 import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import { resolveSessionUserId } from "@/lib/utils";
 import ActivityCommentReads from "@/models/activity_comment_reads.model";
 import ActivityComments from "@/models/activity_comments.model";
 import Users from "@/models/users.model";
-import { authorizeActivityViewer } from "@/app/api/helpers/activity-comments";
+import { authorizeActivityViewer, getActivityViewerIds } from "@/app/api/helpers/activity-comments";
 import { notifyActivityComment } from "@/app/api/helpers/task-activity-comment-notifications";
 import {
   AttachmentValidationError,
-  deleteActivityCommentAttachment,
   validateActivityCommentAttachment,
 } from "@/app/api/helpers/activity-comment-attachments";
 import mongoose from "mongoose";
 import { NextResponse } from "next/server";
-
-connectDB();
 
 const unauthorized = (status: number) =>
   NextResponse.json({ message: status === 401 ? "Unauthorized" : "Forbidden" }, { status });
@@ -56,6 +57,7 @@ export async function GET(
   const { activityId } = await context.params;
   if (!mongoose.isValidObjectId(activityId)) return NextResponse.json({ message: "Invalid activity" }, { status: 400 });
 
+  await connectDB();
   const access = await authorizeActivityViewer(userId, activityId);
   if (access.status !== 200) return unauthorized(access.status);
 
@@ -81,6 +83,7 @@ export async function POST(
   const { activityId } = await context.params;
   if (!mongoose.isValidObjectId(activityId)) return NextResponse.json({ message: "Invalid activity" }, { status: 400 });
 
+  await connectDB();
   const access = await authorizeActivityViewer(userId, activityId);
   if (access.status !== 200) return unauthorized(access.status);
   const payload = await req.json();
@@ -101,6 +104,7 @@ export async function POST(
   let attachment = null;
   if (payload?.attachment) {
     try {
+        await connectDB();
       attachment = await validateActivityCommentAttachment(payload.attachment, {
         taskId: String(access.task._id),
         activityId,
@@ -118,53 +122,43 @@ export async function POST(
     return NextResponse.json({ message: "Add a comment or attachment" }, { status: 400 });
   }
 
+  const actor = await Users.findById(userId).select("name avatar_url").lean();
+  if (!actor) return unauthorized(401);
+  const recipientIds = await getActivityViewerIds(access.task, access.activity);
+  const commentId = new mongoose.Types.ObjectId();
   let created: any;
   try {
-    created = await ActivityComments.create({
-      task_id: access.task._id,
-      activity_id: activityId,
-      author_id: userId,
-      parent_id: parent?._id || null,
-      root_id: parent ? parent.root_id || parent._id : null,
-      depth: parent ? parent.depth + 1 : 0,
-      body,
-      attachment: attachment ? {
-        url: attachment.url,
-        storage_path: attachment.storagePath,
-        name: attachment.name,
-        mime_type: attachment.mimeType,
-        extension: attachment.extension,
-        size: attachment.size,
-      } : null,
+    created = await inTransaction(async dbSession => {
+      // Touch the parent task to serialize against task/activity cascade deletion.
+      const parentTask = await BusinessTasks.updateOne({ _id: access.task._id }, { $inc: { __v: 1 } }, { session: dbSession });
+      if (!parentTask.matchedCount || !await TaskActivities.exists({ _id: activityId }).session(dbSession)) {
+        throw new Error("Activity was deleted while adding a comment");
+      }
+      if (parent && !await ActivityComments.exists({ _id: parent._id, activity_id: activityId, deleted_at: null }).session(dbSession)) {
+        throw new Error("Parent comment was deleted while replying");
+      }
+      if (attachment) await assertUploadNotRetired(attachment.storagePath, dbSession);
+      const [comment] = await ActivityComments.create([{
+        _id: commentId, task_id: access.task._id, activity_id: activityId, author_id: userId,
+        parent_id: parent?._id || null, root_id: parent ? parent.root_id || parent._id : null,
+        depth: parent ? parent.depth + 1 : 0, body,
+        attachment: attachment ? { url: attachment.url, storage_path: attachment.storagePath,
+          name: attachment.name, mime_type: attachment.mimeType, extension: attachment.extension, size: attachment.size,
+        } : null,
+      }], { session: dbSession });
+      await notifyActivityComment({ task: access.task, activity: access.activity, comment, actor,
+        action: parent ? "replied" : "commented", recipientIds, dbSession,
+      });
+      return comment;
     });
   } catch (error) {
-    if (attachment?.storagePath) {
-      try {
-        await deleteActivityCommentAttachment(attachment.storagePath);
-      } catch (cleanupError) {
-        console.log("Failed to roll back activity comment attachment", cleanupError);
-      }
-    }
-    console.log("Failed to create activity comment", error);
-    return NextResponse.json({ message: "Could not add the comment" }, { status: 500 });
+    // Keep a failed upload available for the user's retry. Deleting it here could
+    // race an unknown commit result; abandoned uploads need a separate retention policy.
+    console.error("Failed to create activity comment", error);
+    return NextResponse.json({ message: "Could not add the comment. Please try again." }, { status: 500 });
   }
   const populated: any = await ActivityComments.findById(created._id)
-    .populate({ path: "author_id", select: "name avatar_url" })
-    .lean();
-  const actor = await Users.findById(userId).select("name avatar_url").lean();
-  if (actor) {
-    try {
-      await notifyActivityComment({
-        task: access.task,
-        activity: access.activity,
-        comment: created,
-        actor,
-        action: parent ? "replied" : "commented",
-      });
-    } catch (error) {
-      console.log("Failed to persist activity comment notifications", error);
-    }
-  }
+    .populate({ path: "author_id", select: "name avatar_url" }).lean();
   return NextResponse.json({ comment: serialize(populated, new Set(), userId) }, { status: 201 });
 }
 

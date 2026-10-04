@@ -2,10 +2,9 @@ import connectDB from "@/lib/mongo";
 import Eq_province from "@/models/eq_province.model";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function GET(req:NextRequest){
     try{
+        await connectDB();
         const {searchParams} = new URL(req.url);
         const region_id = searchParams.get("region_id");
 

@@ -1,3 +1,4 @@
+import { requireSuperadmin } from "@/lib/server-access";
 import connectDB from "@/lib/mongo";
 import Eq_area from "@/models/eq_area.model";
 import Eq_camp_contacts from "@/models/eq_camp_contacts.model";
@@ -12,10 +13,11 @@ import Eq_enquiry_wifi_personal from "@/models/eq_enquiry_wifi_personal.model";
 import Eq_Enquiry_Personal_Wifi_Edit from "@/models/eq_enquriy_personal_wifi_edit.model";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function DELETE(req: NextRequest) {
     try {
+        await connectDB();
+        const denied = await requireSuperadmin();
+        if (denied) return denied;
         const { searchParams } = new URL(req.url);
         const area_id = searchParams.get("area_id");
 

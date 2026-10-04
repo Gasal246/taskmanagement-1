@@ -9,10 +9,9 @@ import Eq_camp_solutions from "@/models/eq_camp_solutions.model";
 import { parseFacilityCatalogueFilters } from "@/lib/enquiries/facility-list-filters";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function GET(req:NextRequest){
     try{
+        await connectDB();
         const {searchParams} = new URL(req.url);
         const country_id = searchParams.get("country_id");
         const region_id = searchParams.get("region_id");

@@ -4,10 +4,9 @@ import Eq_camp_solutions from "@/models/eq_camp_solutions.model";
 import { EMPTY_CAMP_SOLUTIONS } from "@/lib/enquiries/solutions";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function GET(req:NextRequest){
     try{
+        await connectDB();
         const {searchParams} = new URL(req.url);
         const area_id = searchParams.get("area_id");
         if(!area_id) return NextResponse.json({message: "Please select area first", status: 400}, {status: 400});

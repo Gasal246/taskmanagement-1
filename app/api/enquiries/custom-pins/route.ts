@@ -4,14 +4,13 @@ import { resolveSessionUserId } from "@/lib/utils";
 import EqCustomMapPins from "@/models/eq_custom_map_pins.model";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 const isValidCoordinates = (latitude: number, longitude: number) => {
   return Number.isFinite(latitude) && Number.isFinite(longitude) && latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180;
 };
 
 export async function GET() {
   try {
+        await connectDB();
     const session = await auth();
     const userId = resolveSessionUserId(session);
 
@@ -43,6 +42,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+        await connectDB();
     const session = await auth();
     const userId = resolveSessionUserId(session);
 
@@ -91,6 +91,7 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
+        await connectDB();
     const session = await auth();
     const userId = resolveSessionUserId(session);
 
@@ -142,6 +143,7 @@ export async function PUT(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
+        await connectDB();
     const session = await auth();
     const userId = resolveSessionUserId(session);
 

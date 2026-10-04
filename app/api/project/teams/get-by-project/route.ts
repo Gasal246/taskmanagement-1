@@ -6,10 +6,9 @@ import { NextRequest, NextResponse } from "next/server";
 import Project_Team_Members from "@/models/project_team_members.model";
 import { authorizeProjectRequest } from "@/app/api/helpers/project-access";
 
-connectDB();
-
 export async function GET(req:NextRequest){
     try{
+        await connectDB();
         const {searchParams} = new URL(req.url);
         const project_id = searchParams.get("project_id");
         if (!project_id) {

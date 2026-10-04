@@ -2,9 +2,8 @@ import AdminAssignBusiness from "@/models/admin_assign_business.model";
 import Business_Tasks from "@/models/business_tasks.model";
 import Business_Project from "@/models/business_project.model";
 import Project_Teams from "@/models/project_team.model";
-import Notifications from "@/models/notifications.model";
-import FcmTokens from "@/models/fcm_tokens.model";
-import { getAdminMessaging } from "@/lib/firebaseAdmin";
+import { enqueueNotifications } from "@/lib/jobs/enqueue";
+import type { ClientSession } from "mongoose";
 import type { NextRequest } from "next/server";
 
 type ActivityNotificationAction = "added" | "removed" | "completed";
@@ -63,6 +62,8 @@ export async function notifyTaskActivityChange({
   action,
   actorId,
   actorName,
+  dbSession,
+  eventKey,
 }: {
   req: NextRequest;
   taskId: string;
@@ -73,6 +74,8 @@ export async function notifyTaskActivityChange({
   action: ActivityNotificationAction;
   actorId: string;
   actorName: string;
+  dbSession?: ClientSession;
+  eventKey?: string;
 }) {
   const task: {
     task_name?: string;
@@ -84,7 +87,7 @@ export async function notifyTaskActivityChange({
     business_id?: string | null;
   } | null = await Business_Tasks.findById(taskId)
     .select("task_name is_project_task assigned_to assigned_teams creator project_id business_id")
-    .lean<{
+    .session(dbSession ?? null).lean<{
       task_name?: string;
       is_project_task?: boolean;
       assigned_to?: string | null;
@@ -100,7 +103,7 @@ export async function notifyTaskActivityChange({
     const admins = await AdminAssignBusiness.find({
       business_id: task.business_id,
       status: 1,
-    }).select("user_id").lean();
+    }).select("user_id").session(dbSession ?? null).lean();
     admins.forEach((admin: any) => {
       if (admin?.user_id) recipients.add(String(admin.user_id));
     });
@@ -115,14 +118,14 @@ export async function notifyTaskActivityChange({
       .filter(Boolean);
     const teams: Array<{ team_head?: string | null }> = await Project_Teams.find({ _id: { $in: teamIds } })
       .select("team_head")
-      .lean<Array<{ team_head?: string | null }>>();
+      .session(dbSession ?? null).lean<Array<{ team_head?: string | null }>>();
     teams.forEach((team) => {
       if (team?.team_head) recipients.add(String(team.team_head));
     });
     if (task.project_id) {
       const project: any = await Business_Project.findById(task.project_id)
         .select("project_head project_heads project_supervisors account_managers site_operational_heads")
-        .lean();
+        .session(dbSession ?? null).lean();
       [
         project?.project_head,
         ...(Array.isArray(project?.project_heads) ? project.project_heads : []),
@@ -175,7 +178,7 @@ export async function notifyTaskActivityChange({
     byLine,
   };
 
-  await Notifications.insertMany(
+  await enqueueNotifications(
     recipientIds.map((recipientId) => ({
       recipient_id: recipientId,
       sender_id: actorId,
@@ -185,42 +188,9 @@ export async function notifyTaskActivityChange({
       data,
       meta,
       read_at: null,
-    }))
+    })),
+    { notification: { title: notificationTitle, body: notificationBody || taskName }, data },
+    eventKey, dbSession
   );
 
-  const tokenDocs = await FcmTokens.find(
-    { user_id: { $in: recipientIds } },
-    { token: 1 }
-  ).lean();
-  const tokens = tokenDocs.map((doc: any) => doc.token).filter(Boolean);
-  if (tokens.length === 0) return;
-
-  try {
-    const messaging = getAdminMessaging();
-    const response = await messaging.sendEachForMulticast({
-      tokens,
-      notification: {
-        title: notificationTitle,
-        body: notificationBody || taskName,
-      },
-      data,
-    });
-    const invalidTokens = response.responses
-      .map((res, index) => {
-        const code = res.error?.code || "";
-        if (
-          code === "messaging/registration-token-not-registered" ||
-          code === "messaging/invalid-registration-token"
-        ) {
-          return tokens[index];
-        }
-        return null;
-      })
-      .filter(Boolean) as string[];
-    if (invalidTokens.length > 0) {
-      await FcmTokens.deleteMany({ token: { $in: invalidTokens } });
-    }
-  } catch (error) {
-    console.log("Failed to send task activity notification", error);
-  }
 }

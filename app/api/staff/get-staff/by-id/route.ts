@@ -22,10 +22,9 @@ import "@/models/area_departments.model";
 import "@/models/location_departments.model";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function GET(req: NextRequest) {
   try {
+        await connectDB();
     const { searchParams } = new URL(req.url);
     const user_id = searchParams.get("user_id");
     const user_role = searchParams.get("role_id");

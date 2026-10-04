@@ -1,11 +1,13 @@
+import { authorizeOrganizationMutation } from "@/lib/organization-access";
 import connectDB from "@/lib/mongo";
 import Client_contacts from "@/models/client_contacts.model";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function POST(req: NextRequest) {
     try {
+        await connectDB();
+        const accessDenied = await authorizeOrganizationMutation(req);
+        if (accessDenied) return accessDenied;
         const { BCContactId } = await req.json();
         const client_contact = await Client_contacts.findById(BCContactId);
         if (!client_contact) {

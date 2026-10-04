@@ -1,9 +1,9 @@
-import mongoose, { Decimal128, ObjectId, Schema } from "mongoose";
+import mongoose, { Document, Decimal128, Types, Schema } from "mongoose";
 
 export interface IEq_Enquiry_Personal_Wifi_Edit extends Document{
-    _id: ObjectId,
-    enquiry_id: ObjectId,
-    enquiry_edit_id: ObjectId,
+    _id: Types.ObjectId,
+    enquiry_id: Types.ObjectId,
+    enquiry_edit_id: Types.ObjectId,
     personal_plan: String,
     personal_start_date: String,
     personal_end_date: String,

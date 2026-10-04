@@ -1,16 +1,19 @@
+import { authorizeEnquiry } from "@/lib/enquiries/access";
 import connectDB from "@/lib/mongo";
 import Eq_Enquiry_Edit from "@/models/eq_enquiry_edit.model";
 import Eq_Enquiry_External_Wifi_Edit from "@/models/eq_enquiry_external_wifi_edit.model";
 import Eq_Enquiry_Personal_Wifi_Edit from "@/models/eq_enquriy_personal_wifi_edit.model";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function GET(req:NextRequest){
     try{
+        await connectDB();
         const {searchParams} = new URL(req.url);
         const enquiry_id = searchParams.get("enquiry_id");
         if(!enquiry_id) return NextResponse.json({message: "Please provide enquiry id", status: 400}, {status: 200});
+
+        const denied = await authorizeEnquiry(enquiry_id);
+        if (denied) return denied;
 
         const edited_enquiry:any = await Eq_Enquiry_Edit.findOne({enquiry_id: enquiry_id}).lean();
         if(edited_enquiry?.wifi_available){

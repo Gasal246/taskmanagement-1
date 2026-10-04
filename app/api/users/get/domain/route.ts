@@ -1,10 +1,11 @@
+import { authorizeUserProfile } from "@/lib/server-access";
 import connectDB from "@/lib/mongo";
 import Admin_assign_business from "@/models/admin_assign_business.model";
 import Area_heads from "@/models/area_heads.model";
 import Area_staffs from "@/models/area_staffs.model";
-import Business from "@/models/business.model";
-import Department_heads from "@/models/department_heads.model";
-import Dep_staffs from "@/models/department_staffs.model";
+import "@/models/business.model";
+import "@/models/department_heads.model";
+import "@/models/department_staffs.model";
 import Region_heads from "@/models/region_heads.model";
 import Region_staffs from "@/models/region_staffs.model";
 import Users from "@/models/users.model";
@@ -24,10 +25,9 @@ import Location_dep_heads from "@/models/location_dep_heads.model";
 import Location_dep_staffs from "@/models/location_dep_staffs.model";
 import { isValidObjectId } from "mongoose";
 
-connectDB();
-
 export async function GET (req: NextRequest) {
     try {
+        await connectDB();
         console.log("URL", req.url)
         const { searchParams } = new URL(req.url);
         const userid = searchParams.get('userid');
@@ -37,17 +37,20 @@ export async function GET (req: NextRequest) {
             return NextResponse.json({ error: "Invalid user id or role" }, { status: 400 });
         }
 
+        const denied = await authorizeUserProfile(userid);
+        if (denied) return denied;
+
         const user = await Users.findById(userid);
         if (!user) {
             return NextResponse.json({ error: "User not found" }, { status: 404 });
         }
 
         // JUST REFRESING THE SCHEMA FOR POPULATING IT
-        await Business.findOne({}).limit(1);
+
 
         switch(role) {
             case 'BUSINESS_ADMIN': {
-                const businesses = await Admin_assign_business.find({ user_id: userid })
+                const businesses = await Admin_assign_business.find({ user_id: userid, status: 1 })
                 .populate({
                     path: "business_id"
                 });
@@ -221,7 +224,7 @@ export async function GET (req: NextRequest) {
                 return NextResponse.json({ returnData });
             }
             case 'AREA_STAFF': {
-                const domains = await Area_staffs.find({ user_id: userid, status: 1 })
+                const domains = await Area_staffs.find({ staff_id: userid, status: 1 })
                 .populate({
                     path: "area_id"
                 });
@@ -255,7 +258,7 @@ export async function GET (req: NextRequest) {
                 return NextResponse.json({ returnData });
             }
             case "LOCATION_STAFF": {
-                const domains = await Location_staffs.find({staff_id: userid, status: 1}).populate({
+                const domains = await Location_staffs.find({user_id: userid, status: 1}).populate({
                     path: "location_id"
                 });
                 

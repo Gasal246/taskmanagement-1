@@ -1,3 +1,4 @@
+import { authorizeEnquiry } from "@/lib/enquiries/access";
 import connectDB from "@/lib/mongo";
 import Eq_camp_contacts from "@/models/eq_camp_contacts.model";
 import Eq_enquiry from "@/models/eq_enquiries.model";
@@ -11,10 +12,9 @@ import Eq_enquiry_wifi_personal from "@/models/eq_enquiry_wifi_personal.model";
 import Eq_enquiry_solutions from "@/models/eq_enquiry_solutions.model";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function DELETE(req: NextRequest) {
     try {
+        await connectDB();
         const { searchParams } = new URL(req.url);
         const enquiry_id = searchParams.get("enquiry_id");
 
@@ -26,6 +26,9 @@ export async function DELETE(req: NextRequest) {
         if (!enquiry) {
             return NextResponse.json({ message: "Enquiry not found", status: 404 }, { status: 404 });
         }
+
+        const denied = await authorizeEnquiry(enquiry_id, "admin");
+        if (denied) return denied;
 
         await Eq_enquiry_wifi_external.deleteMany({ enquiry_id });
         await Eq_enquiry_wifi_personal.deleteMany({ enquiry_id });

@@ -11,6 +11,8 @@ if (process.env.COMM_SERVER_ADDRESS) {
 }
 
 const nextConfig = {
+  // Keep benchmark builds separate from an already running development server.
+  distDir: process.env.TASKMANAGER_PERFORMANCE_BUILD_DIR || ".next",
   images: {
     domains: imageDomains,
   },

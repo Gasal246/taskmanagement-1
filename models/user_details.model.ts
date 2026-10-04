@@ -1,8 +1,8 @@
-import mongoose, { Schema, Document, ObjectId } from 'mongoose';
+import mongoose, { Schema, Document, Types } from 'mongoose';
 
 export interface IUser_details extends Document {
-    _id: ObjectId;
-    user_id: ObjectId | null;
+    _id: Types.ObjectId;
+    user_id: Types.ObjectId | null;
     country: String | null;
     province: String | null;
     national_id: String | null;

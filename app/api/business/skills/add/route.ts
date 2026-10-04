@@ -1,11 +1,15 @@
+import { authorizeOrganizationMutation } from "@/lib/organization-access";
+import { auth } from "@/auth";
+import { canAdministerBusiness } from "@/lib/server-access";
 import connectDB from "@/lib/mongo";
 import Business_skills from "@/models/business_skills.model";
 import { NextResponse, NextRequest } from "next/server";
 
-connectDB();
-
 export async function POST (req: NextRequest) {
     try {
+        await connectDB();
+        const accessDenied = await authorizeOrganizationMutation(req);
+        if (accessDenied) return accessDenied;
         const formdata = await req.formData();
         const formData: any = Object.fromEntries(formdata);
         const body = JSON.parse(formData?.body);
@@ -14,6 +18,10 @@ export async function POST (req: NextRequest) {
         if (!skill_name || !business_id) {
             return NextResponse.json({ error: "Skill name and business id are required" }, { status: 400 });
         }
+
+        const session = await auth();
+        if (!session?.user?.id) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+        if (!session.user.is_super && !await canAdministerBusiness(session.user.id, business_id)) return NextResponse.json({ message: "Forbidden" }, { status: 403 });
 
         const skill = await Business_skills.findOne({ skill_name, business_id });
         if (skill?.status === 0) {

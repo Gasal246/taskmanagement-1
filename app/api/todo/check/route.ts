@@ -6,14 +6,13 @@ import mongoose from "mongoose";
 import { resolveTodoCloudAccess } from "@/lib/todo-access";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 interface Body {
     todo_id: string,
 }
 
 export async function PUT(req: NextRequest) {
     try {
+        await connectDB();
         const session:any = await auth();
         if(!session) return NextResponse.json({message: "Un-Authorized Access", status: 401}, {status: 401});
         const userId = resolveSessionUserId(session);

@@ -1,3 +1,4 @@
+import { authorizeOrganizationMutation } from "@/lib/organization-access";
 import connectDB from '@/lib/mongo';
 import Area_departments from '@/models/area_departments.model';
 import Business_areas from '@/models/business_areas.model';
@@ -6,8 +7,6 @@ import Business_regions from '@/models/business_regions.model';
 import Location_departments from '@/models/location_departments.model';
 import Region_departments from '@/models/region_departments.model';
 import { NextRequest, NextResponse } from 'next/server';
-
-connectDB();
 
 const hierarchyModels = {
     region: { model: Business_regions, nameField: 'region_name', scopeFields: ['business_id'] },
@@ -22,6 +21,9 @@ type HierarchyItemType = keyof typeof hierarchyModels;
 
 export async function POST(req: NextRequest) {
     try {
+        await connectDB();
+        const accessDenied = await authorizeOrganizationMutation(req);
+        if (accessDenied) return accessDenied;
         const { id, name, entity_type } = await req.json() as {
             id?: string;
             name?: string;

@@ -1,10 +1,9 @@
+import { authorizeEnquiry } from "@/lib/enquiries/access";
 import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import Eq_enquiry_comments from "@/models/eq_enquiry_comments.model";
 import Eq_enquiry from "@/models/eq_enquiries.model";
 import { NextRequest, NextResponse } from "next/server";
-
-connectDB();
 
 interface Body {
   enquiry_id?: string;
@@ -13,6 +12,7 @@ interface Body {
 
 export async function POST(req: NextRequest) {
   try {
+        await connectDB();
     const session: any = await auth();
     if (!session) {
       return NextResponse.json({ message: "Unauthorized Access", status: 401 }, { status: 401 });
@@ -28,6 +28,9 @@ export async function POST(req: NextRequest) {
     if (!commentText) {
       return NextResponse.json({ message: "Comment cannot be empty", status: 400 }, { status: 400 });
     }
+
+    const denied = await authorizeEnquiry(enquiryId);
+    if (denied) return denied;
 
     const enquiryExists = await Eq_enquiry.findById(enquiryId).select("_id").lean();
     if (!enquiryExists) {

@@ -1,4 +1,5 @@
 "use client"
+import { signOut } from "next-auth/react";
 import ProfilPageSkeleton from '@/components/skeletons/ProfilPageSkeleton'
 import { Edit2, Key, EyeOff, Eye } from 'lucide-react'
 import React, { useState, useEffect } from 'react'
@@ -47,7 +48,7 @@ const editNameSchema = z.object({
 
 const changePasswordSchema = z.object({
   oldPassword: z.string().min(1, "Old password is required"),
-  newPassword: z.string().min(6, "New password must be at least 6 characters"),
+  newPassword: z.string().min(8, "New password must be at least 8 characters").max(64, "Use at most 64 characters"),
 })
 
 const sendPushSchema = z.object({
@@ -183,7 +184,7 @@ const ProfilPage = () => {
     const res = await UpdateProfile(payload);
     if (res?.status == 201) {
       toast.success(res?.message);
-      refetch();
+      await signOut({ callbackUrl: "/signin" });
     } else {
       toast.error(res?.message);
     }

@@ -1,25 +1,25 @@
-import mongoose, { ObjectId, Schema } from "mongoose";
+import mongoose, { Document, Types, Schema } from "mongoose";
 
 
 export interface IBusiness_Project extends Document {
-    _id: ObjectId,
+    _id: Types.ObjectId,
     project_name: String,
     project_description: String | null,
-    business_id: ObjectId,
-    region_id: ObjectId | null,
-    department_id: ObjectId | null,
-    area_id: ObjectId | null,
-    location_id: ObjectId | null,
-    admin_id: ObjectId,
+    business_id: Types.ObjectId,
+    region_id: Types.ObjectId | null,
+    department_id: Types.ObjectId | null,
+    area_id: Types.ObjectId | null,
+    location_id: Types.ObjectId | null,
+    admin_id: Types.ObjectId,
     status: String,
-    creator: ObjectId,
-    project_head: ObjectId | null,
-    project_heads: ObjectId[],
-    account_managers: ObjectId[],
-    site_operational_heads: ObjectId[],
-    project_supervisors: ObjectId[],
-    approved_by: ObjectId | null,
-    client_id: ObjectId | null,
+    creator: Types.ObjectId,
+    project_head: Types.ObjectId | null,
+    project_heads: Types.ObjectId[],
+    account_managers: Types.ObjectId[],
+    site_operational_heads: Types.ObjectId[],
+    project_supervisors: Types.ObjectId[],
+    approved_by: Types.ObjectId | null,
+    client_id: Types.ObjectId | null,
     start_date: Date | null,
     end_date: Date | null,
     priority: String,
@@ -39,13 +39,13 @@ export interface IBusiness_Project extends Document {
     solution_other?: string,
     primary_solution?: string,
     commercial_model?: string,
-    enquiry_id?: ObjectId,
+    enquiry_id?: Types.ObjectId,
     enquiry_uuid?: string,
-    facility_id?: ObjectId,
-    facility_region_id?: ObjectId,
-    facility_area_id?: ObjectId,
-    facility_city_id?: ObjectId,
-    facility_client_company_id?: ObjectId,
+    facility_id?: Types.ObjectId,
+    facility_region_id?: Types.ObjectId,
+    facility_area_id?: Types.ObjectId,
+    facility_city_id?: Types.ObjectId,
+    facility_client_company_id?: Types.ObjectId,
     facility_capacity?: string,
     facility_occupancy?: number,
 }
@@ -106,6 +106,9 @@ const ProjectsSchema: Schema = new Schema({
 }, { timestamps: true });
 
 // Refresh the cached development model when additive catalogue/source fields hot-reload.
+ProjectsSchema.index({ business_id: 1, createdAt: -1, _id: -1 });
+ProjectsSchema.index({ enquiry_id: 1 });
+
 if (mongoose.models.business_project && !mongoose.models.business_project.schema.path("enquiry_id")) {
     mongoose.deleteModel("business_project");
 }

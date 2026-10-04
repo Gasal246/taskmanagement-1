@@ -1,13 +1,15 @@
+import { authorizeOrganizationMutation } from "@/lib/organization-access";
 import connectDB from "@/lib/mongo";
 import Region_heads from "@/models/region_heads.model";
 import Roles from "@/models/roles.model";
 import User_roles from "@/models/user_roles.model";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function POST (req: NextRequest) {
     try {
+        await connectDB();
+        const accessDenied = await authorizeOrganizationMutation(req);
+        if (accessDenied) return accessDenied;
         const { RHid } = await req.json();
 
         const regHead = await Region_heads.findById(RHid);

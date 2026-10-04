@@ -1,12 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createCalendarEvent, getCalendarFeed, updateCalendarItemStatus } from "./functions";
+import { useSession } from "next-auth/react";
 
 export const useGetCalendarFeed = (
   queryParams: Record<string, string | boolean | undefined>
 ) => {
+  const { data: session } = useSession();
   return useQuery({
-    queryKey: ["calendar-feed", queryParams],
-    queryFn: () => getCalendarFeed(queryParams),
+    queryKey: ["calendar-feed", session?.user?.id, queryParams],
+    queryFn: ({ signal }) => getCalendarFeed(queryParams, signal),
+    enabled: Boolean(session?.user?.id),
   });
 };
 

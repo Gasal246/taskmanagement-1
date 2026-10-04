@@ -1,4 +1,6 @@
 "use client"
+import { useOrganizationOverview } from "@/hooks/use-organization-overview";
+import OrganizationSectionControls from "@/components/admin/OrganizationSectionControls";
 import { AppDispatch, RootState } from '@/redux/store'
 import { Building2, Check, ChevronLeft, CircleCheckBig, EllipsisVertical, Eye, InfoIcon, Plus, Trash2 } from 'lucide-react'
 import React, { useEffect, useState } from 'react'
@@ -9,7 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger, } from "@/components/ui/popove
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator, } from "@/components/ui/breadcrumb";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from '@/components/ui/input';
-import { useAddRegionDepartmentHead, useAddRegionDepartmentStaff, useGetRegionDepartmentCompleteData, useGetRegionUsers, useRemoveRegionDepartment, useRemoveRegionDepartmentStaff, useRemoveRegionDeptHead } from '@/query/business/queries';
+import { useAddRegionDepartmentHead, useAddRegionDepartmentStaff, useRemoveRegionDepartment, useRemoveRegionDepartmentStaff, useRemoveRegionDeptHead } from '@/query/business/queries';
 import { toast } from 'sonner';
 import LoaderSpin from '@/components/shared/LoaderSpin';
 import { useRouter } from 'next/navigation';
@@ -20,49 +22,23 @@ const RegionDepartmentPage = () => {
     const router = useRouter();
     const dispatch = useDispatch<AppDispatch>();
     const { departmentData, regionData } = useSelector((state: RootState) => state.application);
+    const overview = useOrganizationOverview("region-department", departmentData?._id, ["heads", "staffs", "area_departments", "available_staffs"]);
 
     const [openMessageDialog, setOpenMessageDialog] = useState<boolean>(false);
     const [messageTitle, setMessageTitle] = useState<string>("");
     const [messageContent, setMessageContent] = useState<string>("");
-    const [heads, setHeads] = useState<any[]>([]);
-    const [staffs, setStaffs] = useState<any[]>([]);
-    const [areas, setAreas] = useState<any[]>([]);
-    const [areaDepartments, setAreaDepartments] = useState<any[]>([]);
-    const [regionUsers, setRegionUsers] = useState<any[]>([]);
+    const heads = overview.section("heads").items;
+    const staffs = overview.section("staffs").items;
+    const areaDepartments = overview.section("area_departments").items;
+    const areas = [...new Map(areaDepartments.map(dep => [dep.area?._id, dep.area])).values()].filter(Boolean);
 
-    const { mutateAsync: getRegionUsers } = useGetRegionUsers();
     const { mutateAsync: addDepartmentHead, isPending: addingDepartmentHead } = useAddRegionDepartmentHead();
     const { mutateAsync: addDepartmentStaff, isPending: addingDepartmentStaff } = useAddRegionDepartmentStaff();
-    const { mutateAsync: fetchRegionDepartmentData, isPending: loadingRegionDepartmentData } = useGetRegionDepartmentCompleteData();
     const { mutateAsync: removeDepartmentStaff } = useRemoveRegionDepartmentStaff();
     const { mutateAsync: removeRegionDepartment } = useRemoveRegionDepartment();
     const {mutateAsync: removeDeptHead} = useRemoveRegionDeptHead();
 
-    useEffect(() => {
-        if(departmentData) {
-            fetchRegionUsers();
-            handleFetchCompleteDepData();
-        }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [departmentData]);
-
-    const handleFetchCompleteDepData = async () => {
-        const res = await fetchRegionDepartmentData(departmentData?._id);
-        console.log("Res: ", res);
-        if(res?.status === 200) {
-            setHeads(res?.data?.heads);
-            setStaffs(res?.data?.staffs);
-            setAreas(res?.data?.areas || []);
-            setAreaDepartments(res?.data?.area_departments || []);
-        }
-    }
-
-    const fetchRegionUsers = async () => {
-        const res = await getRegionUsers([regionData?._id]);
-        if(res?.status === 200) {
-            setRegionUsers(res?.data);
-        }
-    }
+    const handleFetchCompleteDepData = async () => { await overview.refresh(); };
 
     const handleShowMessageDialog = (title: string, content: string) => {
         setMessageTitle(title);
@@ -73,26 +49,20 @@ const RegionDepartmentPage = () => {
     const [openAddDepartmentHead, setOpenAddDepartmentHead ] = useState<boolean>(false);
     const [selectedUser, setSelectedUser ] = useState<string>("");
     const [isAddingUser, setIsAddingUser] = useState<boolean>(false);
-    const [userSearch, setUserSearch] = useState<string>("");
-    const userSearchTerm = userSearch.trim().toLowerCase();
-    const filteredRegionUsers = regionUsers?.filter((user: any) => {
-        const name = user?.user_id?.name || "";
-        const email = user?.user_id?.email || "";
-        return `${name} ${email}`.toLowerCase().includes(userSearchTerm);
-    });
+    const filteredRegionUsers = overview.section("available_staffs").items;
 
     const clickAddHead = () => {
         setSelectedUser("");
         setIsAddingUser(false);
         setOpenAddDepartmentHead(true);
     }
-    
+
     const clickAddStaff = () => {
         setSelectedUser("");
         setIsAddingUser(true);
         setOpenAddDepartmentHead(true);
     }
-    
+
     const handleAddDepartmentHead = async () => {
         if(!selectedUser) {
             return toast.error("Please select a user before continue.")
@@ -107,7 +77,7 @@ const RegionDepartmentPage = () => {
             toast.success(res?.message);
             setOpenAddDepartmentHead(false);
             setSelectedUser("");
-            fetchRegionUsers();
+
             handleFetchCompleteDepData();
         } else {
             return toast.error(res?.message || "Failed to add department head.")
@@ -123,13 +93,13 @@ const RegionDepartmentPage = () => {
             user_id: selectedUser,
             region_dep_id: departmentData?._id,
         }));
-        
+
         const res = await addDepartmentStaff(formData);
         if(res?.status === 200) {
             toast.success(res?.message);
             setOpenAddDepartmentHead(false);
             setSelectedUser("");
-            fetchRegionUsers();
+
             handleFetchCompleteDepData();
         } else {
             return toast.error(res?.message || "Failed to add department staff.")
@@ -140,7 +110,7 @@ const RegionDepartmentPage = () => {
         const res = await removeDeptHead(headId);
         if(res?.status === 200) {
             toast.success(res?.message);
-            fetchRegionUsers();
+
             handleFetchCompleteDepData();
         } else {
             return toast.error(res?.message || "Failed to remove department head.")
@@ -151,7 +121,7 @@ const RegionDepartmentPage = () => {
         const res = await removeDepartmentStaff(staffId);
         if(res?.status === 200) {
             toast.success(res?.message);
-            fetchRegionUsers();
+
             handleFetchCompleteDepData();
         } else {
             return toast.error(res?.message || "Failed to remove department staff.")
@@ -162,7 +132,7 @@ const RegionDepartmentPage = () => {
         const res = await removeRegionDepartment(regDepId);
         if(res?.status === 200) {
             toast.success(res?.message);
-            fetchRegionUsers();
+
             router.back();
         } else {
             return toast.error(res?.message || "Failed to remove department.")
@@ -230,8 +200,8 @@ const RegionDepartmentPage = () => {
                         <h1 className='text-sm font-medium text-slate-300 capitalize flex items-center gap-1'><InfoIcon size={14} /> Department Heads</h1>
                         <p className='text-xs pl-1 font-medium text-slate-400 lg:w-2/3 capitalize'>Department Heads of {departmentData?.type} in {regionData?.region_name}, they can manage the staffs, projects and connect with the co-departments in {regionData?.region_name}.</p>
                     </div>
-                    <motion.div 
-                        whileTap={{ scale: 0.96 }} 
+                    <motion.div
+                        whileTap={{ scale: 0.96 }}
                         className='flex items-center gap-1 cursor-pointer bg-gradient-to-tr from-slate-950/50 to-slate-950/70 rounded-lg p-2 hover:bg-slate-950/70 border border-slate-700 hover:border-cyan-600 group'
                         onClick={clickAddHead}
                     >
@@ -239,14 +209,13 @@ const RegionDepartmentPage = () => {
                         <h1 className='text-xs font-medium text-slate-400 group-hover:text-cyan-600 capitalize flex items-center gap-1'>Add Head</h1>
                     </motion.div>
                 </div>
-                {!loadingRegionDepartmentData && heads?.length === 0 && (
+                <OrganizationSectionControls key={`${overview.scope}:heads`} overview={overview} name="heads" label="heads" />
+                {overview.section("heads").loaded && heads?.length === 0 && (
                     <div className="flex items-center justify-center h-[15vh]">
                         <h1 className="text-xs font-medium text-slate-300">No heads added.</h1>
                     </div>
                 )}
-                {loadingRegionDepartmentData && <div className="flex items-center justify-center h-[10vh]">
-                    <LoaderSpin size={35} />
-                </div>}
+
                 <div className="flex flex-wrap mt-1">
                     {heads?.map((head: any) => (
                         <div className="w-full lg:w-4/12 p-1" key={head?._id}>
@@ -295,7 +264,6 @@ const RegionDepartmentPage = () => {
                 </div>
             </div>
 
-
             <div className="bg-slate-950/50 rounded-lg p-3 mb-2 min-h-[15vh]">
                 <div className='flex items-center justify-between'>
                     <div>
@@ -303,7 +271,8 @@ const RegionDepartmentPage = () => {
                         <p className='text-xs pl-1 font-medium text-slate-400 lg:w-2/3 capitalize'>Area departments of {departmentData?.type} in {regionData?.region_name}. Each area can manage its own department with the same type.</p>
                     </div>
                 </div>
-                {areaDepartments?.length === 0 && (
+                <OrganizationSectionControls key={`${overview.scope}:area_departments`} overview={overview} name="area_departments" label="area departments" />
+                {overview.section("area_departments").loaded && areaDepartments?.length === 0 && (
                     <div className="flex items-center justify-center h-[15vh]">
                         <h1 className="text-xs font-medium text-slate-300">No sub departments added.</h1>
                     </div>
@@ -367,8 +336,8 @@ const RegionDepartmentPage = () => {
                         <h1 className='text-sm font-medium text-slate-300 capitalize flex items-center gap-1'><InfoIcon size={14} /> Department Staffs</h1>
                         <p className='text-xs pl-1 font-medium text-slate-400 lg:w-2/3 capitalize'>Staffs of {departmentData?.type} department in {regionData?.region_name}, can be assingned to complete the task within this {departmentData?.dep_name} department.</p>
                     </div>
-                    <motion.div 
-                        whileTap={{ scale: 0.96 }} 
+                    <motion.div
+                        whileTap={{ scale: 0.96 }}
                         className='flex items-center gap-1 cursor-pointer bg-gradient-to-tr from-slate-950/50 to-slate-950/70 rounded-lg p-2 hover:bg-slate-950/70 border border-slate-700 hover:border-cyan-600 group'
                         onClick={clickAddStaff}
                     >
@@ -376,14 +345,13 @@ const RegionDepartmentPage = () => {
                         <h1 className='text-xs font-medium text-slate-400 group-hover:text-cyan-600 capitalize flex items-center gap-1'>Add Staff</h1>
                     </motion.div>
                 </div>
-                {!loadingRegionDepartmentData && staffs?.length === 0 && (
+                <OrganizationSectionControls key={`${overview.scope}:staffs`} overview={overview} name="staffs" label="staffs" />
+                {overview.section("staffs").loaded && staffs?.length === 0 && (
                     <div className="flex items-center justify-center h-[15vh]">
                         <h1 className="text-xs font-medium text-slate-300">No staffs added.</h1>
                     </div>
                 )}
-                {loadingRegionDepartmentData && <div className="flex items-center justify-center h-[10vh]">
-                    <LoaderSpin size={35} />
-                </div>}
+
                 <div className="flex flex-wrap mt-1">
                     {staffs?.map((staff: any) => <div className="w-full lg:w-3/12 p-1" key={staff?._id}>
                         <div className="bg-gradient-to-tr from-slate-950/50 to-slate-950/70 rounded-lg p-2 flex items-center gap-1 border border-slate-800 hover:border-cyan-700 relative">
@@ -431,8 +399,6 @@ const RegionDepartmentPage = () => {
                 </div>
             </div>
 
-
-
             {departmentData?.type === "sales" && <div className="bg-slate-950/50 rounded-lg p-3 mb-2 min-h-[15vh]">
                 <div className='flex items-center justify-between'>
                     <div>
@@ -468,16 +434,10 @@ const RegionDepartmentPage = () => {
                         <DialogTitle className='capitalize'>Adding Department {isAddingUser ? 'Staff' : 'Head'}</DialogTitle>
                         <DialogDescription>Adding {isAddingUser ? 'Staff' : 'Head'} For {departmentData?.type} Department {departmentData?.dep_name} of {regionData?.region_name}.</DialogDescription>
                     </DialogHeader>
-                    <div className="space-y-2">
-                        <Input
-                            placeholder="Search staff by name"
-                            value={userSearch}
-                            onChange={(e) => setUserSearch(e.target.value)}
-                        />
-                    </div>
+                    <OrganizationSectionControls key={`${overview.scope}:available_staffs`} overview={overview} name="available_staffs" label="staff" />
                     <div className="relative flex-1 overflow-y-auto pb-16">
-                        {filteredRegionUsers?.length === 0 && <div className='w-full h-[10vh] flex items-center justify-center'>
-                            <h1 className="text-xs font-medium text-slate-400">{userSearchTerm ? "No matching users" : "No region staffs found"}</h1>
+                        {overview.section("available_staffs").loaded && filteredRegionUsers?.length === 0 && <div className='w-full h-[10vh] flex items-center justify-center'>
+                            <h1 className="text-xs font-medium text-slate-400">No matching staff.</h1>
                         </div>}
                         {filteredRegionUsers?.map(( user: any ) => <motion.div
                             whileHover={{ scale: 1.02 }}

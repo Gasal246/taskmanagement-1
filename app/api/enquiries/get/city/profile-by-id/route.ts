@@ -1,3 +1,4 @@
+import { countReadableEnquiries, enquiryActor } from "@/lib/enquiries/access";
 import connectDB from "@/lib/mongo";
 import Eq_area from "@/models/eq_area.model";
 import Eq_camps from "@/models/eq_camps.model";
@@ -5,10 +6,11 @@ import Eq_city from "@/models/eq_city.model";
 import Eq_enquiry from "@/models/eq_enquiries.model";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function GET(req: NextRequest) {
   try {
+        await connectDB();
+        const actor = await enquiryActor();
+        if (!actor) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     const { searchParams } = new URL(req.url);
     const city_id = searchParams.get("city_id");
 
@@ -34,7 +36,7 @@ export async function GET(req: NextRequest) {
     const [areaCount, campCount, enquiryCount] = await Promise.all([
       Eq_area.countDocuments({ city_id }),
       Eq_camps.countDocuments({ city_id }),
-      Eq_enquiry.countDocuments({ city_id }),
+      countReadableEnquiries({ city_id }, actor),
     ]);
 
     return NextResponse.json(

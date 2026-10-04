@@ -6,8 +6,7 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import TanstackProvider from "@/query/TanstackProvider";
 import ReduxProvider from "@/redux/ReduxProvider";
-import UserActivityTracker from "@/components/shared/UserActivityTracker";
-import FcmNotifications from "@/components/shared/FcmNotifications";
+import DeferredNotifications from "@/components/shared/DeferredNotifications";
 import PwaInstallPrompt from "@/components/shared/PwaInstallPrompt";
 import AppBootstrap from "@/components/shared/AppBootstrap";
 
@@ -48,9 +47,8 @@ export default async function RootLayout({
           <TanstackProvider>
             <ReduxProvider>
               <AppBootstrap />
-              <UserActivityTracker />
               <PwaInstallPrompt />
-              <FcmNotifications />
+              <DeferredNotifications />
               {children}
             </ReduxProvider>
           </TanstackProvider>

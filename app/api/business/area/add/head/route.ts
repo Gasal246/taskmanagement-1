@@ -1,11 +1,10 @@
+import { authorizeOrganizationMutation } from "@/lib/organization-access";
 import connectDB from "@/lib/mongo";
 import Area_heads from "@/models/area_heads.model";
 import Roles from "@/models/roles.model";
 import User_roles from "@/models/user_roles.model";
 import Users from "@/models/users.model";
 import { NextRequest, NextResponse } from "next/server";
-
-connectDB();
 
 interface Body {
     area_id: string;
@@ -14,6 +13,9 @@ interface Body {
 
 export async function POST ( req: NextRequest ) {
     try {
+        await connectDB();
+        const accessDenied = await authorizeOrganizationMutation(req);
+        if (accessDenied) return accessDenied;
         const formData = await req.formData();
         const bodyData: any = Object.fromEntries(formData);
         const body = JSON.parse(bodyData?.body) as Body;

@@ -1,8 +1,8 @@
-import mongoose, { Document, ObjectId, Schema } from "mongoose";
+import mongoose, { Document, Types, Schema } from "mongoose";
 
 export interface IFcmToken extends Document {
-  _id: ObjectId;
-  user_id: ObjectId;
+  _id: Types.ObjectId;
+  user_id: Types.ObjectId;
   token: string;
   platform: string | null;
   device: string | null;
@@ -19,6 +19,8 @@ const FcmTokenSchema: Schema = new Schema(
   },
   { timestamps: true }
 );
+
+FcmTokenSchema.index({ user_id: 1, _id: 1 });
 
 const FcmTokens =
   mongoose.models?.fcm_tokens ||

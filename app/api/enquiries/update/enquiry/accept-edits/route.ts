@@ -1,3 +1,4 @@
+import { authorizeEnquiry } from "@/lib/enquiries/access";
 import connectDB from "@/lib/mongo";
 import Eq_enquiry from "@/models/eq_enquiries.model";
 import Eq_Enquiry_Edit from "@/models/eq_enquiry_edit.model";
@@ -7,8 +8,6 @@ import Eq_enquiry_wifi_personal from "@/models/eq_enquiry_wifi_personal.model";
 import Eq_Enquiry_Personal_Wifi_Edit from "@/models/eq_enquriy_personal_wifi_edit.model";
 import { Decimal128 } from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
-
-connectDB();
 
 interface IBody {
     enquiry_id: string,
@@ -49,7 +48,11 @@ interface IBody {
 
 export async function PUT(req:NextRequest){
     try{
+        await connectDB();
         const body: IBody = await req.json();
+        const denied = await authorizeEnquiry(body.enquiry_id, "admin");
+        if (denied) return denied;
+
         const wifiAvailability = body.wifi_available === "Yes"
             ? true
             : body.wifi_available === "No"

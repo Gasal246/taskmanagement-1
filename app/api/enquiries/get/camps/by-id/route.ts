@@ -1,3 +1,6 @@
+import { enquiryActor, enquiryVisibilityStages } from "@/lib/enquiries/access";
+import Enquiries from "@/models/eq_enquiries.model";
+import mongoose from "mongoose";
 import Eq_camp_solutions from "@/models/eq_camp_solutions.model";
 import { EMPTY_CAMP_SOLUTIONS } from "@/lib/enquiries/solutions";
 import connectDB from "@/lib/mongo";
@@ -15,10 +18,9 @@ import "@/models/eq_camp_contacts.model";
 import "@/models/eq_camp_landlord.model";
 import "@/models/eq_camp_realestate.model";
 
-connectDB();
-
 export async function GET(req:NextRequest){
     try{
+        await connectDB();
         const {searchParams} = new URL(req.url);
         const camp_id = searchParams.get("camp_id");
 
@@ -49,7 +51,11 @@ export async function GET(req:NextRequest){
             .populate("headoffice_id")
             .lean();
 
-            const contacts = await Eq_camp_contacts.find({camp_id: camp_id}).lean();
+            const actor = await enquiryActor();
+            if (!actor) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+            if (!mongoose.isValidObjectId(camp_id)) return NextResponse.json({ message: "Provide a valid Facility ID" }, { status: 400 });
+            const visible = await Enquiries.aggregate([{ $match: { camp_id: new mongoose.Types.ObjectId(camp_id!) } }, ...enquiryVisibilityStages(actor), { $project: { _id: 1 } }]);
+            const contacts = await Eq_camp_contacts.find({ camp_id, $or: [{ enquiry_id: null }, { enquiry_id: { $in: visible.map(entry => entry._id) } }] }).lean();
 
         const mapping: any = await Eq_camp_solutions.findOne({ camp_id }).lean();
         const solutions = mapping ? {

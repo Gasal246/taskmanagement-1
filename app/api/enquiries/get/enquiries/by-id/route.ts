@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { canReadEnquiry, enrichEnquiries, enquiryActor } from "@/lib/enquiries/completion-server";
 import { forwardHistoryFilter, historyOrder } from "@/lib/enquiries/completion";
 import connectDB from "@/lib/mongo";
@@ -17,14 +18,14 @@ import Eq_enquiry_wifi_personal from "@/models/eq_enquiry_wifi_personal.model";
 import Eq_enquiry_histories from "@/models/eq_enquiry_histories";
 import { getEnquirySolutions, getFacilitySolutions } from "@/app/api/helpers/enquiry-solutions";
 
-connectDB();
-
 export async function GET(req:NextRequest){
     try{
+        await connectDB();
         const actor = await enquiryActor();
         if (!actor) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
         const {searchParams} = new URL(req.url);
         const enquiry_id = searchParams.get("enquiry_id");
+        if (!mongoose.isValidObjectId(enquiry_id)) return NextResponse.json({ message: "Provide a valid enquiry ID" }, { status: 400 });
         if(!enquiry_id) return NextResponse.json({message:"Enquiry ID Missing", status:401}, {status: 401});
 
         const enquiry: any = await Eq_enquiry.findById(enquiry_id)

@@ -1,13 +1,15 @@
+import { authorizeOrganizationMutation } from "@/lib/organization-access";
 import connectDB from "@/lib/mongo";
 import Region_dep_heads from "@/models/region_dep_heads.model";
 import Roles from "@/models/roles.model";
 import User_roles from "@/models/user_roles.model";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function DELETE ( req: NextRequest ) {
     try {
+        await connectDB();
+        const accessDenied = await authorizeOrganizationMutation(req);
+        if (accessDenied) return accessDenied;
         const { searchParams } = req.nextUrl;
         const head_id = searchParams.get("head_id");
         if(!head_id) {

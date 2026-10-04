@@ -1,9 +1,8 @@
+import { requireSuperadmin } from "@/lib/server-access";
 import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import Roles from "@/models/roles.model";
 import { NextRequest, NextResponse } from "next/server";
-
-connectDB();
 
 interface Body {
     role_number: number;
@@ -12,6 +11,9 @@ interface Body {
 
 export async function POST (req: NextRequest) {
     try {
+        await connectDB();
+        const accessDenied = await requireSuperadmin();
+        if (accessDenied) return accessDenied;
         console.log("Add Role API Called");
         const session: any = await auth();
         if (!session) {

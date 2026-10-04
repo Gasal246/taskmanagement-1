@@ -1,9 +1,9 @@
-import mongoose, { Schema, Document, ObjectId } from 'mongoose';
+import mongoose, { Schema, Document, Types } from 'mongoose';
 
 export interface IUser_skills extends Document {
-    _id: ObjectId;
-    skill_id: ObjectId | null;
-    user_id: ObjectId | null;
+    _id: Types.ObjectId;
+    skill_id: Types.ObjectId | null;
+    user_id: Types.ObjectId | null;
     status: Number | null;
     createdAt: Date;
     updatedAt: Date;

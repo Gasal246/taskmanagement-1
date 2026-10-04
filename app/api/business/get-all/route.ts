@@ -1,15 +1,12 @@
-import { auth } from "@/auth";
+import { requireSuperadmin } from "@/lib/server-access";
 import connectDB from "@/lib/mongo";
 import Business from "@/models/business.model";
 import { NextResponse } from "next/server";
-connectDB();
-
 export async function GET () {
     try {
-        const session = await auth();
-        if(!session){
-            return new NextResponse("Unauthorized", { status: 401 });
-        }
+        await connectDB();
+        const denied = await requireSuperadmin();
+        if (denied) return denied;
 
         const businesses = await Business.find({ status: 1 });
         return Response.json({ data: businesses, status: 200 });

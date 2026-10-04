@@ -1,14 +1,13 @@
+import { canAdministerBusiness } from "@/lib/server-access";
 import { auth } from "@/auth";
-import { getRoleNameFromRequest, getBusinessHeads } from "@/app/api/helpers/task-filter-scope";
-import { resolveActiveBusinessIdForUser } from "@/app/api/helpers/resolve-user-business";
+import { getBusinessHeads } from "@/app/api/helpers/task-filter-scope";
 import connectDB from "@/lib/mongo";
 import Business_staffs from "@/models/business_staffs.model";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function GET(req: NextRequest) {
   try {
+        await connectDB();
     const session: any = await auth();
     const businessId = req.nextUrl.searchParams.get("business_id") || "";
     const kind = req.nextUrl.searchParams.get("kind");
@@ -19,11 +18,9 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ message: "Invalid filter option kind", status: 400 }, { status: 400 });
     }
 
-    const activeBusinessId = await resolveActiveBusinessIdForUser(session.user.id);
     if (
       !businessId ||
-      activeBusinessId !== businessId ||
-      !getRoleNameFromRequest(req).includes("ADMIN")
+      !await canAdministerBusiness(session.user.id, businessId)
     ) {
       return NextResponse.json({ message: "Unauthorized Access", status: 403 }, { status: 403 });
     }

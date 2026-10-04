@@ -1,25 +1,25 @@
 import { SCHEDULE_ACTIONS, type ScheduleHistoryEntry } from "@/lib/activity-deadline";
-import mongoose, { ObjectId, Schema } from "mongoose";
+import mongoose, { Document, Types, Schema } from "mongoose";
 
 interface ITask_Activities extends Document{
-    _id: ObjectId,
+    _id: Types.ObjectId,
     activity: String,
     description: String,
     is_done: Boolean,
-    created_by: ObjectId | null,
-    assigned_to: ObjectId | null,
-    forwarded_to: ObjectId | null,
+    created_by: Types.ObjectId | null,
+    assigned_to: Types.ObjectId | null,
+    forwarded_to: Types.ObjectId | null,
     reassignment_history: Array<{
         action: "reassigned",
-        actor_id: ObjectId,
-        recipient_id: ObjectId,
-        previous_recipient_id: ObjectId | null,
+        actor_id: Types.ObjectId,
+        recipient_id: Types.ObjectId,
+        previous_recipient_id: Types.ObjectId | null,
         createdAt: Date,
     }>,
     schedule_history: ScheduleHistoryEntry[],
-    assigned_skill: ObjectId | null,
-    project_id: ObjectId | null,
-    task_id: ObjectId,
+    assigned_skill: Types.ObjectId | null,
+    project_id: Types.ObjectId | null,
+    task_id: Types.ObjectId,
     start_date: Date | null,
     end_date: Date | null,
     completed_in: Number | null,
@@ -68,9 +68,11 @@ const Task_ActivitiesSchema: Schema = new Schema({
     }], default: [] },
 }, {timestamps:true})
 
+Task_ActivitiesSchema.index({ "documents.storagePath": 1 }, { sparse: true });
 Task_ActivitiesSchema.index({ assigned_to: 1, task_id: 1 });
 Task_ActivitiesSchema.index({ forwarded_to: 1, task_id: 1 });
 Task_ActivitiesSchema.index({ task_id: 1, createdAt: 1, _id: 1 });
+Task_ActivitiesSchema.index({ task_id: 1, updatedAt: -1, _id: -1 });
 
 const Task_Activities = mongoose.models?.task_activities || mongoose.model<ITask_Activities>("task_activities", Task_ActivitiesSchema);
 export default Task_Activities;

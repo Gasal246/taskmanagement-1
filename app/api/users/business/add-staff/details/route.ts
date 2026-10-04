@@ -1,8 +1,6 @@
 import connectDB from "@/lib/mongo";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 interface Body {
     user_id: string;
     skills: string;
@@ -18,6 +16,7 @@ interface Body {
 
 export async function POST (req: NextRequest) {
     try {
+        await connectDB();
         const formdata = await req.formData();
         const formData: any = Object.fromEntries(formdata);
         const body = JSON.parse(formData?.body);

@@ -2,8 +2,6 @@ import connectDB from "@/lib/mongo";
 import Eq_countries from "@/models/eq_countries.model";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 interface Body {
   country_id: string;
   country_name?: string;
@@ -11,6 +9,7 @@ interface Body {
 
 export async function PUT(req: NextRequest) {
   try {
+        await connectDB();
     const body: Body = await req.json();
 
     if (!body.country_id) {

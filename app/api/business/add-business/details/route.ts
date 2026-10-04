@@ -1,3 +1,4 @@
+import { requireSuperadmin } from "@/lib/server-access";
 import connectDB from "@/lib/mongo";
 import Admin_assign_business from "@/models/admin_assign_business.model";
 import Business from "@/models/business.model";
@@ -8,8 +9,6 @@ import Superadmin_plans from "@/models/super_admin_plans.model";
 import User_roles from "@/models/user_roles.model";
 import Users from "@/models/users.model";
 import { NextRequest, NextResponse } from "next/server";
-
-connectDB();
 
 interface Body {
     business_id: string;
@@ -35,6 +34,9 @@ interface Body {
 
 export async function POST (req: NextRequest) {
     try {
+        await connectDB();
+        const accessDenied = await requireSuperadmin();
+        if (accessDenied) return accessDenied;
         const formData = await req.formData();
         const { body } = Object.fromEntries(formData) as { body: string };
         const bodyData = await JSON.parse(body) as Body;

@@ -1,14 +1,20 @@
+import { actionFilterStages } from "./action-filter-pipeline";
+import { escapeSearch, pageBounds } from "@/lib/search";
 import Eq_camps from "@/models/eq_camps.model";
 import Eq_enquiry from "@/models/eq_enquiries.model";
 import mongoose from "mongoose";
-import { matchesActionFilters, validateActionFilters } from "./completion";
-import { actionsForEnquiries } from "./completion-server";
+import { validateActionFilters } from "./completion";
 import { parseFacilityCatalogueFilters } from "./facility-list-filters";
-export async function filteredAdminEnquiries(searchParams: URLSearchParams, actorId = "") {
+export async function filteredAdminEnquiries(searchParams: URLSearchParams, actorId = "", maxLimit = 50, scope: Record<string, any> = {}) {
     const actionParams = Object.fromEntries(searchParams);
     validateActionFilters(actionParams);
     const catalogueFilters = await parseFacilityCatalogueFilters(searchParams);
     const filter: any = {};
+    const businessId = searchParams.get("business_id");
+    if (businessId) {
+      if (!mongoose.isValidObjectId(businessId)) throw new Error("Invalid enquiry filter ID");
+      filter.business_id = new mongoose.Types.ObjectId(businessId);
+    }
 
     // --- Location Filters ---
     const country_id = searchParams.get("country_id");
@@ -23,10 +29,9 @@ export async function filteredAdminEnquiries(searchParams: URLSearchParams, acto
     const camp_capacity = searchParams.get("capacity");
     const search = searchParams.get("search");
     const occupancy = searchParams.get("occupancy");
-    const page = Number(searchParams.get("page")) || 1;
-    const limit = Number(searchParams.get("limit")) || 10;
-
-    const skip = (page - 1) * limit;
+    const { page, limit, skip } = pageBounds(searchParams, 10, maxLimit);
+    const approval = searchParams.get("is_active");
+    const approvalStages = approval === "true" || approval === "false" ? [{ $match: { is_active: approval === "true" } }] : [];
 
     if (country_id && mongoose.Types.ObjectId.isValid(country_id)) filter.country_id = new mongoose.Types.ObjectId(country_id);
     if (region_id && mongoose.Types.ObjectId.isValid(region_id)) filter.region_id = new mongoose.Types.ObjectId(region_id);
@@ -42,9 +47,6 @@ export async function filteredAdminEnquiries(searchParams: URLSearchParams, acto
     const statusValues = status?.split(",").map((value) => value.trim()).filter((value) => value && value !== "all") ?? [];
     if (statusValues.length === 1) filter.status = statusValues[0];
     if (statusValues.length > 1) filter.status = { $in: statusValues };
-
-    const next_action = searchParams.get("next_action");
-    const actionFilter = next_action && next_action !== "all" ? next_action : "";
 
     const wifi_available = searchParams.get("wifi_available");
     if (wifi_available !== null) {
@@ -68,24 +70,18 @@ export async function filteredAdminEnquiries(searchParams: URLSearchParams, acto
     if (due_date) filter.due_date = { $lte: new Date(due_date) };
     if (lease_expiry) filter.lease_expiry_due = { $lte: new Date(lease_expiry) };
 
-    if (enquiry_uuid) filter.enquiry_uuid = { $regex: enquiry_uuid, $options: "i" };
+    if (enquiry_uuid) filter.enquiry_uuid = { $regex: escapeSearch(enquiry_uuid), $options: "i" };
 
+    const campJoinStages: any[] = [
+      { $lookup: { from: Eq_camps.collection.name, localField: "camp_id", foreignField: "_id", as: "campDetails" } },
+      { $unwind: { path: "$campDetails", preserveNullAndEmptyArrays: true } },
+    ];
+    const needsCampFilter = Boolean(catalogueFilters.project_sector || catalogueFilters.facility_type || camp_capacity || occupancy || search);
+    const campPresentationStages = [{ $addFields: { camp_id: "$campDetails" } }, { $project: { campDetails: 0, latestHistory: 0 } }];
     const pipeline: any[] = [
-      { $match: filter },
-      {
-        $lookup: {
-          from: Eq_camps.collection.name,
-          localField: "camp_id",
-          foreignField: "_id",
-          as: "campDetails",
-        },
-      },
-      {
-        $unwind: {
-          path: "$campDetails",
-          preserveNullAndEmptyArrays: true,
-        },
-      },
+      { $match: { $and: [scope, filter] } },
+      ...(!hasPriorityFilter ? [{ $sort: { createdAt: -1, _id: -1 } }] : []),
+      ...(needsCampFilter ? campJoinStages : []),
     ];
 
     if (catalogueFilters.project_sector) {
@@ -107,8 +103,8 @@ export async function filteredAdminEnquiries(searchParams: URLSearchParams, acto
       pipeline.push({
         $match: {
           $or: [
-            { enquiry_uuid: { $regex: search, $options: "i" } },
-            { "campDetails.camp_name": { $regex: search, $options: "i" } },
+            { enquiry_uuid: { $regex: escapeSearch(search), $options: "i" } },
+            { "campDetails.camp_name": { $regex: escapeSearch(search), $options: "i" } },
           ],
         },
       });
@@ -132,25 +128,16 @@ export async function filteredAdminEnquiries(searchParams: URLSearchParams, acto
       );
     }
 
-    pipeline.push(
-      { $addFields: { camp_id: "$campDetails" } },
-      { $project: { campDetails: 0, latestHistory: 0 } }
-    );
+    if (needsCampFilter) pipeline.push(...campPresentationStages);
+    if (hasPriorityFilter) pipeline.push({ $sort: { priorityNumber: 1, createdAt: -1, _id: -1 } });
 
-    pipeline.push(
-      hasPriorityFilter
-        ? { $sort: { priorityNumber: 1, createdAt: -1 } }
-        : { $sort: { createdAt: -1 } }
-    );
-
-    const candidates = await Eq_enquiry.aggregate(pipeline);
-    const actions = await actionsForEnquiries(candidates);
-    const byEnquiry = new Map<string, any[]>();
-    for (const action of actions) {
-      const key = String(action.enquiry_id);
-      byEnquiry.set(key, [...(byEnquiry.get(key) || []), action]);
-    }
-    const matches = candidates.filter((entry: any) => matchesActionFilters(byEnquiry.get(String(entry._id)) || [], actionParams, actorId));
-    const totalRecords = matches.length;
-    return { data: matches.slice(skip, skip + limit), pagination: { page, limit, totalRecords, totalPages: Math.ceil(totalRecords / limit) } };
+    pipeline.push(...actionFilterStages(actionParams, actorId));
+    pipeline.push({ $facet: {
+      data: [...approvalStages, { $skip: skip }, { $limit: limit }, ...(!needsCampFilter ? [...campJoinStages, ...campPresentationStages] : [])],
+      count: [...approvalStages, { $count: "total" }],
+      badges: [{ $group: { _id: { $ifNull: ["$is_active", false] }, count: { $sum: 1 } } }],
+    } });
+    const [result] = await Eq_enquiry.aggregate(pipeline);
+    const totalRecords = result?.count?.[0]?.total || 0;
+    return { data: result?.data || [], badges: { all: (result?.badges || []).reduce((sum: number, row: any) => sum + row.count, 0), waitingApproval: result?.badges?.find((row: any) => !row._id)?.count || 0 }, pagination: { page, limit, totalRecords, totalPages: Math.ceil(totalRecords / limit) } };
 }

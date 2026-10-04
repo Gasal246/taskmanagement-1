@@ -1,3 +1,4 @@
+import { authorizeEnquiryBusiness } from "@/lib/enquiries/access";
 import connectDB from "@/lib/mongo";
 import Eq_enquiry_users from "@/models/eq_enquiry_users.model";
 import Roles from "@/models/roles.model";
@@ -5,15 +6,17 @@ import User_roles from "@/models/user_roles.model";
 import Users from "@/models/users.model";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function GET(req: NextRequest) {
     try {
+        await connectDB();
         const { searchParams } = new URL(req.url);
         const business_id = searchParams.get("business_id");
         const user_type = searchParams.get("user_type");
         if (!business_id) return NextResponse.json({ message: "Please Provide Business_id", status: 400 }, { status: 400 });
 
+
+        const denied = await authorizeEnquiryBusiness(business_id);
+        if (denied) return denied;
 
         switch (user_type) {
             case "users": {

@@ -1,3 +1,11 @@
+import "@/models/roles.model";
+import "@/models/business_regions.model";
+import "@/models/business_areas.model";
+import "@/models/business_skills.model";
+import "@/models/business_locations.model";
+import { auth } from "@/auth";
+import { canManageUser } from "@/lib/server-access";
+import mongoose from "mongoose";
 import connectDB from "@/lib/mongo";
 import Business_areas from "@/models/business_areas.model";
 import Business_locations from "@/models/business_locations.model";
@@ -30,10 +38,9 @@ import User_skills from "@/models/user_skills.model";
 import Users from "@/models/users.model";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function GET (req: NextRequest) {
     try {
+        await connectDB();
         const searchParams = req.nextUrl.searchParams;
         const userid = searchParams.get("userid");
         const status = searchParams.get("status");
@@ -41,46 +48,27 @@ export async function GET (req: NextRequest) {
             return NextResponse.json({ error: "User ID is required" }, { status: 400 });
         }
 
+        const session = await auth();
+        if (!session?.user?.id) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+        if (!session.user.is_super && session.user.id !== userid && !await canManageUser(session.user.id, userid)) return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+
+        if (!mongoose.isValidObjectId(userid)) return NextResponse.json({ message: "Invalid user ID" }, { status: 400 });
         const user = await Users.findById(userid, { password: 0, otp: 0 });
         if (!user) {
             return NextResponse.json({ error: "User not found" }, { status: 404 });
         }
 
-        const user_details = await User_details.findOne({ user_id: userid });
-
-        await Roles.findOne({}).limit(1); // Refreshing business roles
-        const user_roles = await User_roles.find({ user_id: userid, status: status || 1 }).populate({
-            path: 'role_id',
-            select: { role_name: 1, role_number: 1 }
-        });
-
-        await Business_regions.findOne({}).limit(1); // Refreshing business regions
-        const user_regions = await User_regions.find({ user_id: userid, status: status || 1 }).populate({
-            path: "region_id",
-            select: { region_name: 1 }
-        });
-
-        await Business_areas.findOne({}).limit(1); // Refreshing business areas
-        const user_areas = await User_areas.find({ user_id: userid, status: status || 1 }).populate({
-            path: "area_id",
-            select: { area_name: 1 }
-        });
-
-        await Business_skills.findOne({}).limit(1); // Refreshing business skills
-        const user_skills = await User_skills.find({ user_id: userid, status: status || 1 }).populate({
-            path: "skill_id",
-            select: { skill_name: 1 }
-        });
-
-        await Business_locations.findOne({}).limit(1); // Refreshing business locations
-        const user_locations = await User_locations.find({ user_id: userid, status: status || 1 }).populate({
-            path: "location_id",
-            select: { location_name: 1 }
-        });
-
         const docQuery: any = { user_id: userid };
         if (status) docQuery.status = status;
-        const user_docs = await User_docs.find(docQuery);
+        const [user_details, user_roles, user_regions, user_areas, user_skills, user_locations, user_docs] = await Promise.all([
+            User_details.findOne({ user_id: userid }),
+            User_roles.find({ user_id: userid, status: status || 1 }).populate({ path: "role_id", select: "role_name role_number" }),
+            User_regions.find({ user_id: userid, status: status || 1 }).populate({ path: "region_id", select: "region_name" }),
+            User_areas.find({ user_id: userid, status: status || 1 }).populate({ path: "area_id", select: "area_name" }),
+            User_skills.find({ user_id: userid, status: status || 1 }).populate({ path: "skill_id", select: "skill_name" }),
+            User_locations.find({ user_id: userid, status: status || 1 }).populate({ path: "location_id", select: "location_name" }),
+            User_docs.find(docQuery),
+        ]);
 
         const depStatus = status || 1;
         const populateRegionDept = {

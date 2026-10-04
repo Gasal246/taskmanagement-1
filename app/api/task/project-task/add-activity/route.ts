@@ -1,3 +1,5 @@
+import { inTransaction } from "@/lib/jobs/transaction";
+import { assertUploadNotRetired } from "@/lib/jobs/enqueue";
 import { activityScheduleSchema } from "@/lib/activity-schedule";
 import { recalculateTaskTimeline } from "@/app/api/helpers/task-timeline";
 import { auth } from "@/auth";
@@ -16,8 +18,6 @@ import {
 import { ActivityDocumentValidationError, validateActivityDocuments } from "@/app/api/helpers/activity-documents";
 import type { ActivityDocument } from "@/lib/activityDocuments";
 
-connectDB();
-
 interface Body {
     task_id: string,
     project_id: string | null,
@@ -32,6 +32,7 @@ interface Body {
 
 export async function POST(req: NextRequest) {
     try {
+        await connectDB();
         const session: any = await auth();
         if (!session) return new NextResponse("Un Authorized Access", { status: 401 });
 
@@ -102,42 +103,47 @@ export async function POST(req: NextRequest) {
         const projectId = body.project_id ?? task.project_id ?? null;
 
         const documents = await validateActivityDocuments(body.documents, { taskId: body.task_id });
-        const newActivity = new Task_Activities({
-            task_id: body.task_id,
-            project_id: projectId,
-            ...schedule.data,
-            activity: body.activity,
-            description: body.description,
-            is_done: false,
-            created_by: session?.user?.id || null,
-            assigned_to: assignedTo || null,
-            forwarded_to: null,
-            assigned_skill: assignedSkill,
-            documents: documents || [],
-        });
-        const savedActivity = await newActivity.save();
-
-        const updatedTask = await Business_Tasks.findByIdAndUpdate(body.task_id, {
-            $inc:{activity_count: 1}
-        }, {new:true});
-
-        if(updatedTask.status == "Completed") await Business_Tasks.findByIdAndUpdate(body.task_id, {$set:{status:"In Progress"}})
-
-        await recalculateTaskTimeline(body.task_id);
-
-        if (actor?._id) {
-            await notifyTaskActivityChange({
-                req,
-                taskId: body.task_id,
-                activityId: savedActivity?._id?.toString(),
-                activityTitle: body.activity,
-                activityDescription: body.description,
-                activityAssignedTo: assignedTo || null,
-                action: "added",
-                actorId: String(actor._id),
-                actorName: actor?.name || "User",
+        await inTransaction(async dbSession => {
+            for (const document of documents || []) await assertUploadNotRetired(document.storagePath, dbSession);
+            const newActivity = new Task_Activities({
+                task_id: body.task_id,
+                project_id: projectId,
+                ...schedule.data,
+                activity: body.activity,
+                description: body.description,
+                is_done: false,
+                created_by: session?.user?.id || null,
+                assigned_to: assignedTo || null,
+                forwarded_to: null,
+                assigned_skill: assignedSkill,
+                documents: documents || [],
             });
-        }
+            const savedActivity = await newActivity.save({ session: dbSession });
+
+            const updatedTask = await Business_Tasks.findByIdAndUpdate(body.task_id, {
+                $inc:{activity_count: 1}
+            }, {new:true, session: dbSession});
+
+            if (!updatedTask) throw new Error("Task was deleted while adding activity");
+            if(updatedTask.status == "Completed") await Business_Tasks.findByIdAndUpdate(body.task_id, {$set:{status:"In Progress"}}, { session: dbSession })
+
+            await recalculateTaskTimeline(body.task_id, dbSession);
+
+            if (actor?._id) {
+                await notifyTaskActivityChange({
+                    req, dbSession, eventKey: `activity:${savedActivity._id}:added`,
+                    taskId: body.task_id,
+                    activityId: savedActivity?._id?.toString(),
+                    activityTitle: body.activity,
+                    activityDescription: body.description,
+                    activityAssignedTo: assignedTo || null,
+                    action: "added",
+                    actorId: String(actor._id),
+                    actorName: actor?.name || "User",
+                });
+            }
+            return true;
+        });
         
         return NextResponse.json({ message: "Activity Added Successfully" }, { status: 201 });
 

@@ -1,10 +1,9 @@
+import { authorizeUserManagement, requireSuperadmin } from "@/lib/server-access";
 import connectDB from "@/lib/mongo";
 import Roles from "@/models/roles.model";
 import User_roles from "@/models/user_roles.model";
 import Users from "@/models/users.model";
 import { NextRequest, NextResponse } from "next/server";
-
-connectDB();
 
 interface Body {
     user_id: string;
@@ -14,10 +13,13 @@ interface Body {
 
 export async function POST (req: NextRequest) {
     try {
+        await connectDB();
         const formdata = await req.formData();
         const formData: any = Object.fromEntries(formdata);
         const body = JSON.parse(formData?.body);
 
+        const accessDenied = await authorizeUserManagement(body.user_id, body.business_id);
+        if (accessDenied) return accessDenied;
         const user = await Users.findOne({ _id: body.user_id, status: 1 });
         if(!user){
             return NextResponse.json({ error: "User Not Found" }, { status: 404 });
@@ -26,6 +28,11 @@ export async function POST (req: NextRequest) {
         const role = await Roles.findOne({ role_name: body.role_id });
         if(!role){
             return NextResponse.json({ error: "Role Not Found" }, { status: 404 });
+        }
+
+        if (String(role.role_name).includes("ADMIN")) {
+            const denied = await requireSuperadmin();
+            if (denied) return denied;
         }
 
         const userRole = await User_roles.findOne({ user_id: body.user_id, role_id: role._id });

@@ -6,10 +6,9 @@ import { resolveSessionUserId } from "@/lib/utils";
 import mongoose from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function GET(req: NextRequest) {
   try {
+        await connectDB();
     const session: any = await auth();
     if (!session) {
       return NextResponse.json({ message: "Un-Authorized Access" }, { status: 401 });

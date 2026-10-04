@@ -22,6 +22,7 @@ export async function GetEqCountries(){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -43,6 +44,7 @@ export async function GetEqCountriesFiltered(queryParams: any){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -53,6 +55,7 @@ export async function GetEqRegionsByCountry(country_id: string){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -74,6 +77,7 @@ export async function GetEqRegionsFiltered(queryParams: any){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -84,6 +88,7 @@ export async function GetEqProvincesByRegion(region_id: string){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -105,6 +110,7 @@ export async function GetEqProvincesFiltered(queryParams: any){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -115,6 +121,7 @@ export async function GetEqCitiesByProvince(province_id: string){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -136,6 +143,7 @@ export async function GetEqHeadOfficesFiltered(queryParams: any){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -157,6 +165,7 @@ export async function GetStaffEqHeadOfficesFiltered(queryParams: any){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -178,6 +187,7 @@ export async function GetEqCitiesFiltered(queryParams: any){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -188,6 +198,7 @@ export async function GetEqAreasByCity(city_id: string){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -198,6 +209,7 @@ export async function GetEqCampsByArea(area_id: string){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -219,6 +231,7 @@ export async function GetEqAreasFiltered(queryParams: any){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -295,6 +308,7 @@ export async function AddNewEqArea(payload: any){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -316,11 +330,12 @@ export async function GetEqCampsFiltered(queryParams:any){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
 //Get Camps for map
-export async function GetEqCampsForMap(queryParams:any){
+export async function GetEqCampsForMap(queryParams:any, signal?: AbortSignal){
     try{
         const safeParams: Record<string, string> = {};
 
@@ -333,11 +348,10 @@ export async function GetEqCampsForMap(queryParams:any){
         }
 
         const queryString = new URLSearchParams(safeParams).toString();
-        const res = await axios.get(`/api/enquiries/get/camps/map?${queryString}`);
+        const res = await axios.get(`/api/enquiries/get/camps/map?${queryString}`, { signal, timeout: 15_000 });
         return res.data;
     }catch(err){
-        console.log(err);
-        return { camps: [], summary: { total: 0, visited: 0, toVisit: 0, awarded: 0, cancelled: 0, justAdded: 0 }, status: 500 };
+        throw err;
     }
 }
 
@@ -403,6 +417,7 @@ export async function GetStaffEqCampsFiltered(queryParams:any){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -434,6 +449,7 @@ export async function GetAgentEnquiries(){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -444,11 +460,12 @@ export async function GetAgentsByBusiness(business_id: string, search: string){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
 //Get Enquiries with filters
-export async function GetEnquiriesWithFilters(queryParams: any) {
+export async function GetEnquiriesWithFilters(queryParams: any, signal?: AbortSignal) {
   try {
     const safeParams: any = {};
 
@@ -464,7 +481,7 @@ export async function GetEnquiriesWithFilters(queryParams: any) {
     const queryString = new URLSearchParams(safeParams).toString();
 
     const res = await axios.get(
-      `/api/enquiries/get/enquiries/filtered?${queryString}`
+      `/api/enquiries/get/enquiries/filtered?${queryString}`, { signal, timeout: 15_000 }
     );
 
     return res.data || { data: [] };
@@ -504,6 +521,7 @@ export async function ForwardHistory(payload: any) {
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -514,6 +532,7 @@ export async function GetEqUsers (business_id: string, user_type: string) {
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -524,16 +543,18 @@ export async function AddEqUser(payload: any){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
 //Get All Enquiry histories
-export async function GetEnquiryHistories(enquiry_id: string){
+export async function GetEnquiryHistories(enquiry_id: string, options: Record<string, string | number> = {}, signal?: AbortSignal){
     try{
-        const res = await axios.get(`/api/enquiries/get/enquiries/history/get-all?enquiry_id=${enquiry_id}`);
+        const res = await axios.get(`/api/enquiries/get/enquiries/history/get-all`, { params: { enquiry_id, ...options }, signal, timeout: 15_000 });
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -588,19 +609,19 @@ export async function GetEnquiryHistoryById(history_id: string) {
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
 //Get Access Enquries for Staffs
-export async function GetAccessEnquiriesForStaffs(queryParams: any) {
+export async function GetAccessEnquiriesForStaffs(queryParams: any, signal?: AbortSignal) {
     try{
         const queryString = new URLSearchParams(queryParams).toString();
-        const res = await axios.get(`/api/enquiries/staff-side/get/user-enquiries?${queryString}`);
+        const res = await axios.get(`/api/enquiries/staff-side/get/user-enquiries?${queryString}`, { signal, timeout: 15_000 });
         return res.data;
     }catch(err){
         console.log(err);
-        const error = err as any;
-        return { data: [], status: error?.response?.status || 500, message: error?.response?.data?.message || "Unable to load enquiries" };
+        throw err;
     }
 }
 
@@ -616,12 +637,13 @@ export async function GetEnquiryByIdForStaffs(enquiry_id: string){
 }
 
 //Get Enquiry all history for staff
-export async function GetAllEnquiryHistoryForStaffs(enquiry_id: string){
+export async function GetAllEnquiryHistoryForStaffs(enquiry_id: string, options: Record<string, string | number> = {}, signal?: AbortSignal){
     try{
-        const res = await axios.get(`/api/enquiries/staff-side/get/history/get-all?enquiry_id=${enquiry_id}`);
+        const res = await axios.get(`/api/enquiries/staff-side/get/history/get-all`, { params: { enquiry_id, ...options }, signal, timeout: 15_000 });
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -633,6 +655,7 @@ export async function GetUserAssignedEnquiries(queryParams: any){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -709,6 +732,7 @@ export async function UpdateEqArea(payload: any) {
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -719,6 +743,7 @@ export async function UpdateEqCamp(payload: any) {
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -740,6 +765,7 @@ export async function UpdateEnquiry(payload: any){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -750,6 +776,7 @@ export async function GetEqAreaById(area_id: string){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -760,6 +787,7 @@ export async function GetEqAgentByID(agent_id:string){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -798,6 +826,7 @@ export async function GetEqUserProfile(user_id: string){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -808,6 +837,7 @@ export async function GetEqUserLogs(user_id: string){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -818,6 +848,7 @@ export async function GetEqCampsByEnquiry(enquiry_id: string, is_new: boolean){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -828,6 +859,7 @@ export async function AssignEqCamptoEnquiry(payload: any){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -838,6 +870,7 @@ export async function GetEqCampsById(camp_id: string){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -848,6 +881,7 @@ export async function GetEqCountryProfile(country_id: string){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -858,6 +892,7 @@ export async function GetEqRegionProfile(region_id: string){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -868,6 +903,7 @@ export async function GetEqProvinceProfile(province_id: string){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -878,6 +914,7 @@ export async function GetEqCityProfile(city_id: string){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -888,6 +925,7 @@ export async function GetEqHeadOfficeProfile(head_office_id: string){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -909,6 +947,7 @@ export async function GetEqAreaProfile(area_id: string){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -919,6 +958,7 @@ export async function ActivateDeactivateEqAgents(agent_id: string){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -929,6 +969,7 @@ export async function UpdateEqCampContact(payload: any){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -939,6 +980,7 @@ export async function GetEnquiryContacts(enquiry_id: string){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -949,6 +991,7 @@ export async function PutEnquiryEditReq(payload:any){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -959,6 +1002,7 @@ export async function GetEqEdit(enquiry_id: string){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -969,6 +1013,7 @@ export async function AcceptEnquiryEdits(payload: any){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -979,6 +1024,7 @@ export async function AddNewCampContact (payload: any) {
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -989,6 +1035,7 @@ export async function AddNewContactAgent (payload: any) {
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -1010,6 +1057,7 @@ export async function EnquiryToProject(payload: any){
         return res.data;
     } catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -1020,6 +1068,7 @@ export async function CloseEqnuiry(payload: any){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -1030,6 +1079,7 @@ export async function RemoveEqCamp(camp_id: string){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -1106,6 +1156,7 @@ export async function RemoveEqArea(area_id: string){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -1116,6 +1167,7 @@ export async function RemoveEqUsers(user_id: string){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -1126,6 +1178,7 @@ export async function RemoveEnquiryAgent(agent_id: string){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -1136,5 +1189,6 @@ export async function RemoveEnquiry(enquiry_id: string){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }

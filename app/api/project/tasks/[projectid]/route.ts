@@ -19,8 +19,6 @@ import type { StaffTaskStatusFilter } from "@/types/staff-tasks";
 import mongoose from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 const id = (value: any) => value?._id?.toString?.() || value?.toString?.() || "";
 const oid = (value: string) => new mongoose.Types.ObjectId(value);
 const TASK_PRIORITIES = new Set(["high", "medium", "normal"]);
@@ -65,6 +63,7 @@ async function getPeopleForTeams(teamIds: any[]) {
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ projectid: string }> }) {
   try {
+        await connectDB();
     const { projectid } = await params;
     if (!mongoose.isValidObjectId(projectid)) {
       return NextResponse.json({ message: "Invalid project", status: 400 }, { status: 400 });
@@ -348,6 +347,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ proj
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ projectid: string }> }) {
   try {
+        await connectDB();
     const { projectid } = await params;
     if (!mongoose.isValidObjectId(projectid)) {
       return NextResponse.json({ message: "Invalid project", status: 400 }, { status: 400 });

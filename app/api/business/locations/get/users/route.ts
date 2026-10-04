@@ -1,12 +1,14 @@
+import { authorizeOrganizationRead } from "@/lib/organization-access";
 import connectDB from "@/lib/mongo";
 import User_locations from "@/models/user_locations.model";
 import mongoose from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function GET ( req: NextRequest ) {
     try {
+        await connectDB();
+        const denied = await authorizeOrganizationRead(req);
+        if (denied) return denied;
         const { searchParams } = req.nextUrl;
         const loc_id = searchParams.get("loc_id");
 

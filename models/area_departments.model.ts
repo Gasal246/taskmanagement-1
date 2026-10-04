@@ -1,10 +1,10 @@
-import mongoose, { Schema, Document, ObjectId } from 'mongoose';
+import mongoose, { Schema, Document, Types } from 'mongoose';
 
 export interface IArea_departments extends Document {
-  _id: ObjectId;
-  business_id: ObjectId | null;
-  region_id: ObjectId | null;
-  area_id: ObjectId | null;
+  _id: Types.ObjectId;
+  business_id: Types.ObjectId | null;
+  region_id: Types.ObjectId | null;
+  area_id: Types.ObjectId | null;
   type: String | null;
   dep_name: String | null;
   status: Number | null;
@@ -20,6 +20,9 @@ const Area_departmentsSchema: Schema = new Schema({
   dep_name: { type: String },
   status: { type: Number, enum: [0, 1], default: 1 },
 }, { timestamps: true });
+
+Area_departmentsSchema.index({ area_id: 1, status: 1, _id: 1 });
+Area_departmentsSchema.index({ type: 1, status: 1, area_id: 1, _id: 1 });
 
 const Area_departments = mongoose.models?.area_departments || mongoose.model<IArea_departments>('area_departments', Area_departmentsSchema);
 

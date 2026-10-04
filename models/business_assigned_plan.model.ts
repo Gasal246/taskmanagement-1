@@ -1,9 +1,9 @@
-import mongoose, { Schema, Document, ObjectId } from 'mongoose';
+import mongoose, { Schema, Document, Types } from 'mongoose';
 
 export interface IBusiness_assigned_plans extends Document {
-    _id: ObjectId;
-    plan_id: ObjectId | null;
-    business_id: ObjectId | null;
+    _id: Types.ObjectId;
+    plan_id: Types.ObjectId | null;
+    business_id: Types.ObjectId | null;
     status: Number | null;
     createdAt: Date;
     updatedAt: Date;

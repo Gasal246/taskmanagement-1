@@ -1,5 +1,8 @@
 "use client";
 
+import ListPagination from "@/components/shared/ListPagination";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import type { MapBounds, MapViewport } from "@/lib/maps/types";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -141,6 +144,10 @@ export default function EnquiriesMapPage() {
   const [selectedCustomPinId, setSelectedCustomPinId] = useState("");
   const [customPinFocusKey, setCustomPinFocusKey] = useState(0);
   const [selectedCampId, setSelectedCampId] = useState("");
+  const [selectedCamp, setSelectedCamp] = useState<CampMapItem | null>(null);
+  const [viewport, setViewport] = useState<(MapViewport & { filterKey: string }) | null>(null);
+  const [locationPage, setLocationPage] = useState(1);
+  const [listBounds, setListBounds] = useState<MapBounds | null>(null);
   const [campFocusKey, setCampFocusKey] = useState(0);
   const [locationListDialogOpen, setLocationListDialogOpen] = useState(false);
   const [locationListSearch, setLocationListSearch] = useState("");
@@ -168,16 +175,27 @@ export default function EnquiriesMapPage() {
   const { mutateAsync: UpdateCustomMapPin, isPending: isUpdatingCustomPin } = useUpdateEqCustomMapPin();
   const { mutateAsync: DeleteCustomMapPin, isPending: isDeletingCustomPin } = useDeleteEqCustomMapPin();
 
-  const mapQuery = useMemo(
-    () => ({
-      country_id,
-      region_id,
-      province_id,
-    }),
-    [country_id, region_id, province_id]
-  );
-
-  const { data: mapData, isLoading: isMapLoading, isFetching: isMapFetching } = useGetEqCampsForMap(mapQuery, !!country_id);
+  const mapQuery = useMemo(() => ({ country_id, region_id, province_id }), [country_id, region_id, province_id]);
+  const filterKey = JSON.stringify(mapQuery);
+  const debouncedViewport = useDebouncedValue(viewport, 250);
+  const debouncedLocationSearch = useDebouncedValue(locationListSearch);
+  const listScope = JSON.stringify([filterKey, debouncedLocationSearch, listBounds]);
+  const [locationPageScope, setLocationPageScope] = useState("");
+  const currentLocationPage = locationPageScope === listScope ? locationPage : 1;
+  const overview = useGetEqCampsForMap({ ...mapQuery, mode: "overview" }, !!country_id);
+  const { data: mapData, isLoading: isMapLoading, isFetching: isMapFetching, isError: isMapError, refetch: refetchMap } = useGetEqCampsForMap({
+    ...mapQuery, mode: "viewport", ...(debouncedViewport || {}), filterKey: undefined,
+  }, !!country_id && !!debouncedViewport && debouncedViewport.filterKey === filterKey);
+  const locations = useGetEqCampsForMap({ ...mapQuery, mode: "list", ...(listBounds || {}), search: debouncedLocationSearch, page: currentLocationPage, limit: 50 }, !!country_id && locationListDialogOpen);
+  const onViewportChanged = useCallback((value: MapViewport) => {
+    setViewport(current => {
+      const next = { ...value, filterKey };
+      return JSON.stringify(current) === JSON.stringify(next) ? current : next;
+    });
+  }, [filterKey]);
+  const onClusterSelected = useCallback((bounds: MapBounds) => {
+    setListBounds(bounds); setLocationListSearch(""); setLocationListDialogOpen(true);
+  }, []);
 
   const fetchCountries = async () => {
     const res = await GetCountries();
@@ -309,7 +327,7 @@ export default function EnquiriesMapPage() {
 
   const camps: CampMapItem[] = useMemo(() => mapData?.camps || [], [mapData?.camps]);
   const customPins: CustomMapPin[] = useMemo(() => customPinsData?.pins || [], [customPinsData?.pins]);
-  const summary = mapData?.summary || {
+  const summary = overview.data?.summary || {
     total: 0,
     visited: 0,
     toVisit: 0,
@@ -332,18 +350,9 @@ export default function EnquiriesMapPage() {
         .includes(searchValue)
     );
   }, [customPins, customPinSearch]);
-  const filteredLocationList = useMemo(() => {
-    const searchValue = locationListSearch.trim().toLowerCase();
-    if (!searchValue) return camps;
-
-    return camps.filter((camp) =>
-      [camp.camp_name, camp.country, camp.region, camp.province, camp.city, camp.area, `${camp.latitude}`, `${camp.longitude}`]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase()
-        .includes(searchValue)
-    );
-  }, [camps, locationListSearch]);
+  const filteredLocationList: CampMapItem[] = locations.data?.camps || [];
+  const clusters = useMemo(() => mapData?.clusters || [], [mapData?.clusters]);
+  const displayedCustomPins = useMemo(() => selectedCustomPin ? [selectedCustomPin] : [], [selectedCustomPin]);
 
   return (
     <div className="p-4 pb-10">
@@ -479,6 +488,7 @@ export default function EnquiriesMapPage() {
                     className="w-full rounded-full border-slate-700 bg-slate-900/70 text-slate-100 hover:bg-slate-800"
                     onClick={() => {
                       setLocationListSearch("");
+                      setListBounds(null);
                       setLocationListDialogOpen(true);
                     }}
                   >
@@ -492,7 +502,7 @@ export default function EnquiriesMapPage() {
               <div className="mb-4 flex items-center justify-between gap-2">
                 <div>
                   <h2 className="text-sm font-semibold text-slate-100">Legend</h2>
-                  <p className="text-xs text-slate-400">Marker colors on the map.</p>
+                  <p className="text-xs text-slate-400">Totals across the selected filters. Clusters show facility counts.</p>
                 </div>
                 <EarthIcon size={16} className="text-cyan-300" />
               </div>
@@ -504,7 +514,7 @@ export default function EnquiriesMapPage() {
                       <span className={`h-3 w-3 rounded-full ${status.color}`} />
                       <span className="text-sm text-slate-200">{status.label}</span>
                     </div>
-                    <span className="text-sm font-semibold text-slate-100">{summary[status.countKey]}</span>
+                    <span className="text-sm font-semibold text-slate-100">{overview.isFetching ? "…" : summary[status.countKey]}</span>
                   </div>
                 ))}
               </div>
@@ -512,13 +522,23 @@ export default function EnquiriesMapPage() {
           </div>
 
           <div className="space-y-4">
+            {(isMapError || overview.isError) && <div role="alert" className="flex items-center justify-between gap-3 rounded-xl border border-red-800 p-3 text-sm text-red-200">
+              Unable to load facilities. <Button variant="outline" onClick={() => { overview.refetch(); refetchMap(); }}>Retry</Button>
+            </div>}
+            {mapData && <p aria-live="polite" className="text-xs text-slate-400">{isMapFetching ? "Updating map area…" : `${mapData.visibleTotal} facilities in this map area`} · {summary.total} across the selected filters. Select a cluster to zoom or browse.</p>}
             <CampMap
               camps={camps}
-              customPins={selectedCustomPin ? [selectedCustomPin] : []}
+              customPins={displayedCustomPins}
+              clusters={clusters}
+              filterKey={filterKey}
+              fitBounds={country_id ? overview.data?.bounds : null}
+              focusedCamp={selectedCampId ? selectedCamp : null}
+              onViewportChanged={onViewportChanged}
+              onClusterSelected={onClusterSelected}
               customPinsFocusKey={customPinFocusKey}
               focusedCampId={selectedCampId}
               focusedCampKey={campFocusKey}
-              isLoading={isMapLoading || isMapFetching}
+              isLoading={!!country_id && (overview.isFetching || isMapFetching)}
               hasCountrySelection={!!country_id}
               onDirectionsRequested={openDirectionsDialog}
             />
@@ -802,7 +822,7 @@ export default function EnquiriesMapPage() {
         <DialogContent className="max-h-[88dvh] max-w-[94vw] overflow-y-auto overflow-x-hidden border-slate-800 bg-slate-950 text-slate-100 sm:max-w-2xl lg:max-w-3xl">
           <DialogHeader>
             <DialogTitle>Location List</DialogTitle>
-            <DialogDescription className="text-slate-400">Filtered locations from the current map selection.</DialogDescription>
+            <DialogDescription className="text-slate-400">Search all facilities in the selected filters. Cluster selections narrow the list to that area.</DialogDescription>
           </DialogHeader>
 
           <Input
@@ -812,12 +832,15 @@ export default function EnquiriesMapPage() {
             className="border-slate-700 bg-slate-900/70 text-slate-100 placeholder:text-slate-500"
           />
 
+          {listBounds && <Button variant="outline" onClick={() => setListBounds(null)}>Search all filtered locations</Button>}
+          {locations.isError && <p role="alert" className="text-red-300">Unable to load locations. <Button variant="outline" onClick={() => locations.refetch()}>Retry</Button></p>}
+          <ListPagination label="locations" pagination={locations.data?.pagination} busy={locations.isFetching} onPage={page => { setLocationPageScope(listScope); setLocationPage(page); }} />
           <div className="space-y-3">
-            {isMapLoading || isMapFetching ? (
+            {locations.isFetching ? (
               <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-950/50 px-4 py-5 text-sm text-slate-400">
                 Loading locations...
               </div>
-            ) : filteredLocationList.length === 0 ? (
+            ) : locations.isError ? null : filteredLocationList.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-950/50 px-4 py-5 text-sm text-slate-400">
                 No locations match the selected filters.
               </div>
@@ -852,6 +875,7 @@ export default function EnquiriesMapPage() {
                       onClick={() => {
                         setSelectedCustomPinId("");
                         setSelectedCampId(camp._id);
+                        setSelectedCamp(camp);
                         setCampFocusKey((currentKey) => currentKey + 1);
                         setLocationListDialogOpen(false);
                       }}

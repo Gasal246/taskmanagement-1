@@ -1,3 +1,4 @@
+import { invalidateEnquiryCatalogue } from "@/lib/enquiries/catalogue-server";
 import { NextRequest, NextResponse } from "next/server";
 import connectDB from "@/lib/mongo";
 import { enquiryActor } from "@/lib/enquiries/completion-server";
@@ -113,6 +114,8 @@ export async function PUT(req: NextRequest) {
       if (["facility_type", "solution_service"].includes(body.entity) && body.requires_custom_detail !== undefined) item.requires_custom_detail = Boolean(body.requires_custom_detail);
     }
     await item.save();
+    invalidateEnquiryCatalogue();
+    invalidateEnquiryCatalogue();
     return NextResponse.json({ item, message: "Catalogue item updated", status: 200 });
   } catch (error) { return failure(error); }
 }

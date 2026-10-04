@@ -1,11 +1,10 @@
+import { authorizeOrganizationMutation } from "@/lib/organization-access";
 import connectDB from "@/lib/mongo";
 import Region_dep_staffs from "@/models/region_dep_staffs.model";
 import Roles from "@/models/roles.model";
 import User_details from "@/models/user_details.model";
 import User_roles from "@/models/user_roles.model";
 import { NextRequest, NextResponse } from "next/server";
-
-connectDB();
 
 interface Body {
     region_dep_id: string;
@@ -14,6 +13,9 @@ interface Body {
 
 export async function POST ( req: NextRequest ) {
     try {
+        await connectDB();
+        const accessDenied = await authorizeOrganizationMutation(req);
+        if (accessDenied) return accessDenied;
         const formData = await req.formData();
         const { body } = Object.fromEntries(formData) as { body: string };
         const bodyData = await JSON.parse(body) as Body;
@@ -32,6 +34,7 @@ export async function POST ( req: NextRequest ) {
         const data = await Region_dep_staffs.findOne({ region_dep_id: bodyData.region_dep_id, user_id: bodyData.user_id });
         if(data?.status === 0) {
             await Region_dep_staffs.findByIdAndUpdate(data?._id, { status: 1 });
+            return NextResponse.json({ message: "Region department staff reactivated", status: 200 });
         }
 
         if(data) {

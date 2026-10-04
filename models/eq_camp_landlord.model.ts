@@ -1,7 +1,7 @@
-import mongoose, { ObjectId, Schema } from "mongoose";
+import mongoose, { Document, Types, Schema } from "mongoose";
 
 export interface IEq_camp_landlord extends Document{
-    _id: ObjectId,
+    _id: Types.ObjectId,
     landlord_name: String,
     createdAt: Date,
     updatedAt: Date

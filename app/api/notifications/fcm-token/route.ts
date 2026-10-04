@@ -3,8 +3,6 @@ import connectDB from "@/lib/mongo";
 import FcmTokens from "@/models/fcm_tokens.model";
 import { NextResponse } from "next/server";
 
-connectDB();
-
 type Body = {
   token?: string;
   platform?: string;
@@ -13,6 +11,7 @@ type Body = {
 
 export async function POST(req: Request) {
   try {
+        await connectDB();
     const session: any = await auth();
     if (!session) {
       return NextResponse.json(

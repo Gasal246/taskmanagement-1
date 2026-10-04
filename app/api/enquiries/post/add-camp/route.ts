@@ -1,3 +1,4 @@
+import { enquiryActor, resolveEnquiryCreationBusiness } from "@/lib/enquiries/access";
 import { saveCampWithSolutions } from "@/app/api/helpers/camp-solutions";
 import { projectSupportingFieldsSchema } from "@/lib/enquiries/project-classification";
 import { CatalogueValidationError, validateDynamicClassification, validateDynamicSolutions } from "@/lib/enquiries/catalogue-server";
@@ -10,6 +11,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 
 interface Body {
+    business_id?: string,
     camp_name: string,
     project_sector: string,
     facility_type: string,
@@ -33,6 +35,10 @@ export async function POST(req:NextRequest){
     try{
         const body:Body = await req.json();
         await connectDB({ throwOnError: true });
+        const actor = await enquiryActor();
+        if (!actor) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+        const businessId = await resolveEnquiryCreationBusiness(req, actor, body.business_id);
+        if (!actor.admin || !businessId) return NextResponse.json({ message: "Select a business you administer" }, { status: 403 });
         const classification = await validateDynamicClassification(body);
         const supporting = projectSupportingFieldsSchema.safeParse(body);
         if (!supporting.success) return NextResponse.json({ message: supporting.error.issues[0].message, status: 400 }, { status: 400 });
@@ -84,6 +90,7 @@ export async function POST(req:NextRequest){
         }
 
         const newCamp = new Eq_camps({
+            business_id: businessId,
             country_id: body.country_id,
             region_id: body.region_id,
             province_id: body.province_id,

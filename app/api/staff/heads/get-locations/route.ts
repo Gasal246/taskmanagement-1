@@ -5,10 +5,9 @@ import Business_locations from "@/models/business_locations.model";
 import Location_departments from "@/models/location_departments.model";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function GET(req:NextRequest){
     try{
+        await connectDB();
         const {searchParams} = new URL(req.url);
         const area_id = searchParams.get("area_id");
         if(!area_id) return NextResponse.json({message: "Area ID is required", status: 400}, {status: 400});

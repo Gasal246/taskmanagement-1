@@ -1,13 +1,15 @@
+import { requireSuperadmin } from "@/lib/server-access";
 import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import { NextRequest, NextResponse } from "next/server";
 import Superadmin_plans from "@/models/super_admin_plans.model";
 import Business_assined_plans from "@/models/business_assigned_plan.model";
 
-connectDB();
-
 export async function POST (req: NextRequest, context: { params: Promise<{ id: string }> }) {
     try {
+        await connectDB();
+        const accessDenied = await requireSuperadmin();
+        if (accessDenied) return accessDenied;
         const { id } = await context.params;
         const session: any = await auth();
         if (!session) {

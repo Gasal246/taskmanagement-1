@@ -1,3 +1,9 @@
+import { inTransaction } from "@/lib/jobs/transaction";
+import type { ClientSession } from "mongoose";
+import { isActiveStaffInProjectBusiness } from "@/app/api/helpers/project-access";
+import { canAdministerBusiness } from "@/lib/server-access";
+import { DashboardAccessError, resolveDashboardScope } from "@/lib/dashboard-access";
+import { authorizeEnquiry, enquiryActor } from "@/lib/enquiries/access";
 import { auth } from "@/auth";
 import { CatalogueValidationError } from "@/lib/enquiries/catalogue-server";
 import { resolveProjectCatalogueForCreate } from "@/lib/projects/catalogue";
@@ -18,8 +24,6 @@ import Location_dep_staffs from "@/models/location_dep_staffs.model";
 import Business_regions from "@/models/business_regions.model";
 import Eq_enquiry from "@/models/eq_enquiries.model";
 import { notifyProjectHeadChange } from "@/app/api/helpers/project-head-notifications";
-
-connectDB();
 
 interface Body {
     project_name: string,
@@ -53,7 +57,7 @@ interface Body {
     facility_occupancy?: number | string | null
 }
 
-const updateLinkedEnquiryIfNeeded = async (enquiry_id: string | null | undefined, actorId: string) => {
+const updateLinkedEnquiryIfNeeded = async (enquiry_id: string | null | undefined, actorId: string, dbSession?: ClientSession) => {
     if(!enquiry_id) return;
 
     await Eq_enquiry.findByIdAndUpdate(enquiry_id, {
@@ -61,59 +65,81 @@ const updateLinkedEnquiryIfNeeded = async (enquiry_id: string | null | undefined
             status: "Project Awarded",
             is_converted: true
         }
-    });
+    }, { session: dbSession });
 };
 
 export async function POST(req: NextRequest){
     try{
+        await connectDB();
         const session: any = await auth();
         if(!session) return new NextResponse("Un Authorized Access", { status: 401 });
 
         const username = await Users.findById(session?.user?.id).select("name");
         const body = await req.json() as Body;
+        if (body.enquiry_id) {
+            const denied = await authorizeEnquiry(body.enquiry_id, "admin");
+            if (denied) return denied;
+            const source: any = await Eq_enquiry.findById(body.enquiry_id).select("business_id is_active").lean();
+            if (String(source?.business_id) !== String(body.business_id) || !source?.is_active) return NextResponse.json({ message: "Select an approved enquiry in this business" }, { status: 403 });
+        }
         const catalogueFields = await resolveProjectCatalogueForCreate(body);
         //const user = await User_roles.findById(session?.user?.id).populate("role_id", "role_name");
         const userRole = await Roles.findById(body?.role_id);
-        if(userRole?.role_name == "BUSINESS_ADMIN"){
-            const newProject = new Business_Project({
-                project_name: body.project_name,
-                project_description: body.project_description,
-                business_id: body.business_id,
-                status: "approved",
-                client_id: body.client_id,
-                creator: session?.user?.id,
-                project_head: body.project_head || null,
-                project_heads: body.project_head ? [body.project_head] : [],
-                start_date: body.start_date,
-                end_date: body.end_date,
-                task_count: 0,
-                completed_task_count: 0,
-                is_approved: true,
-                admin_id: session?.user?.id,
-                type: body.type,
-                priority: body.priority,
-                ...catalogueFields,
-                region_id: body.region_id,
-                area_id: body.area_id || null
-            })
-
-            const savedProject = await newProject.save();
-            if (body.project_head) {
-                await notifyProjectHeadChange({
-                    recipientIds: [body.project_head],
-                    actorId: session?.user?.id,
-                    projectId: String(savedProject._id),
-                    projectName: body.project_name,
-                    event: "assigned",
-                });
+        if (!session.user.is_super) {
+            if (userRole?.role_name === "BUSINESS_ADMIN") {
+                if (!(await enquiryActor())?.adminBusinessIds?.includes(String(body.business_id))) return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+            } else {
+                const scope = await resolveDashboardScope(session.user.id, body.role_id, body.dept_id);
+                if (scope.businessId !== String(body.business_id)) return NextResponse.json({ message: "Select your assigned business" }, { status: 403 });
             }
-            const flowLog = new Flow_Log({
-                user_id: session?.user?.id,
-                Log: `Project Created and Approved by Business Admin -${username.name}`,
-                description: `Project ${body.project_name} has been created successfully.`,
-                project_id: savedProject._id
-            })
-            const savedFlowLog = await flowLog.save();
+        }
+        if (body.project_head && !await isActiveStaffInProjectBusiness({ business_id: body.business_id }, body.project_head)) {
+            return NextResponse.json({ message: "Project head must be active staff in this business" }, { status: 400 });
+        }
+        if(userRole?.role_name == "BUSINESS_ADMIN"){
+            await inTransaction(async dbSession => {
+                const newProject = new Business_Project({
+                    project_name: body.project_name,
+                    project_description: body.project_description,
+                    business_id: body.business_id,
+                    status: "approved",
+                    client_id: body.client_id,
+                    creator: session?.user?.id,
+                    project_head: body.project_head || null,
+                    project_heads: body.project_head ? [body.project_head] : [],
+                    start_date: body.start_date,
+                    end_date: body.end_date,
+                    task_count: 0,
+                    completed_task_count: 0,
+                    is_approved: true,
+                    admin_id: session?.user?.id,
+                    type: body.type,
+                    priority: body.priority,
+                    ...catalogueFields,
+                    region_id: body.region_id,
+                    area_id: body.area_id || null
+                })
+
+                const savedProject = await newProject.save({ session: dbSession });
+                if (body.project_head) {
+                    await notifyProjectHeadChange({
+                        recipientIds: [body.project_head],
+                        actorId: session?.user?.id,
+                        projectId: String(savedProject._id),
+                        projectName: body.project_name,
+                        event: "assigned", dbSession, eventKey: `project:${savedProject._id}:created`,
+                    });
+                }
+                const flowLog = new Flow_Log({
+                    user_id: session?.user?.id,
+                    Log: `Project Created and Approved by Business Admin -${username.name}`,
+                    description: `Project ${body.project_name} has been created successfully.`,
+                    project_id: savedProject._id
+                })
+                const savedFlowLog = await flowLog.save({ session: dbSession });
+                await updateLinkedEnquiryIfNeeded(body.enquiry_id, session.user.id, dbSession);
+                return true;
+            });
         } else {
             switch(userRole?.role_name){
                 case 'REGION_DEP_HEAD':
@@ -325,10 +351,11 @@ export async function POST(req: NextRequest){
                     return new NextResponse("You are not authorized to create projects", { status: 403 });
             }
         }
-        await updateLinkedEnquiryIfNeeded(body?.enquiry_id, session.user.id);
+        if (userRole?.role_name !== "BUSINESS_ADMIN") await updateLinkedEnquiryIfNeeded(body?.enquiry_id, session.user.id);
 
         return NextResponse.json({ message: "Project created successfully", status:201}, { status: 201 });
     } catch(err: any){
+        if (err instanceof DashboardAccessError) return NextResponse.json({ message: err.message }, { status: err.status });
         if (err instanceof CatalogueValidationError) return NextResponse.json({ message: err.message, status: 400 }, { status: 400 });
         console.log("Error while adding a new project: ", err);
         return new NextResponse(err.message, { status: 500 });

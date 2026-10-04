@@ -3,10 +3,9 @@ import connectDB from "@/lib/mongo";
 import { NextRequest, NextResponse } from "next/server";
 import Area_heads from "@/models/area_heads.model";
 
-connectDB();
-
 export async function GET(req:NextRequest){
     try{
+        await connectDB();
         const session:any = await auth();
         if(!session) return NextResponse.json({message:"Unauthorized", status:401}, {status:401});
 

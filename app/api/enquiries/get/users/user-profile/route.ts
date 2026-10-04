@@ -1,16 +1,24 @@
+import { authorizeUserProfile } from "@/lib/server-access";
+import { enquiryActor, enquiryManagementFilter } from "@/lib/enquiries/access";
 import connectDB from "@/lib/mongo";
 import Eq_enquiry_histories from "@/models/eq_enquiry_histories";
 import Users from "@/models/users.model";
 import mongoose from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function GET(req: NextRequest) {
     try {
+        await connectDB();
         const { searchParams } = new URL(req.url);
         const user_id = searchParams.get("user_id");
         if (!user_id) return NextResponse.json({ message: "User not selected", status: 400 }, { status: 200 });
+
+        const denied = await authorizeUserProfile(user_id);
+        if (denied) return denied;
+        const actor = await enquiryActor();
+        if (!actor) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+        if (actor.actorId !== user_id && !actor.admin) return NextResponse.json({ message: "An active administrator role is required" }, { status: 403 });
+        const scope = actor.actorId === user_id ? {} : enquiryManagementFilter(actor);
 
         const user = await Users.findById(user_id).select("name email phone status").lean();
 
@@ -50,6 +58,7 @@ export async function GET(req: NextRequest) {
             {
                 $unwind: "$enquiry"
             },
+            { $match: Object.fromEntries(Object.entries(scope).map(([field, value]) => [`enquiry.${field}`, value])) },
             {
                 $lookup: {
                     from: "eq_camps",

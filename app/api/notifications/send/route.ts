@@ -1,11 +1,10 @@
+import { canManageUsers } from "@/lib/server-access";
 import { auth } from "@/auth";
 import { NextResponse } from "next/server";
 import { getAdminMessaging } from "@/lib/firebaseAdmin";
 import connectDB from "@/lib/mongo";
 import FcmTokens from "@/models/fcm_tokens.model";
 import Notifications from "@/models/notifications.model";
-
-connectDB();
 
 type Body = {
   token?: string;
@@ -61,6 +60,7 @@ function isTokenInvalid(error: any): boolean {
 
 export async function POST(req: Request) {
   try {
+        await connectDB();
     const apiKey = process.env.FCM_API_KEY;
     const headerKey = req.headers.get("x-api-key");
     const session: any = await auth();
@@ -75,6 +75,12 @@ export async function POST(req: Request) {
     }
 
     const body: Body = await req.json();
+    if (!hasValidApiKey && !session?.user?.is_super) {
+      const ids = Array.isArray(body.recipientIds) ? [...new Set(body.recipientIds)] : [];
+      if (body.token || body.tokens?.length || body.topic || ids.length > 100 || !await canManageUsers(sessionUserId, ids)) {
+        return NextResponse.json({ message: "Send only to staff you manage", status: 403 }, { status: 403 });
+      }
+    }
     const token = body.token?.trim();
     const tokens = body.tokens?.map((item) => item?.trim()).filter(Boolean) ?? [];
     const topic = body.topic?.trim();
@@ -103,8 +109,8 @@ export async function POST(req: Request) {
     const bodyText = notification?.body || data?.body || "";
     const webpushLink = resolveLink(body, data, req);
     const senderId =
-      body.senderId?.trim() ||
       sessionUserId ||
+      (hasValidApiKey ? body.senderId?.trim() : "") ||
       (typeof body.data?.senderId === "string" ? body.data.senderId : "") ||
       (typeof body.data?.sender_id === "string" ? body.data.sender_id : "");
     const recipientIds = Array.isArray(body.recipientIds)

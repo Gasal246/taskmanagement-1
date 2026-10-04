@@ -13,6 +13,7 @@ export const addNewBusinessFunc = async (payload: any) => {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -22,6 +23,7 @@ export async function addBusinessDetailsFunc (payload: any) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -31,6 +33,7 @@ export const getAllBusinessFunc = async () => {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -40,6 +43,7 @@ export const getBusinessByIdFunc = async (id: string) => {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -49,6 +53,7 @@ export async function addBusinessAdminFunc (payload: any) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -58,6 +63,7 @@ export async function editBusinessAdminFunc (payload: any) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -67,6 +73,7 @@ export async function removeBusinessAdminFunc (payload: any) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -76,6 +83,7 @@ export async function getBusinessRegionsFunc (business_id: string) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -85,6 +93,7 @@ export async function addBusinessRegionFunc (payload: any) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -94,6 +103,7 @@ export async function removeBusinessRegionFunc (BRid: string) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -103,6 +113,7 @@ export async function addRegionAreaFunc (payload: any) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -112,6 +123,7 @@ export async function getRegionAreasFunc (region_ids: string[]) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -121,6 +133,7 @@ export async function getAreaLocationsFunc (area_ids: string[]) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -130,6 +143,7 @@ export async function removeRegionAreaFunc (BAid: string) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -139,6 +153,7 @@ export async function addRegionHeadFunc ( payload: any ) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -148,6 +163,7 @@ export async function removeRegionHeadFunc (RHid: string) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -157,6 +173,7 @@ export async function getRegionHeadsFunc ( region_ids: string[] ) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -166,6 +183,7 @@ export async function getRegionUsersFunc (region_ids: string[]) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -175,6 +193,7 @@ export async function addBusinessSkillFunc (payload: any) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -184,6 +203,7 @@ export async function getBusinessSkillsFunc (business_id: string) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -193,6 +213,7 @@ export async function removeBusinessSkillFunc (BSkillId: string) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -202,6 +223,7 @@ export async function updateBusinessSkillFunc (payload: any) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -211,6 +233,7 @@ export async function addBusinessDepartmentFunc (payload: any) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -220,6 +243,7 @@ export async function getBusinessDepartmentsFunc (business_id: string) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -229,6 +253,7 @@ export async function getBusinessDepartmentsByBusiness_idFunc (business_id: stri
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -238,6 +263,7 @@ export async function editBusinessDepFunc (payload: any) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
     
@@ -247,15 +273,7 @@ export async function removeBusinessDepartmentFunc (BDepId: string) {
         return res.data;
     } catch (error) {
         console.log(error);
-    }
-}
-
-export async function getCompleteDepartmentDataFunc (department_id: string) {
-    try {
-        const res = await axios.get(`/api/business/departments/get-complete?dep_id=${department_id}`);
-        return res.data;
-    } catch (error) {
-        console.log(error);
+        throw error;
     }
 }
 
@@ -265,6 +283,7 @@ export async function addDepartmenHeadFunc (payload: any) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -274,6 +293,7 @@ export async function removeDepartmentHeadFunc (DepHeadId: string) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -283,6 +303,7 @@ export async function addDepartmentRegionFunc (payload: any) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -292,6 +313,7 @@ export async function removeDepartmentRegionFunc (DepRegionId: string) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -301,6 +323,7 @@ export async function addDepartmentAreaFunc ( payload: any ) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -310,6 +333,7 @@ export async function removeDepartmentAreaFunc (DepAreaId: string) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -319,6 +343,7 @@ export async function addDepartmentStaffFunc (payload: any) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -328,15 +353,7 @@ export async function removeDepartmentStaffFunc (DepStaffId: string) {
         return res.data;
     } catch (error) {
         console.log(error);
-    }
-}
-
-export async function getRegionCompleteFunc (region_id: string) {
-    try {
-        const res = await axios.get(`/api/business/regions/get-complete?region_id=${region_id}`);
-        return res.data;
-    } catch (error) {
-        console.log(error)
+        throw error;
     }
 }
 
@@ -346,6 +363,7 @@ export async function addRegionDepartmentFunc (payload: any) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -355,6 +373,7 @@ export async function removeRegionDepartmentFunc (RegDepId: string) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -364,6 +383,7 @@ export async function addRegionStaffFunc (payload: any) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -373,6 +393,7 @@ export async function removeRegionStaffFunc (RegStaffId: string) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -384,6 +405,7 @@ export async function getBusinessClientsFunc (business_id: string) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -393,6 +415,7 @@ export async function getBusinessClientCompleteDataByIdFunc ( client_id: string 
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -402,6 +425,7 @@ export async function addBusinessClientFunc ( payload: any ) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -411,6 +435,7 @@ export async function removeBusinessClientFunc ( BClientId: string ) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -420,6 +445,7 @@ export async function addBusinessClientRegionFunc ( payload: any ) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -429,6 +455,7 @@ export async function updateBusinessClientFunc ( payload: any ) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -438,6 +465,7 @@ export async function removeBusinessClientRegionFunc ( BCRegId: string ) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -447,6 +475,7 @@ export async function addBusinessClientAreaFunc ( payload: any ) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -456,6 +485,7 @@ export async function removeBusinessClientAreaFunc ( BCAreaId: string ) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -465,6 +495,7 @@ export async function addBusinessClientContactFunc ( payload: any ) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -473,6 +504,7 @@ export async function updateBusinessClientContactFunc ( payload: any ) {
         const res = await axios.post(`/api/business/clients/update/contact`, payload)
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -482,19 +514,11 @@ export async function removeBusinessClientContactFunc ( BCContactId: string ) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
 // # Region Departments
-
-export async function getRegionDepartmentCompleteDataFunc (reg_dep_id: string) {
-    try {
-        const res = await axios.get(`/api/business/region-dep/get-complete?region_dep_id=${reg_dep_id}`);
-        return res.data;
-    } catch (error) {
-        console.log(error)
-    }
-}
 
 export async function addRegionDepartmentHeadFunc ( payload: any ) {
     try {
@@ -502,6 +526,7 @@ export async function addRegionDepartmentHeadFunc ( payload: any ) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -511,6 +536,7 @@ export async function addRegionDepartmentStaffFunc ( payload: any ) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -520,6 +546,7 @@ export async function removeRegionDepartmentStaffFunc ( RegDepStaffId: string ) 
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -531,6 +558,7 @@ export async function addAreaHeadFunc ( payload: any ) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }  
 
@@ -540,6 +568,7 @@ export async function removeAreaHeads ( AreaHId: string ) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -549,6 +578,7 @@ export async function addAreaStaffFunc ( payload: any ) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -558,15 +588,7 @@ export async function removeAreaStaff ( AreaStaffId: string ) {
         return res.data;
     } catch (error) {
         console.log(error);
-    }
-}
-
-export async function getAreaCompleteDataFunc (area_id: string) {
-    try {
-        const res = await axios.get(`/api/business/area/get-complete?area_id=${area_id}`);
-        return res.data;
-    } catch (error) {
-        console.log(error)
+        throw error;
     }
 }
 
@@ -576,6 +598,7 @@ export async function addAreaDepartmentFunc ( payload: any ) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -585,6 +608,7 @@ export async function removeAreaDepartmentFunc ( AreaDepId: string ) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -594,6 +618,7 @@ export async function getAreaUsersFunc (area_ids: string[]) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -605,6 +630,7 @@ export async function addBusinessLocationFunc ( payload: any ) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -614,6 +640,7 @@ export async function removeBusinessLocationFunc ( LocId: string ) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -623,6 +650,7 @@ export async function addLoctionHeadFunc ( payload: any ) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -632,6 +660,7 @@ export async function removeLocationHeadFunc ( LocHeadId: string ) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -641,6 +670,7 @@ export async function addLocationDepartmentFunc ( payload: any ) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -650,15 +680,7 @@ export async function removeLocationDepartmentFunc ( LocDepId: string ) {
         return res.data;
     } catch (error) {
         console.log(error);
-    }
-}
-
-export async function getLocationCompleteDataFunc (loc_id: string) {
-    try {
-        const res = await axios.get(`/api/business/locations/get-complete?loc_id=${loc_id}`);
-        return res.data;
-    } catch (error) {
-        console.log(error);
+        throw error;
     }
 }
 
@@ -668,6 +690,7 @@ export async function getLocationUsersFunc (loc_id: string) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -677,6 +700,7 @@ export async function addLoctionStaffFunc ( payload: any ) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -686,19 +710,11 @@ export async function removeLocationStaffFunc ( LocStaffId: string ) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
 // Area Departments
-
-export async function getAreaDepartmentCompleteDataFunc (area_dep_id: string) {
-    try {
-        const res = await axios.get(`/api/business/area-dep/get-complete?area_dep_id=${area_dep_id}`);
-        return res.data;
-    } catch (error) {
-        console.log(error);
-    }
-}
 
 export async function addAreaDepartmentHeadFunc ( payload: any ) {
     try {
@@ -706,6 +722,7 @@ export async function addAreaDepartmentHeadFunc ( payload: any ) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -715,6 +732,7 @@ export async function removeAreaDepartmentHeadFunc ( AreaDepHeadId: string ) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -724,6 +742,7 @@ export async function addAreaDepartmentStaffFunc ( payload: any ) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -733,19 +752,11 @@ export async function removeAreaDepartmentStaffFunc ( AreaDepStaffId: string ) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
 // Location Departments
-
-export async function getLocationDepartmentCompleteDataFunc (location_dep_id: string) {
-    try {
-        const res = await axios.get(`/api/business/location-dep/get-complete?location_dep_id=${location_dep_id}`);
-        return res.data;
-    } catch (error) {
-        console.log(error);
-    }
-}
 
 export async function addLocationDepartmentHeadFunc ( payload: any ) {
     try {
@@ -753,6 +764,7 @@ export async function addLocationDepartmentHeadFunc ( payload: any ) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -762,6 +774,7 @@ export async function removeLocationDepartmentHeadFunc ( LocationDepHeadId: stri
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -771,6 +784,7 @@ export async function addLocationDepartmentStaffFunc ( payload: any ) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -780,6 +794,7 @@ export async function removeLocationDepartmentStaffFunc ( LocationDepStaffId: st
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -789,6 +804,7 @@ export async function postNewProjectFunc ( payload: any ) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -846,6 +862,7 @@ export async function AddProjectHeadFunc(payload: { project_id: string; user_id:
         return res.data;
     } catch (err) {
         console.log(err);
+        throw err;
     }
 }
 
@@ -855,6 +872,7 @@ export async function RemoveProjectHeadFunc(project_id: string, user_id: string)
         return res.data;
     } catch (err) {
         console.log(err);
+        throw err;
     }
 }
 
@@ -864,6 +882,7 @@ export async function AddAccountManagerFunc(payload: { project_id: string; user_
         return res.data;
     } catch (err) {
         console.log(err);
+        throw err;
     }
 }
 
@@ -873,6 +892,7 @@ export async function RemoveAccountManagerFunc(project_id: string, user_id: stri
         return res.data;
     } catch (err) {
         console.log(err);
+        throw err;
     }
 }
 
@@ -882,6 +902,7 @@ export async function AddSiteOperationalHeadFunc(payload: { project_id: string; 
         return res.data;
     } catch (err) {
         console.log(err);
+        throw err;
     }
 }
 
@@ -891,6 +912,7 @@ export async function RemoveSiteOperationalHeadFunc(project_id: string, user_id:
         return res.data;
     } catch (err) {
         console.log(err);
+        throw err;
     }
 }
 
@@ -900,6 +922,7 @@ export async function AddProjectSupervisorFunc(payload: { project_id: string; us
         return res.data;
     } catch (err) {
         console.log(err);
+        throw err;
     }
 }
 
@@ -909,6 +932,7 @@ export async function RemoveProjectSupervisorFunc(project_id: string, user_id: s
         return res.data;
     } catch (err) {
         console.log(err);
+        throw err;
     }
 }
 
@@ -918,6 +942,7 @@ export async function ApproveProjectFunc(project_id:string){
         return res;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -927,6 +952,7 @@ export async function deleteProjectFunc(project_id: string) {
         return res.data;
     } catch (err) {
         console.log(err);
+        throw err;
     }
 }
 
@@ -936,6 +962,7 @@ export async function addNewTeamFunc (payload:any){
         return res;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -945,6 +972,7 @@ export async function updateTeamByProject(payload:any){
         return res.data;
     } catch(err){
         console.log(err);
+        throw err;
         
     }
 }
@@ -964,6 +992,7 @@ export async function GetTeamsForProjectsFunc(project_id:string){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
         
     }
 }
@@ -974,6 +1003,7 @@ export async function AddProjectDepartmentFunc(payload:any){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
         
     }
 }
@@ -984,6 +1014,7 @@ export async function SelectProjectActiveDeptFunc(proj_dept_id:string){
         return res.data;
     } catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -993,6 +1024,7 @@ export async function GetAddedProjectDepartmentsFunc(project_id:string){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -1002,6 +1034,7 @@ export async function RemoveAddedProjectDepartmentFunc(proj_dept_id:string){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -1012,6 +1045,7 @@ export async function AddBusinessTaskFunc(payload:any){
         return res;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -1021,6 +1055,7 @@ export async function GetBusinessTasks(project_id:string){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -1030,6 +1065,7 @@ export async function UpdateBusinessTaskFunc(payload:any){
         return res;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -1039,12 +1075,12 @@ export async function DeleteBusinessTaskFunc(task_id: string){
         return res;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
-export async function GetTaskByIdFunc(taskid:string, activityScope?: "assigned"){
-    const params = activityScope ? `?activityScope=${activityScope}` : "";
-    const res = await axios.get(`/api/task/getid/${taskid}${params}`);
+export async function GetTaskByIdFunc(taskid:string, activityScope?: "assigned", options: Record<string, string | number | undefined> = {}, signal?: AbortSignal){
+    const res = await axios.get(`/api/task/getid/${taskid}`, { params: { ...options, activityScope }, signal, timeout: 15_000 });
     if (res.data == null) {
         throw new Error("The task request returned an empty response.");
     }
@@ -1096,6 +1132,7 @@ export async function DeleteTaskActivityFunc(activity_id:string){
         return res;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -1106,6 +1143,7 @@ export async function GetFlowsByProjectFunc(project_id:string){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -1115,6 +1153,7 @@ export async function GetBusinessStaffsWithSkills(business_id:string){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -1124,6 +1163,7 @@ export async function GetBusinessStaffsBySkill(business_id: string, skill_id: st
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -1133,6 +1173,7 @@ export async function GetStaffsByDepartment(department_id:string){
         return res.data;
     } catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -1142,6 +1183,7 @@ export async function GetUserDetails(role_id:string, org_id:string){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -1241,6 +1283,7 @@ export async function GetBusinessForStaff(domain_id: string){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -1257,6 +1300,7 @@ export async function GetAllStaffsForStaff({ role_id, domain_id }: { role_id: st
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -1283,6 +1327,7 @@ export async function GetSingleStaffbyId(user_id:string, role_id:string){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -1293,6 +1338,7 @@ export async function GetDepartmentsforHeads(role_id:string){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -1303,6 +1349,7 @@ export async function GetAreasForHeads(){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -1313,6 +1360,7 @@ export async function GetAreasandDeptsUnderRegion(region_id:string){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -1323,6 +1371,7 @@ export async function GetLocationsandDeptsUnderArea(area_id:string){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -1333,6 +1382,7 @@ export async function GetDepartmentsforLocations(location_id:string){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -1343,6 +1393,7 @@ export async function GetProjectByIdForStaffs(project_id:string){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -1352,6 +1403,7 @@ export async function AddNewProjectByStaff(payload:any){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -1362,6 +1414,7 @@ export async function GetDepartmentsForStaffs(role_id:string, org_id:string){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -1372,6 +1425,7 @@ export async function RemoveRegionDepartmentHead(head_id: string) {
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -1381,6 +1435,7 @@ export async function addProjectDocFunc(payload:any){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -1390,5 +1445,6 @@ export async function removeProjectDocFunc(doc_id:string){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }

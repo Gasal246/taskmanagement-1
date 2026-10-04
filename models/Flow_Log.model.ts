@@ -1,14 +1,14 @@
-import mongoose, { ObjectId, Schema } from "mongoose";
+import mongoose, { Document, Types, Schema } from "mongoose";
 
 
 interface IFlow_Log extends Document {
-    _id: ObjectId,
-    user_id: ObjectId,
+    _id: Types.ObjectId,
+    user_id: Types.ObjectId,
     Log: String,
     description: String | null,
-    task_id: ObjectId | null,
-    project_id: ObjectId | null,
-    activity_id: ObjectId | null,
+    task_id: Types.ObjectId | null,
+    project_id: Types.ObjectId | null,
+    activity_id: Types.ObjectId | null,
     createdAt: Date,
     updatedAt: Date
 }

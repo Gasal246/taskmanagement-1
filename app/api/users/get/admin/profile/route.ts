@@ -1,13 +1,13 @@
+import { authorizeOrganizationRead } from "@/lib/organization-access";
 import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import Business from "@/models/business.model";
 import Users from "@/models/users.model";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function GET(req:NextRequest){
     try{
+        await connectDB();
         const session:any = await auth();
         if(!session) return NextResponse.json({message:"Un-Authorized Access", status: 401}, {status: 401});
 
@@ -15,6 +15,9 @@ export async function GET(req:NextRequest){
         const business_id = searchParams.get("business_id");
 
         if(!business_id) return NextResponse.json({message: "Please provide Business_id", status: 400}, {status: 400});
+
+        const denied = await authorizeOrganizationRead(req);
+        if (denied) return denied;
 
         const user_details = await Users.findById(session?.user?.id).select("-password -otp").lean();
         const business_details = await Business.findById(business_id);

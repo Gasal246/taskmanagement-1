@@ -25,7 +25,7 @@ const ProjectComments = ({ projectid }: { projectid: string }) => {
     const queryClient = useQueryClient();
 
     useEffect(() => {
-        const channel = pusherClient.subscribe(`channel-${projectid}`)
+        const channel = pusherClient.subscribe(`private-project-${projectid}`)
             .bind('comment', async (data: any) => {
                 queryClient.invalidateQueries({
                     queryKey: [QUERY_KEYS.GET_PROJECT_BY_ID, projectid]
@@ -39,8 +39,9 @@ const ProjectComments = ({ projectid }: { projectid: string }) => {
             })
         return () => {
             channel.unbind();
+            pusherClient.unsubscribe(`private-project-${projectid}`);
         };
-    }, [])
+    }, [projectid, queryClient])
 
     const handleAddComment = async () => {
         const formData = new FormData();
@@ -48,6 +49,7 @@ const ProjectComments = ({ projectid }: { projectid: string }) => {
         formData.append('comment', comment);
         const response = await addComment(formData);
         if (response?._id) {
+            setComment("");
             return toast.success("Comment Added Successfully.")
         } else {
             return toast.error("Comment Not Send!!")
@@ -85,7 +87,7 @@ const ProjectComments = ({ projectid }: { projectid: string }) => {
             </div>
             <Space.Compact style={{ width: '100%' }} className='absolute bottom-0 left-0 lg:px-4  gap-1'>
                 <Input type='text' placeholder='enter your comment.' value={comment} onChange={(e) => setComment(e.target.value)} className='bg-black/70 border-dashed focus-visible:ring-0 focus-visible:border-solid' />
-                {comment && <Button className='bg-cyan-800 text-white hover:bg-slate-700' onClick={handleAddComment}>{addingComment ? <LoaderSpin size={24} /> : <Send size={16} />}</Button>}
+                {comment && <Button className='bg-cyan-800 text-white hover:bg-slate-700' onClick={handleAddComment} disabled={addingComment}>{addingComment ? <LoaderSpin size={24} /> : <Send size={16} />}</Button>}
             </Space.Compact>
         </div>
     )

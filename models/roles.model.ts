@@ -1,9 +1,9 @@
-import mongoose, { Schema, Document, ObjectId } from 'mongoose';
+import mongoose, { Schema, Document, Types } from 'mongoose';
 
 export interface IRoles extends Document {
   role_number: Number | null;
   role_name: String | null;
-  _id: ObjectId;
+  _id: Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }

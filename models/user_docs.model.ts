@@ -1,14 +1,14 @@
-import mongoose, { Schema, Document, ObjectId } from 'mongoose';
+import mongoose, { Schema, Document, Types } from 'mongoose';
 
 export interface IUser_docs extends Document {
-  user_id: ObjectId | null;
+  user_id: Types.ObjectId | null;
   doc_name: String | null;
   doc_url: String | null;
   expire_date: Date | null;
   doc_type?: String | null;
   storage_path?: String | null;
   status?: Number | null;
-  _id: ObjectId;
+  _id: Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { projectSupportingFieldsSchema } from "./project-classification";
 import { EMPTY_CAMP_SOLUTIONS } from "./solutions";
-import { validateDynamicClassification, validateDynamicSolutions } from "./catalogue-server";
+import { getEnquiryCatalogue, validateDynamicClassification, validateDynamicSolutions } from "./catalogue-server";
 
 const optionalId = z.string().trim().optional().default("");
 const coordinate = (minimum: number, maximum: number, label: string) => z.preprocess(
@@ -37,8 +37,9 @@ export async function validateEnquiryFacilityPayload(input: unknown) {
   const requestingFacility = parsed.area_input_mode === "new" || parsed.camp_input_mode === "new";
   if (requestingFacility && !parsed.camp_name_request) throw new z.ZodError([{ code: "custom", path: ["camp_name_request"], message: "Facility name is required" }]);
   if (!requestingFacility && !parsed.camp) throw new z.ZodError([{ code: "custom", path: ["camp"], message: "Select a Facility" }]);
+  const catalogue = await getEnquiryCatalogue({ fresh: true });
   const classification = requestingFacility
-    ? await validateDynamicClassification(input)
+    ? await validateDynamicClassification(input, undefined, catalogue)
     : {
         project_sector: "",
         facility_type: "",
@@ -50,7 +51,7 @@ export async function validateEnquiryFacilityPayload(input: unknown) {
     ...parsed,
     ...classification,
     ...projectSupportingFieldsSchema.parse(input),
-    ...await validateDynamicSolutions(input),
+    ...await validateDynamicSolutions(input, undefined, catalogue),
   };
 }
 

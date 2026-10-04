@@ -4,10 +4,9 @@ import { resolveActiveBusinessIdForUser } from "@/app/api/helpers/resolve-user-b
 import connectDB from "@/lib/mongo";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function GET(req: NextRequest) {
   try {
+        await connectDB();
     const session: any = await auth();
     const businessId = req.nextUrl.searchParams.get("business_id");
     if (!session?.user?.id) return NextResponse.json({ message: "Unauthorized Access" }, { status: 401 });

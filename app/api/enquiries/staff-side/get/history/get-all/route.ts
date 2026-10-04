@@ -1,50 +1,22 @@
+import { authorizeEnquiry } from "@/lib/enquiries/access";
+import { enquiryHistoryPage } from "@/lib/enquiries/history-page";
 import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
-import Eq_enquiry_access from "@/models/eq_enquiry_access.model";
-import Eq_enquiry_histories from "@/models/eq_enquiry_histories";
-import { hydrateChangedFieldNames } from "@/lib/enquiry-history-resolver";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function GET(req: NextRequest) {
-    try {
-        const session: any = await auth();
-        if (!session) return NextResponse.json({ message: "Unauthorized Access", status: 401 }, { status: 401 });
-
-        const { searchParams } = new URL(req.url);
-        const enquiry_id = searchParams.get("enquiry_id");
-
-        const histories = await Eq_enquiry_access.find({ enquiry_id: enquiry_id, user_id: session?.user?.id }).populate({
-            path: "history_id",
-            populate: [
-                { path: "action_assignee", select: "name email" },
-                { path: "action_assignments.user_id", select: "name email" },
-                {
-                    path: "assigned_to",
-                    select: "name email"
-                },
-                {
-                    path: "forwarded_by",
-                    select: "name email avatar_url"
-                },
-                {
-                    path: "changed_by",
-                    select: "name email avatar_url"
-                }
-            ]
-        }).lean();
-
-        const visibleHistories = histories.filter((entry: any) => entry.history_id);
-        visibleHistories.sort((a: any, b: any) => {
-            return b.history_id.step_number - a.history_id.step_number;
-        });
-
-        await hydrateChangedFieldNames(visibleHistories, (entry) => entry?.history_id);
-
-        return NextResponse.json({ histories: visibleHistories, status: 200 }, { status: 200 });
-    } catch (err) {
-        console.log("Error while getting histories: ", err);
-        return NextResponse.json({ message: "Internal Server Error", status: 500 }, { status: 500 });
-    }
+  try {
+    await connectDB();
+    const session = await auth();
+    if (!session?.user?.id) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    const params = new URL(req.url).searchParams;
+    const id = params.get("enquiry_id");
+    const denied = await authorizeEnquiry(id);
+    if (denied) return denied;
+    return NextResponse.json(await enquiryHistoryPage(id!, params, session.user.id));
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith("Invalid ")) return NextResponse.json({ message: error.message }, { status: 400 });
+    console.error("Error fetching staff enquiry histories", error);
+    return NextResponse.json({ message: "Internal Server Error" }, { status: 500 });
+  }
 }

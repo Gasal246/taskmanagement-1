@@ -1,9 +1,8 @@
+import { authorizeEnquiry } from "@/lib/enquiries/access";
 import connectDB from "@/lib/mongo";
 import Eq_camp_contacts from "@/models/eq_camp_contacts.model";
 import Eq_enquiry from "@/models/eq_enquiries.model";
 import { NextRequest, NextResponse } from "next/server";
-
-connectDB();
 
 interface IBody {
     enquiry_id: string,
@@ -17,8 +16,11 @@ interface IBody {
 
 export async function POST(req:NextRequest){
     try{
+        await connectDB();
         const body: IBody = await req.json();
 
+        const denied = await authorizeEnquiry(body.enquiry_id, "edit");
+        if (denied) return denied;
         const camp:any = await Eq_enquiry.findById(body.enquiry_id).select("camp_id").lean();
         
         const newContact = new Eq_camp_contacts({

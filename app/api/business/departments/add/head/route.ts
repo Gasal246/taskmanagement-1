@@ -1,3 +1,4 @@
+import { authorizeOrganizationMutation } from "@/lib/organization-access";
 import connectDB from "@/lib/mongo";
 import Business_departments from "@/models/business_departments.model";
 import Department_heads from "@/models/department_heads.model";
@@ -5,8 +6,6 @@ import Roles from "@/models/roles.model";
 import User_roles from "@/models/user_roles.model";
 import Users from "@/models/users.model";
 import { NextRequest, NextResponse } from "next/server";
-
-connectDB();
 
 interface Body {
     dep_id: string;
@@ -16,6 +15,9 @@ interface Body {
 
 export async function POST (req: NextRequest) {
     try {
+        await connectDB();
+        const accessDenied = await authorizeOrganizationMutation(req);
+        if (accessDenied) return accessDenied;
         const formdata = await req.formData();
         const formData: any = Object.fromEntries(formdata);
         const body = JSON.parse(formData?.body) as Body;
@@ -54,6 +56,7 @@ export async function POST (req: NextRequest) {
             await Department_heads.findByIdAndUpdate(depHead?._id, { status: 1 });
             return NextResponse.json({ message: "Department Head Re-Activated", status: 200 }, { status: 200 });
         }
+        if (depHead) return NextResponse.json({ error: "Department head already exists", status: 409 }, { status: 409 });
         
         const newDepHead = new Department_heads({
             user_id: body?.user_id,

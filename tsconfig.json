@@ -29,10 +29,15 @@
     "target": "ES2017"
   },
   "include": [
-    "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
-    ".next/types/**/*.ts"
+    ".next-performance-1502ff8f301f5ef3/types/**/*.ts",
+    ".next-performance-202dc56b53be7c94/types/**/*.ts",
+    ".next-performance-416893f239527ef0/types/**/*.ts",
+    ".next-performance-bf54d21c23d88d09/types/**/*.ts",
+    ".next/types/**/*.ts",
+    "next-env.d.ts",
+    ".next-performance-9e903cd25f6e12dd/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

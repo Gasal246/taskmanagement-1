@@ -35,8 +35,8 @@ export function useProjectDetails(projectId: string, mode: ProjectMode) {
       return response.data?.data;
     },
     enabled: Boolean(projectId),
-    staleTime: Infinity,
-    gcTime: 0,
+    staleTime: 30_000,
+    gcTime: 5 * 60_000,
     retry: 1,
   });
 }
@@ -55,8 +55,8 @@ export function useProjectSection<T = any>(
       return response.data?.data;
     },
     enabled: Boolean(projectId) && enabled,
-    staleTime: Infinity,
-    gcTime: 0,
+    staleTime: 30_000,
+    gcTime: 5 * 60_000,
     retry: 1,
   });
 }

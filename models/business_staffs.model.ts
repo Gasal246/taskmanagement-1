@@ -1,10 +1,10 @@
-import mongoose, { Schema, Document, ObjectId } from 'mongoose';
+import mongoose, { Schema, Document, Types } from 'mongoose';
 
 export interface IBusiness_staffs extends Document {
-  user_id: ObjectId | null;
-  business_id: ObjectId | null;
+  user_id: Types.ObjectId | null;
+  business_id: Types.ObjectId | null;
   status: Number | null;
-  _id: ObjectId;
+  _id: Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -16,6 +16,7 @@ const Business_staffsSchema: Schema = new Schema({
 }, { timestamps: true });
 
 Business_staffsSchema.index({ business_id: 1, status: 1, user_id: 1 });
+Business_staffsSchema.index({ user_id: 1, status: 1, business_id: 1 });
 
 const Business_staffs = mongoose.models?.business_staffs || mongoose.model<IBusiness_staffs>('business_staffs', Business_staffsSchema);
 

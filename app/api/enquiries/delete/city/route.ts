@@ -1,3 +1,4 @@
+import { requireSuperadmin } from "@/lib/server-access";
 import connectDB from "@/lib/mongo";
 import Eq_area from "@/models/eq_area.model";
 import Eq_camps from "@/models/eq_camps.model";
@@ -5,10 +6,11 @@ import Eq_city from "@/models/eq_city.model";
 import Eq_enquiry from "@/models/eq_enquiries.model";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function DELETE(req: NextRequest) {
   try {
+        await connectDB();
+        const denied = await requireSuperadmin();
+        if (denied) return denied;
     const { searchParams } = new URL(req.url);
     const city_id = searchParams.get("city_id");
 

@@ -51,66 +51,26 @@ function removeCookieEverywhere(name: string): void {
   }
 }
 
-async function clearIndexedDBDatabases(): Promise<void> {
-  if (typeof window === "undefined" || !window.indexedDB) return;
-
-  const idbFactory = window.indexedDB as IDBFactory & {
-    databases?: () => Promise<Array<{ name?: string | null }>>;
-  };
-
-  if (typeof idbFactory.databases !== "function") return;
-
-  try {
-    const databases = await idbFactory.databases();
-    await Promise.all(
-      databases.map((database) => {
-        const dbName = database?.name;
-        if (!dbName) return Promise.resolve();
-
-        return new Promise<void>((resolve) => {
-          const request = window.indexedDB.deleteDatabase(dbName);
-          request.onsuccess = () => resolve();
-          request.onerror = () => resolve();
-          request.onblocked = () => resolve();
-        });
-      })
-    );
-  } catch {
-    // Best-effort cleanup only.
-  }
-}
-
 export async function clearClientAuthCleanup(): Promise<void> {
   if (typeof window === "undefined") return;
 
   KNOWN_AUTH_COOKIES.forEach(removeCookieEverywhere);
 
-  document.cookie
-    .split(";")
-    .map((cookie) => cookie.split("=")[0]?.trim())
-    .filter(Boolean)
-    .forEach((cookieName) => removeCookieEverywhere(cookieName));
-
-  try {
-    window.localStorage.clear();
-  } catch {
-    // Best-effort cleanup only.
-  }
-
-  try {
-    window.sessionStorage.clear();
-  } catch {
-    // Best-effort cleanup only.
+  // Personal todos, drafts, preferences and Firebase databases are not auth state.
+  for (const storageName of ["localStorage", "sessionStorage"] as const) {
+    try {
+      const storage = window[storageName];
+      for (const key of KNOWN_AUTH_COOKIES) storage.removeItem(key);
+    } catch { /* Storage may be disabled by the browser. */ }
   }
 
   try {
     if ("caches" in window) {
       const cacheKeys = await window.caches.keys();
-      await Promise.all(cacheKeys.map((key) => window.caches.delete(key)));
+      await Promise.all(cacheKeys.filter(key => key.startsWith("taskmanager-")).map((key) => window.caches.delete(key)));
     }
   } catch {
     // Best-effort cleanup only.
   }
 
-  await clearIndexedDBDatabases();
 }

@@ -70,6 +70,8 @@ function fixture({ allowed = true, project = false, admin = true, creator = fals
   };
   const mocks = {
     '@/lib/mongo': { default: async () => {} },
+    '@/lib/jobs/enqueue': {},
+    '@/lib/jobs/transaction': { inTransaction: async work => work({}) },
     '@/auth': { auth: async () => ({ user: { id: actorId } }) },
     '@/models/users.model': { default: { findById: () => query(state.actor) } },
     '@/models/business_tasks.model': { default: { findById: () => query(state.task) } },

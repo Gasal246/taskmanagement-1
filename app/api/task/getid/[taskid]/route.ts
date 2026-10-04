@@ -16,11 +16,13 @@ import { hasStaffTaskAccess } from "@/app/api/helpers/staff-task-access";
 import { normalizeProjectTaskTeamIds, resolveProjectTaskStaffAccess } from "@/app/api/helpers/project-task-teams";
 import { resolveSelectedHeadContext, getSelectedHeadDirectStaffIds } from "@/app/api/helpers/head-reassignment-scope";
 import { canChangeActivityStatus } from "@/app/api/helpers/activity-status-access";
-connectDB();
-
+import { taskActivityPage } from "@/lib/tasks/activity-page";
+import mongoose from "mongoose";
 export async function GET(req:NextRequest, context: {params: Promise<{taskid:string}>}){
     try{
+        await connectDB();
         const { taskid } = await context.params;
+        if (!mongoose.isValidObjectId(taskid)) return NextResponse.json({ message: "Invalid task ID" }, { status: 400 });
         const { searchParams } = new URL(req.url);
         const activityScope = searchParams.get("activityScope");
         const isAssignedActivityScope = activityScope === "assigned";
@@ -79,9 +81,13 @@ export async function GET(req:NextRequest, context: {params: Promise<{taskid:str
             const scheduleActor = await Users.findById(userId).select("name status");
             const canEditSchedule = await canEditActivitySchedule(req, task, { _id: userId, status: scheduleActor?.status });
             const taskObj = task.toObject();
+            const activityPage = await taskActivityPage(restrictActivities ? assignedActivityQuery : { task_id: taskid }, searchParams);
+            taskObj.activityPagination = activityPage.pagination;
+            taskObj.activitySummary = activityPage.summary;
             const activities = await Task_Activities.find(
-                restrictActivities ? assignedActivityQuery : {task_id: taskid}
+                { _id: { $in: activityPage.ids } }
             )
+                .sort({ updatedAt: -1, _id: -1 })
                 .populate({ path: "created_by", select: "name email avatar_url" })
                 .populate({ path: "assigned_to", select: "name email avatar_url" })
                 .populate({ path: "forwarded_to", select: "name email avatar_url" })
@@ -89,9 +95,9 @@ export async function GET(req:NextRequest, context: {params: Promise<{taskid:str
                 .populate({ path: "reassignment_history.actor_id", select: "name email avatar_url" })
                 .populate({ path: "reassignment_history.recipient_id", select: "name email avatar_url" })
                 .populate({ path: "reassignment_history.previous_recipient_id", select: "name email avatar_url" })
-                .populate({ path: "assigned_skill", select: "skill_name" });
+                .populate({ path: "assigned_skill", select: "skill_name" }).lean();
             const activitiesWithUnread = await addUnreadCommentCounts(activities, userId);
-            if(activities.length > 0 || isAssignedActivityScope) taskObj.activities = activitiesWithUnread.map((activity: any) => ({
+            taskObj.activities = activitiesWithUnread.map((activity: any) => ({
                 ...activity,
                 schedule_history: activity.schedule_history || [],
                 canEditSchedule,
@@ -122,6 +128,7 @@ export async function GET(req:NextRequest, context: {params: Promise<{taskid:str
             return NextResponse.json({message: "No Content"}, {status:203});
         }
     }catch(err){
+        if (err instanceof Error && err.message.startsWith("Invalid ")) return NextResponse.json({ message: err.message }, { status: 400 });
         console.log("error while getting task by id", err);
         return NextResponse.json({message:"Internal Server Error"}, {status:500});
     }

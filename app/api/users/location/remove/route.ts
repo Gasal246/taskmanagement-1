@@ -1,11 +1,13 @@
+import { authorizeOrganizationMutation } from "@/lib/organization-access";
 import connectDB from "@/lib/mongo";
 import User_locations from "@/models/user_locations.model";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function POST ( req: NextRequest ) {
     try {
+        await connectDB();
+        const denied = await authorizeOrganizationMutation(req);
+        if (denied) return denied;
         const { ULocId } = await req.json();
 
         const location = await User_locations.findById(ULocId);
@@ -17,7 +19,7 @@ export async function POST ( req: NextRequest ) {
         return NextResponse.json({ message: "Location removed successfully", status: 200 }, { status: 200 });
     } catch (error: any) {
         console.log(error?.message);
-        return NextResponse.json(`Internal Server Error: ${error?.message}`, { status: 500 });
+        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 };
 

@@ -1,8 +1,7 @@
+import { requireSuperadmin } from "@/lib/server-access";
 import connectDB from "@/lib/mongo";
 import Business from "@/models/business.model";
 import { NextRequest, NextResponse } from "next/server";
-
-connectDB();
 
 interface Body {
     business_name: string;
@@ -17,6 +16,9 @@ interface Body {
 
 export async function POST (req: NextRequest) {
     try {
+        await connectDB();
+        const accessDenied = await requireSuperadmin();
+        if (accessDenied) return accessDenied;
         const formData = await req.formData();
         const { body } = Object.fromEntries(formData) as { body: string };
         const bodyData = await JSON.parse(body) as Body;

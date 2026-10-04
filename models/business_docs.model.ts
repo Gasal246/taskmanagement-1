@@ -1,9 +1,9 @@
-import mongoose, { Schema, Document, ObjectId } from 'mongoose';
+import mongoose, { Schema, Document, Types } from 'mongoose';
 
 export interface IBusiness_docs extends Document {
-  _id: ObjectId;
+  _id: Types.ObjectId;
   doc_url: String | null;
-  business_id: ObjectId | null;
+  business_id: Types.ObjectId | null;
   doc_name: String | null;
   expires_at: Date | null;
   createdAt: Date;

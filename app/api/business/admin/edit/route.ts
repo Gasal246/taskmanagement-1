@@ -1,9 +1,8 @@
+import { requireSuperadmin } from "@/lib/server-access";
 import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import Users from "@/models/users.model";
 import { NextRequest, NextResponse } from "next/server";
-
-connectDB();
 
 interface Body {
     _id?: string;
@@ -16,6 +15,9 @@ interface Body {
 
 export async function POST (req: NextRequest) {
     try {
+        await connectDB();
+        const accessDenied = await requireSuperadmin();
+        if (accessDenied) return accessDenied;
         const session = await auth();
         if(!session) {
             return new NextResponse("Unauthorized", { status: 401 });

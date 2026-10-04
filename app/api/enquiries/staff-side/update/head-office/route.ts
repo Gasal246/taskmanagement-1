@@ -4,8 +4,6 @@ import Eq_camp_headoffice from "@/models/eq_camp_headoffice.model";
 import Eq_camps from "@/models/eq_camps.model";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 interface Body {
   head_office_id: string;
   phone?: string;
@@ -17,6 +15,7 @@ interface Body {
 
 export async function PUT(req: NextRequest) {
   try {
+        await connectDB();
     const session: any = await auth();
     if (!session?.user?.id) {
       return NextResponse.json({ message: "Unauthorized Access", status: 401 }, { status: 401 });

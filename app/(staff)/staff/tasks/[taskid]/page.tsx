@@ -1,5 +1,8 @@
 "use client";
 
+import ListPagination from "@/components/shared/ListPagination";
+import { useActivityPaging } from "@/hooks/use-activity-paging";
+
 import ActivityHistorySheet from "@/components/task/ActivityHistorySheet";
 import ChangeActivityDeadlineDialog from "@/components/task/ChangeActivityDeadlineDialog";
 
@@ -76,7 +79,7 @@ import LoaderSpin from "@/components/shared/LoaderSpin";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "antd";
 import Cookies from "js-cookie";
-import { getSession } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import ActivityCommentsSheet from "@/components/task/ActivityCommentsSheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import axios from "axios";
@@ -174,7 +177,8 @@ const TaskDetails = () => {
   const router = useRouter();
   const params = useParams<{ taskid: string }>();
   const searchParams = useSearchParams();
-  const { data: task, isLoading, isError, error, isFetching, refetch } = useGetTaskById(params.taskid, "assigned");
+  const paging = useActivityPaging(params.taskid, searchParams.get("activityId"));
+  const { data: task, isLoading, isError, error, isFetching, isPlaceholderData, refetch } = useGetTaskById(params.taskid, "assigned", paging.query);
   const { mutateAsync: AddTaskActivity, isPending: isAddingActivity } = useAddTaskActivity();
   const { mutateAsync: UpdateTaskActivity, isPending: isUpdatingActivity } = useUpdateTaskActivity();
   const { mutateAsync: DeleteTaskActivity, isPending: isDeletingActivity } = useDeleteTaskActivity();
@@ -189,7 +193,7 @@ const TaskDetails = () => {
   const [roleId, setRoleId] = useState("");
   const [roleName, setRoleName] = useState("");
   const [domainData, setDomainData] = useState<any>(null);
-  const [isCreator, setIsCreator] = useState(false);
+  const { data: session } = useSession();
 
   const [addActivityDialog, setAddActivityDialog] = useState(false);
   const [editActivityDialog, setEditActivityDialog] = useState(false);
@@ -220,14 +224,15 @@ const TaskDetails = () => {
   const [pendingStatusValue, setPendingStatusValue] = useState<boolean | null>(null);
 
   const taskData = task?.data;
+  const isCreator = Boolean(taskData?.creator && session?.user?.id === taskData.creator);
   const historyActivity = taskData?.activities?.find((activity: any) => String(activity._id) === historyActivityId) || null;
   const isHead = HEAD_ROLES.includes(roleName);
   const canManageActivities = Boolean(taskData?.permissions?.canManageActivities);
   const canAssignActivities = Boolean(taskData?.permissions?.canAssignActivities);
   const canAddActivity = taskData?.is_project_task ? canManageActivities && isCreator : isCreator || (isHead && canManageActivities);
   const visibleActivities = Array.isArray(taskData?.activities) ? taskData.activities : [];
-  const visibleActivityCount = visibleActivities.length;
-  const visibleCompletedActivityCount = visibleActivities.filter((activity: any) => activity?.is_done).length;
+  const visibleActivityCount = taskData?.activitySummary?.total || 0;
+  const visibleCompletedActivityCount = taskData?.activitySummary?.completed || 0;
   const progress = getProgressValue(
     visibleCompletedActivityCount,
     visibleActivityCount
@@ -279,14 +284,6 @@ const TaskDetails = () => {
     taskForm.setValue("priority", taskData.priority || "");
   }, [taskData, taskForm]);
 
-  useEffect(() => {
-    if (!taskData) return;
-    const fetchAuthority = async () => {
-      const session: any = await getSession();
-      setIsCreator(Boolean(taskData?.creator && session?.user?.id === taskData.creator));
-    };
-    fetchAuthority();
-  }, [taskData]);
 
   const loadMyStaffs = useCallback(async () => {
     if (taskData?.is_project_task) {
@@ -402,7 +399,7 @@ const TaskDetails = () => {
     if (res?.status === 200) {
       toast.success(res?.message || "Activity reassigned successfully.");
       handleCloseAssignDialog();
-      refetch();
+
     } else {
       toast.error(res?.message || "Failed to reassign activity.");
     }
@@ -439,7 +436,7 @@ const TaskDetails = () => {
     if (res?.status === 200) {
       toast.success(res?.message || "Activity reassignment removed.");
       handleCloseRemoveReassignment();
-      refetch();
+
     } else {
       toast.error(res?.message || "Failed to remove activity reassignment.");
     }
@@ -491,7 +488,7 @@ const TaskDetails = () => {
       setEditingActivity(null);
       setActivityDocuments([]);
       activityForm.reset();
-      refetch();
+
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to save activity");
     }
@@ -527,7 +524,7 @@ const TaskDetails = () => {
     }
     setDeleteActivityDialog(false);
     setSelectedActivityId(null);
-    refetch();
+
   };
 
   const onDeleteTaskConfirm = async () => {
@@ -566,7 +563,7 @@ const TaskDetails = () => {
     setStatusConfirmOpen(false);
     setPendingStatusActivity(null);
     setPendingStatusValue(null);
-    refetch();
+
   };
 
   const formatDuration = (ms: number) => {
@@ -783,10 +780,16 @@ const TaskDetails = () => {
           )}
         </div>
 
+        <div className="mb-3 flex flex-wrap gap-2">
+          <Input value={paging.search} maxLength={200} aria-label="Search activities" placeholder="Search activities, staff or skills…" onChange={event => paging.setSearch(event.target.value)} className="max-w-md" />
+          {[['', 'All'], ['pending', 'Pending'], ['completed', 'Completed']].map(([value, label]) => <Button key={value} size="sm" variant={paging.status === value ? 'default' : 'outline'} aria-pressed={paging.status === value} onClick={() => paging.setStatus(value)}>{label}</Button>)}
+        </div>
+        <ListPagination pagination={taskData.activityPagination} busy={isFetching || paging.isChanging || isPlaceholderData} onPage={paging.setPage} label="activities" />
+        {taskData.activityPagination?.focusFound === false && <p role="status" className="mb-3 text-sm text-slate-400">The linked activity is unavailable or outside your current scope.</p>}
         <div className="flex flex-wrap">
           {visibleActivities.length > 0 ? (
             visibleActivities.map((activity: any) => (
-              <div key={activity._id} className="w-full p-1">
+              <div key={activity._id} className="w-full p-1" style={{ contentVisibility: "auto", containIntrinsicSize: "auto 350px" }}>
                 <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg border border-slate-700 hover:border-cyan-800">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
@@ -852,7 +855,7 @@ const TaskDetails = () => {
                             const res = await UpdateTaskActivity({ activity_id: activity._id, documents, is_status: false });
                             if (res?.status !== 200) throw new Error(res?.message || "Failed to update documents");
                             toast.success("Documents updated");
-                            await refetch();
+
                           }}
                         />
                       )}
@@ -936,7 +939,7 @@ const TaskDetails = () => {
               </div>
             ))
           ) : (
-            <p className="text-xs text-slate-400">No activities</p>
+            <p className="text-xs text-slate-400">No matching activities</p>
           )}
         </div>
       </div>

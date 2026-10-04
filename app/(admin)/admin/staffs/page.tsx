@@ -136,7 +136,7 @@ const Staffs = () => {
 
   const handleViewStaff = async (user: any) => {
     dispatch(loadAdminBusinessStaff(user));
-    router.push(`/admin/staffs/view-staff`);
+    router.push(`/admin/staffs/${user._id}`);
   }
 
   useEffect(() => {

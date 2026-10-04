@@ -229,6 +229,7 @@ export default function SingleEnquiryPage() {
                     variant="outline"
                     size="sm"
                     className="gap-2"
+                    disabled={!enquiry?.enquiry?.canEdit}
                     onClick={() => handleProtectedNavigation("edit")}
                   >
                     <Pencil size={14} /> Edit
@@ -237,6 +238,7 @@ export default function SingleEnquiryPage() {
                     variant="destructive"
                     size="sm"
                     className="gap-2"
+                    disabled={!enquiry?.enquiry?.canAdminister}
                     onClick={() => setDeleteDialogOpen(true)}
                   >
                     <Trash2 size={14} /> Delete
@@ -247,14 +249,14 @@ export default function SingleEnquiryPage() {
           </div>
           {/* BUTTONS ON RIGHT */}
           <div className="flex flex-wrap items-center gap-3">
-            {!enquiry?.enquiry?.area_id?.is_active && (<Button
+            {enquiry?.enquiry?.canAdminister && !enquiry?.enquiry?.area_id?.is_active && (<Button
               className="flex items-center gap-1"
               onClick={() => router.replace(`/admin/enquiries/${params.enquiry_id}/area/${enquiry?.enquiry?.area_id?._id}`)}
             >
               Activate Area
             </Button>)}
 
-            {!enquiry?.enquiry?.camp_id?.is_active && (<Button
+            {enquiry?.enquiry?.canAdminister && !enquiry?.enquiry?.camp_id?.is_active && (<Button
               className="flex items-center gap-1"
               disabled={!enquiry?.enquiry?.area_id?.is_active}
               onClick={() => router.replace(`/admin/enquiries/${params.enquiry_id}/camp`)}
@@ -262,7 +264,7 @@ export default function SingleEnquiryPage() {
               Activate Camp
             </Button>)}
 
-            {enquiry?.enquiry?.is_edit_req && (
+            {enquiry?.enquiry?.canAdminister && enquiry?.enquiry?.is_edit_req && (
               <Button
                 className="flex items-center gap-1"
                 onClick={() => router.replace(`/admin/enquiries/${params.enquiry_id}/edited`)}

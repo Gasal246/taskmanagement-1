@@ -2,8 +2,6 @@ import connectDB from "@/lib/mongo";
 import Eq_region from "@/models/eq_region.model";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 interface Body {
   region_id: string;
   region_name?: string;
@@ -12,6 +10,7 @@ interface Body {
 
 export async function PUT(req: NextRequest) {
   try {
+        await connectDB();
     const body: Body = await req.json();
 
     if (!body.region_id) {

@@ -3,10 +3,9 @@ import Project_Departments from "@/models/project_departments.model";
 import { NextRequest, NextResponse } from "next/server";
 import { authorizeProjectRequest } from "@/app/api/helpers/project-access";
 
-connectDB();
-
 export async function PUT(req: NextRequest){
     try{
+        await connectDB();
         const {proj_dept_id} = await req.json();
         const projectDepartment = await Project_Departments.findById(proj_dept_id).select("project_id");
         if (!projectDepartment) {

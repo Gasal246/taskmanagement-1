@@ -29,10 +29,9 @@ import { buildProjectSearchClause } from "@/app/api/helpers/project-search";
 import { parseFacilityCatalogueFilters } from "@/lib/enquiries/facility-list-filters";
 import { applyProjectCatalogueFilters } from "@/lib/projects/list-filters";
 
-connectDB();
-
 export async function GET(req: NextRequest) {
     try {
+        await connectDB();
         const session: any = await auth();
         if (!session) {
             return NextResponse.json({ message: "Un-Authorized Access", status: 401 }, { status: 401 });

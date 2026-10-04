@@ -1,3 +1,4 @@
+import { authorizeOrganizationMutation } from "@/lib/organization-access";
 import connectDB from "@/lib/mongo";
 import Area_heads from "@/models/area_heads.model";
 import Roles from "@/models/roles.model";
@@ -5,10 +6,11 @@ import User_roles from "@/models/user_roles.model";
 import Users from "@/models/users.model";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function POST ( req: NextRequest ) {
     try {
+        await connectDB();
+        const accessDenied = await authorizeOrganizationMutation(req);
+        if (accessDenied) return accessDenied;
         const { AreaHId } = await req.json();
         const areaH = await Area_heads.findById(AreaHId);
         if(!areaH){

@@ -3,10 +3,9 @@ import Project_Docs from "@/models/project_docs.model";
 import { NextRequest, NextResponse } from "next/server";
 import { authorizeProjectRequest } from "@/app/api/helpers/project-access";
 
-connectDB();
-
 export async function POST(req: NextRequest) {
   try {
+        await connectDB();
     const { doc_id } = await req.json();
     if (!doc_id) {
       return NextResponse.json({ error: "Document id is required" }, { status: 400 });

@@ -5,10 +5,9 @@ import Eq_enquiry_histories from "@/models/eq_enquiry_histories";
 import Eq_enquiry from "@/models/eq_enquiries.model";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function GET(req: NextRequest) {
   try {
+        await connectDB();
     const session: any = await auth();
     if (!session)
       return NextResponse.json(

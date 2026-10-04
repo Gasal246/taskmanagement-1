@@ -4,10 +4,9 @@ import connectDB from "@/lib/mongo";
 import Eq_area from "@/models/eq_area.model";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function GET(req:NextRequest){
     try{
+        await connectDB();
         const {searchParams} = new URL(req.url);
         const city_id = searchParams.get("city_id");
         if(!city_id) return NextResponse.json({message: "Please select city first", status: 400}, {status: 400});

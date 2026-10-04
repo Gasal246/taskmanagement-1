@@ -1,13 +1,15 @@
+import type { ClientSession } from "mongoose";
 import Task_Activities from "@/models/task_activities.model";
 import { activityScheduleSchema } from "@/lib/activity-schedule";
 import { expectedScheduleSchema, getScheduleChange, scheduleTimestamp } from "@/lib/activity-deadline";
 import { recalculateTaskTimeline } from "@/app/api/helpers/task-timeline";
 
-export async function updateActivitySchedule({ current, body, actor, contentUpdates = {} }: {
+export async function updateActivitySchedule({ current, body, actor, contentUpdates = {}, dbSession }: {
   current: any;
   body: unknown;
   actor: { _id: unknown; name?: string };
   contentUpdates?: Record<string, unknown>;
+  dbSession?: ClientSession;
 }): Promise<{ status: number; message: string }> {
   const parsed = activityScheduleSchema.safeParse(body);
   if (!parsed.success) return { status: 400, message: parsed.error.issues[0].message };
@@ -50,8 +52,8 @@ export async function updateActivitySchedule({ current, body, actor, contentUpda
     start_date: current.start_date ?? null,
     end_date: current.end_date ?? null,
     is_done: current.is_done ?? null,
-  }, update, { new: true, runValidators: true });
+  }, update, { new: true, runValidators: true, ...(dbSession ? { session: dbSession } : {}) });
   if (!saved) return { status: 409, message: "This activity changed while saving. Refresh it and try again." };
-  if (change.action) await recalculateTaskTimeline(current.task_id);
+  if (change.action) await recalculateTaskTimeline(current.task_id, dbSession);
   return { status: 200, message: change.action ? "Activity schedule updated" : "Activity updated" };
 }

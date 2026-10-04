@@ -333,8 +333,14 @@ export async function authorizeProjectRequest(
 
 export async function isActiveStaffInProjectBusiness(
   project: any,
-  userId: string
+  userId: string,
+  dbSession?: mongoose.ClientSession
 ) {
+  if (dbSession) {
+    const staff = await BusinessStaffs.exists({ user_id: userId, business_id: project?.business_id, status: 1 }).session(dbSession);
+    const user = await Users.exists({ _id: userId, status: 1 }).session(dbSession);
+    return Boolean(staff && user);
+  }
   const [staff, user] = await Promise.all([
     BusinessStaffs.exists({
       user_id: userId,

@@ -5,10 +5,9 @@ import Roles from "@/models/roles.model";
 import User_roles from "@/models/user_roles.model";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function GET(req: NextRequest, context: { params: Promise<{ userid: string }> }) {
     try {
+        await connectDB();
         const { userid } = await context.params;
 
         // Get the business ids the user administers or belongs to.

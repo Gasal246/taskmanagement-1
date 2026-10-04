@@ -11,10 +11,9 @@ import mongoose from "mongoose";
 import { addTaskAssignmentSummaries } from "@/app/api/helpers/task-assignment-summary";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function GET(req:NextRequest){
     try{
+        await connectDB();
         const session: any = await auth();
         if (!session?.user?.id) return NextResponse.json({ message: "Unauthorized Access" }, { status: 401 });
         const {searchParams} = new URL(req.url);

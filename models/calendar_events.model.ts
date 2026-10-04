@@ -1,10 +1,10 @@
-import mongoose, { ObjectId, Schema } from "mongoose";
+import mongoose, { Document, Types, Schema } from "mongoose";
 
 export interface ICalendar_Events extends Document {
-  _id: ObjectId;
-  business_id: ObjectId;
-  created_by: ObjectId;
-  attendee_ids: ObjectId[];
+  _id: Types.ObjectId;
+  business_id: Types.ObjectId;
+  created_by: Types.ObjectId;
+  attendee_ids: Types.ObjectId[];
   title: string;
   description?: string | null;
   status: string;

@@ -1,3 +1,4 @@
+import { authorizeEnquiry } from "@/lib/enquiries/access";
 import Eq_enquiry from "@/models/eq_enquiries.model";
 import { forwardHistoryFilter, historyOrder } from "@/lib/enquiries/completion";
 import { auth } from "@/auth";
@@ -5,15 +6,17 @@ import connectDB from "@/lib/mongo";
 import Eq_enquiry_histories from "@/models/eq_enquiry_histories";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function GET(req:NextRequest){
     try{
+        await connectDB();
         const session:any = await auth();
         if(!session) return NextResponse.json({message:"Unauthorized Access", status: 401}, {status: 401});
         
         const {searchParams} = new URL(req.url);
         const enquiry_id = searchParams.get("enquiry_id");
+
+        const denied = await authorizeEnquiry(enquiry_id);
+        if (denied) return denied;
 
         const latestAction:any = await Eq_enquiry_histories.findOne({enquiry_id: enquiry_id, ...forwardHistoryFilter}).populate("camp_id").sort(historyOrder).lean();
 

@@ -23,7 +23,31 @@ const row = (entry: any) => ({
   is_active: entry.is_active !== false, sort_order: Number(entry.sort_order || 0),
 });
 
-export async function getEnquiryCatalogue(): Promise<EnquiryCatalogue> {
+let cachedCatalogue: { value: EnquiryCatalogue; expires: number } | null = null;
+let pendingCatalogue: Promise<EnquiryCatalogue> | null = null;
+let catalogueGeneration = 0;
+
+export function invalidateEnquiryCatalogue() {
+  cachedCatalogue = null;
+  pendingCatalogue = null;
+  catalogueGeneration++;
+}
+
+// Short process-local caching bounds cross-instance staleness to 5 seconds.
+export async function getEnquiryCatalogue(options?: { fresh?: boolean }): Promise<EnquiryCatalogue> {
+  if (options?.fresh) return loadEnquiryCatalogue();
+  if (cachedCatalogue && cachedCatalogue.expires > Date.now()) return cachedCatalogue.value;
+  if (pendingCatalogue) return pendingCatalogue;
+  const generation = catalogueGeneration;
+  const loading = loadEnquiryCatalogue().then(value => {
+    if (generation === catalogueGeneration) cachedCatalogue = { value, expires: Date.now() + 5_000 };
+    return value;
+  }).finally(() => { if (pendingCatalogue === loading) pendingCatalogue = null; });
+  pendingCatalogue = loading;
+  return loading;
+}
+
+async function loadEnquiryCatalogue(): Promise<EnquiryCatalogue> {
   const [sectors, facilityTypes, fields, options, categories, services]: any[][] = await Promise.all([
     EqProjectSector.find({}).sort(ordered).lean(),
     EqFacilityType.find({}).sort(ordered).lean(),
@@ -65,8 +89,8 @@ function valueMap(input: any, field: string) {
 
 const canUse = (entry: { key: string; is_active: boolean }, existingKey?: string) => entry.is_active || entry.key === existingKey;
 
-export async function validateDynamicClassification(input: any, existing?: any) {
-  const catalogue = await getEnquiryCatalogue();
+export async function validateDynamicClassification(input: any, existing?: any, suppliedCatalogue?: EnquiryCatalogue) {
+  const catalogue = suppliedCatalogue || await getEnquiryCatalogue({ fresh: true });
   const sector = catalogue.project_sectors.find((entry) => entry.key === String(input?.project_sector || ""));
   if (!sector || !canUse(sector, existing?.project_sector)) throw new CatalogueValidationError("Select an active project sector");
   const facilityType = sector.facility_types.find((entry) => entry.key === String(input?.facility_type || ""));
@@ -121,8 +145,8 @@ export type DynamicSolutions = {
   commercial_model: typeof COMMERCIAL_MODELS[number];
 };
 
-export async function validateDynamicSolutions(input: any, existing?: any): Promise<DynamicSolutions> {
-  const catalogue = await getEnquiryCatalogue();
+export async function validateDynamicSolutions(input: any, existing?: any, suppliedCatalogue?: EnquiryCatalogue): Promise<DynamicSolutions> {
+  const catalogue = suppliedCatalogue || await getEnquiryCatalogue({ fresh: true });
   const services = catalogue.solution_categories.flatMap((category) => category.is_active
     ? category.services.map((service) => ({ ...service, parent_active: true }))
     : category.services.map((service) => ({ ...service, parent_active: false })));

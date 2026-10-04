@@ -193,13 +193,6 @@ const FcmNotifications = () => {
         return;
       }
 
-      const storedToken = getStoredToken(userId);
-      if (!storedToken && !hasAttemptedRefresh()) {
-        setShowPermissionPrompt(false);
-        setShowRefreshPrompt(true);
-        return;
-      }
-
       setShowRefreshPrompt(false);
 
       const legacyToken = getStoredToken();
@@ -211,6 +204,8 @@ const FcmNotifications = () => {
         const stored = await storeToken();
         if (stored) {
           setShowPermissionPrompt(false);
+        } else if (!hasAttemptedRefresh()) {
+          setShowRefreshPrompt(true);
         }
         return;
       }
@@ -364,9 +359,9 @@ const FcmNotifications = () => {
   }
 
   const blocked = permissionState === "denied";
-  const title = showRefreshPrompt ? "Refresh required" : "Enable notifications";
+  const title = showRefreshPrompt ? "Notification setup incomplete" : "Enable notifications";
   const description = showRefreshPrompt
-    ? "This device does not have an FCM token yet, which usually means the app is still on an older version. Refresh now to load the latest version and finish notification setup for this device."
+    ? "We could not finish setting up notifications on this device. You can try refreshing when you have saved your work."
     : blocked
       ? "Notifications are blocked in your browser settings. Enable them to receive updates even when you are away."
       : "Stay updated even when this tab is closed. Allow notifications to receive task updates and alerts.";
@@ -386,9 +381,10 @@ const FcmNotifications = () => {
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
             {showRefreshPrompt ? (
-              <Button type="button" onClick={handleRefreshApp}>
-                Refresh now
-              </Button>
+              <>
+                <Button type="button" variant="secondary" onClick={() => { markRefreshAttempt(); setShowRefreshPrompt(false); }}>Not now</Button>
+                <Button type="button" onClick={handleRefreshApp}>Refresh now</Button>
+              </>
             ) : (
               <>
                 <Button

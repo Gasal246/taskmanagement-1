@@ -68,3 +68,11 @@ npm run dev
 
 - **Current:** alpha.26.1.3
 - **Last Updated:** Alpha 26.1.3
+
+## Performance and security rollout
+
+Use Node.js 22 or newer. See [the rollout guide](scripts/performance-and-security-rollout.md) for the implemented changes, reviewed legacy enquiry ownership migration, paginated task/history APIs, durable background jobs, index setup, regression checks and the staging test for 3,000 concurrent sessions. Review and migrate legacy enquiry ownership before deploying the business-scoped authorization changes. After building, `npm run test:list-ui` runs isolated pagination and rendering checks in local Chrome/Chromium.
+
+Task activity/comment notifications, enquiry forwarding/facility matching, project approval/assignments, team changes, calendar invitations, legacy task-assignment notifications and upload cleanup now require a job consumer. Configure the target MongoDB replica set and apply the declared indexes, then run `npm run worker:jobs` as a supervised Node.js process, or configure the protected scheduler described in the guide. The web server alone does not drain the queue. Superadmins can review and retry failed jobs at `/superadmin/jobs`.
+
+The facility map now uses indexed map coordinates and server clusters. Existing facilities require the reviewed `migrate:camp-map-points` backfill before switching map traffic; see the rollout guide. Calendar feeds return at most 100 items by default (200 maximum), with a cursor for the next page and counts over the entire matching set.

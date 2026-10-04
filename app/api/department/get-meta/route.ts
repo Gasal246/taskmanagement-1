@@ -7,10 +7,9 @@ import Location_departments from "@/models/location_departments.model";
 import Region_departments from "@/models/region_departments.model";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function GET(req: NextRequest) {
   try {
+        await connectDB();
     const session: any = await auth();
     if (!session) {
       return NextResponse.json({ message: "Un-Authorized Access", status: 401 }, { status: 401 });

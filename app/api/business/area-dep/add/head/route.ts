@@ -1,10 +1,9 @@
+import { authorizeOrganizationMutation } from "@/lib/organization-access";
 import connectDB from "@/lib/mongo";
 import Area_dep_heads from "@/models/area_dep_heads.model";
 import Roles from "@/models/roles.model";
 import User_roles from "@/models/user_roles.model";
 import { NextRequest, NextResponse } from "next/server";
-
-connectDB();
 
 interface Body {
     user_id: string;
@@ -13,6 +12,9 @@ interface Body {
 
 export async function POST ( req: NextRequest ) {
     try {
+        await connectDB();
+        const accessDenied = await authorizeOrganizationMutation(req);
+        if (accessDenied) return accessDenied;
         const formData = await req.formData();
         const bodyData: any = Object.fromEntries(formData);
         const body = JSON.parse(bodyData?.body) as Body;
@@ -28,7 +30,7 @@ export async function POST ( req: NextRequest ) {
             await newUserRole.save();
         }
 
-        const areaDepHead = await Area_dep_heads.findOne({ dep_id: body.dep_id, user_id: body.user_id });
+        const areaDepHead = await Area_dep_heads.findOne({ area_dep_id: body.dep_id, user_id: body.user_id });
         if(areaDepHead?.status === 0) {
             await Area_dep_heads.findByIdAndUpdate(areaDepHead?._id, { status: 1 });
             return NextResponse.json({ message: "Area Department Head added successfully", status: 200 }, { status: 200 });

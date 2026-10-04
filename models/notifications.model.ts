@@ -1,10 +1,10 @@
-import mongoose, { Document, ObjectId, Schema } from "mongoose";
+import mongoose, { Document, Types, Schema } from "mongoose";
 import { NOTIFICATION_RETENTION_SECONDS } from "@/lib/constants";
 
 export interface INotification extends Document {
-  _id: ObjectId;
-  recipient_id: ObjectId;
-  sender_id: ObjectId | null;
+  _id: Types.ObjectId;
+  recipient_id: Types.ObjectId;
+  sender_id: Types.ObjectId | null;
   kind: string;
   title: string;
   body: string;
@@ -33,6 +33,9 @@ NotificationSchema.index(
   { createdAt: 1 },
   { expireAfterSeconds: NOTIFICATION_RETENTION_SECONDS }
 );
+
+NotificationSchema.index({ recipient_id: 1, read_at: 1, createdAt: -1 });
+NotificationSchema.index({ recipient_id: 1, createdAt: -1 });
 
 const Notifications =
   mongoose.models?.notifications ||

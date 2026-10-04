@@ -1,13 +1,13 @@
+import { authorizeEnquiry } from "@/lib/enquiries/access";
 import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import Eq_enquiry_comments from "@/models/eq_enquiry_comments.model";
 import Eq_enquiry from "@/models/eq_enquiries.model";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function GET(req: NextRequest) {
   try {
+        await connectDB();
     const session: any = await auth();
     if (!session) {
       return NextResponse.json({ message: "Unauthorized Access", status: 401 }, { status: 401 });
@@ -19,6 +19,9 @@ export async function GET(req: NextRequest) {
     if (!enquiryId) {
       return NextResponse.json({ message: "Enquiry ID is required", status: 400 }, { status: 400 });
     }
+
+        const denied = await authorizeEnquiry(enquiryId);
+        if (denied) return denied;
 
     let comments = await Eq_enquiry_comments.find({ enquiry_id: enquiryId })
       .sort({ createdAt: -1 })

@@ -1,3 +1,4 @@
+import { authorizeOrganizationMutation } from "@/lib/organization-access";
 import connectDB from "@/lib/mongo";
 import Area_dep_heads from "@/models/area_dep_heads.model";
 import Area_dep_staffs from "@/models/area_dep_staffs.model";
@@ -14,8 +15,6 @@ import {
   getUserActiveProjectTaskUsage,
   hasUsageBlocks,
 } from "@/app/api/helpers/user-role-usage-guard";
-
-connectDB();
 
 const DEPARTMENT_ASSIGNMENT_MODELS: Record<string, any> = {
   region_dep_heads: Region_dep_heads,
@@ -49,6 +48,9 @@ const ROLE_NAME_BY_MODEL: Record<string, string> = {
 
 export async function POST(req: NextRequest) {
   try {
+        await connectDB();
+        const denied = await authorizeOrganizationMutation(req);
+        if (denied) return denied;
     const { assignmentId, assignmentModel } = await req.json();
 
     if (!assignmentId || !assignmentModel) {

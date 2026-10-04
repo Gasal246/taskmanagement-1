@@ -1,13 +1,11 @@
 import connectDB from "@/lib/mongo";
 import Business_locations from "@/models/business_locations.model";
 import Location_departments from "@/models/location_departments.model";
-import { cp } from "fs";
 import { NextRequest, NextResponse } from "next/server";
-
-connectDB();
 
 export async function GET(req:NextRequest){
     try{
+        await connectDB();
         const {searchParams} = new URL(req.url);
         const location_id = searchParams.get("location_id");
         if(!location_id) return NextResponse.json({message: "Location ID is required", status: 400}, {status: 400});

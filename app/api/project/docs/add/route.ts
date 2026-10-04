@@ -6,10 +6,9 @@ import { authorizeProjectRequest } from "@/app/api/helpers/project-access";
 import ProjectTeams from "@/models/project_team.model";
 import ProjectTeamMembers from "@/models/project_team_members.model";
 
-connectDB();
-
 export async function POST(req: NextRequest) {
   try {
+        await connectDB();
     const formdata = await req.formData();
     const formData: any = Object.fromEntries(formdata);
     const body = JSON.parse(formData?.body || "{}");

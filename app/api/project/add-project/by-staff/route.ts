@@ -16,8 +16,6 @@ import Area_dep_staffs from "@/models/area_dep_staffs.model";
 import Location_dep_staffs from "@/models/location_dep_staffs.model";
 import Business_regions from "@/models/business_regions.model";
 import Project_Departments from "@/models/project_departments.model";
-connectDB();
-
 interface Body {
     project_name: string,
     project_description: string,
@@ -49,6 +47,7 @@ interface Body {
 
 export async function POST(req: NextRequest){
     try{
+        await connectDB();
         const session: any = await auth();
         if(!session) return new NextResponse("Un Authorized Access", { status: 401 });
 

@@ -1,9 +1,9 @@
-import mongoose, { Document, ObjectId, Schema } from "mongoose";
+import mongoose, { Document, Types, Schema } from "mongoose";
 
 export interface IActivityCommentRead extends Document {
-  _id: ObjectId;
-  comment_id: ObjectId;
-  user_id: ObjectId;
+  _id: Types.ObjectId;
+  comment_id: Types.ObjectId;
+  user_id: Types.ObjectId;
   seen_at: Date;
 }
 

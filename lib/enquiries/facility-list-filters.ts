@@ -10,6 +10,7 @@ export async function parseFacilityCatalogueFilters(searchParams: Pick<URLSearch
   const project_sector = searchParams.get("project_sector")?.trim() || "";
   const facility_type = searchParams.get("facility_type")?.trim() || "";
   const solutions_required = Array.from(new Set((searchParams.get("solutions_required") || "").split(",").map((code) => code.trim()).filter(Boolean)));
+  if (!project_sector && !facility_type && !solutions_required.length) return { project_sector, facility_type, solutions_required };
   const catalogue = await getEnquiryCatalogue();
   const sector = catalogue.project_sectors.find((item) => item.key === project_sector && item.is_active);
   if (project_sector && !sector) throw new FacilityCatalogueFilterError("Select a valid active project sector");

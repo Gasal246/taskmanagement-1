@@ -1,3 +1,4 @@
+import { useSession } from "next-auth/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { AcceptEnquiryEdits, ActivateDeactivateEqAgents, ActivateEqCamp, AddEnquiryCatalogueItem, AddEqCustomMapPin, AddEqUser, AddEnquiryComment, AddNewCampContact, AddNewContactAgent, AddNewEnquiry, AddNewEqArea, AddNewEqCamp, AddNewEqCity, AddNewEqCountry, AddNewEqHeadOffice, AddNewEqProvince, AddNewEqRegion, AddNewStaffEqHeadOffice, AssignEqCamptoEnquiry, CloseEqnuiry, DeleteEnquiryComment, DeleteEqCustomMapPin, EnquiryToProject, ForwardEnquiryByStaff, ForwardHistory, GetAccessEnquiriesForStaffs, GetAgentEnquiries, GetAgentsByBusiness, GetAllEnquiryHistoryForStaffs, GetEnquiriesWithFilters, GetEnquiryById, GetEnquiryByIdForStaffs, GetEnquiryCatalogue, GetEnquiryComments, GetEnquiryContacts, GetEnquiryHistories, GetEnquiryHistoryById, GetEqAgentByID, GetEqAreaById, GetEqAreaProfile, GetEqAreasByCity,
      GetEqAreasFiltered,
@@ -381,10 +382,18 @@ export const useGetEqCampsFiltered = (queryParams: Record<string, string | numbe
 
 //Get Camps for map
 export const useGetEqCampsForMap = (queryParams: Record<string, string | number | undefined>, enabled = true) => {
+    const { data: session } = useSession();
     return useQuery({
-        queryKey: ["camps-map", queryParams],
-        queryFn: () => GetEqCampsForMap(queryParams),
-        enabled,
+        queryKey: ["camps-map", session?.user?.id, queryParams],
+        queryFn: ({ signal }) => GetEqCampsForMap(queryParams, signal),
+        enabled: enabled && Boolean(session?.user?.id),
+        gcTime: queryParams.mode === "viewport" ? 30_000 : 300_000,
+        placeholderData: (previous, previousQuery) => {
+            const previousParams = previousQuery?.queryKey[2] as typeof queryParams | undefined;
+            return queryParams.mode === "viewport" && previousQuery?.queryKey[1] === session?.user?.id
+                && ["mode", "country_id", "region_id", "province_id"].every(key => previousParams?.[key] === queryParams[key])
+                ? previous : undefined;
+        },
     })
 }
 
@@ -458,9 +467,11 @@ export const useGetAgentsByBusiness = (business_id: string, search: string) => {
 
 //Get Enquiries with Filters
 export const useGetEnquiriesWithFilters = (queryParams: Record<string, string | undefined>) => {
+    const { data: session } = useSession();
     return useQuery({
-        queryKey: ["enquiries", queryParams],
-        queryFn: () => GetEnquiriesWithFilters(queryParams),
+        queryKey: ["enquiries", "admin", session?.user?.id, queryParams],
+        queryFn: ({ signal }) => GetEnquiriesWithFilters(queryParams, signal),
+        enabled: Boolean(session?.user?.id),
     })
 }
 
@@ -472,11 +483,12 @@ export const useExportEnquiries = () => {
 }
 
 //Get Enquiry by ID
-export const useGetEnquiryById = (enquiry_id:string) => {
+export const useGetEnquiryById = (enquiry_id:string, mode: "admin" | "staff" = "admin") => {
+    const { data: session, status } = useSession();
     return useQuery({
-        queryKey: ["enquiry", enquiry_id],
-        queryFn: () => GetEnquiryById(enquiry_id),
-        enabled: !!enquiry_id
+        queryKey: ["enquiry", enquiry_id, mode, session?.user?.id],
+        queryFn: () => (mode === "staff" ? GetEnquiryByIdForStaffs : GetEnquiryById)(enquiry_id),
+        enabled: !!enquiry_id && status === "authenticated",
     })
 }
 
@@ -504,11 +516,14 @@ export const useAddEqUser = () => {
 }
 
 //Get All Histories of Enquiry
-export const useGetEnquiryHistories = (enquiry_id: string) => {
+export const useGetEnquiryHistories = (enquiry_id: string, options: Record<string, string | number> = {}, mode: "admin" | "staff" = "admin") => {
+    const { data: session, status } = useSession();
     return useQuery({
-        queryKey: ["histories", enquiry_id],
-        queryFn: () => GetEnquiryHistories(enquiry_id),
-        enabled: !!enquiry_id,
+        queryKey: ["histories", enquiry_id, mode, session?.user?.id, options],
+        queryFn: ({ signal }) => (mode === "staff" ? GetAllEnquiryHistoryForStaffs : GetEnquiryHistories)(enquiry_id, options, signal),
+        placeholderData: (previous, previousQuery) => previousQuery?.queryKey.slice(0, 4).every((key, index) => key === ["histories", enquiry_id, mode, session?.user?.id][index]) ? previous : undefined,
+        gcTime: 60_000,
+        enabled: !!enquiry_id && status === "authenticated",
     })
 }
 
@@ -553,29 +568,19 @@ export const useGetEnquiryHistoryById = (history_id:string) => {
 
 //Get Access Enquiries for staffs
 export const useGetAccessEnquiriesForStaffs = (queryParams: Record<string, string | undefined>) => {
+    const { data: session } = useSession();
     return useQuery({
-        queryKey: ["enquiries", queryParams],
-        queryFn: () => GetAccessEnquiriesForStaffs(queryParams),
+        queryKey: ["enquiries", "staff", session?.user?.id, queryParams],
+        queryFn: ({ signal }) => GetAccessEnquiriesForStaffs(queryParams, signal),
+        enabled: Boolean(session?.user?.id),
     })
 }
 
 //Get Enquiry by ID for Staffs
-export const useGetEnquiryByIdForStaffs = (enquiry_id: string) => {
-    return useQuery({
-        queryKey: ["enquiry", enquiry_id],
-        queryFn: ()=> GetEnquiryByIdForStaffs(enquiry_id),
-        enabled: !!enquiry_id
-    })
-}
+export const useGetEnquiryByIdForStaffs = (enquiry_id: string) => useGetEnquiryById(enquiry_id, "staff");
 
 //Get All Enquiry Histories for staffs
-export const useGetAllEnquiryHistoryForStaffs = (enquiry_id:string) => {
-    return useQuery({
-        queryKey: ["histories", enquiry_id],
-        queryFn: ()=> GetAllEnquiryHistoryForStaffs(enquiry_id),
-        enabled: !!enquiry_id
-    })
-}
+export const useGetAllEnquiryHistoryForStaffs = (enquiry_id:string, options: Record<string, string | number> = {}) => useGetEnquiryHistories(enquiry_id, options, "staff");
 
 //Get User Assinged Enquiries
 export const useGetUserAssignedEnquiries = (queryParams: Record <string, string | undefined>) => {

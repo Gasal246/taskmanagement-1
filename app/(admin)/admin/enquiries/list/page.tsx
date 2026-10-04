@@ -1,6 +1,7 @@
 "use client";
 import { periodBounds } from "@/lib/enquiries/period";
 import EnquiryCard from "@/components/enquiries/EnquiryCard";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import EnquiryCompletionFilters, { completionFilterDefaults } from "@/components/enquiries/EnquiryCompletionFilters";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -170,14 +171,18 @@ export default function EnquiriesPage() {
 
   const normalizedFilters = useMemo(() => ({
     ...filters,
+    business_id: businessData?._id || "",
     ...periodBounds(filters.period_preset || "all", filters.period_start, filters.period_end),
     status: filters.status === "all" ? "" : filters.status,
     next_action: filters.next_action === "all" ? "" : filters.next_action,
     facility_type: filters.project_sector ? filters.facility_type : "",
-  }), [filters]);
+    is_active: activeListFilter === "waitingApproval" ? "false" : "",
+  }), [filters, activeListFilter, businessData?._id]);
+
+  const debouncedFilters = useDebouncedValue(normalizedFilters);
 
   // Queries
-  const { data: enquiries, isLoading } = useGetEnquiriesWithFilters({ ...normalizedFilters, page: page.toString(), limit: limit.toString() });
+  const { data: enquiries, isLoading } = useGetEnquiriesWithFilters({ ...debouncedFilters, page: page.toString(), limit: limit.toString() });
   const { data: catalogueData, isLoading: isCatalogueLoading } = useGetEnquiryCatalogue();
   const { mutateAsync: exportEnquiries, isPending: isExporting } = useExportEnquiries();
   const { mutateAsync: GetCountries, isPending: isCompanyLoading } = useGetEqCountries();
@@ -258,82 +263,16 @@ export default function EnquiriesPage() {
 
   const updateFilter = (key: string, value: any) => {
     const nextValue = value === undefined ? "" : value;
-    let changed = false;
-    setFilters((prev: any) => {
-      if (prev[key] === nextValue) {
-        return prev;
-      }
-      changed = true;
-      return {
-        ...prev,
-        [key]: nextValue,
-      };
+    if ((filters as any)[key] === nextValue) return;
+    const hierarchy = ["country_id", "region_id", "province_id", "city_id", "area_id", "camp_id"];
+    setFilters((previous: any) => {
+      const next = { ...previous, [key]: nextValue };
+      const index = hierarchy.indexOf(key);
+      if (index >= 0) for (const child of hierarchy.slice(index + 1)) next[child] = "";
+      return next;
     });
-    if (changed) {
-      setPage(1);
-    }
+    setPage(1);
   };
-
-  /* -------------------------------------------------------
-     CASCADING SELECT LOGIC
-  ---------------------------------------------------------*/
-
-  // When country changes
-  useEffect(() => {
-    if (!countryInitialized.current) {
-      countryInitialized.current = true;
-      return;
-    }
-    // reset children
-    updateFilter("region_id", "");
-    updateFilter("province_id", "");
-    updateFilter("city_id", "");
-    updateFilter("area_id", "");
-    updateFilter("camp_id", "");
-  }, [filters.country_id]);
-
-  // When region changes
-  useEffect(() => {
-    if (!regionInitialized.current) {
-      regionInitialized.current = true;
-      return;
-    }
-
-    updateFilter("province_id", "");
-    updateFilter("city_id", "");
-    updateFilter("area_id", "");
-    updateFilter("camp_id", "");
-  }, [filters.region_id]);
-
-  // When province changes
-  useEffect(() => {
-    if (!provinceInitialized.current) {
-      provinceInitialized.current = true;
-      return;
-    }
-    updateFilter("city_id", "");
-    updateFilter("area_id", "");
-    updateFilter("camp_id", "");
-  }, [filters.province_id]);
-
-  // When city changes
-  useEffect(() => {
-    if (!cityInitialized.current) {
-      cityInitialized.current = true;
-      return;
-    }
-    updateFilter("area_id", "");
-    updateFilter("camp_id", "");
-  }, [filters.city_id]);
-
-  // When area changes
-  useEffect(() => {
-    if (!areaInitialized.current) {
-      areaInitialized.current = true;
-      return;
-    }
-    updateFilter("camp_id", "");
-  }, [filters.area_id]);
 
   /* -------------------------------------------------------
           DATE HANDLERS
@@ -392,10 +331,10 @@ export default function EnquiriesPage() {
 
   const enquiryListData = enquiries?.data ?? [];
   const waitingApprovalEnquiries = enquiryListData.filter((e: any) => !e?.is_active);
-  const visibleEnquiries = activeListFilter === "waitingApproval" ? waitingApprovalEnquiries : enquiryListData;
+  const visibleEnquiries = enquiryListData;
   const listFilterBadges = [
-    { key: "all" as const, label: "All Enquiries", count: enquiryListData.length },
-    { key: "waitingApproval" as const, label: "Waiting Approval", count: waitingApprovalEnquiries.length },
+    { key: "all" as const, label: "All Enquiries", count: enquiries?.badges?.all ?? enquiries?.pagination?.totalRecords ?? 0 },
+    { key: "waitingApproval" as const, label: "Waiting Approval", count: enquiries?.badges?.waitingApproval ?? 0 },
   ];
 
   const toggleSelection = (enquiryId: string) => {
@@ -499,13 +438,13 @@ export default function EnquiriesPage() {
         return;
       }
       const exportData = response?.data ?? [];
-      console.log("exportData: ", exportData);
       if (!exportData.length) {
         toast.error("No enquiries found to export.");
         return;
       }
       await exportToExcel(exportData, buildExportFileName("selected"));
-      toast.success(`Exported ${exportData.length} enquiries.`);
+      if (response?.export?.truncated) toast.warning(`Exported ${exportData.length} of ${response.export.totalMatching} matching enquiries. Narrow the filters to export another batch.`);
+      else toast.success(`Exported ${exportData.length} enquiries.`);
       setExportOpen(false);
     } catch (err) {
       console.log(err);
@@ -529,13 +468,13 @@ export default function EnquiriesPage() {
         return;
       }
       const exportData = response?.data ?? [];
-      console.log("exportData: ", exportData);
       if (!exportData.length) {
         toast.error("No enquiries found to export.");
         return;
       }
       await exportToExcel(exportData, buildExportFileName("filtered"));
-      toast.success(`Exported ${exportData.length} enquiries.`);
+      if (response?.export?.truncated) toast.warning(`Exported ${exportData.length} of ${response.export.totalMatching} matching enquiries. Narrow the filters to export another batch.`);
+      else toast.success(`Exported ${exportData.length} enquiries.`);
       setFilteredExportOpen(false);
     } catch (err) {
       console.log(err);
@@ -998,7 +937,7 @@ export default function EnquiriesPage() {
               <button
                 key={badge.key}
                 type="button"
-                onClick={() => setActiveListFilter(badge.key)}
+                onClick={() => { setActiveListFilter(badge.key); setPage(1); }}
                 className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs transition ${isActive
                   ? "border-cyan-400/40 bg-gradient-to-r from-cyan-900/40 via-slate-900 to-emerald-900/30 text-white shadow-sm"
                   : "border-slate-700/80 bg-gradient-to-r from-slate-900/80 to-slate-950/80 text-slate-300 hover:border-slate-600"

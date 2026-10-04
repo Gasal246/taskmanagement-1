@@ -4,10 +4,9 @@ import Eq_enquiry from "@/models/eq_enquiries.model";
 import { NextRequest, NextResponse } from "next/server";
 import "@/models/eq_camps.model";
 
-connectDB();
-
 export async function GET(req:NextRequest){
     try{
+        await connectDB();
         const session:any = await auth();
         if(!session) return NextResponse.json({message: "Unauthorized access", status: 401}, {status: 401});
 

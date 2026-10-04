@@ -1,10 +1,10 @@
-import mongoose, { ObjectId, Schema } from "mongoose";
+import mongoose, { Document, Types, Schema } from "mongoose";
 
 export interface IEq_camp_headoffice extends Document{
-    _id: ObjectId,
-    business_id?: ObjectId,
-    created_by?: ObjectId,
-    createdBy?: ObjectId,
+    _id: Types.ObjectId,
+    business_id?: Types.ObjectId,
+    created_by?: Types.ObjectId,
+    createdBy?: Types.ObjectId,
     phone: String,
     geo_location: String,
     other_details: String,

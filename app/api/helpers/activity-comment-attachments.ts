@@ -113,21 +113,3 @@ export async function validateActivityCommentAttachment(
 
   return { ...attachment, mimeType: expectedMimeType };
 }
-
-export async function deleteActivityCommentAttachment(storagePath?: string | null) {
-  if (!storagePath) return;
-  try {
-    await getAdminStorageBucket().file(storagePath).delete();
-  } catch (error) {
-    if (!isMissingObjectError(error)) throw error;
-  }
-}
-
-export async function deleteActivityCommentAttachments(comments: any[]) {
-  const paths = Array.from(new Set(
-    comments
-      .map((comment) => comment?.attachment?.storage_path)
-      .filter((path): path is string => typeof path === "string" && Boolean(path))
-  ));
-  await Promise.all(paths.map((path) => deleteActivityCommentAttachment(path)));
-}

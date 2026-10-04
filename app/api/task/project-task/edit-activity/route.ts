@@ -1,3 +1,6 @@
+import { inTransaction } from "@/lib/jobs/transaction";
+import { assertUploadNotRetired, enqueueFileCleanup } from "@/lib/jobs/enqueue";
+import { randomUUID } from "node:crypto";
 import { activityScheduleSchema } from "@/lib/activity-schedule";
 import { canEditActivitySchedule } from "@/app/api/helpers/activity-schedule-access";
 import { updateActivitySchedule } from "@/app/api/helpers/activity-schedule-update";
@@ -23,10 +26,8 @@ import {
 import AdminAssignBusiness from "@/models/admin_assign_business.model";
 import BusinessStaffs from "@/models/business_staffs.model";
 import { canChangeActivityStatus } from "@/app/api/helpers/activity-status-access";
-import { ActivityDocumentValidationError, deleteActivityDocuments, validateActivityDocuments } from "@/app/api/helpers/activity-documents";
+import { ActivityDocumentValidationError, validateActivityDocuments } from "@/app/api/helpers/activity-documents";
 import type { ActivityDocument } from "@/lib/activityDocuments";
-connectDB();
-
 interface Body {
     activity_id: string,
     start_date?: string,
@@ -45,6 +46,7 @@ interface Body {
 
 export async function PUT(req: NextRequest) {
     try {
+        await connectDB();
 
         const session: any = await auth();
         if (!session) return new NextResponse("Un Authorized Access", { status: 401 });
@@ -187,64 +189,42 @@ export async function PUT(req: NextRequest) {
                 return NextResponse.json({ message: "You cannot change this activity status", status: 403 }, { status: 403 });
             }
 
-            const changeStatus = await Task_Activities.findByIdAndUpdate(body.activity_id, {
-                $set: { is_done: body.is_done }
-            }, { new: true });
-
-            if (body.is_done && !currentActivity.is_done) {
-                const completedTime = new Date().getTime() -  changeStatus.createdAt.getTime();
-                await Task_Activities.findByIdAndUpdate(changeStatus._id, {
-                    $set: {completed_in: completedTime}
-                })
-                const updatedActivity = await Business_Tasks.findByIdAndUpdate(changeStatus.task_id, {
-                    $inc: { completed_activity: 1 },
-                },{new:true})
-
-                if(updatedActivity.activity_count == updatedActivity.completed_activity){
-                    await Business_Tasks.findByIdAndUpdate(updatedActivity._id, {
-                        $set: {status: "Completed"}
-                    })
-                    if(updatedActivity.is_project_task){
-                        const newFLow = new Flow_Log({
-                            user_id: session?.user?.id,
-                            Log: `${updatedActivity.task_name} Task has been marked as Completed`,
-                            task_id: updatedActivity._id,
-                            project_id: updatedActivity.project_id || "",
-                            description: "Task Marked as complete"
-                        })
-                        await newFLow.save();
-                    }
+            if (typeof body.is_done !== "boolean") return NextResponse.json({ message: "is_done must be a boolean" }, { status: 400 });
+            const eventKey = `activity:${body.activity_id}:completed:${randomUUID()}`;
+            await inTransaction(async dbSession => {
+                const current: any = await Task_Activities.findById(body.activity_id).session(dbSession);
+                if (!current) throw new Error("Activity was deleted while changing status");
+                if (!(adminAccess || (staffAccess && canChangeActivityStatus(task, current, actorId)))) {
+                    throw new Error("Activity assignment changed. Refresh before updating status.");
                 }
-
-                const taskId = changeStatus?.task_id?.toString();
-                if (actor?._id && taskId) {
-                    await notifyTaskActivityChange({
-                        req,
-                        taskId,
-                        activityId: changeStatus?._id?.toString(),
-                        activityTitle: changeStatus?.activity || "",
-                        activityDescription: changeStatus?.description || "",
-                        activityAssignedTo: changeStatus?.assigned_to?.toString() || null,
-                        action: "completed",
-                        actorId: String(actor._id),
-                        actorName: actor?.name || "User",
-                    });
+                if (Boolean(current.is_done) === body.is_done) return true;
+                const changeStatus: any = await Task_Activities.findByIdAndUpdate(current._id, { $set: {
+                    is_done: body.is_done,
+                    completed_in: body.is_done ? Date.now() - current.createdAt.getTime() : null,
+                } }, { new: true, session: dbSession });
+                const updatedTask: any = await Business_Tasks.findByIdAndUpdate(current.task_id, {
+                    $inc: { completed_activity: body.is_done ? 1 : -1 },
+                }, { new: true, session: dbSession });
+                if (!updatedTask) throw new Error("Task was deleted while changing activity status");
+                const completed = updatedTask.activity_count === updatedTask.completed_activity;
+                await Business_Tasks.findByIdAndUpdate(updatedTask._id, {
+                    $set: { status: completed ? "Completed" : "In Progress" },
+                }, { session: dbSession });
+                if (completed && body.is_done && updatedTask.is_project_task) {
+                    await new Flow_Log({ user_id: session.user.id,
+                        Log: `${updatedTask.task_name} Task has been marked as Completed`,
+                        task_id: updatedTask._id, project_id: updatedTask.project_id || "",
+                        description: "Task Marked as complete",
+                    }).save({ session: dbSession });
                 }
-            }
-
-            if (!body.is_done && currentActivity.is_done) {
-                await Task_Activities.findByIdAndUpdate(changeStatus._id, {
-                    $set: {completed_in: null}
-                })
-                const updatedActivity = await Business_Tasks.findByIdAndUpdate(changeStatus.task_id, {
-                    $inc: { completed_activity: -1 },
-                },{new:true})
-                if (updatedActivity.completed_activity < updatedActivity.activity_count) {
-                    await Business_Tasks.findByIdAndUpdate(updatedActivity._id, {
-                        $set: {status: "In Progress"}
-                    })
-                }
-            }
+                if (body.is_done && actor?._id) await notifyTaskActivityChange({ req, dbSession, eventKey,
+                    taskId: String(current.task_id), activityId: String(current._id),
+                    activityTitle: changeStatus.activity || "", activityDescription: changeStatus.description || "",
+                    activityAssignedTo: changeStatus.assigned_to?.toString() || null, action: "completed",
+                    actorId: String(actor._id), actorName: actor.name || "User",
+                });
+                return true;
+            });
 
             return NextResponse.json({
                 message: body.is_done ? "Activity marked as completed" : "Activity marked as not completed",
@@ -313,29 +293,43 @@ export async function PUT(req: NextRequest) {
 
             if (!task) return NextResponse.json({ message: "Task not found" }, { status: 404 });
             if (Object.prototype.hasOwnProperty.call(body, "documents")) {
+                if (!task.is_project_task && !(await canEditActivitySchedule(req, task, actor))) {
+                    return NextResponse.json({ message: "You cannot edit this activity's files" }, { status: 403 });
+                }
                 updateFields.documents = await validateActivityDocuments(body.documents, { taskId: String(currentActivity.task_id) });
             }
-            if (hasScheduleUpdates) {
-                if (!(await canEditActivitySchedule(req, task, actor))) {
-                    return NextResponse.json({ message: "You cannot edit this activity schedule" }, { status: 403 });
-                }
-                const result = await updateActivitySchedule({ current: currentActivity, body, actor, contentUpdates: updateFields });
-                if (result.status === 200 && updateFields.documents) {
-                    const retained = new Set(updateFields.documents.map((document: any) => document.storagePath));
-                    await deleteActivityDocuments((currentActivity.documents || []).filter((document: any) => !retained.has(document.storagePath)));
-                }
+            if (hasScheduleUpdates && !(await canEditActivitySchedule(req, task, actor))) {
+                return NextResponse.json({ message: "You cannot edit this activity schedule" }, { status: 403 });
+            }
+            if (updateFields.documents) {
+                const result = await inTransaction(async dbSession => {
+                    const fresh: any = await Task_Activities.findById(body.activity_id).session(dbSession).lean();
+                    if (!fresh) return { status: 404, message: "Activity not found" };
+                    // An old editor must not overwrite a newer attachment list.
+                    if (JSON.stringify(fresh.documents || []) !== JSON.stringify(currentActivity.documents || [])) {
+                        return { status: 409, message: "Activity files changed. Refresh before saving." };
+                    }
+                    const existing = new Set((fresh.documents || []).map((document: any) => document.storagePath));
+                    for (const document of updateFields.documents) {
+                        if (!existing.has(document.storagePath)) await assertUploadNotRetired(document.storagePath, dbSession);
+                    }
+                    let result = { status: 200, message: "Activity Updated" };
+                    if (hasScheduleUpdates) result = await updateActivitySchedule({ current: fresh, body, actor, contentUpdates: updateFields, dbSession });
+                    else await Task_Activities.findByIdAndUpdate(body.activity_id, { $set: updateFields }, { session: dbSession });
+                    if (result.status === 200) {
+                        const retained = new Set(updateFields.documents.map((document: any) => document.storagePath));
+                        await enqueueFileCleanup((fresh.documents || []).filter((document: any) => !retained.has(document.storagePath))
+                            .map((document: any) => document.storagePath), dbSession);
+                    }
+                    return result;
+                });
                 return NextResponse.json(result, { status: result.status });
             }
-
-            await Task_Activities.findByIdAndUpdate(body.activity_id, {
-                $set: updateFields
-            });
-
-            if (updateFields.documents) {
-                const retained = new Set(updateFields.documents.map((document: any) => document.storagePath));
-                const removed = (currentActivity.documents || []).filter((document: any) => !retained.has(document.storagePath));
-                await deleteActivityDocuments(removed);
+            if (hasScheduleUpdates) {
+                const result = await updateActivitySchedule({ current: currentActivity, body, actor, contentUpdates: updateFields });
+                return NextResponse.json(result, { status: result.status });
             }
+            await Task_Activities.findByIdAndUpdate(body.activity_id, { $set: updateFields });
 
             return NextResponse.json({ message: "Activity Updated", status: 200 }, { status: 200 });
         }

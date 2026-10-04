@@ -1,9 +1,8 @@
+import { authorizeOrganizationMutation } from "@/lib/organization-access";
 import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import Eq_enquiry_users from "@/models/eq_enquiry_users.model";
 import { NextRequest, NextResponse } from "next/server";
-
-connectDB();
 
 interface IBody {
     user_id: string,
@@ -13,6 +12,9 @@ interface IBody {
 
 export async function POST(req: NextRequest){
     try{
+        await connectDB();
+        const denied = await authorizeOrganizationMutation(req);
+        if (denied) return denied;
         const session: any = await auth();
         if(!session) return NextResponse.json({message: "Unauthorized Access", status: 401}, {status: 401});
         const body: IBody = await req.json();

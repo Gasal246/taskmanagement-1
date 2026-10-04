@@ -2,10 +2,9 @@ import connectDB from "@/lib/mongo";
 import Eq_area from "@/models/eq_area.model";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function GET(req:NextRequest){
     try{
+        await connectDB();
         const {searchParams} = new URL(req.url);
         const area_id = searchParams.get("area_id");
 

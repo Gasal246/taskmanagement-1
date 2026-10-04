@@ -1,3 +1,4 @@
+import { authorizeCampMutation } from "@/lib/enquiries/access";
 import Eq_camp_solutions from "@/models/eq_camp_solutions.model";
 import connectDB from "@/lib/mongo";
 import Eq_camp_client_company from "@/models/eq_camp_client_company.model";
@@ -18,12 +19,14 @@ import Eq_enquiry_solutions from "@/models/eq_enquiry_solutions.model";
 import { message } from "antd";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function DELETE(req:NextRequest){
     try{
+        await connectDB();
         const {searchParams} = new URL(req.url);
         const camp_id:any = searchParams.get("camp_id");
+
+        const denied = await authorizeCampMutation(String(camp_id));
+        if (denied) return denied;
 
         const isEnquiryAdded:any = await Eq_enquiry.findOne({camp_id: camp_id}).lean();
         if(isEnquiryAdded){

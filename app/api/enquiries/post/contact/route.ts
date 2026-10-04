@@ -1,8 +1,7 @@
+import { enquiryActor, editableEnquiryForCamp } from "@/lib/enquiries/access";
 import connectDB from "@/lib/mongo";
 import Eq_camp_contacts from "@/models/eq_camp_contacts.model";
 import { NextRequest, NextResponse } from "next/server";
-
-connectDB();
 
 interface IBody {
     camp_id: string,
@@ -16,10 +15,16 @@ interface IBody {
 
 export async function POST(req:NextRequest){
     try{
+        await connectDB();
         let body : IBody = await req.json();
 
+        const actor = await enquiryActor();
+        if (!actor) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+        const enquiry = await editableEnquiryForCamp(body.camp_id, actor);
+        if (!enquiry) return NextResponse.json({ message: "You cannot change contacts for this Facility" }, { status: 403 });
         const newContact = new Eq_camp_contacts({
             camp_id: body.camp_id,
+            enquiry_id: enquiry._id,
             contact_name: body.contact_name,
             contact_email: body.contact_email,
             contact_phone: body.contact_phone,

@@ -1,3 +1,5 @@
+import { auth } from "@/auth";
+import { canAccessBusiness } from "@/lib/server-access";
 import connectDB from "@/lib/mongo";
 import Business_staffs from "@/models/business_staffs.model";
 import User_skills from "@/models/user_skills.model";
@@ -6,16 +8,18 @@ import Task_Activities from "@/models/task_activities.model";
 import { NextRequest, NextResponse } from "next/server";
 import '@/models/business_skills.model';
 
-connectDB();
-
 export async function GET(req:NextRequest){
     try{
+        await connectDB();
         const {searchParams} = new URL(req.url);
         const business_id = searchParams.get("business_id");
         const skill_id = searchParams.get("skill_id");
         if (!business_id) {
             return NextResponse.json({ message: "Business ID is required", status: 400 }, { status: 400 });
         }
+        const session = await auth();
+        if (!session?.user?.id) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+        if (!session.user.is_super && !await canAccessBusiness(session.user.id, business_id)) return NextResponse.json({ message: "Forbidden" }, { status: 403 });
         const staffs = await Business_staffs.find({ business_id: business_id, status: 1 })
             .populate({
                 path: "user_id",
@@ -25,22 +29,22 @@ export async function GET(req:NextRequest){
             .lean();
 
         const activeStaffs = staffs.filter((staff: any) => staff?.user_id);
-        const filteredStaffs: any[] = [];
-        for (const staff of activeStaffs) {
-            const skills = await User_skills.find({
-                user_id: staff.user_id._id,
-                status: 1,
-                ...(skill_id ? { skill_id } : {})
-            })
-                .populate("skill_id", "skill_name")
-                .lean();
-
-            if (skill_id && skills.length === 0) {
-                continue;
-            }
-            staff.skills = skills;
-            filteredStaffs.push(staff);
+        const skills = await User_skills.find({
+            user_id: { $in: activeStaffs.map((staff: any) => staff.user_id._id) },
+            status: 1,
+            ...(skill_id ? { skill_id } : {}),
+        }).populate("skill_id", "skill_name").lean();
+        const skillsByUser = new Map<string, any[]>();
+        for (const skill of skills) {
+            const key = String(skill.user_id);
+            const rows = skillsByUser.get(key) || [];
+            rows.push(skill);
+            skillsByUser.set(key, rows);
         }
+        const filteredStaffs = activeStaffs.filter((staff: any) => {
+            staff.skills = skillsByUser.get(String(staff.user_id._id)) || [];
+            return !skill_id || staff.skills.length > 0;
+        });
 
         const staffUserIds = filteredStaffs
             .map((staff: any) => staff?.user_id?._id)

@@ -1,9 +1,8 @@
+import { authorizeEnquiry } from "@/lib/enquiries/access";
 import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import Eq_enquiry_comments from "@/models/eq_enquiry_comments.model";
 import { NextRequest, NextResponse } from "next/server";
-
-connectDB();
 
 interface Body {
   comment_id?: string;
@@ -12,6 +11,7 @@ interface Body {
 
 export async function PUT(req: NextRequest) {
   try {
+        await connectDB();
     const session: any = await auth();
     if (!session) {
       return NextResponse.json({ message: "Unauthorized Access", status: 401 }, { status: 401 });
@@ -36,6 +36,9 @@ export async function PUT(req: NextRequest) {
     if (String(comment.user_id) !== String(session?.user?.id)) {
       return NextResponse.json({ message: "You can only edit your own comments", status: 403 }, { status: 403 });
     }
+
+    const denied = await authorizeEnquiry(String(comment.enquiry_id));
+    if (denied) return denied;
 
     comment.comment = nextComment;
     await comment.save();

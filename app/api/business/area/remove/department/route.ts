@@ -1,11 +1,13 @@
+import { authorizeOrganizationMutation } from "@/lib/organization-access";
 import connectDB from "@/lib/mongo";
 import Area_departments from "@/models/area_departments.model";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function POST ( req: NextRequest ) {
     try {
+        await connectDB();
+        const accessDenied = await authorizeOrganizationMutation(req);
+        if (accessDenied) return accessDenied;
         const { AreaDepId } = await req.json();
 
         const area_dep = await Area_departments.findById(AreaDepId);

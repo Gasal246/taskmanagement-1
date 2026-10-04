@@ -3,10 +3,9 @@ import Business_areas from "@/models/business_areas.model";
 import Region_departments from "@/models/region_departments.model";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function GET(req:NextRequest){
     try{
+        await connectDB();
         const {searchParams} = new URL(req.url);
         const region_id = searchParams.get("region_id");
         if(!region_id) return NextResponse.json({message: "Region ID is required", status: 400}, {status: 400});

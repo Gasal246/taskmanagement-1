@@ -1,3 +1,4 @@
+import { authorizeCampMutation } from "@/lib/enquiries/access";
 import Eq_camp_solutions from "@/models/eq_camp_solutions.model";
 import { saveCampWithSolutions } from "@/app/api/helpers/camp-solutions";
 import { CatalogueValidationError, validateDynamicClassification, validateDynamicSolutions } from "@/lib/enquiries/catalogue-server";
@@ -7,8 +8,6 @@ import Eq_camp_landlord from "@/models/eq_camp_landlord.model";
 import Eq_camp_realestate from "@/models/eq_camp_realestate.model";
 import Eq_camps from "@/models/eq_camps.model";
 import { NextRequest, NextResponse } from "next/server";
-
-connectDB();
 
 interface IBody {
     camp_name?: string,
@@ -40,7 +39,11 @@ interface IBody {
 
 export async function PUT(req: NextRequest){
     try{
+        await connectDB();
         const body: IBody = await req.json();
+        const denied = await authorizeCampMutation(body.camp_id);
+        if (denied) return denied;
+
         const hasSolutions = ["solutions_required", "solution_details", "solution_other", "primary_solution", "commercial_model"].some(key => Object.prototype.hasOwnProperty.call(body, key));
         const existingSolutions: any = hasSolutions ? await Eq_camp_solutions.findOne({ camp_id: body.camp_id }).lean() : null;
         const campToEdit = await Eq_camps.findById(body.camp_id);

@@ -1,3 +1,7 @@
+import { escapeSearch } from "@/lib/search";
+import { auth } from "@/auth";
+import { canAccessBusiness } from "@/lib/server-access";
+import "@/models/business.model";
 import connectDB from "@/lib/mongo";
 import Business from "@/models/business.model";
 import Business_staffs from "@/models/business_staffs.model";
@@ -7,10 +11,9 @@ import User_regions from "@/models/user_regions.model";
 import User_skills from "@/models/user_skills.model";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function GET (req: NextRequest) {
     try {
+        await connectDB();
         const { searchParams } = await req.nextUrl;
         const business_id = await searchParams.get("business_id");
         const region_id = await searchParams.get("region_id");
@@ -22,7 +25,9 @@ export async function GET (req: NextRequest) {
             return NextResponse.json({ error: "Business ID is required" }, { status: 400 });
         }
         
-        await Business.findOne({}).limit(1); // JUST REFRESING THE SCHEMA FOR POPULATING IT
+        const session = await auth();
+        if (!session?.user?.id) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+        if (!session.user.is_super && !await canAccessBusiness(session.user.id, business_id)) return NextResponse.json({ message: "Forbidden" }, { status: 403 });
         const intersectSets = (current: Set<string> | null, next: Set<string>) => {
             if (!current) return next;
             const result = new Set<string>();
@@ -68,7 +73,7 @@ export async function GET (req: NextRequest) {
             select: { password: 0, otp: 0 }
         };
         if (search) {
-            const searchRegex = new RegExp(search, "i");
+            const searchRegex = new RegExp(escapeSearch(search), "i");
             populateOptions.match = {
                 $or: [
                     { name: searchRegex },

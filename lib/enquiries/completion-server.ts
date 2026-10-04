@@ -1,33 +1,16 @@
 import mongoose from 'mongoose';
-import { auth } from '@/auth';
 import Eq_enquiry from '@/models/eq_enquiries.model';
 import Histories from '@/models/eq_enquiry_histories';
 import Access from '@/models/eq_enquiry_access.model';
-import User_roles from '@/models/user_roles.model';
 import Users from '@/models/users.model';
 import Eq_users_log from '@/models/eq_users_log.model';
 import '@/models/roles.model';
 import { actionHistoryFilter, actionProgress, assignmentsFor, historyOrder, idOf, initialActionFor } from './completion';
 
-export async function enquiryActor() {
-  const session: any = await auth();
-  const actorId = idOf(session?.user?.id);
-  if (!mongoose.isValidObjectId(actorId)) return null;
-  const roles = await User_roles.find({ user_id: actorId, status: 1 }).populate({ path: 'role_id', select: 'role_name' }).lean();
-  return { actorId, admin: Boolean(session?.user?.is_super || roles.some((r: any) => r.role_id?.role_name === 'BUSINESS_ADMIN')) };
-}
-export type EnquiryActor = NonNullable<Awaited<ReturnType<typeof enquiryActor>>>;
+import { canAdministerEnquiry, canScheduleAction, type EnquiryActor } from './access';
+export { enquiryActor, canReadEnquiry, canScheduleAction, canAdministerEnquiry, type EnquiryActor } from './access';
 export class EnquiryRequestError extends Error {
   constructor(public status: number, message: string) { super(message); }
-}
-export async function canReadEnquiry(enquiry: any, actor: EnquiryActor) {
-  if (actor.admin || idOf(enquiry.createdBy) === actor.actorId || (enquiry.enquiry_brought_by || []).some((id: any) => idOf(id) === actor.actorId)) return true;
-  if (await Access.exists({ enquiry_id: enquiry._id, user_id: actor.actorId })) return true;
-  return Boolean(await Histories.exists({ enquiry_id: enquiry._id, assigned_to: actor.actorId, ...actionHistoryFilter }));
-}
-export async function canScheduleAction(enquiry: any, actor: EnquiryActor) {
-  if (actor.admin || idOf(enquiry.createdBy) === actor.actorId) return true;
-  return Boolean(await Histories.exists({ enquiry_id: enquiry._id, assigned_to: actor.actorId, ...actionHistoryFilter }));
 }
 export async function actionsForEnquiries(entries: any[]) {
   if (!entries.length) return [];
@@ -49,23 +32,32 @@ export async function actionsForEnquiries(entries: any[]) {
 }
 export async function enrichEnquiries(entries: any[], actor: EnquiryActor) {
   const actions = await actionsForEnquiries(entries);
+  const byEnquiry = new Map<string, any[]>();
+  for (const action of actions) {
+    const key = idOf(action.enquiry_id);
+    const list = byEnquiry.get(key) || [];
+    list.push(action);
+    byEnquiry.set(key, list);
+  }
   return entries.map(entry => {
-    const list = actions.filter(a => idOf(a.enquiry_id) === idOf(entry)).map(action => ({
+    const manages = canAdministerEnquiry(entry, actor);
+    const list = (byEnquiry.get(idOf(entry)) || []).map(action => ({
       ...action, progress: actionProgress(action),
       action_assignments: assignmentsFor(action).map((part: any) => ({ ...part,
         can_complete: Boolean(entry.is_active && part.status === 'pending' && idOf(part.user_id) === actor.actorId),
-        can_cancel: Boolean(part.status === 'pending' && (actor.admin || idOf(part.user_id) === actor.actorId)),
-        can_reopen: Boolean(actor.admin && part.status !== 'pending'),
+        can_cancel: Boolean(part.status === 'pending' && (manages || idOf(part.user_id) === actor.actorId)),
+        can_reopen: Boolean(manages && part.status !== 'pending'),
       })),
     })).sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
     const completed = list.flatMap(action => action.action_assignments.filter((p: any) => p.status === 'completed').map((part: any) => ({ ...part, action: part.performed_action || action.action, action_id: action._id })))
       .sort((a, b) => +new Date(b.completed_at) - +new Date(a.completed_at));
-    const canSchedule = actor.admin || idOf(entry.createdBy) === actor.actorId || list.some(a => a.action_assignments.some((p: any) => idOf(p.user_id) === actor.actorId));
+    const canSchedule = manages || idOf(entry.createdBy) === actor.actorId || list.some(a => a.action_assignments.some((p: any) => idOf(p.user_id) === actor.actorId));
     return { ...entry, actions: list, latest_forward: list.find(a => a.change_type === 'FORWARD' || !a.change_type) || null,
       latest_action: list[0] || null, last_completed_action: completed[0] || null,
       pending_action_parts: list.reduce((sum, a) => sum + a.progress.pending, 0),
       canScheduleAction: Boolean(entry.is_active && canSchedule), canRecordAction: Boolean(entry.is_active && canSchedule),
-      current_actor_id: actor.actorId,
+      current_actor_id: actor.actorId, canAdminister: manages,
+      canEdit: Boolean(canSchedule || (entry.enquiry_brought_by || []).some((id: any) => idOf(id) === actor.actorId)),
     };
   });
 }
@@ -95,12 +87,12 @@ export async function transitionAction(body: any, actor: EnquiryActor) {
   const targetId = body.assignee_id || actor.actorId;
   if (!mongoose.isValidObjectId(targetId) || !Number.isInteger(body.expected_revision) || body.expected_revision < 0) throw new EnquiryRequestError(400, 'Refresh the action before continuing');
   if (body.operation === 'complete' && targetId !== actor.actorId) throw new EnquiryRequestError(403, 'Each assignee must complete their own part');
-  if ((body.operation === 'reopen' || targetId !== actor.actorId) && !actor.admin) throw new EnquiryRequestError(403, 'Only an admin can manage another assignee’s part');
   const session = await mongoose.startSession();
   try {
     await session.withTransaction(async () => {
       const enquiry: any = await Eq_enquiry.findById(body.enquiry_id).session(session);
       if (!enquiry) throw new EnquiryRequestError(404, 'Enquiry not found');
+      if ((body.operation === 'reopen' || targetId !== actor.actorId) && !canAdministerEnquiry(enquiry, actor)) throw new EnquiryRequestError(403, 'Only this enquiry’s administrator can manage another assignee’s part');
       if (body.operation === 'complete' && !enquiry.is_active) throw new EnquiryRequestError(403, 'Admin approval is required before action completion');
       let action: any = await Histories.findOne({ _id: body.action_id, enquiry_id: enquiry._id, ...actionHistoryFilter }).session(session);
       if (!action && idOf(enquiry) === body.action_id) {

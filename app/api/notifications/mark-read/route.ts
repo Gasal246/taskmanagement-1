@@ -5,8 +5,6 @@ import { resolveSessionUserId } from "@/lib/utils";
 import { NextResponse } from "next/server";
 import { NOTIFICATION_RETENTION_MS } from "@/lib/constants";
 
-connectDB();
-
 type Body = {
   ids?: string[];
   all?: boolean;
@@ -14,6 +12,7 @@ type Body = {
 
 export async function POST(req: Request) {
   try {
+        await connectDB();
     const session = await auth();
     const userId = resolveSessionUserId(session);
     if (!userId) {

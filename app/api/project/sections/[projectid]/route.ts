@@ -14,8 +14,6 @@ import { NextRequest, NextResponse } from "next/server";
 import "@/models/users.model";
 import "@/models/project_departments.model";
 
-connectDB();
-
 const validSections = new Set([
   "operations",
   "flow",
@@ -86,6 +84,7 @@ export async function GET(
   context: { params: Promise<{ projectid: string }> }
 ) {
   try {
+        await connectDB();
     const session: any = await auth();
     if (!session) {
       return NextResponse.json({ message: "Un-Authorized Access" }, { status: 401 });

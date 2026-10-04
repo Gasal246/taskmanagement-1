@@ -1,19 +1,19 @@
-import mongoose, { ObjectId, Schema } from "mongoose";
+import mongoose, { Document, Types, Schema } from "mongoose";
 
 export interface IEq_enquiry_histories extends Document {
-    _id: ObjectId,
-    camp_id: ObjectId,
-    enquiry_id: ObjectId,
-    assigned_to: ObjectId[],
-    forwarded_by?: ObjectId,
-    changed_by?: ObjectId,
+    _id: Types.ObjectId,
+    camp_id: Types.ObjectId,
+    enquiry_id: Types.ObjectId,
+    assigned_to: Types.ObjectId[],
+    forwarded_by?: Types.ObjectId,
+    changed_by?: Types.ObjectId,
     change_type?: String,
-    source_forward_id?: ObjectId,
+    source_forward_id?: Types.ObjectId,
     previous_action?: String,
     action_origin?: string,
     action_assignments?: any[],
-    action_id?: ObjectId,
-    action_assignee?: ObjectId,
+    action_id?: Types.ObjectId,
+    action_assignee?: Types.ObjectId,
     changed_fields?: Array<{
         field: String,
         label: String,
@@ -69,7 +69,8 @@ const Eq_enquiry_historiesSchema: Schema = new Schema({
     next_step_date: {type: Date}
 }, {timestamps: true});
 
-Eq_enquiry_historiesSchema.index({ enquiry_id: 1, step_number: -1, createdAt: -1 });
+Eq_enquiry_historiesSchema.index({ assigned_to: 1, createdAt: 1 });
+Eq_enquiry_historiesSchema.index({ enquiry_id: 1, step_number: -1, createdAt: -1, _id: -1 });
 
 if (mongoose.models.eq_enquiry_histories && !mongoose.models.eq_enquiry_histories.schema.path("action_assignments")) {
     mongoose.deleteModel("eq_enquiry_histories");

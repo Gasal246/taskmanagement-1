@@ -1,16 +1,16 @@
-import mongoose, { Schema, Document, ObjectId } from 'mongoose';
+import mongoose, { Schema, Document, Types } from 'mongoose';
 
 export interface IClients extends Document {
   Name: String | null;
-  Region: ObjectId | null;
-  Area: ObjectId | null;
+  Region: Types.ObjectId | null;
+  Area: Types.ObjectId | null;
   Details: String | null;
-  AddedBy: ObjectId[] | [];
-  AdminId: ObjectId | null;
-  OpenedBy: ObjectId[] | [];
+  AddedBy: Types.ObjectId[] | [];
+  AdminId: Types.ObjectId | null;
+  OpenedBy: Types.ObjectId[] | [];
   updatedAt: Date | null;
   createdAt: Date | null;
-  _id: ObjectId;
+  _id: Types.ObjectId;
 }
 
 const ClientsSchema: Schema = new Schema({

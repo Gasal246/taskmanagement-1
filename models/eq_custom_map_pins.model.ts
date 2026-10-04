@@ -1,8 +1,8 @@
-import mongoose, { Document, ObjectId, Schema } from "mongoose";
+import mongoose, { Document, Types, Schema } from "mongoose";
 
 export interface IEqCustomMapPin extends Document {
-  _id: ObjectId;
-  user_id: ObjectId;
+  _id: Types.ObjectId;
+  user_id: Types.ObjectId;
   title: string;
   description: string;
   latitude: number;

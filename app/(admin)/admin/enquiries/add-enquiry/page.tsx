@@ -163,6 +163,9 @@ export default function AddEnquiry() {
     const [countries, setCountries] = useState([]);
     const [docFile, setDocFile] = useState<File | null>(null);
     const [docPreview, setDocPreview] = useState<string | null>(null);
+    useEffect(() => () => {
+        if (docPreview?.startsWith("blob:")) URL.revokeObjectURL(docPreview);
+    }, [docPreview]);
     const [docType, setDocType] = useState<string>('');
     const [uploadingDoc, setUploadingDoc] = useState(false);
     const [uploadedDoc, setUploadedDoc] = useState<{ url: string; name: string; type?: string; storagePath?: string } | null>(null);

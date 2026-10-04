@@ -1,10 +1,10 @@
-import mongoose, { Schema, Document, ObjectId } from 'mongoose';
+import mongoose, { Schema, Document, Types } from 'mongoose';
 
 export interface IBusiness_clients extends Document {
-  _id: ObjectId;
+  _id: Types.ObjectId;
   client_name: String | null;
   short_name: String | null;
-  business_id: ObjectId | null;
+  business_id: Types.ObjectId | null;
   category: String | null;
   industry: String | null;
   business_type: String | null;

@@ -2,132 +2,77 @@ import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import Calendar_Events from "@/models/calendar_events.model";
 import Users from "@/models/users.model";
+import Staff from "@/models/business_staffs.model";
+import Admins from "@/models/admin_assign_business.model";
+import Business from "@/models/business.model";
 import { NextRequest, NextResponse } from "next/server";
 import { resolveActiveBusinessIdForUser } from "@/app/api/helpers/resolve-user-business";
 import { notifyCalendarEventRecipients } from "@/app/api/helpers/calendar-notifications";
-import { HEAD_ROLES } from "@/lib/constants";
+import { getSelectedHeadDirectStaffIds, resolveSelectedHeadContext } from "@/app/api/helpers/head-reassignment-scope";
+import { inTransaction } from "@/lib/jobs/transaction";
+import mongoose from "mongoose";
+import { z } from "zod";
 
-connectDB();
-
-type Body = {
-  title: string;
-  description?: string;
-  start_date: string | Date;
-  end_date: string | Date;
-  attendee_ids?: string[];
-  status?: string;
-};
-
-const getRoleName = (req: NextRequest) => {
-  const roleCookie = req.cookies.get("user_role")?.value || "";
-  try {
-    const parsed = roleCookie ? JSON.parse(roleCookie) : null;
-    return String(parsed?.role_name || parsed?.role || "").toUpperCase();
-  } catch (error) {
-    return "";
-  }
-};
-
-const toIsoDate = (value: string | Date | undefined) => {
-  if (!value) return null;
-  const date = new Date(value);
-  return Number.isNaN(date.valueOf()) ? null : date;
-};
-
+const dateSchema = z.string().datetime({ offset: true }).pipe(z.coerce.date());
+const bodySchema = z.object({
+  title: z.string().trim().min(1).max(200), description: z.string().trim().max(5000).optional().default(""),
+  start_date: dateSchema, end_date: dateSchema,
+  attendee_ids: z.array(z.string().refine(value => mongoose.Types.ObjectId.isValid(value), "Invalid attendee ID")).max(100).optional().default([]),
+  status: z.enum(["To Do", "In Progress", "Completed", "Cancelled"]).optional().default("To Do"),
+}).refine(body => body.end_date >= body.start_date, { message: "End date must be after start date", path: ["end_date"] });
+class InvitationError extends Error {
+  constructor(public status: number, message: string) { super(message); }
+}
 export async function POST(req: NextRequest) {
+  let raw: unknown;
+  try { raw = await req.json(); } catch { return NextResponse.json({ message: "Invalid JSON" }, { status: 400 }); }
+  const parsed = bodySchema.safeParse(raw);
+  if (!parsed.success) return NextResponse.json({ message: parsed.error.issues[0].message }, { status: 400 });
   try {
-    const session: any = await auth();
-    if (!session) {
-      return NextResponse.json({ message: "Unauthorized Access" }, { status: 401 });
+    const session = await auth();
+    if (!session?.user?.id) return NextResponse.json({ message: "Unauthorized Access" }, { status: 401 });
+    await connectDB();
+    const userId = session.user.id;
+    const businessId = await resolveActiveBusinessIdForUser(userId);
+    if (!businessId) return NextResponse.json({ message: "Business assignment not found" }, { status: 400 });
+    const attendeeIds = [...new Set([...parsed.data.attendee_ids, userId])];
+    const otherIds = attendeeIds.filter(id => id !== userId);
+    // Cookie labels are a selection hint, never a grant to invite other users.
+    const admin = await Admins.exists({ user_id: userId, business_id: businessId, status: 1 });
+    if (otherIds.length && !admin && !session.user.is_super) {
+      const context = await resolveSelectedHeadContext(req, userId, businessId);
+      const directStaff = context ? await getSelectedHeadDirectStaffIds(context) : [];
+      if (!context || otherIds.some(id => !directStaff.includes(id))) {
+        return NextResponse.json({ message: "You may invite only staff in your assigned scope" }, { status: 403 });
+      }
     }
-
-    const body: Body = await req.json();
-    const title = String(body?.title || "").trim();
-    const description = String(body?.description || "").trim();
-    const status = String(body?.status || "To Do").trim();
-    const startDate = toIsoDate(body?.start_date);
-    const endDate = toIsoDate(body?.end_date);
-
-    if (!title || !startDate || !endDate) {
-      return NextResponse.json(
-        { message: "Title, start date and end date are required." },
-        { status: 400 }
-      );
-    }
-
-    if (endDate.getTime() < startDate.getTime()) {
-      return NextResponse.json(
-        { message: "End date must be after start date." },
-        { status: 400 }
-      );
-    }
-
-    const businessId = await resolveActiveBusinessIdForUser(session?.user?.id);
-    if (!businessId) {
-      return NextResponse.json(
-        { message: "Business assignment not found." },
-        { status: 400 }
-      );
-    }
-
-    const roleName = getRoleName(req);
-    const isAdmin =
-      roleName === "BUSINESS_ADMIN" ||
-      roleName === "SUPER_ADMIN" ||
-      roleName.includes("ADMIN");
-    const canAssignStaff = isAdmin || HEAD_ROLES.includes(roleName);
-
-    const rawAttendees = Array.isArray(body?.attendee_ids) ? body.attendee_ids : [];
-    const uniqueAttendees = Array.from(
-      new Set(
-        rawAttendees
-          .map((id) => String(id || "").trim())
-          .filter(Boolean)
-      )
-    );
-
-    const attendeeIds = canAssignStaff
-      ? Array.from(new Set([...uniqueAttendees, String(session.user.id)]))
-      : [String(session.user.id)];
-    const sender = await Users.findById(session.user.id).select("name").lean<{ name?: string }>();
-
-    const newEvent = await Calendar_Events.create({
-      business_id: businessId,
-      created_by: session.user.id,
-      attendee_ids: attendeeIds,
-      title,
-      description,
-      status,
-      start_date: startDate,
-      end_date: endDate,
-    });
-
-    if (canAssignStaff && attendeeIds.length > 0) {
-      await notifyCalendarEventRecipients({
-        recipientIds: attendeeIds,
-        senderId: String(session.user.id),
-        senderName: sender?.name || "Admin",
-        eventId: String(newEvent._id),
-        eventTitle: title,
-        description,
-        startDate,
-        endDate,
+    const newEvent = await inTransaction(async dbSession => {
+      const activeBusiness = await Business.exists({ _id: businessId, status: 1 }).session(dbSession);
+      const users = await Users.find({ _id: { $in: attendeeIds }, status: 1 }).select("_id name").session(dbSession).lean();
+      const staff = await Staff.find({ user_id: { $in: attendeeIds }, business_id: businessId, status: 1 }).select("user_id").session(dbSession).lean();
+      const admins = await Admins.find({ user_id: { $in: attendeeIds }, business_id: businessId, status: 1 }).select("user_id").session(dbSession).lean();
+      const members = new Set([...staff, ...admins].map((row: any) => String(row.user_id)));
+      if (!activeBusiness || users.length !== attendeeIds.length || attendeeIds.some(id => !members.has(id))) {
+        throw new InvitationError(400, "Every attendee must be an active member of this business");
+      }
+      const [event] = await Calendar_Events.create([{
+        ...parsed.data, business_id: businessId, created_by: userId, attendee_ids: attendeeIds,
+      }], { session: dbSession });
+      await notifyCalendarEventRecipients({ recipientIds: attendeeIds, senderId: userId,
+        senderName: users.find((user: any) => String(user._id) === userId)?.name || "User",
+        eventId: String(event._id), eventTitle: parsed.data.title, description: parsed.data.description,
+        startDate: parsed.data.start_date, endDate: parsed.data.end_date, dbSession,
       });
-    }
-
+      return event;
+    });
     const populatedEvent = await Calendar_Events.findById(newEvent._id)
       .populate({ path: "created_by", select: "name avatar_url" })
-      .populate({ path: "attendee_ids", select: "name avatar_url" })
-      .lean();
-
-    return NextResponse.json(
-      { message: "Calendar event created.", data: populatedEvent },
-      { status: 201 }
-    );
+      .populate({ path: "attendee_ids", select: "name avatar_url" }).lean();
+    return NextResponse.json({ message: "Calendar event created.", data: populatedEvent }, { status: 201 });
   } catch (error) {
-    console.log("Error while creating calendar event", error);
+    if (error instanceof InvitationError) return NextResponse.json({ message: error.message }, { status: error.status });
+    console.error("Calendar event creation failed");
     return NextResponse.json({ message: "Internal Server Error" }, { status: 500 });
   }
 }
-
 export const dynamic = "force-dynamic";

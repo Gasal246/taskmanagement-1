@@ -1,10 +1,10 @@
-import mongoose, { Schema, Document, ObjectId } from 'mongoose';
+import mongoose, { Schema, Document, Types } from 'mongoose';
 
 export interface IClient_regions extends Document {
-  client_id: ObjectId | null;
-  region_id: ObjectId | null;
+  client_id: Types.ObjectId | null;
+  region_id: Types.ObjectId | null;
   status: Number | null;
-  _id: ObjectId;
+  _id: Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }

@@ -1,7 +1,7 @@
 import axios from "axios";
 
 export async function getCalendarFeed(
-  queryParams: Record<string, string | boolean | undefined>
+  queryParams: Record<string, string | boolean | undefined>, signal?: AbortSignal
 ) {
   try {
     const params = new URLSearchParams();
@@ -13,11 +13,10 @@ export async function getCalendarFeed(
     });
 
     const queryString = params.toString();
-    const response = await axios.get(`/api/calendar/feed${queryString ? `?${queryString}` : ""}`);
+    const response = await axios.get(`/api/calendar/feed${queryString ? `?${queryString}` : ""}`, { signal, timeout: 15_000 });
     return response.data;
   } catch (error) {
-    console.log(error);
-    return { items: [], summary: { total: 0, tasks: 0, enquiries: 0, customEvents: 0 } };
+    throw error;
   }
 }
 

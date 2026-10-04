@@ -40,6 +40,7 @@ const applicationSlice = createSlice({
     name: "application",
     initialState,
     reducers: {
+        resetApplication: () => initialState,
         loadAdminBusiness: (state, action: PayloadAction<any>) => {
             state.businessAdded = action.payload
         },
@@ -104,5 +105,6 @@ export const {
     loadEnquiriesListPage,
     loadAdminEnquiriesListState,
     loadStaffEnquiriesListState
+    ,resetApplication
 } = applicationSlice.actions
 export default applicationSlice.reducer

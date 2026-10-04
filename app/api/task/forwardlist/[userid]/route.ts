@@ -5,10 +5,9 @@ import Business_regions from "@/models/business_regions.model";
 import Users from "@/models/users.model";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function GET (req: NextRequest, context: { params: Promise<{ userid: string }> }) {
     try {
+        await connectDB();
         const { userid } = await context.params;
         const userData = await Users.findById(userid, { Role: 1, Addedby: 1, Area: 1, Region: 1, Department: 1 });
         let fieldsUnder = {

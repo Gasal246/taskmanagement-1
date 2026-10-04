@@ -1,10 +1,10 @@
 import { timeStamp } from "console";
-import mongoose, { ObjectId, Schema } from "mongoose";
+import mongoose, { Document, Types, Schema } from "mongoose";
 
 export interface IEq_region extends Document{
-    _id: ObjectId,
+    _id: Types.ObjectId,
     region_name: String,
-    country_id: ObjectId,
+    country_id: Types.ObjectId,
     createdAt: Date,
     updatedAt: Date
 }

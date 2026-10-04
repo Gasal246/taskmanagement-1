@@ -1,14 +1,14 @@
 /* eslint-disable no-undef */
-importScripts("https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js");
+importScripts("https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js");
 importScripts(
-  "https://www.gstatic.com/firebasejs/10.13.0/firebase-messaging-compat.js"
+  "https://www.gstatic.com/firebasejs/12.19.0/firebase-messaging-compat.js"
 );
 
-const PRECACHE_NAME = "taskmanager-precache-v2";
-const RUNTIME_CACHE_NAME = "taskmanager-runtime-v2";
+const PRECACHE_NAME = "taskmanager-precache-v3";
+const RUNTIME_CACHE_NAME = "taskmanager-runtime-v3";
 const BADGE_CACHE_NAME = "taskmanager-meta-v1";
 const BADGE_COUNT_CACHE_KEY = "/__badge_count__";
-const CORE_ASSETS = ["/", "/logo.png", "/avatar.png", "/manifest.webmanifest"];
+const CORE_ASSETS = ["/offline.html", "/logo.png", "/avatar.png", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -25,7 +25,7 @@ self.addEventListener("activate", (event) => {
         Promise.all(
           keys
             .filter(
-              (key) => key !== PRECACHE_NAME && key !== RUNTIME_CACHE_NAME
+              (key) => key.startsWith("taskmanager-") && key !== PRECACHE_NAME && key !== RUNTIME_CACHE_NAME && key !== BADGE_CACHE_NAME
             )
             .map((key) => caches.delete(key))
         )
@@ -37,29 +37,21 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
   const url = new URL(event.request.url);
-  if (url.origin !== self.location.origin) return;
+  if (url.origin !== self.location.origin || url.pathname.startsWith("/api/")) return;
   // Never cache Next.js internals to avoid stale chunks and broken HMR.
   if (url.pathname.startsWith("/_next/")) return;
 
   if (event.request.mode === "navigate") {
     event.respondWith(
-      fetch(event.request)
-        .then((response) => {
-          const copy = response.clone();
-          caches
-            .open(RUNTIME_CACHE_NAME)
-            .then((cache) => cache.put(event.request, copy))
-            .catch(() => undefined);
-          return response;
-        })
-        .catch(() => caches.match(event.request).then((cached) => cached || caches.match("/")))
+      fetch(event.request).catch(async () =>
+        (await caches.match("/offline.html")) || new Response("You are offline. Reconnect and try again.", { status: 503, headers: { "Content-Type": "text/plain" } })
+      )
     );
     return;
   }
 
-  const isStaticAsset =
-    /\.(?:png|jpg|jpeg|svg|gif|webp|ico|woff2?)$/i.test(url.pathname);
-  if (!isStaticAsset) return;
+  // Cache only known public assets, never arbitrary uploaded/private files.
+  if (!CORE_ASSETS.includes(url.pathname)) return;
 
   event.respondWith(
     caches.match(event.request).then((cached) => {
@@ -176,7 +168,8 @@ self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const data = event.notification?.data || {};
   const relativeUrl = data.link || data.url || "/";
-  const targetUrl = new URL(relativeUrl, self.location.origin).href;
+  const requestedUrl = new URL(relativeUrl, self.location.origin);
+  const targetUrl = requestedUrl.origin === self.location.origin ? requestedUrl.href : self.location.origin + "/";
 
   event.waitUntil(
     clients

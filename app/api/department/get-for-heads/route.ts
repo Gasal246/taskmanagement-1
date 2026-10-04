@@ -10,10 +10,9 @@ import Region_departments from "@/models/region_departments.model";
 import Region_heads from "@/models/region_heads.model";
 import User_roles from "@/models/user_roles.model";
 import { NextRequest, NextResponse } from "next/server";
-connectDB();
-
 export async function GET(req:NextRequest){
     try{
+        await connectDB();
         const {searchParams} = new URL(req.url);
         const session:any = await auth();
         if(!session) return NextResponse.json({message:"Un-Authorized Access", status:401}, {status:401});

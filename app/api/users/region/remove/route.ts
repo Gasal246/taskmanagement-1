@@ -1,11 +1,13 @@
+import { authorizeOrganizationMutation } from "@/lib/organization-access";
 import connectDB from "@/lib/mongo";
 import User_regions from "@/models/user_regions.model";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function POST (req: NextRequest) {
     try {
+        await connectDB();
+        const denied = await authorizeOrganizationMutation(req);
+        if (denied) return denied;
         const { URegId } = await req.json();
 
         const userRegion = await User_regions.findById(URegId);

@@ -1,13 +1,15 @@
+import { authorizeOrganizationMutation } from "@/lib/organization-access";
 import connectDB from "@/lib/mongo";
 import Location_dep_heads from "@/models/location_dep_heads.model";
 import Roles from "@/models/roles.model";
 import User_roles from "@/models/user_roles.model";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function POST ( req: NextRequest ) {
     try {
+        await connectDB();
+        const accessDenied = await authorizeOrganizationMutation(req);
+        if (accessDenied) return accessDenied;
         const { LocationDepHeadId } = await req.json();
         const locationDepHead = await Location_dep_heads.findById(LocationDepHeadId);
         if(!locationDepHead){

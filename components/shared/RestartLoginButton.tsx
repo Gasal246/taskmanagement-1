@@ -60,7 +60,7 @@ const RestartLoginButton = ({ className }: RestartLoginButtonProps) => {
           <AlertDialogHeader>
             <AlertDialogTitle>Restart Login Session?</AlertDialogTitle>
             <AlertDialogDescription className="text-slate-300">
-              This will clear saved login data on this browser. You will have to log in again to continue.
+              This will clear saved login data and sign you out. Your personal todos and saved preferences will be kept.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

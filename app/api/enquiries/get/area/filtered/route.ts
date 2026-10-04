@@ -6,10 +6,9 @@ import Eq_province from "@/models/eq_province.model";
 import Eq_city from "@/models/eq_city.model";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function GET(req:NextRequest){
     try{
+        await connectDB();
         const {searchParams} = new URL(req.url);
 
         const country_id = searchParams.get("country_id");

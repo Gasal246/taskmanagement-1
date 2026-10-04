@@ -1,13 +1,15 @@
+import { authorizeOrganizationRead } from "@/lib/organization-access";
 import connectDB from "@/lib/mongo";
 import Area_heads from "@/models/area_heads.model";
 import Area_staffs from "@/models/area_staffs.model";
 import "@/models/users.model";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function GET(req: NextRequest) {
     try {
+        await connectDB();
+        const denied = await authorizeOrganizationRead(req);
+        if (denied) return denied;
         const { searchParams } = req.nextUrl;
         const ids = searchParams.get("area_ids");
         const area_ids: any[] = ids?.split(",") || [];
@@ -36,8 +38,6 @@ export async function GET(req: NextRequest) {
             match: { status: 1 }
         });
         const activeHeadData = headData.filter((item: any) => item?.user_id);
-        console.log("staff data: ", staffData);
-        console.log("headData: ", activeHeadData);
 
         return NextResponse.json({ data: [ ...staffData, ...activeHeadData ], status: 200 }, { status: 200 });
     } catch (error: any) {

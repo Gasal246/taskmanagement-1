@@ -1,11 +1,13 @@
+import { authorizeOrganizationRead } from "@/lib/organization-access";
 import connectDB from "@/lib/mongo";
 import Business from "@/models/business.model";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function GET(req:NextRequest){
     try{
+        await connectDB();
+        const denied = await authorizeOrganizationRead(req);
+        if (denied) return denied;
         const {searchParams} = new URL(req.url);
         const business_id = searchParams.get("domain_id");
         const business = await Business.findById(business_id);

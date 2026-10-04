@@ -1,19 +1,22 @@
+import { authorizeUserProfile } from "@/lib/server-access";
 import connectDB from "@/lib/mongo";
 import Users from "@/models/users.model";
 import { isValidObjectId } from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
-
-connectDB();
 
 export async function GET (
     req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        await connectDB();
         const { id } = await params;
         if (!id || !isValidObjectId(id)) {
             return NextResponse.json({ error: "Invalid user id" }, { status: 400 });
         }
+        const denied = await authorizeUserProfile(id);
+        if (denied) return denied;
+
         const user = await Users.findOne({ _id: id, status: 1 }, { password: 0, otp: 0 });
         return NextResponse.json(user);
     } catch (error) {

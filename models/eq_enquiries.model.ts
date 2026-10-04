@@ -1,14 +1,15 @@
-import mongoose, { Decimal128, ObjectId, Schema } from "mongoose";
+import mongoose, { Document, Decimal128, Types, Schema } from "mongoose";
 
 export interface IEq_enquiries extends Document{
-    _id: ObjectId,
-    country_id: ObjectId,
-    region_id: ObjectId,
-    province_id: ObjectId,
-    city_id: ObjectId,
-    area_id: ObjectId,
-    camp_id: ObjectId,
-    createdBy: ObjectId,
+    _id: Types.ObjectId,
+    business_id?: Types.ObjectId,
+    country_id: Types.ObjectId,
+    region_id: Types.ObjectId,
+    province_id: Types.ObjectId,
+    city_id: Types.ObjectId,
+    area_id: Types.ObjectId,
+    camp_id: Types.ObjectId,
+    createdBy: Types.ObjectId,
     enquiry_uuid: String,
     is_active: Boolean,
     status: String,
@@ -30,24 +31,25 @@ export interface IEq_enquiries extends Document{
     is_edit_req: Boolean,
     wifi_setup: String,
     is_converted: Boolean,
-    enquiry_brought_by: ObjectId[],
-    meeting_initiated_by: ObjectId[],
-    project_closed_by: ObjectId[],
-    project_managed_by: ObjectId[],
+    enquiry_brought_by: Types.ObjectId[],
+    meeting_initiated_by: Types.ObjectId[],
+    project_closed_by: Types.ObjectId[],
+    project_managed_by: Types.ObjectId[],
     enquiry_user_notes: String,
     is_completed: boolean,
     completed_at?: Date,
-    completed_by?: ObjectId,
+    completed_by?: Types.ObjectId,
     completion_action?: string,
     completion_notes?: string,
     completion_source?: string,
-    completion_forward_id?: ObjectId,
+    completion_forward_id?: Types.ObjectId,
     completion_date_estimated?: boolean,
     createdAt: Date,
     updatedAt: Date
 }
 
 const Eq_enquiriesSchema:Schema = new Schema({
+    business_id: { type: Schema.Types.ObjectId, ref: "business", immutable: true },
     is_completed: { type: Boolean, default: false },
     completed_at: { type: Date },
     completed_by: { type: Schema.Types.ObjectId, ref: "users" },
@@ -84,6 +86,7 @@ const Eq_enquiriesSchema:Schema = new Schema({
     is_edit_req: {type: Boolean},
     wifi_setup: {type: String},
     is_converted: {type: Boolean, default: false},
+    converted_project_id: { type: Schema.Types.ObjectId, ref: "business_project" },
     enquiry_brought_by: { type: [Schema.Types.ObjectId], ref: "users", default: [] },
     meeting_initiated_by: { type: [Schema.Types.ObjectId], ref: "users", default: [] },
     project_closed_by: { type: [Schema.Types.ObjectId], ref: "users", default: [] },
@@ -92,9 +95,18 @@ const Eq_enquiriesSchema:Schema = new Schema({
 }, {timestamps: true});
 
 // Refresh the cached development model when this additive schema is hot-reloaded.
-if (mongoose.models.eq_enquiry && !mongoose.models.eq_enquiry.schema.path("completed_at")) {
+if (mongoose.models.eq_enquiry && (!mongoose.models.eq_enquiry.schema.path("completed_at") || !mongoose.models.eq_enquiry.schema.path("business_id"))) {
     mongoose.deleteModel("eq_enquiry");
 }
+
+// Actual list ordering, approval filtering, staff ownership and identity checks.
+Eq_enquiriesSchema.index({ business_id: 1, createdAt: -1, _id: -1 });
+Eq_enquiriesSchema.index({ business_id: 1, is_active: 1, createdAt: -1, _id: -1 });
+Eq_enquiriesSchema.index({ createdAt: -1, _id: -1 });
+Eq_enquiriesSchema.index({ is_active: 1, createdAt: -1, _id: -1 });
+Eq_enquiriesSchema.index({ createdBy: 1, createdAt: -1, _id: -1 });
+Eq_enquiriesSchema.index({ camp_id: 1 });
+Eq_enquiriesSchema.index({ enquiry_uuid: 1 });
 
 const Eq_enquiry = mongoose.models?.eq_enquiry || mongoose.model<IEq_enquiries>("eq_enquiry", Eq_enquiriesSchema);
 

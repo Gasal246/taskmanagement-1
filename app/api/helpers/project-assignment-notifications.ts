@@ -1,6 +1,5 @@
-import { getAdminMessaging } from "@/lib/firebaseAdmin";
-import FcmTokens from "@/models/fcm_tokens.model";
-import Notifications from "@/models/notifications.model";
+import { enqueueNotifications } from "@/lib/jobs/enqueue";
+import type { ClientSession } from "mongoose";
 import Users from "@/models/users.model";
 
 type ProjectAssignmentRole =
@@ -55,6 +54,8 @@ export async function notifyProjectAssignmentChange({
   event,
   teamId,
   teamName,
+  dbSession,
+  eventKey,
 }: {
   recipientIds: string[];
   actorId?: string | null;
@@ -64,12 +65,14 @@ export async function notifyProjectAssignmentChange({
   event: ProjectAssignmentEvent;
   teamId?: string | null;
   teamName?: string | null;
+  dbSession: ClientSession;
+  eventKey: string;
 }) {
   const recipients = toUniqueIds(recipientIds);
   if (recipients.length === 0) return;
 
   const actor = actorId
-    ? await Users.findById(actorId).select("name").lean<{ name?: string }>()
+    ? await Users.findById(actorId).select("name").session(dbSession).lean<{ name?: string }>()
     : null;
   const actorName = actor?.name?.trim() || "Unknown";
   const roleConfig = ROLE_CONFIG[role];
@@ -100,7 +103,7 @@ export async function notifyProjectAssignmentChange({
     link: `/staff/projects/${projectId}`,
   };
 
-  await Notifications.insertMany(
+  await enqueueNotifications(
     recipients.map((recipientId) => ({
       recipient_id: recipientId,
       sender_id: actorId || null,
@@ -110,46 +113,9 @@ export async function notifyProjectAssignmentChange({
       data,
       meta,
       read_at: null,
-    }))
+    })),
+    { notification: { title, body }, data },
+    `${eventKey}:${role}:${event}`, dbSession
   );
 
-  const tokenDocs = await FcmTokens.find(
-    { user_id: { $in: recipients } },
-    { token: 1 }
-  ).lean();
-  const tokens = tokenDocs.map((doc: any) => doc?.token).filter(Boolean);
-  if (tokens.length === 0) return;
-
-  try {
-    const messaging = getAdminMessaging();
-    const response = await messaging.sendEachForMulticast({
-      tokens,
-      notification: {
-        title,
-        body,
-      },
-      data: Object.fromEntries(
-        Object.entries(data).map(([key, value]) => [key, String(value)])
-      ),
-    });
-
-    const invalidTokens = response.responses
-      .map((res, index) => {
-        const code = res.error?.code || "";
-        if (
-          code === "messaging/registration-token-not-registered" ||
-          code === "messaging/invalid-registration-token"
-        ) {
-          return tokens[index];
-        }
-        return null;
-      })
-      .filter(Boolean) as string[];
-
-    if (invalidTokens.length > 0) {
-      await FcmTokens.deleteMany({ token: { $in: invalidTokens } });
-    }
-  } catch (error) {
-    console.log("Failed to send project assignment notification", error);
-  }
 }

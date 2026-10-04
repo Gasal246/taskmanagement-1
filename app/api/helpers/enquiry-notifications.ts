@@ -1,7 +1,6 @@
 import Eq_enquiry from "@/models/eq_enquiries.model";
-import Notifications from "@/models/notifications.model";
-import FcmTokens from "@/models/fcm_tokens.model";
-import { getAdminMessaging } from "@/lib/firebaseAdmin";
+import { enqueueNotifications } from "@/lib/jobs/enqueue";
+import type { ClientSession } from "mongoose";
 import type { NextRequest } from "next/server";
 
 const resolveRoleDomain = (req: NextRequest) => {
@@ -44,6 +43,8 @@ export async function notifyEnquiryForward({
   priority,
   actorId,
   actorName,
+  dbSession,
+  eventKey,
 }: {
   req: NextRequest;
   recipientIds: string[];
@@ -52,13 +53,15 @@ export async function notifyEnquiryForward({
   priority: number;
   actorId: string;
   actorName: string;
+  dbSession?: ClientSession;
+  eventKey?: string;
 }) {
   const recipients = Array.from(new Set(recipientIds.filter(Boolean)));
   if (recipients.length === 0) return;
 
   const enquiry: { enquiry_uuid?: string } | null = await Eq_enquiry.findById(enquiryId)
     .select("enquiry_uuid")
-    .lean<{ enquiry_uuid?: string }>();
+    .session(dbSession ?? null).lean<{ enquiry_uuid?: string }>();
   const enquiryUuid = enquiry?.enquiry_uuid || "";
 
   const { role, domain, byLine } = resolveRoleDomain(req);
@@ -112,41 +115,7 @@ export async function notifyEnquiryForward({
     },
   ]);
 
-  await Notifications.insertMany(notificationsPayload);
-
-  const tokenDocs = await FcmTokens.find(
-    { user_id: { $in: recipients } },
-    { token: 1 }
-  ).lean();
-  const tokens = tokenDocs.map((doc: any) => doc.token).filter(Boolean);
-  if (tokens.length === 0) return;
-
-  try {
-    const messaging = getAdminMessaging();
-    const response = await messaging.sendEachForMulticast({
-      tokens,
-      notification: {
-        title: forwardTitle,
-        body: bodyText,
-      },
-      data: dataBase,
-    });
-    const invalidTokens = response.responses
-      .map((res, index) => {
-        const code = res.error?.code || "";
-        if (
-          code === "messaging/registration-token-not-registered" ||
-          code === "messaging/invalid-registration-token"
-        ) {
-          return tokens[index];
-        }
-        return null;
-      })
-      .filter(Boolean) as string[];
-    if (invalidTokens.length > 0) {
-      await FcmTokens.deleteMany({ token: { $in: invalidTokens } });
-    }
-  } catch (error) {
-    console.log("Failed to send enquiry notifications", error);
-  }
+  await enqueueNotifications(notificationsPayload, {
+    notification: { title: forwardTitle, body: bodyText }, data: dataBase,
+  }, eventKey, dbSession);
 }

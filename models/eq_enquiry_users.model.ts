@@ -1,11 +1,11 @@
-import mongoose, { ObjectId, Schema } from "mongoose";
+import mongoose, { Document, Types, Schema } from "mongoose";
 import { object } from "zod";
 
 export interface IEq_enquriy_users extends Document{
-    _id: ObjectId,
-    user_id: ObjectId,
-    business_id: ObjectId,
-    addedBy: ObjectId,
+    _id: Types.ObjectId,
+    user_id: Types.ObjectId,
+    business_id: Types.ObjectId,
+    addedBy: Types.ObjectId,
     createdAt: Date,
     updatedAt: Date
 };

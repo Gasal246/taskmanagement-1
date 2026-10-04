@@ -1,7 +1,7 @@
-import mongoose, { Schema, Document, ObjectId } from 'mongoose';
+import mongoose, { Schema, Document, Types } from 'mongoose';
 
 export interface ISuperadmin extends Document {
-  _id: ObjectId;
+  _id: Types.ObjectId;
   name: String;
   email: String;
   password: String;
@@ -12,7 +12,7 @@ export interface ISuperadmin extends Document {
 const SuperadminSchema: Schema = new Schema({
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true },
-  password: { type: String, required: true },
+  password: { type: String, required: true, select: false },
   superadmin_id: { type: String },
   is_super: { type: Boolean, default: true },
 }, { timestamps: true });
@@ -20,4 +20,3 @@ const SuperadminSchema: Schema = new Schema({
 const Superadmin = mongoose?.models?.superadmin || mongoose.model<ISuperadmin>('superadmin', SuperadminSchema);
 
 export default Superadmin;
-

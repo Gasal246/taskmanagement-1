@@ -1,4 +1,6 @@
 "use client"
+import { useOrganizationOverview } from "@/hooks/use-organization-overview";
+import OrganizationSectionControls from "@/components/admin/OrganizationSectionControls";
 import { RootState } from '@/redux/store'
 import React, { useEffect, useState } from 'react'
 import { useSelector } from 'react-redux'
@@ -14,8 +16,7 @@ import { Eye } from 'lucide-react';
 import { Trash2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from 'sonner';
-import { useAddAreaDepartment, useAddAreaHead, useAddAreaStaff, useAddBusinessLocation, useGetAreaCompleteData, useRemoveAreaHead, useRemoveAreaStaff, useRemoveRegionArea } from '@/query/business/queries';
-import { useGetBusinessStaffs } from '@/query/user/queries';
+import { useAddAreaDepartment, useAddAreaHead, useAddAreaStaff, useAddBusinessLocation, useRemoveAreaHead, useRemoveAreaStaff, useRemoveRegionArea } from '@/query/business/queries';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import LoaderSpin from '@/components/shared/LoaderSpin';
@@ -32,9 +33,9 @@ const RegionAreaPage = () => {
     const { mutateAsync: removeArea } = useRemoveRegionArea();
     const { businessData } = useSelector((state: RootState) => state.user)
     const { regionData, areaData } = useSelector((state: RootState) => state.application);
+    const overview = useOrganizationOverview("area", areaData?._id, ["heads", "staffs", "locations", "departments", "available_staffs"]);
 
     const { mutateAsync: addBusinessLocation, isPending: addingBusinessLocation } = useAddBusinessLocation();
-    const { mutateAsync: getCompleteArea, isPending: loadingCompleteArea } = useGetAreaCompleteData();
     const { mutateAsync: addAreaHead, isPending: addingAreaHead } = useAddAreaHead();
     const { mutateAsync: addAreaStaff, isPending: addingAreaStaff } = useAddAreaStaff();
     const { mutateAsync: removeAreaHead } = useRemoveAreaHead();
@@ -42,30 +43,16 @@ const RegionAreaPage = () => {
     const { mutateAsync: addAreaDepartment, isPending: addingAreaDepartment } = useAddAreaDepartment();
 
     const [selectedUser, setSelectedUser] = useState<string>("");
-    const [heads, setHeads] = useState<any[]>([]);
-    const [staffs, setStaffs] = useState<any[]>([]);
-    const [locations, setLocations] = useState<any[]>([]);
-    const [area_deps, setAreaDeps] = useState<any[]>([]);
+    const heads = overview.section("heads").items;
+    const staffs = overview.section("staffs").items;
+    const locations = overview.section("locations").items;
+    const area_deps = overview.section("departments").items;
 
     useEffect(() => {
-        if(areaData?._id) {
-            handleFetchCompleteData();
-        } else {
-            router.replace('/admin')
-        }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [areaData]);
+        if (!areaData?._id) router.replace("/admin");
+    }, [areaData?._id, router]);
 
-    const handleFetchCompleteData = async () => {
-        const res = await getCompleteArea(areaData?._id);
-        if(res?.status === 200) {
-            setHeads(res?.data?.heads);
-            setStaffs(res?.data?.staffs);
-            setLocations(res?.data?.locations);
-            setAreaDeps(res?.data?.departments);
-        }
-        // console.log(res);
-    }
+    const handleFetchCompleteData = async () => { await overview.refresh(); };
 
     // Add location
     const [addLocationDialog, setAddLocationDialog] = useState<boolean>(false);
@@ -91,16 +78,9 @@ const RegionAreaPage = () => {
     }
 
     // Business Staffs
-    const { data: businessStaffs, isLoading: loadingBusinessStaffs } = useGetBusinessStaffs(businessData?._id);
     const [openAreaHeadOrStaffDialog, setOpenAreaHeadOrStaffDialog] = useState<boolean>(false);
     const [isAddingUser, setIsAddingUser] = useState<boolean>(false);
-    const [staffSearch, setStaffSearch] = useState<string>("");
-    const staffSearchTerm = staffSearch.trim().toLowerCase();
-    const filteredStaffs = businessStaffs?.filter((staff: any) => {
-        const name = staff?.user_id?.name || "";
-        const email = staff?.user_id?.email || "";
-        return `${name} ${email}`.toLowerCase().includes(staffSearchTerm);
-    });
+    const filteredStaffs = overview.section("available_staffs").items;
 
     const clickAddHead = () => {
         setSelectedUser("");
@@ -139,7 +119,7 @@ const RegionAreaPage = () => {
         if(!selectedUser) {
             return toast.error("User is Required.", { description: "Please select a valid user." })
         }
-        if(staffs?.find((staff: any) => staff?.user_id === selectedUser)) {
+        if(staffs?.find((staff: any) => (staff?.staff_id || staff?.user_id) === selectedUser)) {
             return toast.error("User is Already Added as Staff.", { description: "User is already added." })
         }
         const formData = new FormData();
@@ -277,16 +257,15 @@ const RegionAreaPage = () => {
                         <h1 className='text-xs font-medium text-slate-400 group-hover:text-cyan-600 capitalize flex items-center gap-1'>Add Head</h1>
                     </motion.div>
                 </div>
-                {!loadingCompleteArea && heads?.length === 0 && (
+                <OrganizationSectionControls key={`${overview.scope}:heads`} overview={overview} name="heads" label="heads" />
+                {overview.section("heads").loaded && heads?.length === 0 && (
                     <div className="flex items-center justify-center h-[15vh]">
                         <h1 className="text-xs font-medium text-slate-300">No heads added.</h1>
                     </div>
                 )}
-                {loadingCompleteArea && <div className="flex items-center justify-center h-[10vh]">
-                    <LoaderSpin size={35} />
-                </div>}
+
                 <div className="flex flex-wrap mt-1">
-                    {heads?.map((head: any) => 
+                    {heads?.map((head: any) =>
                     <div className="w-full lg:w-4/12 p-1" key={head?._id}>
                         <div className="bg-gradient-to-tr from-slate-950/50 to-slate-950/70 rounded-lg p-2 border border-slate-700 hover:border-cyan-600 flex items-center gap-1 select-none relative">
                             <Avatar src={head?.user?.avatar_url} size={40} />
@@ -350,16 +329,15 @@ const RegionAreaPage = () => {
                         <h1 className='text-xs font-medium text-slate-400 group-hover:text-cyan-600 capitalize flex items-center gap-1'>Add Department</h1>
                     </motion.div>
                 </div>
-                {!loadingCompleteArea && area_deps?.length === 0 && (
+                <OrganizationSectionControls key={`${overview.scope}:departments`} overview={overview} name="departments" label="departments" />
+                {overview.section("departments").loaded && area_deps?.length === 0 && (
                     <div className="flex items-center justify-center h-[15vh]">
                         <h1 className="text-xs font-medium text-slate-300">No departments added.</h1>
                     </div>
                 )}
-                {loadingCompleteArea && <div className="flex items-center justify-center h-[10vh]">
-                    <LoaderSpin size={35} />
-                </div>}
+
                 <div className="flex flex-wrap mt-1">
-                    {area_deps?.map((dep: any) => 
+                    {area_deps?.map((dep: any) =>
                     <div className="w-full lg:w-4/12 p-1" key={dep?._id}>
                         <div className="bg-gradient-to-tr from-slate-950/50 to-slate-950/70 rounded-lg p-2 border border-slate-700 hover:border-cyan-600 flex items-center gap-1 select-none relative">
                             <div>
@@ -413,14 +391,13 @@ const RegionAreaPage = () => {
                         <h1 className='text-xs font-medium text-slate-400 group-hover:text-cyan-600 capitalize flex items-center gap-1'>Add Location</h1>
                     </motion.div>
                 </div>
-                {!loadingCompleteArea && locations?.length === 0 && (
+                <OrganizationSectionControls key={`${overview.scope}:locations`} overview={overview} name="locations" label="locations" />
+                {overview.section("locations").loaded && locations?.length === 0 && (
                     <div className="flex items-center justify-center h-[15vh]">
                         <h1 className="text-xs font-medium text-slate-300">No locations added.</h1>
                     </div>
                 )}
-                {loadingCompleteArea && <div className="flex items-center justify-center h-[10vh]">
-                    <LoaderSpin size={35} />
-                </div>}
+
                 <div className="flex flex-wrap mt-1">
                     {locations?.length > 0 && locations?.map((location: any) => <div className="w-full lg:w-3/12 p-1" key={location?._id}>
                         <div className="bg-gradient-to-tr from-slate-950/50 to-slate-950/70 rounded-lg p-2 px-4 border border-slate-700 hover:border-cyan-600 flex items-center gap-1 select-none relative">
@@ -457,7 +434,6 @@ const RegionAreaPage = () => {
                 </div>
             </div>
 
-
             <div className="bg-gradient-to-tr from-slate-950/50 to-slate-950/70 rounded-lg p-3 my-2 min-h-[15vh]">
                 <div className='flex items-center justify-between'>
                     <div>
@@ -473,14 +449,13 @@ const RegionAreaPage = () => {
                         <h1 className='text-xs font-medium text-slate-400 group-hover:text-cyan-600 capitalize flex items-center gap-1'>Add Staff</h1>
                     </motion.div>
                 </div>
-                {!loadingCompleteArea && staffs?.length === 0 && (
+                <OrganizationSectionControls key={`${overview.scope}:staffs`} overview={overview} name="staffs" label="staffs" />
+                {overview.section("staffs").loaded && staffs?.length === 0 && (
                     <div className="flex items-center justify-center h-[15vh]">
                         <h1 className="text-xs font-medium text-slate-300">No staffs added.</h1>
                     </div>
                 )}
-                {loadingCompleteArea && <div className="flex items-center justify-center h-[10vh]">
-                    <LoaderSpin size={35} />
-                </div>}
+
                 <div className="flex flex-wrap mt-1">
                     {staffs?.map((staff: any) => <div className="w-full lg:w-3/12 p-1" key={staff?._id}>
                         <div className="bg-gradient-to-tr from-slate-950/50 to-slate-950/70 rounded-lg p-2 border border-slate-700 hover:border-cyan-600 flex items-center gap-2 select-none relative">
@@ -559,16 +534,10 @@ const RegionAreaPage = () => {
                         <DialogTitle className='capitalize'>Adding Area {isAddingUser ? 'Staff' : 'Head'}</DialogTitle>
                         <DialogDescription>Adding {isAddingUser ? 'Staff' : 'Head'} For {areaData?.area_name} of {regionData?.region_name}.</DialogDescription>
                     </DialogHeader>
-                    <div className="space-y-2">
-                        <Input
-                            placeholder="Search staff by name"
-                            value={staffSearch}
-                            onChange={(e) => setStaffSearch(e.target.value)}
-                        />
-                    </div>
+                    <OrganizationSectionControls key={`${overview.scope}:available_staffs`} overview={overview} name="available_staffs" label="staff" />
                     <div className="relative flex-1 overflow-y-auto pb-16">
-                        {!loadingBusinessStaffs && filteredStaffs?.length === 0 && <div className='w-full h-[10vh] flex items-center justify-center'>
-                            <h1 className="text-xs font-medium text-slate-400">{staffSearchTerm ? "No matching users" : "No business staffs found"}</h1>
+                        {overview.section("available_staffs").loaded && filteredStaffs?.length === 0 && <div className='w-full h-[10vh] flex items-center justify-center'>
+                            <h1 className="text-xs font-medium text-slate-400">No matching staff.</h1>
                         </div>}
                         {filteredStaffs?.map(( staff: any ) => <motion.div
                             whileHover={{ scale: 1.02 }}

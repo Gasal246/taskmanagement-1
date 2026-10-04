@@ -1,14 +1,17 @@
+import { authorizeEnquiry } from "@/lib/enquiries/access";
 import connectDB from "@/lib/mongo";
 import Eq_camp_contacts from "@/models/eq_camp_contacts.model";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function GET(req:NextRequest){
     try{
+        await connectDB();
         const { searchParams } = new URL(req.url);
    
         const enquiry_id = searchParams.get("enquiry_id");
+
+        const denied = await authorizeEnquiry(enquiry_id);
+        if (denied) return denied;
 
         const contacts = await Eq_camp_contacts.find({enquiry_id: enquiry_id}).lean();
 

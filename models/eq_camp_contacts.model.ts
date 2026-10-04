@@ -1,15 +1,15 @@
-import mongoose, { ObjectId, Schema } from "mongoose";
+import mongoose, { Document, Types, Schema } from "mongoose";
 
 export interface IEq_camp_contacts extends Document{
-    _id: ObjectId,
+    _id: Types.ObjectId,
     contact_name: String
     contact_phone: String,
     contact_email: String,
     contact_authorization: String,
     contact_designation: String,
     is_decision_maker: Boolean,
-    camp_id: ObjectId,
-    enquiry_id: ObjectId,
+    camp_id: Types.ObjectId,
+    enquiry_id: Types.ObjectId,
     createdAt: Date,
     updatedAt: Date
 }

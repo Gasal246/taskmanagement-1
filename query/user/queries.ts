@@ -72,14 +72,16 @@ export const useVerifyUserOtp = () => {
 
 export const useSetupUserPassword = () => {
     return useMutation({
-        mutationFn: ({ email, password }: { email: string, password: string }) => setupUserPassword({ email, password })
+        mutationFn: ({ email, password, token }: { email: string, password: string, token: string }) => setupUserPassword({ email, password, token })
     })
 }
 
 export const useGetUserRolesAndDomains = (userid: string) => {
     return useQuery({
-        queryKey: [USER_KEYS.GET_USER_ROLES_AND_DOMAINS],
-        queryFn: () => getUserRolesAndDomains(userid)
+        queryKey: [USER_KEYS.GET_USER_ROLES_AND_DOMAINS, userid],
+        queryFn: () => getUserRolesAndDomains(userid),
+        enabled: Boolean(userid),
+        staleTime: 60_000,
     });
 }
 

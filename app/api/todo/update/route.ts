@@ -6,8 +6,6 @@ import mongoose from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
 import { resolveTodoCloudAccess } from "@/lib/todo-access";
 
-connectDB();
-
 type UpdateBody = {
   todo_id: string;
   content?: string;
@@ -17,6 +15,7 @@ type UpdateBody = {
 
 export async function PATCH(req: NextRequest) {
   try {
+        await connectDB();
     const session: any = await auth();
     if (!session) return NextResponse.json({ message: "Un-Authorized Access", status: 401 }, { status: 401 });
     const userId = resolveSessionUserId(session);

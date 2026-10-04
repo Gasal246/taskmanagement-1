@@ -1,7 +1,7 @@
 "use client"
 import React, { useEffect, useState } from 'react'
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator, } from "@/components/ui/breadcrumb";
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '@/redux/store';
 import { DraftingCompass, EllipsisVertical, Eye, Files, ListTodo, LockKeyhole, MapPinned, Package, PencilRuler, SquareArrowUp, SquareArrowUpRight, Trash2, UserRound } from 'lucide-react';
@@ -87,8 +87,10 @@ const StaffPageSkeleton = () => {
 
 const StaffPage = () => {
   const router = useRouter();
+  const params = useParams<{ userId?: string }>();
   const dispatch = useDispatch<AppDispatch>();
   const { businessStaff } = useSelector((state: RootState) => state.application);
+  const targetUserId = params.userId || businessStaff?._id;
   const { businessData } = useSelector((state: RootState) => state.user);
   const { mutateAsync: getUserProfile, isPending: loadingUserProfile } = useGetUserCompleteProfile();
   const [userData, setUserData] = useState<any>(null);
@@ -134,7 +136,7 @@ const StaffPage = () => {
     console.log("Hello there")
     const formData = new FormData();
     formData.append('body', JSON.stringify({
-      user_id: businessStaff?._id,
+      user_id: targetUserId,
       name: values.name,
       email: values.email,
       phone: values.phone,
@@ -153,13 +155,13 @@ const StaffPage = () => {
   }
 
   useEffect(() => {
-    if (!businessStaff?._id) return;
-    handleGetCompleteProfile(businessStaff._id);
+    if (!targetUserId) return;
+    handleGetCompleteProfile(targetUserId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [businessStaff?._id])
+  }, [targetUserId])
 
   const handleGetCompleteProfile = async (staffId?: string) => {
-    const targetStaffId = staffId || businessStaff?._id;
+    const targetStaffId = staffId || targetUserId;
     if (!targetStaffId) return;
 
     const response = await getUserProfile(targetStaffId);
@@ -321,7 +323,7 @@ const StaffPage = () => {
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
-            <BreadcrumbPage>{businessStaff?.name}</BreadcrumbPage>
+            <BreadcrumbPage>{userData?.name || businessStaff?.name}</BreadcrumbPage>
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
@@ -350,14 +352,14 @@ const StaffPage = () => {
                 <div className='w-full p-0.5 space-y-1'>
                   <Popconfirm
                     title={isBlocked ? "This will unblock this staff." : "This will block this staff."}
-                    onConfirm={() => handleEditUserStatus(businessStaff?._id)}
+                    onConfirm={() => handleEditUserStatus(targetUserId)}
                   >
                     <motion.div whileTap={{ scale: 0.98 }} whileHover={{ scale: 1.02 }} className='bg-slate-800/50 w-full p-1 py-2 text-slate-400 cursor-pointer hover:text-slate-200 flex items-center justify-center gap-1 border border-dashed border-slate-700 rounded-lg'>
                       <LockKeyhole size={14} />
                       <h1 className='text-xs font-semibold'>{isBlocked ? "Unblock" : "Block"}</h1>
                     </motion.div>
                   </Popconfirm>
-                  <Popconfirm title="This action will delete this staff entirely from this application, you can block this staff if you are not sure ?" onConfirm={() => handleRemoveUser(businessStaff?._id)}>
+                  <Popconfirm title="This action will delete this staff entirely from this application, you can block this staff if you are not sure ?" onConfirm={() => handleRemoveUser(targetUserId)}>
                     <motion.div whileTap={{ scale: 0.98 }} whileHover={{ scale: 1.02 }} className='bg-slate-800/50 w-full p-1 py-2 text-red-600 cursor-pointer hover:text-red-400 flex items-center justify-center gap-1 border border-dashed border-slate-700 rounded-lg'>
                       <Trash2 size={14} />
                       <h1 className='text-xs font-semibold'>Delete</h1>

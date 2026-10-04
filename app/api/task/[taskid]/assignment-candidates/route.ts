@@ -10,13 +10,12 @@ import Users from "@/models/users.model";
 import mongoose from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ taskid: string }> }
 ) {
   try {
+        await connectDB();
     const session: any = await auth();
     const userId = String(session?.user?.id || "");
     const { taskid } = await params;

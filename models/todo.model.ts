@@ -1,11 +1,11 @@
-import mongoose, { ObjectId, Schema } from "mongoose";
+import mongoose, { Document, Types, Schema } from "mongoose";
 
 export type TodoPriority = "low" | "medium" | "high";
 
 export interface ITodo extends Document {
-    _id: ObjectId,
+    _id: Types.ObjectId,
     content: String,
-    user_id: ObjectId,
+    user_id: Types.ObjectId,
     is_completed: Boolean,
     completed_at?: Date,
     priority: TodoPriority,

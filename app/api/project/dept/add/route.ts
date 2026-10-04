@@ -6,8 +6,6 @@ import Region_departments from "@/models/region_departments.model";
 import { NextRequest, NextResponse } from "next/server";
 import { authorizeProjectRequest } from "@/app/api/helpers/project-access";
 
-connectDB();
-
 interface Body{
     project_id: string,
     department_id: string,
@@ -17,6 +15,7 @@ interface Body{
 
 export async function POST(req: NextRequest){
     try{
+        await connectDB();
 
         const body: Body = await req.json();
         const authorization = await authorizeProjectRequest(body.project_id, "manage");

@@ -1,3 +1,6 @@
+import { temporaryDatabaseFailureResponse } from "@/lib/auth-availability";
+import { taskActivityFilterStages } from "@/lib/tasks/filter-pipeline";
+import { pageBounds, escapeSearch } from "@/lib/search";
 import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import Business_Tasks from "@/models/business_tasks.model";
@@ -6,9 +9,6 @@ import Business_Project from "@/models/business_project.model";
 import Project_Teams from "@/models/project_team.model";
 import Task_Activities from "@/models/task_activities.model";
 import { NextRequest, NextResponse } from "next/server";
-import {
-  escapeRegex,
-} from "@/app/api/helpers/task-filter-scope";
 import mongoose from "mongoose";
 import { addTaskAssignmentSummaries } from "@/app/api/helpers/task-assignment-summary";
 import {
@@ -20,8 +20,6 @@ import {
 import type { StaffTaskStatusFilter, TaskPriorityFilter } from "@/types/staff-tasks";
 
 import { resolveSelectedHeadContext, getSelectedHeadDirectStaffIds } from "@/app/api/helpers/head-reassignment-scope";
-connectDB();
-
 const toObjectId = (value: unknown) =>
   value instanceof mongoose.Types.ObjectId
     ? value
@@ -29,6 +27,7 @@ const toObjectId = (value: unknown) =>
 
 export async function GET(req: NextRequest) {
   try {
+        await connectDB();
     const session: any = await auth();
     if (!session) {
       return NextResponse.json(
@@ -53,8 +52,7 @@ export async function GET(req: NextRequest) {
         : "all";
     const startDate = searchParams.get("start_date");
     const endDate = searchParams.get("end_date");
-    const page = Math.max(1, Number(searchParams.get("page")) || 1);
-    const limit = Math.min(50, Math.max(1, Number(searchParams.get("limit")) || 12));
+    const { page, limit, skip } = pageBounds(searchParams, 12, 50);
     const nameQuery = (searchParams.get("nameQuery") || "").trim();
     const staffId = (searchParams.get("staffId") || "").trim();
     const statusParam = (searchParams.get("status") || "").trim();
@@ -62,7 +60,6 @@ export async function GET(req: NextRequest) {
     const hasValidStart = Boolean(startDate && startDate !== "undefined");
     const hasValidEnd = Boolean(endDate && endDate !== "undefined");
     const hasType = Boolean(typeParam);
-    const skip = (page - 1) * limit;
 
     if (statusParam && !isTaskStatusFilter(statusParam)) {
       return NextResponse.json(
@@ -219,44 +216,8 @@ export async function GET(req: NextRequest) {
       ],
     };
 
-    const nameRegex = nameQuery ? new RegExp(escapeRegex(nameQuery), "i") : null;
-    const [nameActivityMatches, staffActivityMatches] = await Promise.all([
-      nameRegex
-        ? Task_Activities.find({ $and: [{ activity: nameRegex }, visibleActivityScope] }).select("task_id").lean()
-        : Promise.resolve([]),
-      staffObjectId
-        ? Task_Activities.find({
-            $and: [
-              { $or: [{ assigned_to: staffObjectId }, { forwarded_to: staffObjectId }] },
-              visibleActivityScope,
-            ],
-          })
-            .select("task_id")
-            .lean()
-        : Promise.resolve([]),
-    ]);
-
-    const nameActivityIds = nameActivityMatches
-      .map((item: any) => item.task_id)
-      .filter(Boolean)
-      .map(toObjectId);
-    const staffActivityIds = staffActivityMatches
-      .map((item: any) => item.task_id)
-      .filter(Boolean)
-      .map(toObjectId);
-
-    if (nameRegex) {
-      query.$and = [
-        ...(query.$and || []),
-        { $or: [{ task_name: nameRegex }, { _id: { $in: nameActivityIds } }] },
-      ];
-    }
-    if (staffObjectId) {
-      query.$and = [
-        ...(query.$and || []),
-        { $or: [{ assigned_to: staffObjectId }, { _id: { $in: staffActivityIds } }] },
-      ];
-    }
+    const nameRegex = nameQuery ? new RegExp(escapeSearch(nameQuery), "i") : null;
+    const activityFilterStages = taskActivityFilterStages(nameRegex, staffObjectId, visibleActivityScope);
 
     const now = new Date();
     const statusMatch = getTaskStatusMatchStages(
@@ -265,43 +226,23 @@ export async function GET(req: NextRequest) {
 
     const [result] = await Business_Tasks.aggregate([
       { $match: query },
+      ...activityFilterStages,
       {
         $lookup: {
           from: Task_Activities.collection.name,
-          let: {
-            taskId: "$_id",
-            isProjectTask: "$is_project_task",
-            creator: "$creator",
-            projectId: "$project_id",
-            assignedTeams: {
-              $cond: [
-                { $isArray: "$assigned_teams" },
-                "$assigned_teams",
-                {
-                  $cond: [
-                    { $ne: [{ $ifNull: ["$assigned_teams", null] }, null] },
-                    ["$assigned_teams"],
-                    [],
-                  ],
-                },
-              ],
-            },
-          },
+          localField: "_id",
+          foreignField: "task_id",
+          let: { taskId: "$_id" },
           pipeline: [
             {
               $match: {
                 $expr: {
-                  $and: [
-                    { $eq: ["$task_id", "$$taskId"] },
-                    {
-                      $or: [
-                        { $in: ["$$taskId", fullActivityTaskIds.map(toObjectId)] },
-                        { $in: ["$assigned_to", supervisedStaffObjectIds] },
-                        { $in: ["$forwarded_to", supervisedStaffObjectIds] },
-                        { $eq: ["$assigned_to", userObjectId] },
-                        { $eq: ["$forwarded_to", userObjectId] },
-                      ],
-                    },
+                  $or: [
+                    { $in: ["$$taskId", fullActivityTaskIds.map(toObjectId)] },
+                    { $in: ["$assigned_to", supervisedStaffObjectIds] },
+                    { $in: ["$forwarded_to", supervisedStaffObjectIds] },
+                    { $eq: ["$assigned_to", userObjectId] },
+                    { $eq: ["$forwarded_to", userObjectId] },
                   ],
                 },
               },
@@ -351,6 +292,8 @@ export async function GET(req: NextRequest) {
             {
               $project: {
                 task_name: 1,
+                __nameActivityMatched: 1,
+                __staffActivityMatched: 1,
                 task_description: 1,
                 createdAt: 1,
                 end_date: 1,
@@ -428,8 +371,6 @@ export async function GET(req: NextRequest) {
         Number(stats.comments || 0),
       ])
     );
-    const nameActivitySet = new Set(nameActivityIds.map((id) => id.toString()));
-    const staffActivitySet = new Set(staffActivityIds.map((id) => id.toString()));
     const summary = normalizeTaskSummary(result?.summary || []);
 
     const total = result?.pagination?.[0]?.total || 0;
@@ -460,13 +401,13 @@ export async function GET(req: NextRequest) {
             match: {
               nameMatched: Boolean(
                 nameRegex &&
-                  (nameActivitySet.has(taskId) || nameRegex.test(task.task_name || ""))
+                  (task.__nameActivityMatched || nameRegex.test(task.task_name || ""))
               ),
               staffTaskAssigned: Boolean(
                 staffObjectId && task.assigned_to?.toString() === staffId
               ),
               staffActivityAssigned: Boolean(
-                staffObjectId && staffActivitySet.has(taskId)
+                staffObjectId && task.__staffActivityMatched
               ),
             },
           };
@@ -484,6 +425,8 @@ export async function GET(req: NextRequest) {
       { status: 200 }
     );
   } catch (err) {
+    const unavailable = temporaryDatabaseFailureResponse(err);
+    if (unavailable) return unavailable;
     console.log("Error while fetching all staff tasks: ", err);
     return NextResponse.json(
       { message: "Internal Server Error", status: 500 },

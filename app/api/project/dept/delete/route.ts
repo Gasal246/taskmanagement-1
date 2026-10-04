@@ -3,10 +3,9 @@ import Project_Departments from "@/models/project_departments.model";
 import { NextRequest, NextResponse } from "next/server";
 import { authorizeProjectRequest } from "@/app/api/helpers/project-access";
 
-connectDB();
-
 export async function DELETE(req:NextRequest){
     try{
+        await connectDB();
         const { searchParams } = new URL(req.url);
         const proj_dept_id = searchParams.get("proj_dept_id");
 

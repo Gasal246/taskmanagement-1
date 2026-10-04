@@ -1,6 +1,5 @@
-import FcmTokens from "@/models/fcm_tokens.model";
-import Notifications from "@/models/notifications.model";
-import { getAdminMessaging } from "@/lib/firebaseAdmin";
+import { enqueueNotifications } from "@/lib/jobs/enqueue";
+import type { ClientSession } from "mongoose";
 
 const truncateText = (value: string, maxLength: number) => {
   const text = value?.trim() || "";
@@ -30,6 +29,7 @@ export async function notifyCalendarEventRecipients({
   description,
   startDate,
   endDate,
+  dbSession,
 }: {
   recipientIds: string[];
   senderId: string;
@@ -39,6 +39,7 @@ export async function notifyCalendarEventRecipients({
   description?: string;
   startDate: Date | string;
   endDate?: Date | string | null;
+  dbSession: ClientSession;
 }) {
   const recipients = Array.from(
     new Set(
@@ -84,51 +85,8 @@ export async function notifyCalendarEventRecipients({
     read_at: null,
   }));
 
-  await Notifications.insertMany(payload);
-
-  try {
-    const tokens = await FcmTokens.find(
-      { user_id: { $in: recipients } },
-      { token: 1 }
-    ).lean();
-    const tokenList = tokens.map((item: any) => item.token).filter(Boolean);
-    if (tokenList.length === 0) return;
-
-    const messaging = getAdminMessaging();
-    const response = await messaging.sendEachForMulticast({
-      tokens: tokenList,
-      notification: {
-        title: `New Schedule: ${titleText}`,
-        body: bodyText || titleText,
-      },
-      data: {
-        type: "calendar",
-        eventId,
-        link: "/staff/calendar",
-        eventTitle: titleText,
-        eventStart: startDate ? new Date(startDate).toISOString() : "",
-        eventEnd: endDate ? new Date(endDate).toISOString() : "",
-        senderName: senderName || "",
-      },
-    });
-
-    const invalidTokens = response.responses
-      .map((res, index) => {
-        const code = res.error?.code || "";
-        if (
-          code === "messaging/registration-token-not-registered" ||
-          code === "messaging/invalid-registration-token"
-        ) {
-          return tokenList[index];
-        }
-        return null;
-      })
-      .filter(Boolean) as string[];
-
-    if (invalidTokens.length > 0) {
-      await FcmTokens.deleteMany({ token: { $in: invalidTokens } });
-    }
-  } catch (error) {
-    console.log("Failed to send calendar notifications", error);
-  }
+  await enqueueNotifications(payload, {
+    notification: { title: `New Schedule: ${titleText}`, body: bodyText || titleText },
+    data: payload[0].data,
+  }, `calendar:${eventId}:created`, dbSession);
 }

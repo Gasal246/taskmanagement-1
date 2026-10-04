@@ -29,6 +29,9 @@ const SuperSidebar = () => {
                     <DashboardIcon /> Application Roles
                 </motion.button>
             </Link>
+            <Link href="/superadmin/jobs" className={`${pathname.includes('/jobs') ? 'dark:bg-cyan-950 bg-blue-400' : 'dark:bg-slate-800 bg-slate-50'} w-full p-2 font-medium flex gap-2 items-center`}>
+                <DashboardIcon /> Background Jobs
+            </Link>
         </div>
     )
 }

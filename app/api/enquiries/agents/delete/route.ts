@@ -1,25 +1,35 @@
 import connectDB from "@/lib/mongo";
-import Eq_agents_details from "@/models/eq_agents_details.model";
-import Roles from "@/models/roles.model";
-import User_roles from "@/models/user_roles.model";
+import { agentManagementScope, AgentAccessError } from "@/lib/enquiries/agent-access";
+import EqAgentDetails from "@/models/eq_agents_details.model";
+import UserRoles from "@/models/user_roles.model";
 import Users from "@/models/users.model";
+import Staff from "@/models/business_staffs.model";
+import Admins from "@/models/admin_assign_business.model";
+import mongoose from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
-export async function DELETE(req:NextRequest){
-    try{
-        const {searchParams} = new URL(req.url);
-        const agent_id = searchParams.get("agent_id");
-
-        const agent_role_id:any = await Roles.findOne({role_name: "AGENT"}).select("role_name").lean();
-        await User_roles.deleteOne({role_id: agent_role_id._id, user_id: agent_id});
-        await Eq_agents_details.deleteOne({user_id: agent_id});
-        await Users.findByIdAndDelete(agent_id);
-
-        return NextResponse.json({message: "Agent Deleted Successfully", status: 200}, {status: 200});
-    }catch(err){
-        console.log("Error while deleting an Agent: ", err);
-        return NextResponse.json({message: "Internal Server Error", status: 500}, {status: 500});
-    }
+export async function DELETE(req: NextRequest) {
+  let dbSession: mongoose.ClientSession | undefined;
+  try {
+    await connectDB();
+    const params = req.nextUrl.searchParams;
+    const userId = params.get("agent_id");
+    const scope = await agentManagementScope(userId, params.get("business_id"));
+    if (scope.actor.actorId === userId) return NextResponse.json({ message: "You cannot delete your own account here" }, { status: 403 });
+    dbSession = await mongoose.startSession();
+    await dbSession.withTransaction(async () => {
+      await UserRoles.deleteMany({ user_id: userId, role_id: scope.agentRole.role_id._id, business_id: scope.businessId }).session(dbSession!);
+      const hasRoles = await UserRoles.exists({ user_id: userId }).session(dbSession!);
+      const hasStaff = await Staff.exists({ user_id: userId }).session(dbSession!);
+      const hasAdmin = await Admins.exists({ user_id: userId }).session(dbSession!);
+      if (!hasRoles && !hasStaff && !hasAdmin) {
+        await EqAgentDetails.deleteOne({ user_id: userId }).session(dbSession!);
+        await Users.deleteOne({ _id: userId }).session(dbSession!);
+      }
+    });
+    return NextResponse.json({ message: "Agent removed from this business", status: 200 });
+  } catch (error) {
+    const status = error instanceof AgentAccessError ? error.status : 500;
+    return NextResponse.json({ message: error instanceof AgentAccessError ? error.message : "Unable to remove agent" }, { status });
+  } finally { await dbSession?.endSession(); }
 }

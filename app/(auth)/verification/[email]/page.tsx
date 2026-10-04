@@ -13,7 +13,7 @@ import { ShieldAlert, Timer } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { Tooltip } from 'antd'
 import SharedFooter from '@/components/shared/SharedFooter'
-import { useGetUserByEmail, useSendEmailVerification, useVerifyUserOtp } from '@/query/user/queries'
+import { useSendEmailVerification, useVerifyUserOtp } from '@/query/user/queries'
 
 const FormSchema = z.object({
     pin: z.string().min(6, {
@@ -24,28 +24,13 @@ const FormSchema = z.object({
 const EmailVerificationPage = ({ params }: { params: Promise<{ email: string }> }) => {
     const { email: encodedEmail } = React.use(params);
     const email = decodeURIComponent(encodedEmail) || '';
-    const { mutateAsync: findUserByEmail } = useGetUserByEmail();
     const { mutateAsync: sendEmailOtp, isPending: sendingEmail, status: emailSendStatus } = useSendEmailVerification();
     const { mutateAsync: verifyOtp, isPending: verifyingOTP, status: verificationStatus } = useVerifyUserOtp();
-    const [userFound, setUserFound] = useState(false);
-    const [timer, setTimer] = useState(120);
+    const userFound = true;
+    const [timer, setTimer] = useState(600);
     const [isTimerActive, setIsTimerActive] = useState(true);
     const [isOTPFormVisible, setIsOTPFormVisible] = useState(false);
     const router = useRouter();
-
-    useEffect(() => {
-        const fn = async () => {
-            const res = await findUserByEmail(email);
-            if (res?.status) {
-                setUserFound(true)
-            } else {
-                setUserFound(false);
-                toast.error("User Not Found!!");
-                router.back();
-            }
-        }
-        fn();
-    }, [email])
 
     useEffect(() => {
         let timerInterval: NodeJS.Timeout;
@@ -61,7 +46,8 @@ const EmailVerificationPage = ({ params }: { params: Promise<{ email: string }> 
     }, [timer, isTimerActive]);
 
     const handleSendOTP = async () => {
-        const res = await sendEmailOtp(email);
+        let res;
+        try { res = await sendEmailOtp(email); } catch { return toast.error("Unable to send recovery code. Try again later."); }
         if(!res){
             return toast.error("Email Not Send!!")
         }
@@ -69,7 +55,7 @@ const EmailVerificationPage = ({ params }: { params: Promise<{ email: string }> 
             description: email
         })
         setIsOTPFormVisible(true);
-        setTimer(120)
+        setTimer(600)
         setIsTimerActive(true)
     };
 
@@ -89,12 +75,13 @@ const EmailVerificationPage = ({ params }: { params: Promise<{ email: string }> 
     })
 
     async function onSubmit(data: z.infer<typeof FormSchema>) {
-        const response = await verifyOtp({ email, otp: data.pin });
+        let response;
+        try { response = await verifyOtp({ email, otp: data.pin }); } catch { return toast.error("Invalid or expired recovery code"); }
         if(response?.status){
             toast.success("OTP Verified successfully!", {
                 description: email
             })
-            router.replace(`/verification/${email}/reset-password/${form.getValues('pin')}`)
+            router.replace(`/verification/${encodeURIComponent(email)}/reset-password/${response.resetToken}`)
         }else{
             toast.error("OTP Verification Failed!!");
             setIsOTPFormVisible(false);
@@ -150,7 +137,7 @@ const EmailVerificationPage = ({ params }: { params: Promise<{ email: string }> 
                                             )}
                                         />
                                         <div className="flex justify-between items-center">
-                                            <Button type="submit">{ verifyingOTP ? 'Verifying...' : 'Verify'}</Button>
+                                            <Button type="submit" disabled={verifyingOTP}>{ verifyingOTP ? 'Verifying...' : 'Verify'}</Button>
                                             <h1 className='flex items-center gap-1'><Timer size={14} /><span className='font-bold flex items-center'>{Math.floor(timer / 60)} : {timer % 60 < 10 ? '0' : ''}{timer % 60}</span></h1>
                                         </div>
                                     </form>
@@ -158,7 +145,7 @@ const EmailVerificationPage = ({ params }: { params: Promise<{ email: string }> 
                                 <div className='flex flex-col items-center justify-center gap-3'>
                                     <h1>Email Verification {`{ "${email}" }`}</h1>
                                     <Tooltip title={`This will send a email to ${email} with a six digit OTP.`}>
-                                        <Button onClick={handleSendOTP} type='button'>{sendingEmail ? 'Sending...' : 'Send OTP'}</Button>
+                                        <Button onClick={handleSendOTP} type='button' disabled={sendingEmail}>{sendingEmail ? 'Sending...' : 'Send OTP'}</Button>
                                     </Tooltip>
                                 </div>
                         )

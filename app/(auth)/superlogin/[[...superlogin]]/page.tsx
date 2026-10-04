@@ -49,18 +49,18 @@ const SuperLogin = () => {
             })
             if (response?.error) {
                 toast("Login Failed!", {
-                    description: "There is a mismatch in provided credentials."
+                    description: response.status === 503 ? "Sign-in is temporarily unavailable. Please try again shortly." : "There is a mismatch in provided credentials."
                 })
             }
             if (response?.ok) {
+                form.reset()
                 toast("Login Success..", {
                     description: "Good to see you " + values.email
                 })
             }
-        } catch (error) {
-            console.log(error)
+        } catch {
+            toast("Unable to sign in", { description: "Please check your connection and try again." })
         } finally {
-            form.reset()
             setLoading(false)
         }
     }

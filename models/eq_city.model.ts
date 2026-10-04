@@ -1,10 +1,10 @@
-import mongoose, { ObjectId, Schema } from "mongoose";
+import mongoose, { Document, Types, Schema } from "mongoose";
 
 export interface IEq_city extends Document{
-    _id: ObjectId,
-    country_id: ObjectId,
-    region_id: ObjectId,
-    province_id: ObjectId,
+    _id: Types.ObjectId,
+    country_id: Types.ObjectId,
+    region_id: Types.ObjectId,
+    province_id: Types.ObjectId,
     city_name: String,
     createdAt: Date,
     updatedAt: Date

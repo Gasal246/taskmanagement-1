@@ -5,8 +5,6 @@ import Todos from "@/models/todo.model";
 import { resolveSessionUserId } from "@/lib/utils";
 import { resolveTodoCloudAccess } from "@/lib/todo-access";
 
-connectDB();
-
 interface Body{
     content: string;
     priority?: "low" | "medium" | "high";
@@ -15,6 +13,7 @@ interface Body{
 
 export async function POST(req: NextRequest){
     try{
+        await connectDB();
         const session:any = await auth();
         if(!session) return NextResponse.json({message:"Un-Authorized Access", status: 401}, {status: 401});
         const userId = resolveSessionUserId(session);

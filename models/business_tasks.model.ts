@@ -1,12 +1,12 @@
-import mongoose, { ObjectId, Schema } from "mongoose";
+import mongoose, { Document, Types, Schema } from "mongoose";
 
 interface IBusiness_Tasks extends Document {
-    _id: ObjectId,
-    project_id: ObjectId | null,
-    assigned_teams: ObjectId[],
-    assigned_to: ObjectId | null,
-    business_id: ObjectId | null,
-    creator: ObjectId,
+    _id: Types.ObjectId,
+    project_id: Types.ObjectId | null,
+    assigned_teams: Types.ObjectId[],
+    assigned_to: Types.ObjectId | null,
+    business_id: Types.ObjectId | null,
+    creator: Types.ObjectId,
     task_name: String,
     task_description: String,
     priority: "high" | "medium" | "normal",
@@ -47,6 +47,8 @@ Business_TasksSchema.index({ assigned_to: 1, updatedAt: -1 });
 Business_TasksSchema.index({ assigned_teams: 1, updatedAt: -1 });
 Business_TasksSchema.index({ creator: 1, updatedAt: -1 });
 Business_TasksSchema.index({ is_project_task: 1, updatedAt: -1 });
+
+Business_TasksSchema.index({ project_id: 1, is_project_task: 1, updatedAt: -1, _id: -1 });
 
 const Business_Tasks = mongoose.models?.business_tasks || mongoose.model<IBusiness_Tasks>('business_tasks', Business_TasksSchema);
 

@@ -1,5 +1,7 @@
 "use client"
-import React, { useEffect, useState } from 'react'
+import { useOrganizationOverview } from "@/hooks/use-organization-overview";
+import OrganizationSectionControls from "@/components/admin/OrganizationSectionControls";
+import React, { useState } from 'react'
 import { useSelector } from 'react-redux'
 import { RootState } from '@/redux/store'
 import { motion } from 'framer-motion';
@@ -7,76 +9,40 @@ import { Check, EllipsisVertical, Eye, Library, MapPinned, Plus, Trash2, UserPlu
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator, BreadcrumbLink } from '@/components/ui/breadcrumb'
 import { useRouter } from 'next/navigation'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from '@/components/ui/input';
-import { useGetBusinessStaffs } from '@/query/user/queries';
 import { toast } from 'sonner';
 import { Avatar } from 'antd';
-import { useAddDepartmentArea, useAddDepartmentHead, useAddDepartmentRegion, useAddDepartmentStaff, useGetBusinessRegions, useGetCompleteDepartmentData, useGetRegionAreas, useRemoveDepartmentArea, useRemoveDepartmentHead, useRemoveDepartmentRegion, useRemoveDepartmentStaff } from '@/query/business/queries';
+import { useAddDepartmentArea, useAddDepartmentHead, useAddDepartmentRegion, useAddDepartmentStaff, useRemoveDepartmentArea, useRemoveDepartmentHead, useRemoveDepartmentRegion, useRemoveDepartmentStaff } from '@/query/business/queries';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Popconfirm } from 'antd';
-import LoaderSpin from '@/components/shared/LoaderSpin';
 
 const DepartmentPage = () => {
     const router = useRouter();
-    const { departmentData, businessPlan } = useSelector((state: RootState) => state.application);
+    const { departmentData } = useSelector((state: RootState) => state.application);
+    const overview = useOrganizationOverview("department", departmentData?._id, ["heads", "staffs", "regions", "areas", "available_regions", "available_areas", "available_staffs"]);
     const { businessData } = useSelector((state: RootState) => state.user);
-    const { data: allStaffs } = useGetBusinessStaffs(businessData?._id);
-    const { mutateAsync: getDepartmentData, isPending: loadingDepartmentData } = useGetCompleteDepartmentData();
-    const { mutateAsync: getRegions } = useGetBusinessRegions();
-    const { mutateAsync: getAreas } = useGetRegionAreas();
     const [isAddingStaff, setIsAddingStaff] = useState(false);
     const [currentSelectedStaff, setCurrentSelectedStaff] = useState<string>('');
-    const [staffSearch, setStaffSearch] = useState<string>('');
-    const [allRegions, setAllRegions] = useState<any[]>([]);
-    const [allAreas, setAllAreas] = useState<any[]>([]);
+    const allAreas = overview.section("available_areas").items;
     const [addHeadDialog, setAddHeadDialog] = useState(false);
-    const [regionSearch, setRegionSearch] = useState<string>('');
-    const [areaSearch, setAreaSearch] = useState<string>('');
 
-    const { mutateAsync: addDepartmentHead } = useAddDepartmentHead();
+    const { mutateAsync: addDepartmentHead, isPending: addingHead } = useAddDepartmentHead();
     const { mutateAsync: removeDepartmentHead } = useRemoveDepartmentHead();
-    const { mutateAsync: addDepartmentRegion } = useAddDepartmentRegion();
+    const { mutateAsync: addDepartmentRegion, isPending: addingRegion } = useAddDepartmentRegion();
     const { mutateAsync: removeDepartmentRegion } = useRemoveDepartmentRegion();
-    const { mutateAsync: addDepartmentArea } = useAddDepartmentArea();
+    const { mutateAsync: addDepartmentArea, isPending: addingArea } = useAddDepartmentArea();
     const { mutateAsync: removeDepartmentArea } = useRemoveDepartmentArea();
-    const { mutateAsync: addDepartmentStaff } = useAddDepartmentStaff();
+    const { mutateAsync: addDepartmentStaff, isPending: addingStaff } = useAddDepartmentStaff();
     const { mutateAsync: removeDepartmentStaff } = useRemoveDepartmentStaff();
 
-    const [heads, setHeads] = useState<any[]>([]);
-    const [regions, setRegions] = useState<any[]>([]);
-    const [areas, setAreas] = useState<any[]>([]);
-    const [staffs, setStaffs] = useState<any[]>([]);
-    const staffSearchTerm = staffSearch.trim().toLowerCase();
-    const filteredStaffs = allStaffs?.filter((staff: any) => {
-        const name = staff?.user_id?.name || "";
-        const email = staff?.user_id?.email || "";
-        return `${name} ${email}`.toLowerCase().includes(staffSearchTerm);
-    });
-    const regionSearchTerm = regionSearch.trim().toLowerCase();
-    const filteredRegions = allRegions.filter((region: any) => {
-        const name = region?.region_name || "";
-        return name.toLowerCase().includes(regionSearchTerm);
-    });
-    const areaSearchTerm = areaSearch.trim().toLowerCase();
-    const filteredAreas = allAreas.filter((area: any) => {
-        const name = area?.area_name || "";
-        return name.toLowerCase().includes(areaSearchTerm);
-    });
+    const heads = overview.section("heads").items;
+    const regions = overview.section("regions").items;
+    const areas = overview.section("areas").items;
+    const staffs = overview.section("staffs").items;
+    const filteredStaffs = overview.section("available_staffs").items;
+    const filteredRegions = overview.section("available_regions").items;
+    const filteredAreas = overview.section("available_areas").items;
 
-    const handleGetCompleteDepData = async () => {
-        if (!departmentData?._id) return toast.error("No department data found");
-        const res = await getDepartmentData(departmentData?._id);
-        console.log(res);
-        if (res?.status == 200) {
-            setHeads(res?.data?.heads);
-            setRegions(res?.data?.regions);
-            if(res?.data?.regions?.length > 0) {
-                handleFetchBusinessAreas(res?.data?.regions?.map((region: any) => region?.business_region_id?._id));
-            }
-            setAreas(res?.data?.areas);
-            setStaffs(res?.data?.staffs);
-        }
-    }
+    const handleGetCompleteDepData = async () => { await overview.refresh(); };
 
     const handleClickAddStaff = () => {
         setIsAddingStaff(true);
@@ -87,6 +53,7 @@ const DepartmentPage = () => {
         setAddHeadDialog(true);
     }
     const handleAddHead = async () => {
+        if (addingHead) return;
         if (!currentSelectedStaff) {
             return toast.error("Please select a staff.")
         }
@@ -120,10 +87,11 @@ const DepartmentPage = () => {
     }
 
     const handleAddStaff = async () => {
+        if (addingStaff) return;
         if (!currentSelectedStaff) {
             return toast.error("Please select a staff.")
         }
-        if(staffs?.find((staff: any) => staff?.user_id?._id === currentSelectedStaff)) {
+        if(staffs?.find((staff: any) => staff?.staff_id?._id === currentSelectedStaff)) {
             return toast.error("Staff already added.")
         }
         const formData = new FormData();
@@ -157,15 +125,8 @@ const DepartmentPage = () => {
     const [addRegionDialog, setAddRegionDialog] = useState(false);
     const [currentSelectedRegion, setCurrentSelectedRegion] = useState<string>('');
 
-    const handleFetchBusinessRegions = async () => {
-        if (!businessData?._id) return;
-        const res = await getRegions({ business_id: businessData?._id });
-        if (res?.status == 200) {
-            setAllRegions(res?.data);
-        }
-    }
-
     const handleAddRegion = async () => {
+        if (addingRegion) return;
         if (!currentSelectedRegion) {
             return toast.error("Please select a region.")
         }
@@ -200,22 +161,12 @@ const DepartmentPage = () => {
     const [addAreaDialog, setAddAreaDialog] = useState(false);
     const [currentSelectedArea, setCurrentSelectedArea] = useState<string>('');
 
-    const handleFetchBusinessAreas = async (region_ids: string[]) => {
-        if (!region_ids?.length) {
-            toast.error('no areas fetched');
-            return;
-        }
-        const res = await getAreas({ region_ids });
-        if (res?.status == 200) {
-            setAllAreas(res?.data);
-        }
-    }
-
     const handleAddArea = async () => {
+        if (addingArea) return;
         if (!currentSelectedArea) {
             return toast.error("Please select an area.")
         }
-        if(areas?.find((area: any) => area?.business_area_id?._id === currentSelectedArea)) {
+        if(areas?.find((area: any) => area?.area_id?._id === currentSelectedArea)) {
             return toast.error("Area already added.")
         }
         const formData = new FormData();
@@ -243,14 +194,6 @@ const DepartmentPage = () => {
             toast.error(res?.message || "Failed to remove area.");
         }
     }
-
-    useEffect(() => {
-        if (businessData) {
-            handleGetCompleteDepData();
-            handleFetchBusinessRegions();
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [businessData]);
 
     return (
         <div className='p-4 pb-10'>
@@ -283,15 +226,10 @@ const DepartmentPage = () => {
                     </motion.div>
                 </div>
 
-                {!loadingDepartmentData && heads?.length === 0 && (
+                <OrganizationSectionControls key={`${overview.scope}:heads`} overview={overview} name="heads" label="heads" />
+                {overview.section("heads").loaded && heads?.length === 0 && (
                     <div className='w-full h-[10vh] flex items-center justify-center'>
                         <h1 className='text-xs text-slate-400'>No head data found, you can add a new one.</h1>
-                    </div>
-                )}
-
-                {loadingDepartmentData && (
-                    <div className='w-full h-[10vh] flex items-center justify-center'>
-                        <LoaderSpin size={50} />
                     </div>
                 )}
 
@@ -346,15 +284,10 @@ const DepartmentPage = () => {
                     </motion.div>
                 </div>
 
-                {!loadingDepartmentData && regions?.length === 0 && (
+                <OrganizationSectionControls key={`${overview.scope}:regions`} overview={overview} name="regions" label="regions" />
+                {overview.section("regions").loaded && regions?.length === 0 && (
                     <div className='w-full h-[10vh] flex items-center justify-center'>
                         <h1 className='text-xs text-slate-400'>No region data found, you can add a new one.</h1>
-                    </div>
-                )}
-
-                {loadingDepartmentData && (
-                    <div className='w-full h-[10vh] flex items-center justify-center'>
-                        <LoaderSpin size={50} />
                     </div>
                 )}
 
@@ -405,15 +338,10 @@ const DepartmentPage = () => {
                     </motion.div>
                 </div>
 
-                {!loadingDepartmentData && areas?.length === 0 && (
+                <OrganizationSectionControls key={`${overview.scope}:areas`} overview={overview} name="areas" label="areas" />
+                {overview.section("areas").loaded && areas?.length === 0 && (
                     <div className='w-full h-[10vh] flex items-center justify-center'>
                         <h1 className='text-xs text-slate-400'>No area data found, you can add a new one.</h1>
-                    </div>
-                )}
-
-                {loadingDepartmentData && (
-                    <div className='w-full h-[10vh] flex items-center justify-center'>
-                        <LoaderSpin size={50} />
                     </div>
                 )}
 
@@ -464,15 +392,10 @@ const DepartmentPage = () => {
                     </motion.div>
                 </div>
 
-                {!loadingDepartmentData && staffs?.length === 0 && (
+                <OrganizationSectionControls key={`${overview.scope}:staffs`} overview={overview} name="staffs" label="staffs" />
+                {overview.section("staffs").loaded && staffs?.length === 0 && (
                     <div className='w-full h-[10vh] flex items-center justify-center'>
                         <h1 className='text-xs text-slate-400'>No staffs data found, you can add a new one.</h1>
-                    </div>
-                )}
-
-                {loadingDepartmentData && (
-                    <div className='w-full h-[10vh] flex items-center justify-center'>
-                        <LoaderSpin size={50} />
                     </div>
                 )}
 
@@ -520,7 +443,6 @@ const DepartmentPage = () => {
 
             </div>
 
-
             {/* Add Department Head */}
             <Dialog open={addHeadDialog} onOpenChange={setAddHeadDialog}>
                 <DialogContent className="lg:w-[450px] max-h-[70vh] flex flex-col border-slate-800 bg-black/10 backdrop-blur-sm">
@@ -528,17 +450,11 @@ const DepartmentPage = () => {
                         <DialogTitle>Add Department {isAddingStaff ? "Staff" : "Head"}</DialogTitle>
                         <DialogDescription>You can add any business staff as department {isAddingStaff ? "staff" : "head"} for {departmentData?.dep_name}.</DialogDescription>
                     </DialogHeader>
-                    <div className="space-y-2">
-                        <Input
-                            placeholder="Search staff by name"
-                            value={staffSearch}
-                            onChange={(e) => setStaffSearch(e.target.value)}
-                        />
-                    </div>
+                    <OrganizationSectionControls key={`${overview.scope}:available_staffs`} overview={overview} name="available_staffs" label="staff" />
                     <div className="relative flex-1 overflow-y-auto pb-16">
-                        {filteredStaffs?.length === 0 && (
+                        {overview.section("available_staffs").loaded && filteredStaffs?.length === 0 && (
                             <div className="flex items-center justify-center h-[10vh]">
-                                <h1 className="text-xs font-medium text-slate-300">{staffSearchTerm ? "No matching users." : "No business staffs."}</h1>
+                                <h1 className="text-xs font-medium text-slate-300">No matching staff.</h1>
                             </div>
                         )}
                         {filteredStaffs?.map((staff: any) => (
@@ -560,13 +476,13 @@ const DepartmentPage = () => {
                     </div>
                     <DialogFooter className="w-full">
                         <div className="pt-2 bg-slate-950/80 w-full">
-                            <motion.div
+                            <motion.button type="button" disabled={addingHead || addingStaff}
                                 whileTap={{ scale: 0.98 }}
                                 onClick={isAddingStaff ? handleAddStaff : handleAddHead}
                                 className="w-full bg-gradient-to-tr from-slate-700/50 to-slate-800/50 p-3 hover:border-cyan-500 border border-slate-700 select-none cursor-pointer rounded-lg flex items-center gap-1 justify-center">
                                 <Plus size={16} />
-                                <h1 className="font-semibold text-sm text-slate-300 flex items-center gap-1">Add Deparment {isAddingStaff ? "Staff" : "Head"}</h1>
-                            </motion.div>
+                                <h1 className="font-semibold text-sm text-slate-300 flex items-center gap-1">Add Department {isAddingStaff ? "Staff" : "Head"}</h1>
+                            </motion.button>
                         </div>
                     </DialogFooter>
                 </DialogContent>
@@ -579,17 +495,11 @@ const DepartmentPage = () => {
                         <DialogTitle>Add Department Region</DialogTitle>
                         <DialogDescription>Select the business regions for {departmentData?.dep_name}.</DialogDescription>
                     </DialogHeader>
-                    <div className="space-y-2">
-                        <Input
-                            placeholder="Search regions by name"
-                            value={regionSearch}
-                            onChange={(e) => setRegionSearch(e.target.value)}
-                        />
-                    </div>
+                    <OrganizationSectionControls key={`${overview.scope}:available_regions`} overview={overview} name="available_regions" label="regions" />
                     <div className="relative flex-1 overflow-y-auto pb-16">
-                        {filteredRegions?.length === 0 && (
+                        {overview.section("available_regions").loaded && filteredRegions?.length === 0 && (
                             <div className="flex items-center justify-center h-[10vh]">
-                                <h1 className="text-xs font-medium text-slate-300">{regionSearchTerm ? "No matching regions." : "No business regions."}</h1>
+                                <h1 className="text-xs font-medium text-slate-300">No matching regions.</h1>
                             </div>
                         )}
                         {filteredRegions?.map((region: any) => (
@@ -605,13 +515,13 @@ const DepartmentPage = () => {
                     </div>
                     <DialogFooter className="w-full">
                         <div className="pt-2 bg-slate-950/80 w-full">
-                            <motion.div
+                            <motion.button type="button" disabled={addingRegion}
                                 whileTap={{ scale: 0.98 }}
                                 onClick={handleAddRegion}
                                 className="w-full bg-gradient-to-tr from-slate-700/50 to-slate-800/50 p-3 hover:border-cyan-500 border border-slate-700 select-none cursor-pointer rounded-lg flex items-center gap-1 justify-center">
                                 <Plus size={16} />
-                                <h1 className="font-semibold text-sm text-slate-300 flex items-center gap-1">Add Deparment Region</h1>
-                            </motion.div>
+                                <h1 className="font-semibold text-sm text-slate-300 flex items-center gap-1">Add Department Region</h1>
+                            </motion.button>
                         </div>
                     </DialogFooter>
                 </DialogContent>
@@ -624,22 +534,11 @@ const DepartmentPage = () => {
                         <DialogTitle>Add Department Area</DialogTitle>
                         <DialogDescription>Select the business areas for {departmentData?.dep_name}.</DialogDescription>
                     </DialogHeader>
-                    <div className="space-y-2">
-                        <Input
-                            placeholder="Search areas by name"
-                            value={areaSearch}
-                            onChange={(e) => setAreaSearch(e.target.value)}
-                        />
-                    </div>
+                    <OrganizationSectionControls key={`${overview.scope}:available_areas`} overview={overview} name="available_areas" label="areas" />
                     <div className="relative flex-1 overflow-y-auto pb-16">
-                        {allRegions?.length === 0 && (
+                        {overview.section("available_areas").loaded && filteredAreas?.length === 0 && (
                             <div className="flex items-center justify-center h-[10vh]">
-                                <h1 className="text-xs font-medium text-slate-300">No business regions.</h1>
-                            </div>
-                        )}
-                        {filteredAreas?.length === 0 && allRegions?.length !== 0 && (
-                            <div className="flex items-center justify-center h-[10vh]">
-                                <h1 className="text-xs font-medium text-slate-300">{areaSearchTerm ? "No matching areas." : "No business areas."}</h1>
+                                <h1 className="text-xs font-medium text-slate-300">No areas in the assigned regions match this search.</h1>
                             </div>
                         )}
                         {filteredAreas?.map((area: any) => (
@@ -655,13 +554,13 @@ const DepartmentPage = () => {
                     </div>
                     <DialogFooter className="w-full">
                         <div className="pt-2 bg-slate-950/80 w-full">
-                            <motion.div
+                            <motion.button type="button" disabled={addingArea}
                                 whileTap={{ scale: 0.98 }}
                                 onClick={handleAddArea}
                                 className="w-full bg-gradient-to-tr from-slate-700/50 to-slate-800/50 p-3 hover:border-cyan-500 border border-slate-700 select-none cursor-pointer rounded-lg flex items-center gap-1 justify-center">
                                 <Plus size={16} />
-                                <h1 className="font-semibold text-sm text-slate-300 flex items-center gap-1">Add Deparment Area</h1>
-                            </motion.div>
+                                <h1 className="font-semibold text-sm text-slate-300 flex items-center gap-1">Add Department Area</h1>
+                            </motion.button>
                         </div>
                     </DialogFooter>
                 </DialogContent>

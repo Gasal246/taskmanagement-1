@@ -5,8 +5,6 @@ import { resolveSessionUserId } from "@/lib/utils";
 import Todos from "@/models/todo.model";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 type ImportTodo = {
   _id: string;
   content: string;
@@ -20,6 +18,7 @@ type ImportTodo = {
 
 export async function POST(req: NextRequest) {
   try {
+        await connectDB();
     const session: any = await auth();
     if (!session) return NextResponse.json({ message: "Un-Authorized Access", status: 401 }, { status: 401 });
 

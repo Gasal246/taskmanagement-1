@@ -1,14 +1,16 @@
+import { authorizeOrganizationMutation } from "@/lib/organization-access";
 import connectDB from "@/lib/mongo";
 import Area_staffs from "@/models/area_staffs.model";
 import Roles from "@/models/roles.model";
 import User_roles from "@/models/user_roles.model";
 import { NextResponse } from "next/server";
 
-connectDB();
-
 export async function POST(req: Request) {
     const { AreaStaffId } = await req.json();
     try {
+        await connectDB();
+        const accessDenied = await authorizeOrganizationMutation(req);
+        if (accessDenied) return accessDenied;
         const areaStaff = await Area_staffs.findById(AreaStaffId);
         if (!areaStaff) {
             return NextResponse.json({ error: "Area Staff not found" }, { status: 404 });

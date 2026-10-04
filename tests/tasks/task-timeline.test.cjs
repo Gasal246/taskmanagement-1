@@ -25,7 +25,7 @@ const schedule = load('lib/activity-schedule.ts');
 const d = value => new Date(value);
 const pair = { start_date: '2026-09-15T08:00:00.000Z', end_date: '2026-09-15T09:00:00.000Z' };
 const plain = value => JSON.parse(JSON.stringify(value));
-const chain = value => ({ select() { return this; }, lean: async () => value, then: (resolve, reject) => Promise.resolve(value).then(resolve, reject) });
+const chain = value => ({ select() { return this; }, session() { return this; }, lean: async () => value, then: (resolve, reject) => Promise.resolve(value).then(resolve, reject) });
 
 test('activity schedules require two valid offset timestamps and permit equal endpoints', () => {
   for (const value of [pair, { ...pair, end_date: pair.start_date }, {
@@ -143,6 +143,9 @@ function routeFixture({ project = false, manager = true, admin = true } = {}) {
     '@/auth': { auth: async () => ({ user: { id: 'actor' } }) },
     '@/lib/mongo': { default: () => {} },
     '@/lib/activity-schedule': schedule,
+    '@/lib/jobs/transaction': { inTransaction: async work => work({}) },
+    '@/lib/jobs/enqueue': { assertUploadNotRetired: async () => {}, enqueueFileCleanup: async () => {} },
+    '@/lib/server-access': { canAccessBusiness: async () => true, canAdministerBusiness: async () => admin },
     '@/app/api/helpers/task-timeline': { recalculateTaskTimeline: async id => state.recalculated.push(id) },
     '@/models/users.model': { default: { findById: () => chain({ _id: 'actor', name: 'Actor', status: 1 }) } },
     '@/models/business_tasks.model': { default: {
@@ -236,35 +239,8 @@ test('task editing ignores manually supplied task dates', async () => {
   assert.equal(Object.hasOwn(fields, 'end_date'), false);
 });
 
-test('calendar feed excludes unscheduled tasks and keeps exact calculated timestamps', async () => {
-  const taskRows = [
-    { _id: 'scheduled', start_date: d(pair.start_date), end_date: d(pair.end_date) },
-    { _id: 'empty', createdAt: d(pair.start_date), start_date: null, end_date: null },
-    { _id: 'partial', createdAt: d(pair.start_date), start_date: d(pair.start_date), end_date: null },
-  ];
-  const mocks = {
-    '@/auth': { auth: async () => ({ user: { id: 'actor' } }) },
-    '@/lib/mongo': { default: () => {} },
-    '@/app/api/helpers/resolve-user-business': { resolveActiveBusinessIdForUser: async () => 'business' },
-    '@/lib/constants': { HEAD_ROLES: [] },
-    '@/models/business_tasks.model': { default: { find: () => ({
-      populate() { return this; }, sort() { return this; }, lean: async () => taskRows,
-    }) } },
-  };
-  for (const model of ['calendar_events.model', 'eq_enquiry_histories', 'project_team.model',
-    'project_team_members.model', 'region_staffs.model', 'area_staffs.model', 'location_staffs.model',
-    'region_dep_staffs.model', 'area_dep_staffs.model', 'location_dep_staffs.model',
-    'eq_enquiries.model', 'eq_camps.model', 'eq_camp_headoffice.model']) mocks[`@/models/${model}`] = {};
-  const api = load('app/api/calendar/feed/route.ts', mocks);
-  const response = await api.GET(new NextRequest('http://localhost/api/calendar/feed?includeEnquiries=false&includeCustomEvents=false', {
-    headers: { cookie: `user_role=${JSON.stringify({ role_name: 'BUSINESS_ADMIN' })}` },
-  }));
-  assert.equal(response.status, 200);
-  const body = await response.json();
-  assert.deepEqual(body.items.map(item => item.sourceId), ['scheduled']);
-  assert.equal(body.items[0].start, pair.start_date);
-  assert.equal(body.items[0].end, pair.end_date);
-});
+// Calendar bounds and unscheduled-task exclusions are exercised with real MongoDB
+// in tests/security/large-views.test.cjs.
 
 test('both task creation APIs initialize dates to null without requiring a schedule', async () => {
   for (const includeDates of [false, true]) {
@@ -289,7 +265,7 @@ test('both task creation APIs initialize dates to null without requiring a sched
       '@/app/api/helpers/task-list-status': {},
     });
     const dates = includeDates ? pair : {};
-    const res = await f.request('add-task', 'POST', { task_name: 'New task', is_project_task: false, ...dates });
+    const res = await f.request('add-task', 'POST', { task_name: 'New task', business_id: '111111111111111111111111', is_project_task: false, ...dates });
     assert.equal(res.status, 201);
     assert.equal(saved.start_date, null);
     assert.equal(saved.end_date, null);

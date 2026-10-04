@@ -1,3 +1,4 @@
+import { authorizeUserManagement } from "@/lib/server-access";
 import connectDB from "@/lib/mongo";
 import Area_dep_heads from "@/models/area_dep_heads.model";
 import Area_dep_staffs from "@/models/area_dep_staffs.model";
@@ -14,8 +15,6 @@ import {
   hasUsageBlocks,
 } from "@/app/api/helpers/user-role-usage-guard";
 
-connectDB();
-
 const ASSIGNMENT_MODEL_BY_ROLE: Record<string, { model: any; userField: "user_id" | "staff_id" }> = {
   REGION_DEP_HEAD: { model: Region_dep_heads, userField: "user_id" },
   REGION_DEP_STAFF: { model: Region_dep_staffs, userField: "user_id" },
@@ -28,6 +27,7 @@ const ASSIGNMENT_MODEL_BY_ROLE: Record<string, { model: any; userField: "user_id
 
 export async function POST(req: NextRequest) {
   try {
+        await connectDB();
     const { URoleId } = await req.json();
 
     if (!URoleId) {
@@ -39,6 +39,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "User Role Not Found" }, { status: 404 });
     }
 
+        const accessDenied = await authorizeUserManagement(String(userRole.user_id), userRole.business_id);
+        if (accessDenied) return accessDenied;
     await userRole.populate({ path: "role_id", select: { role_name: 1 } });
     const roleName = userRole?.role_id?.role_name;
     const userId = userRole?.user_id?.toString?.();

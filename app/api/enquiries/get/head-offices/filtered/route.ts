@@ -2,10 +2,9 @@ import connectDB from "@/lib/mongo";
 import Eq_camp_headoffice from "@/models/eq_camp_headoffice.model";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function GET(req: NextRequest) {
   try {
+        await connectDB();
     const { searchParams } = new URL(req.url);
     const search = searchParams.get("search")?.trim() || "";
     const pageParam = Number(searchParams.get("page"));

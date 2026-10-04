@@ -4,10 +4,9 @@ import { resolveTodoCloudAccess } from "@/lib/todo-access";
 import { resolveSessionUserId } from "@/lib/utils";
 import { NextResponse } from "next/server";
 
-connectDB();
-
 export async function GET() {
   try {
+        await connectDB();
     const session: any = await auth();
     if (!session) return NextResponse.json({ message: "Un-Authorized Access" }, { status: 401 });
 

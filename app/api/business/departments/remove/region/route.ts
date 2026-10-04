@@ -1,10 +1,12 @@
+import { authorizeOrganizationMutation } from "@/lib/organization-access";
 import connectDB from "@/lib/mongo";
 import Department_regions from "@/models/department_regions.model";
 
-connectDB();
-
 export async function POST(request: Request) {
     try {
+        await connectDB();
+        const accessDenied = await authorizeOrganizationMutation(request);
+        if (accessDenied) return accessDenied;
         const { DepRegionId } = await request.json();
         if (!DepRegionId) return new Response("No department region id provided", { status: 400 });
         

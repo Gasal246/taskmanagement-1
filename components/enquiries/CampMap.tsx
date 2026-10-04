@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { CampCluster, MapBounds, MapViewport } from "@/lib/maps/types";
 
 export type CampMapItem = {
   _id: string;
@@ -31,6 +32,12 @@ type CampMapProps = {
   customPins?: CustomMapPin[];
   customPinsFocusKey?: number;
   focusedCampId?: string;
+  focusedCamp?: CampMapItem | null;
+  clusters?: CampCluster[];
+  filterKey?: string;
+  fitBounds?: MapBounds | null;
+  onViewportChanged?: (viewport: MapViewport) => void;
+  onClusterSelected?: (bounds: MapBounds) => void;
   focusedCampKey?: number;
   isLoading?: boolean;
   hasCountrySelection: boolean;
@@ -283,156 +290,120 @@ const createCustomInfoWindowContent = (
 };
 
 export default function CampMap({
-  camps,
-  customPins = [],
-  customPinsFocusKey = 0,
-  focusedCampId = "",
-  focusedCampKey = 0,
-  isLoading = false,
-  hasCountrySelection,
-  onDirectionsRequested,
+  camps, clusters = [], customPins = [], customPinsFocusKey = 0, focusedCamp = null,
+  focusedCampKey = 0, isLoading = false, hasCountrySelection, onDirectionsRequested,
+  filterKey = "", fitBounds, onViewportChanged, onClusterSelected,
 }: CampMapProps) {
   const mapRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<any>(null);
   const infoWindowRef = useRef<any>(null);
-  const markersRef = useRef<any[]>([]);
+  const markersRef = useRef(new Map<string, { marker: any; signature: string }>());
+  const viewportCallback = useRef(onViewportChanged);
+  viewportCallback.current = onViewportChanged;
+  const lastFit = useRef<string | null>(null);
+  const [ready, setReady] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
-
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
 
   useEffect(() => {
-    if (!apiKey) {
-      setMapError("Add NEXT_PUBLIC_GOOGLE_MAPS_API_KEY to render the map.");
-      return;
-    }
-
-    let isCancelled = false;
-
-    loadGoogleMaps(apiKey)
-      .then((google) => {
-        if (isCancelled || !mapRef.current) return;
-
-        if (!mapInstanceRef.current) {
-          mapInstanceRef.current = new google.maps.Map(mapRef.current, {
-            center: DEFAULT_CENTER,
-            zoom: DEFAULT_ZOOM,
-            mapTypeControl: true,
-            streetViewControl: false,
-            fullscreenControl: false,
-            gestureHandling: "greedy",
-            clickableIcons: false,
-            mapTypeId: "roadmap",
-          });
-
-          infoWindowRef.current = new google.maps.InfoWindow();
-        }
-
-        setMapError(null);
-      })
-      .catch((error) => {
-        if (!isCancelled) {
-          setMapError(error instanceof Error ? error.message : "Failed to load Google Maps.");
-        }
-      });
-
+    if (!apiKey) { setMapError("The map is currently unavailable. Please contact your administrator."); return; }
+    let cancelled = false;
+    let idleListener: any;
+    loadGoogleMaps(apiKey).then(google => {
+      if (cancelled || !mapRef.current) return;
+      const map = new google.maps.Map(mapRef.current, { center: DEFAULT_CENTER, zoom: DEFAULT_ZOOM,
+        mapTypeControl: true, streetViewControl: false, fullscreenControl: false,
+        gestureHandling: "greedy", clickableIcons: false, mapTypeId: "roadmap" });
+      mapInstanceRef.current = map;
+      infoWindowRef.current = new google.maps.InfoWindow();
+      const report = () => {
+        const bounds = map.getBounds();
+        if (!bounds) return;
+        const ne = bounds.getNorthEast(), sw = bounds.getSouthWest();
+        viewportCallback.current?.({ south: sw.lat(), west: sw.lng(), north: ne.lat(), east: ne.lng(), zoom: map.getZoom() || 5 });
+      };
+      idleListener = map.addListener("idle", report);
+      report();
+      setReady(true); setMapError(null);
+    }).catch(error => { if (!cancelled) setMapError(error instanceof Error ? error.message : "Unable to load the map."); });
+    const markers = markersRef.current;
     return () => {
-      isCancelled = true;
+      cancelled = true; idleListener?.remove();
+      const google = (window as any).google;
+      markers.forEach(({ marker }) => { google?.maps?.event.clearInstanceListeners(marker); marker.setMap(null); });
+      markers.clear(); infoWindowRef.current?.close(); mapInstanceRef.current = null;
     };
   }, [apiKey]);
 
+  // Filter changes fit once. Refreshes and panning never pull the camera back.
   useEffect(() => {
+    if (!ready || fitBounds === undefined || lastFit.current === filterKey) return;
+    lastFit.current = filterKey;
     const map = mapInstanceRef.current;
-    const google = (window as any).google;
-
-    if (!map || !google?.maps) return;
-
-    markersRef.current.forEach((marker) => marker.setMap(null));
-    markersRef.current = [];
-
-    if (!camps.length && !customPins.length) {
-      map.setCenter(DEFAULT_CENTER);
-      map.setZoom(DEFAULT_ZOOM);
-      return;
-    }
-
-    const bounds = new google.maps.LatLngBounds();
-
-    const campMarkers = camps.map((camp) => {
-      const meta = STATUS_META[camp.visited_status] || STATUS_META["Just Added"];
-      const marker = new google.maps.Marker({
-        position: { lat: camp.latitude, lng: camp.longitude },
-        map,
-        title: camp.camp_name,
-        icon: {
-          url: getMarkerIconUrl(meta.color),
-          scaledSize: new google.maps.Size(34, 42),
-          anchor: new google.maps.Point(17, 42),
-        },
-      });
-
-      marker.addListener("click", () => {
-        if (!infoWindowRef.current) return;
-        infoWindowRef.current.setContent(createInfoWindowContent(camp, onDirectionsRequested));
-        infoWindowRef.current.open({ map, anchor: marker });
-      });
-
-      bounds.extend(marker.getPosition());
-      return marker;
-    });
-
-    const customPinMarkers = customPins.map((pin) => {
-      const marker = new google.maps.Marker({
-        position: { lat: pin.latitude, lng: pin.longitude },
-        map,
-        title: pin.title,
-        icon: {
-          url: getMarkerIconUrl(CUSTOM_PIN_COLOR),
-          scaledSize: new google.maps.Size(34, 42),
-          anchor: new google.maps.Point(17, 42),
-        },
-      });
-
-      marker.addListener("click", () => {
-        if (!infoWindowRef.current) return;
-        infoWindowRef.current.setContent(createCustomInfoWindowContent(pin, onDirectionsRequested));
-        infoWindowRef.current.open({ map, anchor: marker });
-      });
-
-      bounds.extend(marker.getPosition());
-      return marker;
-    });
-
-    markersRef.current = [...campMarkers, ...customPinMarkers];
-
-    if (customPins.length === 1 && customPinMarkers[0] && infoWindowRef.current) {
-      infoWindowRef.current.setContent(createCustomInfoWindowContent(customPins[0], onDirectionsRequested));
-      infoWindowRef.current.open({ map, anchor: customPinMarkers[0] });
-    }
-
-    const focusedCampIndex = focusedCampId ? camps.findIndex((camp) => camp._id === focusedCampId) : -1;
-    if (focusedCampIndex >= 0 && campMarkers[focusedCampIndex] && infoWindowRef.current) {
-      const focusedCamp = camps[focusedCampIndex];
-      infoWindowRef.current.setContent(createInfoWindowContent(focusedCamp, onDirectionsRequested));
-      infoWindowRef.current.open({ map, anchor: campMarkers[focusedCampIndex] });
-      map.setCenter({ lat: focusedCamp.latitude, lng: focusedCamp.longitude });
-      map.setZoom(14);
-      return;
-    }
-
-    if (markersRef.current.length === 1) {
-      const onlyPin = camps[0] || customPins[0];
-      map.setCenter({ lat: onlyPin.latitude, lng: onlyPin.longitude });
-      map.setZoom(14);
-      return;
-    }
-
-    map.fitBounds(bounds);
-    google.maps.event.addListenerOnce(map, "idle", () => {
-      if (map.getZoom() > 14) {
-        map.setZoom(14);
+    if (fitBounds) {
+      if (fitBounds.south === fitBounds.north && fitBounds.west === fitBounds.east) {
+        map.setCenter({ lat: fitBounds.south, lng: fitBounds.west }); map.setZoom(14);
+      } else {
+        map.fitBounds(fitBounds);
+        (window as any).google.maps.event.addListenerOnce(map, "idle", () => { if (map.getZoom() > 14) map.setZoom(14); });
       }
+    } else { map.setCenter(DEFAULT_CENTER); map.setZoom(DEFAULT_ZOOM); }
+  }, [ready, fitBounds, filterKey]);
+
+  useEffect(() => {
+    if (!ready) return;
+    const map = mapInstanceRef.current, google = (window as any).google;
+    const entries = [
+      ...camps.filter(camp => camp._id !== focusedCamp?._id).map(camp => ({ key: `camp:${camp._id}`, value: camp, type: "camp" })),
+      ...(focusedCamp ? [{ key: `camp:${focusedCamp._id}`, value: focusedCamp, type: "camp" }] : []),
+      ...clusters.map(cluster => ({ key: `cluster:${cluster.id}`, value: cluster, type: "cluster" })),
+      ...customPins.map(pin => ({ key: `custom:${pin.id}`, value: pin, type: "custom" })),
+    ];
+    const wanted = new Set(entries.map(entry => entry.key));
+    markersRef.current.forEach(({ marker }, key) => {
+      if (!wanted.has(key)) { google.maps.event.clearInstanceListeners(marker); marker.setMap(null); markersRef.current.delete(key); }
     });
-  }, [camps, customPins, customPinsFocusKey, focusedCampId, focusedCampKey, onDirectionsRequested]);
+    entries.forEach(({ key, value, type }) => {
+      const item: any = value;
+      const signature = JSON.stringify(item);
+      const existing = markersRef.current.get(key);
+      if (existing?.signature === signature) return;
+      if (existing) { google.maps.event.clearInstanceListeners(existing.marker); existing.marker.setMap(null); }
+      const isCluster = type === "cluster";
+      const color = type === "custom" ? CUSTOM_PIN_COLOR : (STATUS_META[item.visited_status] || STATUS_META["Just Added"]).color;
+      const marker = new google.maps.Marker({ position: { lat: item.latitude, lng: item.longitude }, map,
+        title: isCluster ? `${item.count} facilities. Select to zoom or browse.` : item.camp_name || item.title,
+        ...(isCluster ? { label: { text: String(item.count), color: "white", fontWeight: "700" }, icon: { path: google.maps.SymbolPath.CIRCLE, scale: 22, fillColor: "#0891b2", fillOpacity: 0.95, strokeColor: "white", strokeWeight: 2 } }
+          : { icon: { url: getMarkerIconUrl(color), scaledSize: new google.maps.Size(34, 42), anchor: new google.maps.Point(17, 42) } }),
+      });
+      marker.addListener("click", () => {
+        if (isCluster) {
+          if (map.getZoom() >= 18 || (item.bounds.south === item.bounds.north && item.bounds.west === item.bounds.east)) {
+            onClusterSelected?.({ south: Math.max(-90, item.bounds.south - 0.000001), north: Math.min(90, item.bounds.north + 0.000001), west: Math.max(-180, item.bounds.west - 0.000001), east: Math.min(180, item.bounds.east + 0.000001) });
+          } else { map.fitBounds(item.bounds); }
+          return;
+        }
+        infoWindowRef.current.setContent(type === "custom" ? createCustomInfoWindowContent(item, onDirectionsRequested) : createInfoWindowContent(item, onDirectionsRequested));
+        infoWindowRef.current.open({ map, anchor: marker });
+      });
+      markersRef.current.set(key, { marker, signature });
+    });
+  }, [ready, camps, clusters, customPins, focusedCamp, onDirectionsRequested, onClusterSelected]);
+
+  useEffect(() => {
+    if (!ready || !focusedCamp) return;
+    const map = mapInstanceRef.current;
+    map.setCenter({ lat: focusedCamp.latitude, lng: focusedCamp.longitude }); map.setZoom(14);
+    const entry = markersRef.current.get(`camp:${focusedCamp._id}`);
+    if (entry) { infoWindowRef.current.setContent(createInfoWindowContent(focusedCamp, onDirectionsRequested)); infoWindowRef.current.open({ map, anchor: entry.marker }); }
+  }, [ready, focusedCamp, focusedCampKey, onDirectionsRequested]);
+  useEffect(() => {
+    if (!ready || !customPins.length) return;
+    const pin = customPins[0], map = mapInstanceRef.current;
+    map.setCenter({ lat: pin.latitude, lng: pin.longitude }); map.setZoom(14);
+    const entry = markersRef.current.get(`custom:${pin.id}`);
+    if (entry) { infoWindowRef.current.setContent(createCustomInfoWindowContent(pin, onDirectionsRequested)); infoWindowRef.current.open({ map, anchor: entry.marker }); }
+  }, [ready, customPins, customPinsFocusKey, onDirectionsRequested]);
 
   return (
     <div className="relative overflow-hidden rounded-[28px] border border-slate-800/80 bg-slate-950/80">
@@ -452,14 +423,14 @@ export default function CampMap({
         </div>
       ) : null}
 
-      {!mapError && hasCountrySelection && !isLoading && camps.length === 0 && customPins.length === 0 ? (
+      {!mapError && hasCountrySelection && !isLoading && camps.length === 0 && clusters.length === 0 && customPins.length === 0 ? (
         <div className="absolute left-4 top-4 rounded-full border border-slate-700/80 bg-slate-950/85 px-4 py-2 text-xs font-medium text-slate-300 shadow-lg shadow-slate-950/40">
-          No camps with coordinates match the selected filters.
+          No facilities in this map area. Move the map or change the filters.
         </div>
       ) : null}
 
       {!mapError && isLoading ? (
-        <div className="absolute inset-0 flex items-center justify-center bg-slate-950/45 backdrop-blur-[1px]">
+        <div className="pointer-events-none absolute right-4 top-4">
           <div className="rounded-full border border-cyan-500/30 bg-slate-950/90 px-4 py-2 text-sm text-cyan-100">
             Loading map pins...
           </div>

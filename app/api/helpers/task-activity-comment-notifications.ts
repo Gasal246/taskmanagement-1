@@ -1,6 +1,5 @@
-import FcmTokens from "@/models/fcm_tokens.model";
-import Notifications from "@/models/notifications.model";
-import { getAdminMessaging } from "@/lib/firebaseAdmin";
+import { enqueueNotifications } from "@/lib/jobs/enqueue";
+import type { ClientSession } from "mongoose";
 import { getActivityViewerIds } from "@/app/api/helpers/activity-comments";
 
 const excerpt = (value: string, max = 140) => {
@@ -14,14 +13,18 @@ export async function notifyActivityComment({
   comment,
   actor,
   action,
+  dbSession,
+  recipientIds: suppliedRecipients,
 }: {
   task: any;
   activity: any;
   comment: any;
   actor: any;
   action: "commented" | "replied";
+  dbSession?: ClientSession;
+  recipientIds?: string[];
 }) {
-  const viewers = await getActivityViewerIds(task, activity);
+  const viewers = suppliedRecipients ?? await getActivityViewerIds(task, activity);
   const recipientIds = viewers.filter((id) => id !== String(actor._id));
   if (!recipientIds.length) return;
 
@@ -44,7 +47,7 @@ export async function notifyActivityComment({
   };
   const meta = { ...data, commentExcerpt: body };
 
-  await Notifications.insertMany(
+  await enqueueNotifications(
     recipientIds.map((recipientId) => ({
       recipient_id: recipientId,
       sender_id: actor._id,
@@ -54,28 +57,9 @@ export async function notifyActivityComment({
       data,
       meta,
       read_at: null,
-    }))
+    })),
+    { notification: { title, body: `${actor.name || "Someone"}: ${body}` }, data },
+    `comment:${commentId}`, dbSession
   );
 
-  const tokenDocs = await FcmTokens.find({ user_id: { $in: recipientIds } }, { token: 1 }).lean();
-  const tokens = tokenDocs.map((doc: any) => doc.token).filter(Boolean);
-  if (!tokens.length) return;
-
-  try {
-    const response = await getAdminMessaging().sendEachForMulticast({
-      tokens,
-      notification: { title, body: `${actor.name || "Someone"}: ${body}` },
-      data,
-    });
-    const invalidTokens = response.responses.flatMap((result, index) => {
-      const code = result.error?.code || "";
-      return code === "messaging/registration-token-not-registered" ||
-        code === "messaging/invalid-registration-token"
-        ? [tokens[index]]
-        : [];
-    });
-    if (invalidTokens.length) await FcmTokens.deleteMany({ token: { $in: invalidTokens } });
-  } catch (error) {
-    console.log("Failed to send activity comment notification", error);
-  }
 }

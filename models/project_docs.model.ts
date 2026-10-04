@@ -1,15 +1,15 @@
-import mongoose, { ObjectId, Schema } from "mongoose";
+import mongoose, { Document, Types, Schema } from "mongoose";
 
 export interface IProjectDocs extends Document {
-  _id: ObjectId;
-  project_id: ObjectId;
+  _id: Types.ObjectId;
+  project_id: Types.ObjectId;
   doc_name: string;
   doc_url: string;
   doc_type?: string | null;
   storage_path?: string | null;
   access_type: "public" | "private";
-  access_to: ObjectId[];
-  created_by?: ObjectId | null;
+  access_to: Types.ObjectId[];
+  created_by?: Types.ObjectId | null;
   status?: Number | null;
   createdAt: Date;
   updatedAt: Date;

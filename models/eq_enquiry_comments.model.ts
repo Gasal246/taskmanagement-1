@@ -1,9 +1,9 @@
-import mongoose, { ObjectId, Schema } from "mongoose";
+import mongoose, { Document, Types, Schema } from "mongoose";
 
 export interface IEq_enquiry_comments extends Document {
-  _id: ObjectId;
-  enquiry_id: ObjectId;
-  user_id: ObjectId;
+  _id: Types.ObjectId;
+  enquiry_id: Types.ObjectId;
+  user_id: Types.ObjectId;
   comment: string;
   createdAt: Date;
   updatedAt: Date;

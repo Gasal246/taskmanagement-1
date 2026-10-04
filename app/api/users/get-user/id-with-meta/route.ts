@@ -1,3 +1,4 @@
+import { authorizeUserProfile } from "@/lib/server-access";
 import connectDB from "@/lib/mongo";
 import { SALES_STAFF_ROLE_LABEL_SCOPES } from "@/lib/constants";
 import Area_departments from "@/models/area_departments.model";
@@ -10,8 +11,6 @@ import Region_dep_staffs from "@/models/region_dep_staffs.model";
 import Users from "@/models/users.model";
 import { isValidObjectId } from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
-
-connectDB();
 
 type SalesScope = "REGION" | "AREA" | "LOCATION";
 
@@ -93,6 +92,7 @@ const checkSalesStaffByScope = async (user_id: string, roleLabel: string) => {
 
 export async function POST(req: NextRequest) {
     try {
+        await connectDB();
         const body = await req.json();
         const user_id = body?.user_id;
         // const roleLabel = body?.roleLabel || "";
@@ -100,6 +100,9 @@ export async function POST(req: NextRequest) {
         if (!user_id || !isValidObjectId(user_id)) {
             return NextResponse.json({ error: "Invalid user id" }, { status: 400 });
         }
+
+        const denied = await authorizeUserProfile(user_id);
+        if (denied) return denied;
 
         const [user, eqUserExists] = await Promise.all([
             Users.findOne({ _id: user_id, status: 1 }, { password: 0, otp: 0 }).lean(),

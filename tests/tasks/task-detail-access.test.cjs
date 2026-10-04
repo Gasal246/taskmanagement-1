@@ -20,14 +20,16 @@ function fixture({ userId = 'participant', active = true, project = false, admin
   ];
   const matches = (row, query) => Object.entries(query).every(([key, value]) => key === '$or'
     ? value.some(condition => matches(row, condition)) : value && typeof value === 'object' && '$in' in value ? value.$in.includes(row[key]) : row[key] === value);
-  const chain = value => ({ populate() { return this; }, select() { return Promise.resolve(value); }, then(resolve, reject) { return Promise.resolve(value).then(resolve, reject); } });
+  const chain = value => ({ populate() { return this; }, sort() { return this; }, lean() { return Promise.resolve(value); }, select() { return Promise.resolve(value); }, then(resolve, reject) { return Promise.resolve(value).then(resolve, reject); } });
   const mocks = {
+    mongoose: { default: { isValidObjectId: () => true } },
     '@/app/api/helpers/activity-schedule-access': { canEditActivitySchedule: async () => admin || userId === 'creator' },
     '@/app/api/helpers/activity-status-access': statusExports,
     '@/app/api/helpers/head-reassignment-scope': {
       resolveSelectedHeadContext: async () => active && supervised.length ? {} : null,
       getSelectedHeadDirectStaffIds: async () => supervised,
     },
+    '@/lib/tasks/activity-page': { taskActivityPage: async query => ({ ids: activities.filter(row => matches(row, query)).map(row => row._id), pagination: {}, summary: {} }) },
     '@/auth': { auth: async () => ({ user: { id: userId } }) },
     '@/lib/mongo': { default: async () => {} },
     '@/lib/utils': { resolveSessionUserId: session => session.user.id },
@@ -134,9 +136,12 @@ test('status API rejects supervisory viewers before writing, while allowing actu
       const mocks = {
         '@/auth': { auth: async () => ({ user: { id: userId } }) },
         '@/lib/mongo': { default: async () => {} },
+        '@/lib/jobs/transaction': { inTransaction: async work => work({}) },
+        '@/lib/jobs/enqueue': {},
+        'node:crypto': require('node:crypto'),
         '@/models/users.model': { default: { findById: () => ({ select: async () => ({ status: 1 }) }) } },
         '@/models/business_tasks.model': { default: { findById: () => ({ select: () => ({ lean: async () => task }) }) } },
-        '@/models/task_activities.model': { default: { findById: async () => activity, findByIdAndUpdate: async () => { writes++; return activity; } } },
+        '@/models/task_activities.model': { default: { findById: () => ({ session() { return this; }, then(resolve) { return Promise.resolve(activity).then(resolve); } }), findByIdAndUpdate: async () => { writes++; return activity; } } },
         '@/models/admin_assign_business.model': { default: { exists: async () => false } },
         '@/models/business_staffs.model': { default: { exists: async () => true } },
         '@/app/api/helpers/activity-status-access': statusExports,
@@ -159,7 +164,7 @@ test('status API rejects supervisory viewers before writing, while allowing actu
       }));
       const participant = ['staff', 'recipient'].includes(userId);
       assert.equal(response.status, participant ? 200 : 403);
-      assert.equal(writes, participant ? 1 : 0);
+      assert.equal(writes, 0); // Repeating an unchanged status is an idempotent no-op.
     }
   }
 });

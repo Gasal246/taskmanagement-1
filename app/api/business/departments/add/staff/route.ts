@@ -1,10 +1,9 @@
+import { authorizeOrganizationMutation } from "@/lib/organization-access";
 import connectDB from "@/lib/mongo";
 import Dep_staffs from "@/models/department_staffs.model";
 import Roles from "@/models/roles.model";
 import User_roles from "@/models/user_roles.model";
 import { NextRequest, NextResponse } from "next/server";
-
-connectDB();
 
 interface Body {
     user_id: string;
@@ -14,15 +13,19 @@ interface Body {
 
 export async function POST ( req: NextRequest ) {
     try {
+        await connectDB();
+        const accessDenied = await authorizeOrganizationMutation(req);
+        if (accessDenied) return accessDenied;
         const formdata = await req.formData();
         const formData: any = Object.fromEntries(formdata);
         const body = JSON.parse(formData?.body) as Body;
 
-        const dep_staff = await Dep_staffs.findOne({ dep_id: body?.dep_id, user_id: body?.user_id })
+        const dep_staff = await Dep_staffs.findOne({ dep_id: body?.dep_id, staff_id: body?.user_id })
         if(dep_staff?.status === 0) {
             await Dep_staffs.findByIdAndUpdate(dep_staff._id, { status: 1 });
             return NextResponse.json({ message: "Staff Re-Activated", status: 200 }, { status: 200 });
         }
+        if (dep_staff) return NextResponse.json({ error: "Department staff already exists", status: 409 }, { status: 409 });
 
         const role = await Roles.findOne({ role_name: "DEPARTMENT_STAFF"})
         if(!role){

@@ -5,10 +5,9 @@ import { resolveSessionUserId } from "@/lib/utils";
 import { NextResponse } from "next/server";
 import { NOTIFICATION_RETENTION_MS } from "@/lib/constants";
 
-connectDB();
-
 export async function GET() {
   try {
+        await connectDB();
     const session = await auth();
     const userId = resolveSessionUserId(session);
     if (!userId) {
@@ -19,11 +18,6 @@ export async function GET() {
     }
 
     const cutoff = new Date(Date.now() - NOTIFICATION_RETENTION_MS);
-
-    await Notifications.deleteMany({
-      recipient_id: userId,
-      createdAt: { $lt: cutoff },
-    });
 
     const unreadCount = await Notifications.countDocuments({
       recipient_id: userId,

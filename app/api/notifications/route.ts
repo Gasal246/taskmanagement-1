@@ -5,10 +5,9 @@ import { resolveSessionUserId } from "@/lib/utils";
 import { NextResponse } from "next/server";
 import { NOTIFICATION_RETENTION_MS } from "@/lib/constants";
 
-connectDB();
-
 export async function GET(req: Request) {
   try {
+        await connectDB();
     const session = await auth();
     const userId = resolveSessionUserId(session);
     if (!userId) {
@@ -23,11 +22,6 @@ export async function GET(req: Request) {
     const limit = Number.isFinite(limitParam) ? Math.min(Math.max(limitParam, 1), 50) : 30;
 
     const cutoff = new Date(Date.now() - NOTIFICATION_RETENTION_MS);
-
-    await Notifications.deleteMany({
-      recipient_id: userId,
-      createdAt: { $lt: cutoff },
-    });
 
     const [notifications, unreadCount] = await Promise.all([
       Notifications.find({ recipient_id: userId, createdAt: { $gte: cutoff } })

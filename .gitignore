@@ -11,6 +11,7 @@
 
 # next.js
 /.next/
+/.next-performance-*/
 /out/
 
 # production
@@ -48,3 +49,13 @@ firebase/taskmanager-4b024-firebase-adminsdk-fbsvc-1a48bd159d.json
 # Public enquiry classification catalogues
 !lib/enquiries/project-sectors.json
 !lib/enquiries/solution-catalogue.json
+
+!.env.example
+
+# Authenticated load-test sessions and reports
+/tests/load/actors.local.json
+/tests/load/actors.*.private.json
+/tests/load/results*.json
+
+# Private reviewed ownership mappings and reports
+*.private.json

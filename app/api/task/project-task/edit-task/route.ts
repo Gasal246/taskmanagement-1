@@ -4,8 +4,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { canManageProjectTaskActivities } from "@/app/api/helpers/project-task-teams";
 
-connectDB();
-
 interface Body{
     task_name: string,
     task_description: string,
@@ -18,6 +16,7 @@ interface Body{
 
 export async function PUT(req:NextRequest){
     try{
+        await connectDB();
         const session: any = await auth();
         if (!session?.user?.id) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
         const body:Body = await req.json();

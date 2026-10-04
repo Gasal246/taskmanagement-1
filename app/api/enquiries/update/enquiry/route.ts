@@ -1,3 +1,4 @@
+import { enquiryActor, canEditEnquiry, canChangeEnquiryFacility } from "@/lib/enquiries/access";
 import { preserveInitialAction, canScheduleAction } from "@/lib/enquiries/completion-server";
 import { forwardHistoryFilter, historyOrder } from "@/lib/enquiries/completion";
 import { auth } from "@/auth";
@@ -15,7 +16,6 @@ import Eq_enquiry_access from "@/models/eq_enquiry_access.model";
 import Eq_enquiry_histories from "@/models/eq_enquiry_histories";
 import Eq_enquiry_wifi_external from "@/models/eq_enquiry_wifi_external.model";
 import Eq_enquiry_wifi_personal from "@/models/eq_enquiry_wifi_personal.model";
-import User_roles from "@/models/user_roles.model";
 import { projectSupportingFieldsSchema } from "@/lib/enquiries/project-classification";
 import { CatalogueValidationError, getEnquiryCatalogue, validateDynamicClassification, validateDynamicSolutions } from "@/lib/enquiries/catalogue-server";
 import { getCatalogueServiceLabel, sectorByKey } from "@/lib/enquiries/catalogue";
@@ -23,8 +23,6 @@ import { saveEnquirySolutions, saveFacilitySolutions } from "@/app/api/helpers/e
 import Eq_enquiry_solutions from "@/models/eq_enquiry_solutions.model";
 import "@/models/roles.model";
 import { NextRequest, NextResponse } from "next/server";
-
-connectDB();
 
 interface Body {
     enquiry_id?: string;
@@ -376,6 +374,7 @@ const buildEnquiryAuditSnapshot = async (enquiryId: string): Promise<EnquiryAudi
 
 export async function PUT(req: NextRequest) {
     try {
+        await connectDB();
         const session: any = await auth();
         if (!session) {
             return NextResponse.json({ message: "Unauthorized Access", status: 401 }, { status: 401 });
@@ -412,37 +411,14 @@ export async function PUT(req: NextRequest) {
             return NextResponse.json({ message: "Enquiry not found", status: 404 }, { status: 404 });
         }
 
-        const latestHistoryForAccess: any = await Eq_enquiry_histories
-            .findOne({ enquiry_id: enquiry._id, ...forwardHistoryFilter })
-            .sort(historyOrder)
-            .select("assigned_to")
-            .lean();
+        const actor = await enquiryActor();
+        if (!actor || !await canEditEnquiry(enquiry, actor)) return NextResponse.json({ message: "You are not allowed to edit this enquiry" }, { status: 403 });
 
-        const assignedList = Array.isArray(latestHistoryForAccess?.assigned_to)
-            ? latestHistoryForAccess.assigned_to
-            : latestHistoryForAccess?.assigned_to
-                ? [latestHistoryForAccess.assigned_to]
-                : [];
-        const broughtByList = Array.isArray(enquiry?.enquiry_brought_by)
-            ? enquiry.enquiry_brought_by
-            : [];
-
-        const isAssignedToCurrentUser = await canScheduleAction(enquiry, { actorId: currentUserId, admin: false });
-        const isBroughtByCurrentUser = broughtByList.some((id: any) => String(id) === currentUserId);
-        const isCreatedByCurrentUser = String(enquiry?.createdBy || "") === currentUserId;
-        const isSuperUser = Boolean(session?.user?.is_super);
-
-        const activeRoles = await User_roles.find({ user_id: currentUserId, status: 1 })
-            .populate({ path: "role_id", select: "role_name" })
-            .lean();
-        const isBusinessAdmin = activeRoles.some((role: any) => role?.role_id?.role_name === "BUSINESS_ADMIN");
-
-        if (!isSuperUser && !isBusinessAdmin && !isCreatedByCurrentUser && !isBroughtByCurrentUser && !isAssignedToCurrentUser) {
-            return NextResponse.json(
-                { message: "You are not allowed to edit this enquiry.", status: 403 },
-                { status: 403 }
-            );
-        }
+        const facilityId = enquiry.camp_id || (campInputMode === "existing" ? toIdOrNull(body.camp) : null);
+        const existingFacility = facilityId ? await Eq_camps.findById(facilityId) : null;
+        const mayChangeFacility = existingFacility && await canChangeEnquiryFacility(enquiry, existingFacility, actor);
+        if (existingFacility && !existingFacility.is_active && !mayChangeFacility) return NextResponse.json({ message: "This Facility belongs to or is used by another business" }, { status: 403 });
+        if (!enquiry.business_id && (areaInputMode === "new" || campInputMode === "new")) return NextResponse.json({ message: "Review this enquiry’s business ownership before requesting a new Facility or area" }, { status: 403 });
 
         if (toTextOrNull(body.followup_status) === "Closed" && enquiry.status !== "Closed") return NextResponse.json({ message: "Use Follow-up actions to record completed calls and visits", status: 400 }, { status: 400 });
 
@@ -492,6 +468,7 @@ export async function PUT(req: NextRequest) {
 
         if (areaInputMode === "new" && !isBlank(body.area_name_request)) {
             const newArea = new Eq_area({
+                business_id: enquiry.business_id,
                 country_id: countryId,
                 region_id: regionId,
                 province_id: provinceId,
@@ -507,6 +484,7 @@ export async function PUT(req: NextRequest) {
         if (campInputMode === "existing" && campId) {
             const existingEnquiry = await Eq_enquiry.findOne({
                 camp_id: campId,
+                business_id: enquiry.business_id,
                 _id: { $ne: enquiry._id }
             });
             if (existingEnquiry) {
@@ -577,6 +555,7 @@ export async function PUT(req: NextRequest) {
             }
 
             const newCamp = new Eq_camps({
+                business_id: enquiry.business_id,
                 area_id: areaId,
                 country_id: countryId,
                 region_id: regionId,
@@ -609,7 +588,7 @@ export async function PUT(req: NextRequest) {
 
             if (campToEdit.is_active) {
                 const mappedVisitedStatus = getCampVisitedStatusFromEnquiryStatus(body.followup_status);
-                if (mappedVisitedStatus && campToEdit.visited_status !== mappedVisitedStatus) {
+                if (mayChangeFacility && mappedVisitedStatus && campToEdit.visited_status !== mappedVisitedStatus) {
                     campToEdit.visited_status = mappedVisitedStatus;
                     await campToEdit.save();
                 }
@@ -750,7 +729,7 @@ export async function PUT(req: NextRequest) {
         enquiry.wifi_setup = wifiAvailability === true && wifiType === "Other Sources" ? toTextOrNull(body.other_wifi_details) : null;
         enquiry.latitude = toTextOrNull(body.latitude);
         enquiry.longitude = toTextOrNull(body.longitude);
-        enquiry.is_active = areaInputMode === "existing" && campInputMode === "existing" && Boolean(areaId && campId);
+        // Approval is performed exclusively by the administrator approval route.
         if (Array.isArray(body.enquiry_brought_by)) {
             enquiry.enquiry_brought_by = body.enquiry_brought_by;
         }

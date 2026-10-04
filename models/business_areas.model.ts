@@ -1,10 +1,10 @@
-import mongoose, { Schema, Document, ObjectId } from 'mongoose';
+import mongoose, { Schema, Document, Types } from 'mongoose';
 
 export interface IBusiness_areas extends Document {
-  _id: ObjectId;
+  _id: Types.ObjectId;
   area_name: String | null;
-  business_id: ObjectId | null;
-  region_id: ObjectId | null;
+  business_id: Types.ObjectId | null;
+  region_id: Types.ObjectId | null;
   status: Number | null;
   createdAt: Date;
   updatedAt: Date;
@@ -25,6 +25,9 @@ Business_areasSchema.virtual("departments", {
 
 Business_areasSchema.set("toObject", { virtuals: true });
 Business_areasSchema.set("toJSON", { virtuals: true });
+
+Business_areasSchema.index({ region_id: 1, status: 1, _id: 1 });
+Business_areasSchema.index({ business_id: 1, status: 1, _id: 1 });
 
 const Business_areas = mongoose.models?.business_areas || mongoose.model<IBusiness_areas>('business_areas', Business_areasSchema);
 

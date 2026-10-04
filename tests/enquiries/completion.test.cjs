@@ -22,7 +22,7 @@ let mongoProcess, directory;
 const creator = new mongoose.Types.ObjectId();
 const assignee = new mongoose.Types.ObjectId();
 const viewer = new mongoose.Types.ObjectId();
-const admin = { actorId: String(new mongoose.Types.ObjectId()), admin: true };
+const admin = { actorId: String(new mongoose.Types.ObjectId()), admin: true, isSuper: true };
 const actor = { actorId: String(creator), admin: false };
 const delay = ms => new Promise(r => setTimeout(r, ms));
 

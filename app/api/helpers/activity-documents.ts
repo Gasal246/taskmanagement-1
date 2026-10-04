@@ -28,6 +28,7 @@ const objectFromUrl = (value: string) => {
 export async function validateActivityDocuments(value: unknown, context: { taskId: string }) {
   if (value === undefined) return undefined;
   if (!Array.isArray(value) || value.length > 20) throw new ActivityDocumentValidationError("An activity can have up to 20 documents");
+  if (!value.length) return [];
   const bucket = getAdminStorageBucket();
   const prefix = `${ROOT}/${context.taskId}/`;
   return Promise.all(value.map(async (item): Promise<ActivityDocument> => {
@@ -57,13 +58,5 @@ export async function validateActivityDocuments(value: unknown, context: { taskI
         metadata.metadata?.taskId !== context.taskId || metadata.metadata?.uploaderId !== pathParts[0] || metadata.metadata?.originalName !== document.name)
       throw new ActivityDocumentValidationError("Document metadata does not match the uploaded file");
     return { ...document, mimeType: expectedMime };
-  }));
-}
-
-export async function deleteActivityDocuments(documents: Array<{ storagePath?: string }> = []) {
-  await Promise.all(documents.map(async ({ storagePath }) => {
-    if (!storagePath) return;
-    try { await getAdminStorageBucket().file(storagePath).delete(); }
-    catch (error) { if (!isMissing(error)) throw error; }
   }));
 }

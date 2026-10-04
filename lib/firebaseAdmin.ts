@@ -1,3 +1,4 @@
+import { Storage } from "@google-cloud/storage";
 import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getMessaging } from "firebase-admin/messaging";
 import { getStorage } from "firebase-admin/storage";
@@ -77,4 +78,20 @@ export function getAdminMessaging() {
 export function getAdminStorageBucket() {
   const app = getAdminApp();
   return getStorage(app).bucket(process.env.FIREBASE_STORAGE_BUCKET || DEFAULT_STORAGE_BUCKET);
+}
+
+// The outbox owns retries. Bound each storage call instead of inheriting the SDK's
+// ten-minute retry budget, without changing the request-time validation client.
+let backgroundStorage: Storage | undefined;
+export function getBackgroundStorageBucket() {
+  if (!backgroundStorage) {
+    const account = loadServiceAccount();
+    backgroundStorage = new Storage({
+      projectId: account.projectId,
+      credentials: { client_email: account.clientEmail, private_key: account.privateKey },
+      timeout: 15_000,
+      retryOptions: { autoRetry: false },
+    });
+  }
+  return backgroundStorage.bucket(process.env.FIREBASE_STORAGE_BUCKET || DEFAULT_STORAGE_BUCKET);
 }

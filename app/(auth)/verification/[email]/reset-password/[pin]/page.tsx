@@ -1,23 +1,22 @@
 "use client"
-/* eslint-disable react-hooks/exhaustive-deps */
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { z } from "zod";
 import { useRouter } from 'next/navigation';
-import React, { useEffect } from 'react'
+import React from 'react'
 import { toast } from 'sonner';
 import { Button } from "@/components/ui/button"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
-import { useSetupUserPassword, useVerifyUserOtp } from "@/query/user/queries";
+import { useSetupUserPassword } from "@/query/user/queries";
 
 const formSchema = z.object({
   password: z.string()
-    .min(6, { message: "Password must have a minimum of 6 characters" })
-    .max(20, { message: "Shorten your password to within 20 characters to make it easier to remember" }),
+    .min(8, { message: "Use at least 8 characters" })
+    .max(64, { message: "Use at most 64 characters" }),
   cpassword: z.string()
-    .min(6, { message: "Password must have a minimum of 6 characters" })
-    .max(20, { message: "Shorten your password to within 20 characters to make it easier to remember" })
+    .min(8, { message: "Use at least 8 characters" })
+    .max(64, { message: "Use at most 64 characters" })
 })
 .refine(data => data.password === data.cpassword, {
   message: "Passwords must match",
@@ -28,19 +27,7 @@ const ResetPassword = ({ params }: { params: Promise<{ email: string, pin: strin
   const { email: encodedEmail, pin } = React.use(params);
   const email = decodeURIComponent(encodedEmail) || '';
   const router = useRouter()
-  const { mutateAsync: verifyOtp } = useVerifyUserOtp();
   const { mutateAsync: setupNewPassword, isPending: settingupPassword } = useSetupUserPassword();
-
-  useEffect(() => {
-    const fn = async () => {
-      const res = await verifyOtp({ email, otp: pin });
-      if (!res || !res?.status) {
-        toast.error("Seems Like You Are into Something Huh??.")
-        router.replace('/')
-      }
-    }
-    fn()
-  }, [])
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -54,16 +41,14 @@ const ResetPassword = ({ params }: { params: Promise<{ email: string, pin: strin
     if(values.password !== values.cpassword){
       return toast.error("passwords are not matching!!")
     }
-    const response = await setupNewPassword({ email, password: values.password })
-    if(!response){
-      return toast.error("password setup failed", {
-        description: "some unexpected error occured, please try again"
-      })
+    try {
+      const response = await setupNewPassword({ email, password: values.password, token: pin });
+      if (!response?.status) throw new Error(response?.message || "Password reset failed");
+      toast.success("Password updated. Sign in with your new password.");
+      router.replace('/signin');
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || error?.message || "Unable to reset password");
     }
-    toast.success("New Password Updated!", {
-      description: `password updated ${email}`
-    })
-    return router.replace('/')
   }
 
   return (
@@ -78,7 +63,7 @@ const ResetPassword = ({ params }: { params: Promise<{ email: string, pin: strin
               <FormItem>
                 <FormLabel>New password</FormLabel>
                 <FormControl>
-                  <Input type="password" placeholder="enter your password" {...field} />
+                  <Input autoComplete="new-password" type="password" placeholder="enter your password" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -91,13 +76,13 @@ const ResetPassword = ({ params }: { params: Promise<{ email: string, pin: strin
               <FormItem>
                 <FormLabel>Confirm password</FormLabel>
                 <FormControl>
-                  <Input type="password" placeholder="enter your password again" {...field} />
+                  <Input autoComplete="new-password" type="password" placeholder="enter your password again" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
-          <Button type="submit">{ settingupPassword ? 'Setting Up..' : 'Confirm'}</Button>
+          <Button type="submit" disabled={settingupPassword}>{ settingupPassword ? 'Setting Up..' : 'Confirm'}</Button>
         </form>
       </Form>
     </div>

@@ -1,14 +1,14 @@
-import mongoose, { ObjectId, Schema } from "mongoose";
+import mongoose, { Document, Types, Schema } from "mongoose";
 
 export interface IEq_enquiry_wifi_external extends Document{
-    _id: ObjectId,
-    enquiry_id: ObjectId,
+    _id: Types.ObjectId,
+    enquiry_id: Types.ObjectId,
     contractor_name: String,
     contract_start_date: Date,
     contract_end_date: Date,
     contract_speed: String,
     contract_package: String,
-    camp_id: ObjectId,
+    camp_id: Types.ObjectId,
     plain_points: String,
     createdAt: Date,
     updatedAt: Date

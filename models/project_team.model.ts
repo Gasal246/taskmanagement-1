@@ -1,13 +1,13 @@
-import mongoose, { ObjectId, Schema } from "mongoose";
+import mongoose, { Document, Types, Schema } from "mongoose";
 
 
 interface IProject_Teams extends Document {
-    _id: ObjectId,
+    _id: Types.ObjectId,
     team_name: string,
-    project_id: ObjectId,
-    project_dept_id: ObjectId,
-    department_id: ObjectId,
-    team_head: ObjectId,
+    project_id: Types.ObjectId,
+    project_dept_id: Types.ObjectId,
+    department_id: Types.ObjectId,
+    team_head: Types.ObjectId,
     members_count: Number,
     createdAt: Date,
     updatedAt: Date

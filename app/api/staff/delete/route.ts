@@ -1,12 +1,12 @@
+import { authorizeUserManagement } from "@/lib/server-access";
 import connectDB from "@/lib/mongo";
 import Business_staffs from "@/models/business_staffs.model";
 import User_roles from "@/models/user_roles.model";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function DELETE(req: NextRequest) {
     try {
+        await connectDB();
         const { searchParams } = new URL(req.url);
         const staff_id = searchParams.get("staff_id");
         const business_id = searchParams.get("business_id");
@@ -14,6 +14,9 @@ export async function DELETE(req: NextRequest) {
         if (!staff_id || !business_id) {
             return NextResponse.json({ message: "Staff id and business id are required", status: 400 }, { status: 400 });
         }
+
+        const denied = await authorizeUserManagement(staff_id, business_id);
+        if (denied) return denied;
 
         const staffRecord = await Business_staffs.findOne({ user_id: staff_id, business_id });
         if (!staffRecord) {

@@ -10,8 +10,6 @@ import {
 } from "@/lib/projects/catalogue";
 import { CatalogueValidationError } from "@/lib/enquiries/catalogue-server";
 
-connectDB();
-
 interface Body {
     project_id: string,
     project_name: string,
@@ -40,6 +38,7 @@ interface Body {
 
 export async function PUT(req: NextRequest) {
     try {
+        await connectDB();
         const body: Body = await req.json();
         if (!body.project_id) return NextResponse.json({ message: "Please Provide project_id" }, { status: 400 });
 

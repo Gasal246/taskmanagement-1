@@ -1,12 +1,12 @@
-import mongoose, { Schema, Document, ObjectId } from 'mongoose';
+import mongoose, { Schema, Document, Types } from 'mongoose';
 
 export interface IClient_contacts extends Document {
-  client_id: ObjectId | null;
+  client_id: Types.ObjectId | null;
   contact_name: String | null;
   designation: String | null;
   email: String | null;
   phone: String | null;
-  _id: ObjectId;
+  _id: Types.ObjectId;
   status: Number;
   createdAt: Date;
   updatedAt: Date;

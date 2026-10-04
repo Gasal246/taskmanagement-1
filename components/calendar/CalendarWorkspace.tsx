@@ -1,5 +1,8 @@
 "use client";
 
+import { useCursorPaging } from "@/hooks/use-cursor-paging";
+
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   addDays,
@@ -418,6 +421,7 @@ const CalendarWorkspace = ({ mode }: CalendarWorkspaceProps) => {
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: WEEK_STARTS_ON }));
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search);
   const [createOpen, setCreateOpen] = useState(false);
   const [createStart, setCreateStart] = useState(new Date());
   const [pendingDate, setPendingDate] = useState<Date | null>(null);
@@ -504,12 +508,21 @@ const CalendarWorkspace = ({ mode }: CalendarWorkspaceProps) => {
     };
   }, [domainData, isHead, mode, roleId, roleName]);
 
-  const { data, isLoading, isFetching } = useGetCalendarFeed({
+  const paging = useCursorPaging(JSON.stringify([businessData?._id, roleId, domainData, debouncedSearch, weekStart.toISOString()]));
+  const { data, isLoading, isFetching, isError, refetch } = useGetCalendarFeed({
+    cursor: paging.cursor,
+    context: JSON.stringify({ businessId: businessData?._id, roleId, domainData }),
     includeTasks: true,
     includeEnquiries: true,
     includeCustomEvents: true,
-    search,
+    search: debouncedSearch,
+    start_date: weekStart.toISOString(),
+    end_date: weekEnd.toISOString(),
   });
+
+  useEffect(() => {
+    if (isError) toast.error("Unable to load the calendar. Check your connection and try again.");
+  }, [isError]);
 
   const items = useMemo<CalendarItem[]>(
     () => (Array.isArray(data?.items) ? data.items : []),
@@ -739,7 +752,7 @@ const CalendarWorkspace = ({ mode }: CalendarWorkspaceProps) => {
             <Input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search task title"
+              placeholder="Search titles, people or enquiries"
               className="h-9 w-56 rounded-full border-slate-700 bg-slate-900 pl-9"
             />
           </div>
@@ -827,7 +840,7 @@ const CalendarWorkspace = ({ mode }: CalendarWorkspaceProps) => {
               <span className="inline-flex items-center gap-2">
                 <CalendarCheck2 size={16} /> All tasks
               </span>
-              <span>{pendingItems.length}</span>
+              <span>{data?.summary?.pending ?? pendingItems.length}</span>
             </button>
             <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-3">
               <p className="text-xs uppercase tracking-[0.25em] text-slate-500">Lists</p>
@@ -835,13 +848,21 @@ const CalendarWorkspace = ({ mode }: CalendarWorkspaceProps) => {
                 <span className="inline-flex items-center gap-2">
                   <CheckCircle2 size={16} className="text-cyan-300" /> My Tasks
                 </span>
-                <span className="text-xs text-slate-500">{pendingItems.length}</span>
+                <span className="text-xs text-slate-500">{data?.summary?.pending ?? pendingItems.length}</span>
               </div>
             </div>
           </div>
         </aside>
 
         <main className="min-w-0 bg-slate-950/40">
+          <nav aria-label="Calendar results pagination" className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 px-4 py-3 text-xs text-slate-300">
+            <p aria-live="polite">{data?.summary?.total ?? 0} matching items · Page {paging.page} · {items.length} shown. Day badges and task cards reflect this page.</p>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" disabled={isFetching || paging.page === 1} onClick={paging.previous}>Previous</Button>
+              <Button size="sm" variant="outline" disabled={isFetching || !data?.pagination?.nextCursor} onClick={() => paging.next(data.pagination.nextCursor)}>Next</Button>
+            </div>
+            {isError && <Button size="sm" variant="outline" onClick={() => refetch()}>Retry calendar</Button>}
+          </nav>
           {isLoading ? (
             <div className="flex h-full min-h-[620px] items-center justify-center">
               <LoaderSpin size={24} title="Loading calendar..." />
@@ -886,7 +907,7 @@ const CalendarWorkspace = ({ mode }: CalendarWorkspaceProps) => {
                               onClick={() => setPendingDate(day)}
                               className="w-full truncate rounded-md border border-cyan-400/30 bg-cyan-400/10 px-2 py-1 text-left text-[11px] text-cyan-100"
                             >
-                              {pendingCount} pending task{pendingCount > 1 ? "s" : ""}
+                              {pendingCount} pending on this page
                             </button>
                           )}
                           {dueItems.slice(0, 1).map((item) => (
@@ -942,7 +963,7 @@ const CalendarWorkspace = ({ mode }: CalendarWorkspaceProps) => {
                   <div>
                     <h2 className="text-base font-semibold text-slate-100">My Tasks</h2>
                     <p className="text-xs text-slate-500">
-                      All pending tasks and enquiry actions
+                      Pending tasks and enquiry actions for the selected week
                     </p>
                   </div>
                   <Button
@@ -959,7 +980,7 @@ const CalendarWorkspace = ({ mode }: CalendarWorkspaceProps) => {
                 <div className="mt-5 space-y-3">
                   {pendingItems.length === 0 && (
                     <p className="rounded-xl border border-dashed border-slate-700 p-5 text-sm text-slate-500">
-                      No pending tasks or enquiry actions.
+                      No pending tasks or enquiry actions on this page.
                     </p>
                   )}
                   {pendingItems.map((item) => {

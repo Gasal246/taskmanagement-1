@@ -1,11 +1,13 @@
+import { authorizeOrganizationRead } from "@/lib/organization-access";
 import connectDB from "@/lib/mongo";
 import Business_locations from "@/models/business_locations.model";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function GET ( req: NextRequest ) {
     try {
+        await connectDB();
+        const denied = await authorizeOrganizationRead(req);
+        if (denied) return denied;
         const { searchParams } = req.nextUrl;
         const area_ids = searchParams.get("area_ids");
         let areaIds = area_ids?.split(",");

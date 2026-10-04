@@ -1,25 +1,10 @@
-import connectDB from "@/lib/mongo";
-import Users from "@/models/users.model";
-import { NextRequest, NextResponse } from "next/server";
-
-connectDB();
-
-export async function POST (req: NextRequest) {
-    try {
-        const { email, otp } = await req.json();
-        const user = await Users.findOne({ email });
-        if(!user){
-            return Response.json({ status: false })
-        }
-        if(user?.otp !== otp){
-            return Response.json({ status: false })
-        }
-        
-        return Response.json({ status: true })
-    } catch (error) {
-        console.log(error)
-        return new NextResponse("Internal Server Error", { status: 500 })
-    }
+import { verifyPasswordReset } from "@/lib/password-reset";
+import { NextResponse } from "next/server";
+export async function POST(req: Request) {
+  try { const body = await req.json(); return await verifyPasswordReset(body.email, body.otp); }
+  catch (error) {
+    console.error("Recovery verification failed", error);
+    return NextResponse.json({ status: false, message: "Unable to verify recovery code. Try again later." }, { status: 503 });
+  }
 }
-
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic";

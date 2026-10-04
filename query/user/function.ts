@@ -7,6 +7,7 @@ export async function getUserByEmail ( email: string ) {
         return res.data;
     } catch (error) {
         console.log(error)
+        throw error;
     }
 }
 
@@ -16,6 +17,7 @@ export async function getUserByUserId ( userid: string ) {
         return res.data;
     } catch (error) {
         console.log(error)
+        throw error;
     }
 }
 
@@ -25,15 +27,17 @@ export async function getUserByUserIdWithMeta(payload: { user_id: string; roleLa
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
 export async function sendEmailVerification ( email: string ) {
     try {
-        const res = await axios.post(`/api/users/verification/send-mail`, { email });
+        const res = await axios.post(`/api/users/verification/send-mail`, { email, kind: "otp" });
         return res.data;
     } catch (error) {
         console.log(error)
+        throw error;
     }
 }
 
@@ -43,15 +47,17 @@ export async function verifyUserOtp ( { email, otp }: { email: string, otp: stri
         return res.data;
     } catch (error) {
         console.log(error)
+        throw error;
     }
 }
 
-export async function setupUserPassword ( { email, password }: { email: string, password: string } ) {
+export async function setupUserPassword ( { email, password, token }: { email: string, password: string, token: string } ) {
     try {
-        const res = await axios.post(`/api/users/verification/setup-pass`, { email, password });
+        const res = await axios.post(`/api/users/verification/setup-pass`, { email, password, token });
         return res.data;
     } catch (error) {
         console.log(error)
+        throw error;
     }
 }
 
@@ -61,6 +67,7 @@ export async function getUserRolesAndDomains ( userid: string ) {
         return res.data;
     } catch (error) {
         console.log(error)
+        throw error;
     }
 }
 
@@ -70,6 +77,7 @@ export async function getUserDomainByRole (userid: string, role: string) {
         return res.data;
     } catch (error) {
         console.log(error)
+        throw error;
     }
 }
 
@@ -104,6 +112,7 @@ export async function getBusinessStaffs (
         return res.data;
     } catch (error) {
         console.log(error)
+        throw error;
     }
 }
 
@@ -113,6 +122,7 @@ export async function addBusinessStaff ( payload: any ) {
         return res.data;
     } catch (error) {
         console.log(error)
+        throw error;
     }
 }
 
@@ -122,6 +132,7 @@ export async function getUserCompleteProfileFunc (userid: string) {
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -131,6 +142,7 @@ export async function addUserRegionFunc (payload: any) {
         return res.data;
     } catch (error) {
         console.log(error)
+        throw error;
     }
 }
 
@@ -140,6 +152,7 @@ export async function removeUserRegionFunc (URegId: string) {
         return res.data;
     } catch (error) {
         console.log(error)
+        throw error;
     }
 }
 
@@ -149,6 +162,7 @@ export async function addUserRoleFunc (payload: any) {
         return res.data;
     } catch (error) {
         console.log(error)
+        throw error;
     }
 }
 
@@ -158,6 +172,7 @@ export async function removeUserRoleFunc (URoleId: string) {
         return res.data;
     } catch (error) {
         console.log(error)
+        throw error;
     }
 }
 
@@ -167,6 +182,7 @@ export async function removeUserRolePermanentFunc(URoleId: string) {
         return res.data;
     } catch (error) {
         console.log(error)
+        throw error;
     }
 }
 
@@ -176,6 +192,7 @@ export async function addUserAreaFunc (payload: any) {
         return res.data;
     } catch (error) {
         console.log(error)
+        throw error;
     }
 }
 
@@ -185,6 +202,7 @@ export async function removeUserAreaFunc (UAreaId: string) {
         return res.data;
     } catch (error) {
         console.log(error)
+        throw error;
     }
 }
 
@@ -194,6 +212,7 @@ export async function addUserLocationFunc (payload: any) {
         return res.data;
     } catch (error) {
         console.log(error)
+        throw error;
     }
 }
 
@@ -203,6 +222,7 @@ export async function removeUserLocationFunc (ULocId: string) {
         return res.data;
     } catch (error) {
         console.log(error)
+        throw error;
     }
 }
 
@@ -212,6 +232,7 @@ export async function addUserSkillFunc (payload: any) {
         return res.data;
     } catch (error) {
         console.log(error)
+        throw error;
     }
 }
 
@@ -221,6 +242,7 @@ export async function removeUserSkillFunc (USkillId: string) {
         return res.data;
     } catch (error) {
         console.log(error)
+        throw error;
     }
 }
 
@@ -230,6 +252,7 @@ export async function addUserDocFunc (payload: any) {
         return res.data;
     } catch (error) {
         console.log(error)
+        throw error;
     }
 }
 
@@ -239,6 +262,7 @@ export async function removeUserDocFunc (UDocId: string) {
         return res.data;
     } catch (error) {
         console.log(error)
+        throw error;
     }
 }
 
@@ -248,6 +272,7 @@ export async function removeDepartmentAssignmentPermanentFunc(payload: { assignm
         return res.data;
     } catch (error) {
         console.log(error)
+        throw error;
     }
 }
 
@@ -258,6 +283,7 @@ export async function GetFullStaffProfile (role_id: string, org_id: string){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -268,6 +294,7 @@ export async function UpdateStaffProfile(paylaod:any){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -278,6 +305,7 @@ export async function GetAdminProfile(business_id:string){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -348,6 +376,7 @@ export async function AddNewAgent(payload: any){
         return res.data;
     }catch(err){
         console.log(err);
+        throw err;
     }
 }
 
@@ -357,6 +386,7 @@ export async function updateUserData ( payload: any ) {
        return res.data;
     } catch (error) {
         console.log(error)
+        throw error;
     }
 }
 
@@ -366,6 +396,7 @@ export async function updateStaffStatus(payload: { staffid: string; status: "act
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }
 
@@ -375,5 +406,6 @@ export async function deleteBusinessStaff(payload: { staff_id: string; business_
         return res.data;
     } catch (error) {
         console.log(error);
+        throw error;
     }
 }

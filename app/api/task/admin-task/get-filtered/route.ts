@@ -1,3 +1,7 @@
+import { temporaryDatabaseFailureResponse } from "@/lib/auth-availability";
+import { taskActivityFilterStages } from "@/lib/tasks/filter-pipeline";
+import { pageBounds, escapeSearch } from "@/lib/search";
+import { canAdministerBusiness } from "@/lib/server-access";
 import { auth } from "@/auth";
 import { addTaskAssignmentSummaries } from "@/app/api/helpers/task-assignment-summary";
 import {
@@ -7,21 +11,15 @@ import {
   normalizeTaskSummary,
 } from "@/app/api/helpers/task-list-status";
 import {
-  escapeRegex,
   getBusinessHeads,
-  getRoleNameFromRequest,
 } from "@/app/api/helpers/task-filter-scope";
-import { resolveActiveBusinessIdForUser } from "@/app/api/helpers/resolve-user-business";
 import connectDB from "@/lib/mongo";
 import ActivityComments from "@/models/activity_comments.model";
 import Business_staffs from "@/models/business_staffs.model";
 import Business_Tasks from "@/models/business_tasks.model";
-import Task_Activities from "@/models/task_activities.model";
 import type { StaffTaskStatusFilter, TaskPriorityFilter } from "@/types/staff-tasks";
 import mongoose from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
-
-connectDB();
 
 const toObjectId = (value: unknown) =>
   value instanceof mongoose.Types.ObjectId
@@ -36,6 +34,7 @@ const parseDate = (value: string | null) => {
 
 export async function GET(req: NextRequest) {
   try {
+        await connectDB();
     const session: any = await auth();
     if (!session?.user?.id || !mongoose.isValidObjectId(session.user.id)) {
       return NextResponse.json({ message: "Unauthorized Access", status: 401 }, { status: 401 });
@@ -55,9 +54,7 @@ export async function GET(req: NextRequest) {
     const assignedById = (searchParams.get("assignedById") || "").trim();
     const statusParam = (searchParams.get("status") || "").trim();
     const priorityParam = (searchParams.get("priority") || "").trim().toLowerCase();
-    const page = Math.max(1, Number(searchParams.get("page")) || 1);
-    const limit = Math.min(50, Math.max(1, Number(searchParams.get("limit")) || 12));
-    const skip = (page - 1) * limit;
+    const { page, limit, skip } = pageBounds(searchParams, 12, 50);
 
     if (!businessId || !mongoose.isValidObjectId(businessId)) {
       return NextResponse.json({ message: "Valid business_id is required", status: 400 }, { status: 400 });
@@ -75,10 +72,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ message: "Invalid assigned-by filter", status: 400 }, { status: 400 });
     }
 
-    const activeBusinessId = await resolveActiveBusinessIdForUser(session.user.id);
     if (
-      activeBusinessId !== businessId ||
-      !getRoleNameFromRequest(req).includes("ADMIN")
+      !await canAdministerBusiness(session.user.id, businessId)
     ) {
       return NextResponse.json({ message: "Unauthorized Access", status: 403 }, { status: 403 });
     }
@@ -115,38 +110,8 @@ export async function GET(req: NextRequest) {
       query.$and = [...(query.$and || []), { creator: assignedByObjectId }];
     }
 
-    const nameRegex = nameQuery ? new RegExp(escapeRegex(nameQuery), "i") : null;
-    const [nameActivityMatches, staffActivityMatches] = await Promise.all([
-      nameRegex
-        ? Task_Activities.find({ activity: nameRegex }).select("task_id").lean()
-        : Promise.resolve([]),
-      staffObjectId
-        ? Task_Activities.find({
-            $or: [{ assigned_to: staffObjectId }, { forwarded_to: staffObjectId }],
-          }).select("task_id").lean()
-        : Promise.resolve([]),
-    ]);
-    const nameActivityIds = nameActivityMatches
-      .map((item: any) => item.task_id)
-      .filter(Boolean)
-      .map(toObjectId);
-    const staffActivityIds = staffActivityMatches
-      .map((item: any) => item.task_id)
-      .filter(Boolean)
-      .map(toObjectId);
-
-    if (nameRegex) {
-      query.$and = [
-        ...(query.$and || []),
-        { $or: [{ task_name: nameRegex }, { _id: { $in: nameActivityIds } }] },
-      ];
-    }
-    if (staffObjectId) {
-      query.$and = [
-        ...(query.$and || []),
-        { $or: [{ assigned_to: staffObjectId }, { _id: { $in: staffActivityIds } }] },
-      ];
-    }
+    const nameRegex = nameQuery ? new RegExp(escapeSearch(nameQuery), "i") : null;
+    const activityFilterStages = taskActivityFilterStages(nameRegex, staffObjectId);
 
     const now = new Date();
     const statusMatch = getTaskStatusMatchStages(
@@ -154,6 +119,7 @@ export async function GET(req: NextRequest) {
     );
     const [result] = await Business_Tasks.aggregate([
       { $match: query },
+      ...activityFilterStages,
       ...getTaskStatusAggregationStages(now),
       {
         $facet: {
@@ -170,6 +136,8 @@ export async function GET(req: NextRequest) {
             {
               $project: {
                 task_name: 1,
+                __nameActivityMatched: 1,
+                __staffActivityMatched: 1,
                 task_description: 1,
                 end_date: 1,
                 is_project_task: 1,
@@ -216,8 +184,6 @@ export async function GET(req: NextRequest) {
         Number(row.count || 0),
       ])
     );
-    const nameActivitySet = new Set(nameActivityIds.map((id) => id.toString()));
-    const staffActivitySet = new Set(staffActivityIds.map((id) => id.toString()));
     const total = result?.pagination?.[0]?.total || 0;
 
     return NextResponse.json({
@@ -245,13 +211,13 @@ export async function GET(req: NextRequest) {
           match: {
             nameMatched: Boolean(
               nameRegex &&
-                (nameActivitySet.has(taskId) || nameRegex.test(task.task_name || ""))
+                (task.__nameActivityMatched || nameRegex.test(task.task_name || ""))
             ),
             staffTaskAssigned: Boolean(
               staffObjectId && task.assigned_to?.toString() === staffId
             ),
             staffActivityAssigned: Boolean(
-              staffObjectId && staffActivitySet.has(taskId)
+              staffObjectId && task.__staffActivityMatched
             ),
             assignedByMatched: Boolean(
               assignedByObjectId && task.creator?.toString() === assignedById
@@ -270,6 +236,9 @@ export async function GET(req: NextRequest) {
       status: 200,
     });
   } catch (error) {
+    const unavailable = temporaryDatabaseFailureResponse(error);
+    if (unavailable) return unavailable;
+    if (error instanceof Error && /Invalid (search|pagination)/.test(error.message)) return NextResponse.json({ message: error.message, status: 400 }, { status: 400 });
     console.log("Error while fetching admin task overview", error);
     return NextResponse.json({ message: "Internal Server Error", status: 500 }, { status: 500 });
   }

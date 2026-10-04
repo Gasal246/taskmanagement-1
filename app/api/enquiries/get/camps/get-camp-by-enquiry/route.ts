@@ -1,21 +1,20 @@
+import { authorizeEnquiry } from "@/lib/enquiries/access";
 import connectDB from "@/lib/mongo";
 import Eq_camps from "@/models/eq_camps.model";
 import Eq_enquiry from "@/models/eq_enquiries.model";
 import { getFacilitySolutions } from "@/app/api/helpers/enquiry-solutions";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function GET(req: NextRequest) {
     try {
+        await connectDB();
         const { searchParams } = new URL(req.url);
         const enquiry_id = searchParams.get("enquiry_id");
         const is_new = searchParams.get("is_new");
 
-        console.log("enquiry_id: ", enquiry_id);
-        console.log("is_new?: ", is_new);
-        
-    
+        const denied = await authorizeEnquiry(enquiry_id);
+        if (denied) return denied;
+
         switch (is_new) {
             case "true": {
                 const camp_id: any = await Eq_enquiry.findById(enquiry_id).select("camp_id").lean();

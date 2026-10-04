@@ -1,3 +1,4 @@
+import { countReadableEnquiries, enquiryActor } from "@/lib/enquiries/access";
 import connectDB from "@/lib/mongo";
 import Eq_area from "@/models/eq_area.model";
 import Eq_camps from "@/models/eq_camps.model";
@@ -6,10 +7,11 @@ import Eq_enquiry from "@/models/eq_enquiries.model";
 import Eq_province from "@/models/eq_province.model";
 import { NextRequest, NextResponse } from "next/server";
 
-connectDB();
-
 export async function GET(req: NextRequest) {
   try {
+        await connectDB();
+        const actor = await enquiryActor();
+        if (!actor) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     const { searchParams } = new URL(req.url);
     const province_id = searchParams.get("province_id");
 
@@ -35,7 +37,7 @@ export async function GET(req: NextRequest) {
       Eq_city.countDocuments({ province_id }),
       Eq_area.countDocuments({ province_id }),
       Eq_camps.countDocuments({ province_id }),
-      Eq_enquiry.countDocuments({ province_id }),
+      countReadableEnquiries({ province_id }, actor),
     ]);
 
     return NextResponse.json(

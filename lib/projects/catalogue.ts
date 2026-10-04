@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import {
   CatalogueValidationError,
+  getEnquiryCatalogue,
   validateDynamicClassification,
   validateDynamicSolutions,
 } from "@/lib/enquiries/catalogue-server";
@@ -14,9 +15,10 @@ import {
 } from "@/lib/projects/capacity";
 
 export async function validateProjectCatalogue(input: unknown, existing?: unknown) {
+  const catalogue = await getEnquiryCatalogue({ fresh: true });
   const [classification, solutions] = await Promise.all([
-    validateDynamicClassification(input, existing),
-    validateDynamicSolutions(input, existing),
+    validateDynamicClassification(input, existing, catalogue),
+    validateDynamicSolutions(input, existing, catalogue),
   ]);
 
   return {
@@ -84,7 +86,8 @@ export function projectConversionMetadata(enquiry: any, facility: any) {
   };
 }
 
-export async function resolveProjectCatalogueForCreate(input: any) {
+export async function resolveProjectCatalogueForCreate(input: any, session?: mongoose.ClientSession) {
+  const scoped = (query: any) => session ? query.session(session) : query;
   const enquiryId = String(input?.enquiry_id || "").trim();
   if (!enquiryId) {
     return {
@@ -94,16 +97,19 @@ export async function resolveProjectCatalogueForCreate(input: any) {
   }
   if (!mongoose.isValidObjectId(enquiryId)) throw new CatalogueValidationError("Select a valid enquiry to convert");
 
-  const enquiry: any = await EqEnquiry.findById(enquiryId)
-    .select("camp_id enquiry_uuid region_id area_id city_id")
+  const enquiry: any = await scoped(EqEnquiry.findById(enquiryId)
+    .select("camp_id enquiry_uuid region_id area_id city_id"))
     .lean();
   if (!enquiry) throw new CatalogueValidationError("The enquiry being converted was not found");
   if (!enquiry.camp_id) throw new CatalogueValidationError("The enquiry does not have a linked Facility");
 
-  const facility: any = await EqCamp.findById(enquiry.camp_id).lean();
+  const facility: any = await scoped(EqCamp.findById(enquiry.camp_id)).lean();
   if (!facility) throw new CatalogueValidationError("The enquiry's linked Facility was not found");
 
-  const [enquirySolutions, facilitySolutions]: any[] = await Promise.all([
+  const [enquirySolutions, facilitySolutions]: any[] = session ? [
+    await scoped(EqEnquirySolutions.findOne({ enquiry_id: enquiry._id })).lean(),
+    await scoped(EqCampSolutions.findOne({ camp_id: facility._id })).lean(),
+  ] : await Promise.all([
     EqEnquirySolutions.findOne({ enquiry_id: enquiry._id }).lean(),
     EqCampSolutions.findOne({ camp_id: facility._id }).lean(),
   ]);

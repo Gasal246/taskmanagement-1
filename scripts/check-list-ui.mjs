@@ -1,0 +1,210 @@
+// Isolated browser fixture: no application server, credentials or database.
+import fs from "node:fs/promises";
+import path from "node:path";
+import os from "node:os";
+import http from "node:http";
+import { spawn } from "node:child_process";
+import { once } from "node:events";
+import { createRequire } from "node:module";
+const require = createRequire(import.meta.url);
+const root = process.cwd();
+const temp = await fs.mkdtemp(path.join(os.tmpdir(), "taskmanager-list-ui-"));
+const chromeBinary = process.env.CHROME_BINARY || (process.platform === "darwin" ? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" : "google-chrome");
+const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+let browser, socket, server;
+try {
+  const loader = path.join(temp, "typescript-loader.cjs");
+  await fs.writeFile(loader, `const ts = require(${JSON.stringify(require.resolve("typescript"))}); module.exports = source => ts.transpileModule(source, { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2020, esModuleInterop: true } }).outputText;`);
+  const compiledWebpack = require("next/dist/compiled/webpack/webpack");
+  compiledWebpack.init();
+  const webpack = compiledWebpack.webpack;
+  await new Promise((resolve, reject) => webpack({
+    mode: "production", optimization: { minimize: false }, entry: path.join(root, "tests/ui/list-pagination.fixture.tsx"), output: { path: temp, filename: "fixture.js" },
+    plugins: [new webpack.DefinePlugin({ "process.env": JSON.stringify({ NODE_ENV: "production", NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: "isolated-fixture" }) })],
+    resolve: { alias: { "@": root }, extensions: [".tsx", ".ts", ".js"], modules: [path.join(root, "node_modules"), "node_modules"] },
+    module: { rules: [{ test: /\.tsx?$/, exclude: /node_modules/, use: loader }] },
+  }, (error, stats) => error || stats.hasErrors() ? reject(error || new Error(stats.toString({ all: false, errors: true }))) : resolve()));
+  const cssDirectory = path.join(root, process.env.UI_TEST_BUILD_DIR || ".next", "static/css");
+  const cssFiles = (await fs.readdir(cssDirectory)).filter(file => file.endsWith(".css"));
+  const css = (await Promise.all(cssFiles.map(file => fs.readFile(path.join(cssDirectory, file), "utf8")))).join("\n");
+  server = http.createServer(async (req, res) => {
+    if (req.url === "/fixture.js") { res.setHeader("Content-Type", "text/javascript; charset=utf-8"); res.end(await fs.readFile(path.join(temp, "fixture.js"))); }
+    else if (req.url === "/style.css") { res.setHeader("Content-Type", "text/css"); res.end(css); }
+    else if (req.url === "/") res.end('<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/style.css"><style>body{background:#020617;color:#eee;padding:12px}button{border:1px solid #555;padding:6px;margin:4px}main{max-width:900px;margin:auto}</style></head><body><div id="root"></div><script src="/fixture.js"></script></body></html>');
+    else { res.statusCode = 404; res.end(); }
+  });
+  await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  browser = spawn(chromeBinary, ["--headless=new", "--disable-gpu", "--no-first-run", "--remote-debugging-port=0", `--user-data-dir=${path.join(temp, "profile")}`, "about:blank"], { stdio: "ignore" });
+  let spawnError;
+  browser.on("error", error => { spawnError = error; });
+  let port;
+  for (let i = 0; i < 100; i++) {
+    if (spawnError) throw spawnError;
+    try { port = (await fs.readFile(path.join(temp, "profile/DevToolsActivePort"), "utf8")).split("\n")[0]; break; } catch { await wait(100); }
+  }
+  if (!port) throw new Error("Chrome did not start; set CHROME_BINARY to a local Chromium executable");
+  const tabs = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
+  socket = new WebSocket(tabs.find(tab => tab.type === "page").webSocketDebuggerUrl);
+  await once(socket, "open");
+  let messageId = 0;
+  const pending = new Map();
+  const browserErrors = [];
+  socket.addEventListener("message", event => { const message = JSON.parse(event.data); if (message.method === "Runtime.exceptionThrown") browserErrors.push(message.params.exceptionDetails.exception?.description || message.params.exceptionDetails.text); if (message.id && pending.has(message.id)) { pending.get(message.id)(message); pending.delete(message.id); } });
+  const command = (method, params = {}) => new Promise((resolve, reject) => {
+    const id = ++messageId;
+    const timer = setTimeout(() => { pending.delete(id); reject(new Error(`Browser command timeout: ${method}`)); }, 10_000);
+    pending.set(id, response => { clearTimeout(timer); response.error ? reject(new Error(response.error.message)) : resolve(response.result); });
+    socket.send(JSON.stringify({ id, method, params }));
+  });
+  const evaluate = async expression => {
+    const result = await command("Runtime.evaluate", { expression, returnByValue: true, awaitPromise: true });
+    if (result.exceptionDetails) throw new Error(result.exceptionDetails.text + ": " + result.exceptionDetails.exception?.description);
+    return result.result.value;
+  };
+  const until = async expression => { for (let i = 0; i < 80; i++) { if (await evaluate(expression)) return; await wait(100); } throw new Error(`UI check timed out: ${expression}\n${JSON.stringify(browserErrors)}\n${await evaluate('JSON.stringify(window.listChecks || document.body.innerText)')}`); };
+  const check = async (expression, name) => { if (!await evaluate(expression)) throw new Error(`${name}\n${await evaluate('document.body.textContent.slice(0, 2400)')}`); console.log(`PASS ${name}`); };
+  await command("Runtime.enable");
+  await command("Emulation.setDeviceMetricsOverride", { width: 1100, height: 850, deviceScaleFactor: 1, mobile: false });
+  await command("Page.navigate", { url: origin });
+  await until('document.getElementById("task-result")?.textContent === "Page 3" && document.querySelectorAll("[data-row]").length > 0');
+  await check('document.querySelectorAll("[data-row]").length < 25', "only visible history rows mount");
+  await evaluate('const scroller = document.querySelector("[aria-label^=Scrollable]"); scroller.scrollTop = scroller.scrollHeight;');
+  await until('Array.from(document.querySelectorAll("[data-row]")).some(row => row.dataset.row === "24")');
+  console.log("PASS variable-height scrolling reaches the last row");
+  await evaluate('Array.from(document.querySelectorAll("button")).find(button => button.textContent.includes("Show all rows")).click()');
+  await until('document.querySelectorAll("[data-row]").length === 25');
+  console.log("PASS accessible full-page view retains every row");
+  await evaluate('Array.from(document.querySelectorAll("button")).find(button => button.textContent === "Next").click()');
+  await until('document.getElementById("task-result").textContent === "Page 4" && document.getElementById("loading").textContent === "ready"');
+  await check('window.listChecks.requests.filter(r => r.url.includes("/task/")).length === 2 && !window.listChecks.requests.filter(r => r.url.includes("/task/"))[1].params.activityId', "paging clears the notification anchor without duplicate requests");
+  await evaluate('document.getElementById("search").click()');
+  await until('window.listChecks.requests.some(r => r.params.activitySearch === "literal [.*]")');
+  await check('document.getElementById("task-result").textContent === "Page 4"', "previous results remain visible while filtering");
+  await evaluate('document.getElementById("pending").click()');
+  await until('document.getElementById("loading").textContent === "ready"');
+  await check('window.listChecks.aborted > 0 && window.listChecks.requests.at(-1).params.page === 1 && window.listChecks.requests.at(-1).params.activityStatus === "pending"', "new filters reset pagination and cancel obsolete requests");
+  const count = await evaluate('window.listChecks.requests.length');
+  await evaluate('document.getElementById("cached").click()');
+  await until('document.getElementById("task-result").textContent === "Page 4" && document.getElementById("loading").textContent === "ready"');
+  await check(`window.listChecks.requests.length === ${count}`, "returning to a fresh page uses its cache");
+  await evaluate('document.getElementById("staff").click()');
+  await until('document.getElementById("history-mode").textContent === "staff"');
+  await check('window.listChecks.requests.some(r => r.url.includes("staff-side"))', "staff history never reuses the admin response");
+  await command("Emulation.setDeviceMetricsOverride", { width: 375, height: 812, deviceScaleFactor: 1, mobile: true });
+  await check('document.documentElement.scrollWidth <= 375 && window.listChecks.errors.length === 0', "mobile layout fits the viewport without browser errors");
+  await evaluate('document.getElementById("jobs").click()');
+  await until('document.querySelectorAll("tbody tr").length === 25');
+  await check('document.body.textContent.includes("Oldest queued job") && document.querySelector("[aria-pressed=true]").textContent.includes("failed")', "background job monitoring shows failures and queue age");
+  await evaluate('Array.from(document.querySelectorAll("button")).find(button => button.textContent === "Next").click()');
+  await until('document.querySelectorAll("tbody tr").length === 1 && document.body.textContent.includes("Page 2")');
+  await check('window.listChecks.jobRequests.some(url => url.includes("page=2"))', "background job pagination requests only the selected page");
+  await evaluate('Array.from(document.querySelectorAll("button")).find(button => button.textContent === "Retry").click()');
+  await check('Array.from(document.querySelectorAll("button")).filter(button => button.textContent === "Retry").every(button => button.disabled)', "background job retry disables duplicate submission");
+  await until('document.querySelector("[role=alert]")?.textContent.includes("Provider is still unavailable")');
+  await evaluate('Array.from(document.querySelectorAll("button")).find(button => button.textContent === "Retry").click()');
+  await until('document.body.textContent.includes("Retry queued.")');
+  await check('window.listChecks.jobRetryCalls === 2', "background job retry surfaces errors and confirms a successful retry");
+  await evaluate('Array.from(document.querySelectorAll("[aria-pressed]")).find(button => button.textContent.includes("pending")).click()');
+  await until('document.body.textContent.includes("Page 1") && !Array.from(document.querySelectorAll("button")).some(button => button.textContent === "Retry")');
+  await check('document.documentElement.scrollWidth <= 375 && window.listChecks.errors.length === 0', "pending jobs cannot be retried and the job table fits mobile screens");
+  await evaluate('document.getElementById("large").click()');
+  await until('document.getElementById("calendar-page")?.textContent.includes("First") && document.getElementById("map-ready")?.textContent.includes("loaded")');
+  await check('window.largeChecks.markers.filter(marker => marker.map).length === 2', "dense map clusters mount bounded markers after asynchronous map setup");
+  const fits = await evaluate('window.largeChecks.fits');
+  const creations = await evaluate('window.largeChecks.markerCreations');
+  await evaluate('document.getElementById("map-refresh").click()');
+  await until('document.getElementById("map-ready").textContent.includes("1")');
+  await check(`window.largeChecks.fits === ${fits} && window.largeChecks.markerCreations === ${creations}`, "unchanged map refreshes preserve camera and marker instances");
+  const requests = await evaluate('window.listChecks.requests.filter(row => row.url.includes("/camps/map")).length');
+  await evaluate('document.getElementById("map-pan").click()');
+  await until(`window.listChecks.requests.filter(row => row.url.includes("/camps/map")).length > ${requests}`);
+  await check('window.listChecks.requests.filter(row => row.url.includes("/camps/map")).at(-1).url.includes("south=24")', "map panning requests the new visible bounds");
+  const abortedBeforePan = await evaluate('window.listChecks.aborted');
+  await evaluate('window.largeChecks.maps[0].bounds = { south: 24.1, west: 54, north: 25, east: 55 }; window.largeChecks.maps[0].idle()');
+  await until('window.listChecks.requests.filter(row => row.url.includes("/camps/map")).at(-1).url.includes("south=24.1")');
+  await evaluate('window.largeChecks.maps[0].bounds = { south: 24.2, west: 54, north: 25, east: 55 }; window.largeChecks.maps[0].idle()');
+  await until('window.listChecks.requests.filter(row => row.url.includes("/camps/map")).at(-1).url.includes("south=24.2")');
+  await check(`window.listChecks.aborted > ${abortedBeforePan}`, "new map bounds cancel obsolete requests");
+  await evaluate('document.getElementById("map-cluster").click()');
+  await check('window.largeChecks.clusterSelections === 1', "coincident facilities can be browsed through a cluster selection");
+  await evaluate('document.getElementById("calendar-next").click()');
+  await until('document.getElementById("calendar-page").textContent.includes("Page 2: Second")');
+  await check('document.getElementById("calendar-next").disabled && document.getElementById("calendar-total").textContent === "200"', "calendar pages stop at the last cursor and preserve full-result totals");
+  const calendarRequests = await evaluate('window.listChecks.requests.filter(row => row.url.includes("/calendar/feed")).length');
+  await evaluate('document.getElementById("calendar-previous").click()');
+  await until('document.getElementById("calendar-page").textContent.includes("Page 1: First")');
+  await check(`window.listChecks.requests.filter(row => row.url.includes("/calendar/feed")).length === ${calendarRequests}`, "previous calendar pages use fresh cached data");
+  await evaluate('document.getElementById("calendar-next").click()');
+  await until('document.getElementById("calendar-page").textContent.includes("Page 2: Second")');
+  await evaluate('document.getElementById("calendar-filter").click()');
+  await until('document.getElementById("calendar-page").textContent.includes("Page 1: Filtered")');
+  await check('!window.listChecks.requests.filter(row => row.url.includes("/calendar/feed")).at(-1).url.includes("cursor=")', "new calendar filters reset cursor before requesting");
+  await check('document.documentElement.scrollWidth <= 375 && window.listChecks.errors.length === 0', "map and calendar controls fit mobile screens without browser errors");
+  await evaluate('document.getElementById("organization").click()');
+  await until('document.querySelectorAll("[data-org-row]").length === 25');
+  await check('window.listChecks.requests.filter(r => r.url.includes("get-complete")).length === 2 && !window.listChecks.requests.some(r => ["staffs", "available_staffs"].includes(r.params?.section))', "organization summaries load once and unseen sections/candidate lists stay unloaded");
+  await check('document.querySelector("[data-organization-section=heads]").textContent.includes("61 heads total")', "overview totals describe all records beyond the first page");
+  await evaluate('Array.from(document.querySelector("[data-organization-section=heads]").querySelectorAll("button")).find(b => b.textContent === "Next").click()');
+  await until('document.getElementById("org-results").textContent.includes("A page 2")');
+  await check('document.querySelectorAll("[data-org-row]").length === 25 && document.querySelector("[data-organization-section=heads]").textContent.includes("26–50 of 61")', "organization next page stays bounded and preserves full counts");
+  await evaluate('const input = document.querySelector("[aria-label=\\"Search heads\\"]"); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value").set.call(input,"[.*]"); input.dispatchEvent(new Event("input", {bubbles:true}));');
+  await until('document.getElementById("org-results").textContent.includes("A last [.*] person")');
+  await check('window.listChecks.requests.filter(r => r.params?.section === "heads").at(-1).params.page === 1 && document.querySelector("[data-organization-section=heads]").textContent.includes("61 heads total") && document.querySelectorAll("[data-org-row]").length === 1', "literal overview search resets paging and retains the unfiltered summary total");
+  await evaluate('const input2 = document.querySelector("[aria-label=\\"Search heads\\"]"); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value").set.call(input2, ""); input2.dispatchEvent(new Event("input", {bubbles:true}));');
+  await until('document.getElementById("org-results").textContent.includes("A page 1")');
+  await evaluate('Array.from(document.querySelector("[data-organization-section=heads]").querySelectorAll("button")).find(b => b.textContent === "Next").click()');
+  await until('document.getElementById("org-results").textContent.includes("A page 2")');
+  const orgAborted = await evaluate('window.listChecks.aborted');
+  await evaluate('Array.from(document.querySelector("[data-organization-section=heads]").querySelectorAll("button")).find(b => b.textContent === "Next").click()');
+  await until('window.listChecks.requests.filter(r => r.params?.section === "heads").at(-1).params.page === 3');
+  await evaluate('document.getElementById("org-b").click()');
+  await check('document.querySelectorAll("[data-org-row]").length === 0', "organization switches immediately clear old-scope rows");
+  await until('document.getElementById("org-results").textContent.includes("B page 1")');
+  await check(`window.listChecks.aborted > ${orgAborted} && document.querySelector('[aria-label="Search heads"]').value === ""`, "organization switches cancel stale requests and reset search/page state");
+  await evaluate('document.getElementById("org-error").click()');
+  await until('document.querySelector("[role=alert]")?.textContent.includes("Unable to load heads")');
+  await check('document.querySelectorAll("[data-org-row]").length === 0', "failed overview authorization/network refreshes hide stale rows and offer retry");
+  await evaluate('Array.from(document.querySelector("[data-organization-section=heads]").querySelectorAll("button")).find(b => b.textContent === "Retry").click()');
+  await until('document.getElementById("org-results").textContent.includes("B page 1") && !document.querySelector("[role=alert]")');
+  console.log("PASS overview retry recovers without losing organization scope");
+  await evaluate('document.getElementById("org-choices").click()');
+  await until('document.querySelectorAll("[data-org-choice]").length === 25');
+  await check('document.getElementById("org-selector").textContent.includes("of 10000")', "staff selectors load on demand with bounded choices and full-result pagination");
+  const choiceRequests = await evaluate('window.listChecks.requests.filter(r => r.params?.section === "available_staffs").length');
+  await evaluate('document.getElementById("org-choices").click()');
+  await until('!document.getElementById("org-selector")');
+  await evaluate('Array.from(document.querySelector("[data-organization-section=heads]").querySelectorAll("button")).find(b => b.textContent === "Next").click()');
+  await until('document.getElementById("org-results").textContent.includes("B page 2")');
+  await evaluate('Array.from(document.querySelector("[data-organization-section=heads]").querySelectorAll("button")).find(b => b.textContent === "Next").click()');
+  await until('document.getElementById("org-results").textContent.includes("B page 3")');
+  await evaluate('document.getElementById("org-remove").click()');
+  await until('document.getElementById("org-results").textContent.includes("B page 1") && document.getElementById("org-results").getAttribute("aria-busy") === "false" && document.querySelector("[data-organization-section=heads]").textContent.includes("25 heads total")');
+  await check('document.querySelector("[data-organization-section=heads]").textContent.includes("Page 1 of 1")', "deleting the last overview page automatically returns to an existing page");
+  await check(`window.listChecks.requests.filter(r => r.params?.section === "available_staffs").length === ${choiceRequests}`, "closed assignment dialogs do not refetch candidate lists during mutations");
+  await evaluate('document.getElementById("org-choices").click()');
+  await until(`window.listChecks.requests.filter(r => r.params?.section === "available_staffs").length > ${choiceRequests} && document.querySelectorAll("[data-org-choice]").length === 25`);
+  console.log("PASS reopening an invalidated assignment dialog refreshes its bounded choices");
+  await check('document.documentElement.scrollWidth <= 375 && window.listChecks.errors.length === 0', "organization search, paging and selector controls fit mobile screens without browser errors");
+  await evaluate('document.getElementById("session-recovery").click()');
+  await until('document.getElementById("recovery-status")?.textContent === "authenticated"');
+  await evaluate('document.getElementById("lose-session").click()');
+  await until('document.querySelector("[role=alert]")?.textContent.includes("sign-in has been preserved")');
+  await check('document.getElementById("recovery-status").textContent === "loading"', "session 503 retains a loading state instead of notifying consumers of logout");
+  await evaluate('window.sessionResponse = "network"; document.querySelector("[role=alert] button").click()');
+  await until('window.sessionProbeRequests.includes("network") && document.querySelector("[role=alert]")?.textContent.includes("sign-in has been preserved")');
+  await check('document.getElementById("recovery-status").textContent === "loading"', "network session failures remain retryable without clearing authentication state");
+  await evaluate('window.sessionResponse = "valid"; document.querySelector("[role=alert] button").click()');
+  await until('document.getElementById("recovery-status").textContent === "authenticated" && !document.querySelector("[role=alert]")');
+  console.log("PASS session retry restores the upstream provider after recovery");
+  await evaluate('window.sessionResponse = "logout"; document.getElementById("lose-session").click()');
+  await until('document.getElementById("recovery-status").textContent === "unauthenticated"');
+  console.log("PASS genuine session rejection still reaches the unauthenticated state");
+  if (browserErrors.length) throw new Error(browserErrors.join("\n"));
+
+} finally {
+  socket?.close();
+  if (browser?.pid && browser.exitCode === null) { const exited = once(browser, "exit"); browser.kill("SIGTERM"); await exited; }
+  if (server) await new Promise(resolve => server.close(resolve));
+  await fs.rm(temp, { recursive: true, force: true });
+}

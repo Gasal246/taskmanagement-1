@@ -7,12 +7,12 @@ import { authorizeActivityViewer } from "@/app/api/helpers/activity-comments";
 import mongoose from "mongoose";
 import { NextResponse } from "next/server";
 
-connectDB();
 
 export async function POST(
   req: Request,
   context: { params: Promise<{ activityId: string }> }
 ) {
+  await connectDB();
   const session = await auth();
   const userId = resolveSessionUserId(session);
   if (!userId) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });

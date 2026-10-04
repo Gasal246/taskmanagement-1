@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 "use client"
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -14,8 +14,6 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { CircleCheckBig, ExternalLink, ShieldAlert } from "lucide-react";
-import debounce from "lodash/debounce";
-import { useGetUserByEmail } from "@/query/user/queries";
 
 const formSchema = z.object({
   email: z.string().min(2).max(50),
@@ -24,9 +22,6 @@ const formSchema = z.object({
 
 const LoginPage = () => {
   const [loading, setLoading] = useState(false);
-  const { mutateAsync: findUserByEmail, isPending: findingEmail } = useGetUserByEmail();
-  const [showpassword, setShowPassword] = useState(false);
-  const [userFound, setUserFound] = useState(false);
   const session = useSession();
   const router = useRouter();
 
@@ -55,39 +50,21 @@ const LoginPage = () => {
       });
       if (response?.error) {
         toast("Login Failed!", {
-          description: response.error,
+          description: response.status === 503 ? "Sign-in is temporarily unavailable. Please try again shortly." : response.error,
         });
       }
       if (response?.ok) {
+        form.reset();
         toast("Login Success..", {
           description: "Welcome back " + values.email,
         });
       }
-    } catch (error) {
-      console.log(error);
+    } catch {
+      toast("Unable to sign in", { description: "Please check your connection and try again." });
     } finally {
-      form.reset();
-      setShowPassword(false);
-      setUserFound(false);
       setLoading(false);
     }
   }
-
-  const handleEmailEntry = async (email: string) => {
-    form.setValue("email", email);
-
-    if (email.length < 5) {
-      setUserFound(false);
-      setShowPassword(false);
-      return;
-    }
-
-    const res = await findUserByEmail(email);
-    setUserFound(!!res?.status);
-    setShowPassword(Boolean(res?.status && res?.user?.password));
-  };
-
-  const debouncedEmailEntry = useCallback(debounce(handleEmailEntry, 300), []);
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 px-4 py-6 text-slate-100">
@@ -123,38 +100,17 @@ const LoginPage = () => {
                   <FormControl>
                     <Input
                       {...field}
-                      onChange={(e) => {
-                        field.onChange(e);
-                        debouncedEmailEntry(e.target.value);
-                      }}
-                      placeholder="Enter your email"
+                      type="email" autoComplete="username" placeholder="Enter your email"
                       className="border-slate-700 bg-transparent"
                     />
                   </FormControl>
-                  <FormDescription>
-                    {findingEmail ? (
-                      <i className="flex items-center gap-2 not-italic">
-                        <Image src="/icons/loadingspin.svg" width={18} height={18} alt="loader" />
-                        <span className="text-xs text-slate-300">Checking your account...</span>
-                      </i>
-                    ) : userFound ? (
-                      <i className="flex items-center gap-2 not-italic">
-                        <CircleCheckBig size={14} className="text-green-500" />
-                        <span className="text-xs text-green-500">Email found.</span>
-                      </i>
-                    ) : (
-                      <i className="flex items-center gap-2 not-italic">
-                        <ShieldAlert size={14} className="text-slate-500" />
-                        <span className="text-xs text-slate-500">Enter email address.</span>
-                      </i>
-                    )}
-                  </FormDescription>
+
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            {showpassword && (
+            {(
               <FormField
                 control={form.control}
                 name="password"
@@ -163,7 +119,7 @@ const LoginPage = () => {
                     <FormControl>
                       <Input
                         placeholder="Enter your password"
-                        type="password"
+                        type="password" autoComplete="current-password"
                         {...field}
                         className="border-slate-700 bg-transparent"
                       />
@@ -175,21 +131,12 @@ const LoginPage = () => {
             )}
 
             <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-              {form.getValues("email").length > 4 && <Link href="/forgetpassword" className="text-sm text-cyan-300 hover:text-cyan-200">
+              {<Link href="/forgetpassword" className="text-sm text-cyan-300 hover:text-cyan-200">
                 Forgot password?
               </Link>}
 
-              {form.getValues("email").length > 0 && form.getValues("password").length > 0 && (
-                <Button type="submit">
-                  {loading ? <Image src="/icons/loadingspin.svg" width={22} height={22} alt="loader" /> : "Login now"}
-                </Button>
-              )}
-
-              {!showpassword && userFound && (
-                <Button type="button" variant="outline" onClick={() => router.push(`/verification/${form.getValues("email")}`)}>
-                  Verify & Add Password
-                </Button>
-              )}
+              <Button type="submit" disabled={loading}>{loading ? "Signing in..." : "Sign in"}</Button>
+              <Link href="/forgetpassword" className="text-sm text-cyan-300">Set up your password</Link>
             </div>
           </form>
         </Form>

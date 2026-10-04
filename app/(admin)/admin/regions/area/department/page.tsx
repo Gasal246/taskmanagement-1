@@ -1,4 +1,6 @@
 "use client"
+import { useOrganizationOverview } from "@/hooks/use-organization-overview";
+import OrganizationSectionControls from "@/components/admin/OrganizationSectionControls";
 import { AppDispatch, RootState } from '@/redux/store'
 import React, { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
@@ -10,7 +12,7 @@ import { motion } from "framer-motion";
 import { Trash2 } from "lucide-react";
 import { EllipsisVertical } from "lucide-react";
 import { Avatar, Popconfirm } from 'antd';
-import { useAddAreaDepartmentHead, useAddAreaDepartmentStaff, useAddLocationDepartmentHead, useAddLocationDepartmentStaff, useGetAreaDepartmentCompleteData, useGetAreaLocations, useGetAreaUsers, useGetLocationDepartmentCompleteData, useGetLocationUsers, useRemoveAreaDepartment, useRemoveAreaDepartmentHead, useRemoveAreaDepartmentStaff, useRemoveLocationDepartment, useRemoveLocationDepartmentHead, useRemoveLocationDepartmentStaff } from '@/query/business/queries';
+import { useAddAreaDepartmentHead, useAddAreaDepartmentStaff, useAddLocationDepartmentHead, useAddLocationDepartmentStaff, useRemoveAreaDepartment, useRemoveAreaDepartmentHead, useRemoveAreaDepartmentStaff, useRemoveLocationDepartment, useRemoveLocationDepartmentHead, useRemoveLocationDepartmentStaff } from '@/query/business/queries';
 import LoaderSpin from '@/components/shared/LoaderSpin';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -22,12 +24,9 @@ const AreaDepartmentPage = () => {
     const router = useRouter();
     const dispatch = useDispatch<AppDispatch>();
     const { regionData, areaData, departmentData, locationData } = useSelector((state: RootState) => state.application);
+    const isLocationDepartment = Boolean(departmentData?.location_id);
+    const overview = useOrganizationOverview(isLocationDepartment ? "location-department" : "area-department", departmentData?._id, isLocationDepartment ? ["heads", "staffs", "available_staffs"] : ["heads", "staffs", "subdeps", "available_staffs"]);
 
-    const { mutateAsync: getCompleteData, isPending: loadingCompleteData } = useGetAreaDepartmentCompleteData();
-    const { mutateAsync: getLocationCompleteData, isPending: loadingLocationCompleteData } = useGetLocationDepartmentCompleteData();
-    const { mutateAsync: getAreaLocations } = useGetAreaLocations();
-    const { mutateAsync: getAreaUsers } = useGetAreaUsers();
-    const { mutateAsync: getLocationUsers } = useGetLocationUsers();
     const { mutateAsync: addAreaDepartmentHead, isPending: addingDepartmentHead } = useAddAreaDepartmentHead();
     const { mutateAsync: addAreaDepartmentStaff, isPending: addingDepartmentStaff } = useAddAreaDepartmentStaff();
     const { mutateAsync: addLocationDepartmentHead, isPending: addingLocationDepartmentHead } = useAddLocationDepartmentHead();
@@ -39,80 +38,26 @@ const AreaDepartmentPage = () => {
     const { mutateAsync: removeLocationDepartmentStaff } = useRemoveLocationDepartmentStaff();
     const { mutateAsync: removeLocationDepartment } = useRemoveLocationDepartment();
 
-    const [heads, setHeads] = useState<any>([]);
-    const [staffs, setStaffs] = useState<any>([]);
-    const [subDepartments, setSubDepartments] = useState<any[]>([]);
-    const [areaLocations, setAreaLocations] = useState<any[]>([]);
-    const [areaUsers, setAreaUsers] = useState<any>([]);
-    const [locationUsers, setLocationUsers] = useState<any>([]);
-    const isLocationDepartment = Boolean(departmentData?.location_id);
+    const heads = overview.section("heads").items;
+    const staffs = overview.section("staffs").items;
+    const subDepartments = overview.section("subdeps").items;
+    const areaLocations = [...new Map(subDepartments.map(dep => [dep.location?._id, dep.location])).values()].filter(Boolean);
     const locationId = isLocationDepartment ? (departmentData?.location_id?._id || departmentData?.location_id) : undefined;
     const locationName = isLocationDepartment
         ? (locationData?.location_name || areaLocations?.find((loc: any) => loc?._id === locationId)?.location_name || departmentData?.location_id?.location_name || departmentData?.location?.location_name)
         : undefined;
     const showLocationCrumb = Boolean(isLocationDepartment && locationName);
-    const isLoadingDepartmentData = isLocationDepartment ? loadingLocationCompleteData : loadingCompleteData;
     const isAddingDepartmentHead = isLocationDepartment ? addingLocationDepartmentHead : addingDepartmentHead;
     const isAddingDepartmentStaff = isLocationDepartment ? addingLocationDepartmentStaff : addingDepartmentStaff;
-    const departmentUsers = isLocationDepartment ? locationUsers : areaUsers;
     const departmentScopeLabel = isLocationDepartment
         ? `${regionData?.region_name}, ${areaData?.area_name}, ${locationName || 'this location'}`
         : `${regionData?.region_name}, ${areaData?.area_name}`;
 
     useEffect(() => {
-        if (departmentData?._id) {
-            handleFetchCompleteDepData();
-            handleFetchAreaLocations();
-            if(isLocationDepartment) {
-                handleFetchLocationUsers();
-            } else {
-                handleFetchAreaUsers();
-            }
-        } else {
-            router.push("/admin");
-        }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [departmentData]);
+        if (!departmentData?._id) router.replace("/admin");
+    }, [departmentData?._id, router]);
 
-    const handleFetchCompleteDepData = async () => {
-        const res = isLocationDepartment
-            ? await getLocationCompleteData(departmentData?._id)
-            : await getCompleteData(departmentData?._id);
-        if (res?.status === 200) {
-            console.log("Res: ", res);
-            setHeads(res?.data?.heads || []);
-            setStaffs(res?.data?.staffs || []);
-            setSubDepartments(isLocationDepartment ? [] : (res?.data?.subdeps || []));
-        } else {
-            return toast.error("Data not fetched!!", { description: "Something went wrong while fetching complete department data" })
-        }
-    }
-
-    const handleFetchAreaLocations = async () => {
-        if(!areaData?._id) return;
-        const res = await getAreaLocations({ area_ids: [areaData?._id] });
-        if(res?.status === 200) {
-            setAreaLocations(res?.data || []);
-        }
-    }
-
-    const handleFetchAreaUsers = async () => {
-        const res = await getAreaUsers([areaData?._id]);
-        console.log("area users: ", res?.data[0]?.user_id?.name);
-        
-        if (res?.status === 200) {
-            setAreaUsers(res?.data || []);
-        }
-    }
-
-    const handleFetchLocationUsers = async () => {
-        const locId = locationData?._id || locationId;
-        if(!locId) return;
-        const res = await getLocationUsers(locId);
-        if(res?.status === 200) {
-            setLocationUsers(res?.data || []);
-        }
-    }
+    const handleFetchCompleteDepData = async () => { await overview.refresh(); };
 
     const handleRemoveDepartment = async () => {
         const res = isLocationDepartment
@@ -129,13 +74,7 @@ const AreaDepartmentPage = () => {
     const [selectedUser, setSelectedUser] = useState<string>("");
     const [isAddingStaff, setIsAddingStaff] = useState<boolean>(false);
     const [addStaffOpen, setAddStaffOpen] = useState<boolean>(false);
-    const [userSearch, setUserSearch] = useState<string>("");
-    const userSearchTerm = userSearch.trim().toLowerCase();
-    const filteredDepartmentUsers = departmentUsers?.filter((user: any) => {
-        const name = user?.user_id?.name || "";
-        const email = user?.user_id?.email || "";
-        return `${name} ${email}`.toLowerCase().includes(userSearchTerm);
-    });
+    const filteredDepartmentUsers = overview.section("available_staffs").items;
 
     const clickAddHead = () => {
         setSelectedUser("");
@@ -161,11 +100,7 @@ const AreaDepartmentPage = () => {
         if (res?.status === 200) {
             toast.success("Department Head Added Successfully!!", { description: "Department Head Added Successfully!!" })
             handleFetchCompleteDepData();
-            if(isLocationDepartment) {
-                handleFetchLocationUsers();
-            } else {
-                handleFetchAreaUsers();
-            }
+
             setAddStaffOpen(false);
         } else {
             return toast.error("Head not added!!", { description: res?.error || "Something went wrong while adding department head" })
@@ -182,7 +117,7 @@ const AreaDepartmentPage = () => {
         if (!selectedUser) {
             return toast.error("Please select a user before continue.")
         }
-        if (staffs?.find((staff: any) => staff?.user_id === selectedUser)) {
+        if (staffs?.find((staff: any) => (staff?.staff_id || staff?.user_id) === selectedUser)) {
             return toast.error("User is Already Added as Staff.", { description: "User is already added." })
         }
         const formData = new FormData();
@@ -196,11 +131,7 @@ const AreaDepartmentPage = () => {
         if (res?.status === 200) {
             toast.success("Department Staff Added Successfully!!", { description: "Department Staff Added Successfully!!" })
             handleFetchCompleteDepData();
-            if(isLocationDepartment) {
-                handleFetchLocationUsers();
-            } else {
-                handleFetchAreaUsers();
-            }
+
             setAddStaffOpen(false);
         } else {
             return toast.error("Staff not added!!", { description: res?.error || "Something went wrong while adding department staff" })
@@ -231,7 +162,6 @@ const AreaDepartmentPage = () => {
         }
     }
 
-    
     const handleViewSubDepartment = (subDepartment: any) => {
         const locId = subDepartment?.location_id?._id || subDepartment?.location_id;
         const location = areaLocations?.find((loc: any) => loc?._id === locId);
@@ -249,7 +179,6 @@ const AreaDepartmentPage = () => {
         await dispatch(loadAdminBusinessStaff(user));
         router.push(`/admin/staffs/view-staff`);
     }
-
 
     return (
         <div className='p-4 pb-20'>
@@ -317,14 +246,13 @@ const AreaDepartmentPage = () => {
                         <h1 className='text-xs font-medium text-slate-400 group-hover:text-cyan-600 capitalize flex items-center gap-1'>Add Head</h1>
                     </motion.div>
                 </div>
-                {!isLoadingDepartmentData && heads?.length === 0 && (
+                <OrganizationSectionControls key={`${overview.scope}:heads`} overview={overview} name="heads" label="heads" />
+                {overview.section("heads").loaded && heads?.length === 0 && (
                     <div className="flex items-center justify-center h-[15vh]">
                         <h1 className="text-xs font-medium text-slate-300">No heads added.</h1>
                     </div>
                 )}
-                {isLoadingDepartmentData && <div className="flex items-center justify-center h-[10vh]">
-                    <LoaderSpin size={35} />
-                </div>}
+
                 <div className="flex flex-wrap mt-1">
                     {heads?.map((head: any) => (
                         <div className="w-full lg:w-4/12 p-1" key={head?._id}>
@@ -381,7 +309,8 @@ const AreaDepartmentPage = () => {
                             <p className='text-xs pl-1 font-medium text-slate-400 lg:w-2/3 capitalize'>Location departments of {departmentData?.type} under {areaData?.area_name}.</p>
                         </div>
                     </div>
-                    {subDepartments?.length === 0 && (
+                    <OrganizationSectionControls key={`${overview.scope}:subdeps`} overview={overview} name="subdeps" label="subdeps" />
+                {overview.section("subdeps").loaded && subDepartments?.length === 0 && (
                         <div className="flex items-center justify-center h-[15vh]">
                             <h1 className="text-xs font-medium text-slate-300">No sub departments added.</h1>
                         </div>
@@ -455,14 +384,13 @@ const AreaDepartmentPage = () => {
                         <h1 className='text-xs font-medium text-slate-400 group-hover:text-cyan-600 capitalize flex items-center gap-1'>Add Staff</h1>
                     </motion.div>
                 </div>
-                {!isLoadingDepartmentData && staffs?.length === 0 && (
+                <OrganizationSectionControls key={`${overview.scope}:staffs`} overview={overview} name="staffs" label="staffs" />
+                {overview.section("staffs").loaded && staffs?.length === 0 && (
                     <div className="flex items-center justify-center h-[15vh]">
                         <h1 className="text-xs font-medium text-slate-300">No staffs added.</h1>
                     </div>
                 )}
-                {isLoadingDepartmentData && <div className="flex items-center justify-center h-[10vh]">
-                    <LoaderSpin size={35} />
-                </div>}
+
                 <div className="flex flex-wrap mt-1">
                     {staffs?.map((staff: any) => (
                         <div className="w-full lg:w-4/12 p-1" key={staff?._id}>
@@ -518,21 +446,11 @@ const AreaDepartmentPage = () => {
                         <DialogTitle className='capitalize'>Adding Department {isAddingStaff ? 'Staff' : 'Head'}</DialogTitle>
                         <DialogDescription>Adding {isAddingStaff ? 'Staff' : 'Head'} For {departmentData?.type} Department {departmentData?.dep_name} of {departmentScopeLabel}.</DialogDescription>
                     </DialogHeader>
-                    <div className="space-y-2">
-                        <Input
-                            placeholder="Search staff by name"
-                            value={userSearch}
-                            onChange={(e) => setUserSearch(e.target.value)}
-                        />
-                    </div>
+                    <OrganizationSectionControls key={`${overview.scope}:available_staffs`} overview={overview} name="available_staffs" label="staff" />
                     <div className="relative flex-1 overflow-y-auto pb-16">
-                        {filteredDepartmentUsers?.length === 0 && <div className='w-full h-[10vh] flex items-center justify-center'>
+                        {overview.section("available_staffs").loaded && filteredDepartmentUsers?.length === 0 && <div className='w-full h-[10vh] flex items-center justify-center'>
                             <h1 className="text-xs font-medium text-slate-400">
-                                {userSearchTerm
-                                    ? "No matching users"
-                                    : (isLocationDepartment
-                                        ? `No Users with location (${locationName || 'this location'}) found.`
-                                        : `No Users with area (${areaData?.area_name}) found.`)}
+                                No matching staff.
                             </h1>
                         </div>}
                         {filteredDepartmentUsers?.map((user: any) => <motion.div

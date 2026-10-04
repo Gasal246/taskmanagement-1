@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { canReadEnquiry, enrichEnquiries, enquiryActor, canScheduleAction } from "@/lib/enquiries/completion-server";
 import { forwardHistoryFilter, historyOrder } from "@/lib/enquiries/completion";
 import { auth } from "@/auth";
@@ -18,10 +19,9 @@ import "@/models/eq_camps.model";
 import "@/models/users.model";
 import { getEnquirySolutions, getFacilitySolutions } from "@/app/api/helpers/enquiry-solutions";
 
-connectDB();
-
 export async function GET(req:NextRequest){
     try{
+        await connectDB();
         const session:any = await auth();
         if(!session) return NextResponse.json({message: "Unauthorized access", status: 401}, {status: 401});
 
@@ -29,6 +29,7 @@ export async function GET(req:NextRequest){
         if (!actor) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
         const {searchParams} = new URL(req.url);
         const enquiry_id = searchParams.get("enquiry_id");
+        if (!mongoose.isValidObjectId(enquiry_id)) return NextResponse.json({ message: "Provide a valid enquiry ID" }, { status: 400 });
 
         const enquiry:any = await Eq_enquiry.findById(enquiry_id)
         .populate("country_id")
