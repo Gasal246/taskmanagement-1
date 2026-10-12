@@ -26,6 +26,7 @@ export async function GET(req: NextRequest) {
       $or: [
         { assigned_to: { $in: staffIds } },
         { forwarded_to: { $in: staffIds } },
+        { assignees: { $in: staffIds } },
       ],
       is_done: { $ne: true },
     })
@@ -35,7 +36,7 @@ export async function GET(req: NextRequest) {
     const grouped: Record<string, any[]> = {};
     for (const activity of activities) {
       const activityStaffIds = new Set(
-        [activity?.assigned_to, activity?.forwarded_to]
+        [...(Array.isArray(activity?.assignees) ? activity.assignees : []), activity?.assigned_to, activity?.forwarded_to]
           .map((id) => id?.toString())
           .filter((id): id is string => Boolean(id && staffIds.includes(id)))
       );

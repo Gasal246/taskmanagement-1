@@ -3,8 +3,14 @@ import { SCHEDULE_ACTION_LABELS, type ScheduleHistoryEntry } from "@/lib/activit
 export function buildActivityHistory(activity: any, creator: any) {
   if (!activity?._id) return [];
   const entries: any[] = (activity.reassignment_history || [])
-    .filter((entry: any) => entry.action === "reassigned")
-    .map((entry: any) => ({ ...entry, event_type: "reassigned", event_label: "Reassigned to", event_user: entry.recipient_id, event_order: 2 }));
+    .filter((entry: any) => ["reassigned", "assigned", "removed"].includes(entry.action))
+    .map((entry: any) => ({
+      ...entry,
+      event_type: entry.action === "removed" ? "assignment_removed" : "assigned_more",
+      event_label: entry.action === "removed" ? "Removed from activity" : "Assigned to activity",
+      event_user: entry.recipient_id,
+      event_order: 2,
+    }));
   if (activity.assigned_to?._id) entries.push({
     _id: `assigned-${activity._id}`, event_type: "assigned", event_label: "Assigned to",
     event_user: activity.assigned_to, event_order: 1, createdAt: activity.createdAt,

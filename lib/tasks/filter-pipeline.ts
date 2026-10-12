@@ -24,7 +24,7 @@ export function taskActivityFilterStages(
     { $set: { __nameActivityMatched: { $gt: [{ $size: "$__matchingNameActivity" }, 0] } } },
   );
   if (staffId) stages.push(
-    exists("__matchingStaffActivity", { $or: [{ assigned_to: staffId }, { forwarded_to: staffId }] }),
+    exists("__matchingStaffActivity", { $or: [{ assigned_to: staffId }, { forwarded_to: staffId }, { assignees: staffId }] }),
     { $match: { $or: [{ assigned_to: staffId }, { "__matchingStaffActivity.0": { $exists: true } }] } },
     { $set: { __staffActivityMatched: { $gt: [{ $size: "$__matchingStaffActivity" }, 0] } } },
   );

@@ -52,6 +52,79 @@ const resolveNotificationTitle = (action: ActivityNotificationAction) => {
   return "Activity Completed";
 };
 
+export async function notifyTaskActivityAssignmentChange({
+  taskId,
+  activityId,
+  activityTitle,
+  action,
+  targetName,
+  participantIds,
+  actorId,
+  eventKey,
+  dbSession,
+}: {
+  taskId: string;
+  activityId: string;
+  activityTitle?: string | null;
+  action: "assigned" | "removed";
+  targetName?: string | null;
+  participantIds: string[];
+  actorId: string;
+  eventKey?: string;
+  dbSession?: ClientSession;
+}) {
+  const task: any = await Business_Tasks.findById(taskId)
+    .select("task_name business_id is_project_task")
+    .session(dbSession ?? null)
+    .lean();
+  if (!task) return;
+
+  const adminRows = task.business_id
+    ? await AdminAssignBusiness.find({ business_id: task.business_id, status: 1 })
+        .select("user_id")
+        .session(dbSession ?? null)
+        .lean()
+    : [];
+  const adminIds = new Set(adminRows.map((row: any) => String(row.user_id || "")).filter(Boolean));
+  const recipientIds = Array.from(new Set(participantIds.map(String).filter(Boolean)))
+    .filter((recipientId) => recipientId !== actorId && !adminIds.has(recipientId));
+  if (!recipientIds.length) return;
+
+  const activityName = truncateText(activityTitle || "Activity", 64);
+  const taskName = truncateText(task.task_name || "Task", 64);
+  const personName = truncateText(targetName || "A team member", 64);
+  const title = action === "assigned" ? "Activity member added" : "Activity member removed";
+  const body = action === "assigned"
+    ? `${personName} was added to ${activityName}`
+    : `${personName} was removed from ${activityName}`;
+  const data: Record<string, string> = {
+    type: "task-activity-assignment",
+    taskId,
+    taskName,
+    taskType: task.is_project_task ? "Project Task" : "Individual Task",
+    activityId,
+    activityTitle: activityName,
+    action,
+  };
+  const meta = { ...data, targetName: personName };
+
+  await enqueueNotifications(
+    recipientIds.map((recipientId) => ({
+      recipient_id: recipientId,
+      sender_id: actorId,
+      kind: "task-activity",
+      title,
+      body,
+      data,
+      meta,
+      read_at: null,
+    })),
+    { notification: { title, body }, data },
+    eventKey,
+    dbSession
+  );
+}
+
 export async function notifyTaskActivityChange({
   req,
   taskId,

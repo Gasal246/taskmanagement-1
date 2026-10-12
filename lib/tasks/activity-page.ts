@@ -21,8 +21,9 @@ export async function taskActivityPage(visibleQuery: any, params: URLSearchParam
     const regex = new RegExp(escapeSearch(search), "i");
     filters.push(
       { $lookup: { from: Users.collection.name, localField: "assigned_to", foreignField: "_id", pipeline: [{ $project: { name: 1 } }], as: "_assignee" } },
+      { $lookup: { from: Users.collection.name, localField: "assignees", foreignField: "_id", pipeline: [{ $project: { name: 1 } }], as: "_assignees" } },
       { $lookup: { from: Skills.collection.name, localField: "assigned_skill", foreignField: "_id", pipeline: [{ $project: { skill_name: 1 } }], as: "_skill" } },
-      { $match: { $or: [{ activity: regex }, { description: regex }, { "_assignee.name": regex }, { "_skill.skill_name": regex }] } },
+      { $match: { $or: [{ activity: regex }, { description: regex }, { "_assignee.name": regex }, { "_assignees.name": regex }, { "_skill.skill_name": regex }] } },
     );
   }
   let requestedPage = bounds.page;
@@ -42,7 +43,7 @@ export async function taskActivityPage(visibleQuery: any, params: URLSearchParam
   const [result] = await Activities.aggregate([
     { $match: visible },
     ...order,
-    { $project: { _id: 1, updatedAt: 1, is_done: 1, activity: 1, description: 1, assigned_to: 1, assigned_skill: 1 } },
+    { $project: { _id: 1, updatedAt: 1, is_done: 1, activity: 1, description: 1, assigned_to: 1, assignees: 1, assigned_skill: 1 } },
     { $facet: {
       summary: [{ $group: { _id: null, total: { $sum: 1 }, completed: { $sum: { $cond: [{ $eq: ["$is_done", true] }, 1, 0] } } } }],
       matching: [...filters, { $count: "total" }],

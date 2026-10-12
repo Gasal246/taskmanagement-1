@@ -11,7 +11,7 @@ import Flow_Log from "@/models/Flow_Log.model";
 import Task_Activities from "@/models/task_activities.model";
 import Users from "@/models/users.model";
 import { NextRequest, NextResponse } from "next/server";
-import { notifyTaskActivityChange } from "@/app/api/helpers/task-activity-notifications";
+import { notifyTaskActivityAssignmentChange, notifyTaskActivityChange } from "@/app/api/helpers/task-activity-notifications";
 import {
     getHierarchyReassignmentHeads,
     getSelectedHeadDirectStaffIds,
@@ -25,7 +25,7 @@ import {
 
 import AdminAssignBusiness from "@/models/admin_assign_business.model";
 import BusinessStaffs from "@/models/business_staffs.model";
-import { canChangeActivityStatus } from "@/app/api/helpers/activity-status-access";
+import { canChangeActivityStatus, getActivityAssigneeIds } from "@/app/api/helpers/activity-status-access";
 import { ActivityDocumentValidationError, validateActivityDocuments } from "@/app/api/helpers/activity-documents";
 import type { ActivityDocument } from "@/lib/activityDocuments";
 interface Body {
@@ -39,6 +39,8 @@ interface Body {
     description?: string | null,
     assigned_to?: string | null,
     forwarded_to?: string | null,
+    assignee_id?: string | null,
+    assignment_action?: "add" | "remove",
     assigned_skill?: string | null,
     is_status?: boolean,
     documents?: ActivityDocument[]
@@ -55,7 +57,7 @@ export async function PUT(req: NextRequest) {
         const body: Body = await req.json();
         if (!body.activity_id) return NextResponse.json({ message: "Please Provide Activity_id" }, { status: 400 });
 
-        if (Object.prototype.hasOwnProperty.call(body, "forwarded_to")) {
+        if (body.assignment_action || Object.prototype.hasOwnProperty.call(body, "forwarded_to")) {
             const currentActivity = await Task_Activities.findById(body.activity_id);
             if (!currentActivity) {
                 return NextResponse.json({ message: "Activity not found", status: 404 }, { status: 404 });
@@ -65,110 +67,130 @@ export async function PUT(req: NextRequest) {
             const task: any = await Business_Tasks.findById(currentActivity.task_id)
                 .select("business_id project_id creator assigned_to is_project_task assigned_teams")
                 .lean();
-            if (task?.is_project_task) {
-                if (!(await canAssignProjectTaskActivities(task, actorId))) {
-                    return NextResponse.json(
-                        { message: "Only the task creator or a project manager can reassign this activity", status: 403 },
-                        { status: 403 }
-                    );
-                }
-                if (!body.forwarded_to) {
-                    await Task_Activities.findByIdAndUpdate(body.activity_id, { $set: { forwarded_to: null } });
-                    return NextResponse.json({ message: "Activity reassignment removed", status: 200 }, { status: 200 });
-                }
-                const candidates = await getProjectTaskAssignmentCandidateIds(task, actorId);
-                if (!candidates.includes(String(body.forwarded_to))) {
-                    return NextResponse.json(
-                        { message: "Activities can only be reassigned to active heads or members of the selected teams", status: 403 },
-                        { status: 403 }
-                    );
-                }
-                if (String(currentActivity.forwarded_to || "") === String(body.forwarded_to)) {
-                    return NextResponse.json({ message: "Activity is already reassigned to this staff member", status: 200 }, { status: 200 });
-                }
-                await Task_Activities.findByIdAndUpdate(body.activity_id, {
-                    $set: { forwarded_to: body.forwarded_to },
-                    $push: {
-                        reassignment_history: {
-                            action: "reassigned",
-                            actor_id: actor._id,
-                            recipient_id: body.forwarded_to,
-                            previous_recipient_id: currentActivity.forwarded_to || null,
-                            createdAt: new Date(),
-                        }
-                    }
-                });
-                return NextResponse.json({ message: "Activity reassigned successfully", status: 200 }, { status: 200 });
-            }
+            if (!task) return NextResponse.json({ message: "Task not found", status: 404 }, { status: 404 });
             if (actor?.status !== 1) {
-                return NextResponse.json({ message: "An active HEAD role is required", status: 403 }, { status: 403 });
+                return NextResponse.json({ message: "An active account is required", status: 403 }, { status: 403 });
             }
-            if (String(currentActivity.assigned_to || "") !== actorId) {
-                return NextResponse.json(
-                    { message: "Only the HEAD assigned to this activity can reassign it", status: 403 },
-                    { status: 403 }
-                );
-            }
-            const headContext = task?.business_id
+            const adminAccess = await AdminAssignBusiness.exists({
+                user_id: actorId,
+                business_id: task.business_id,
+                status: 1,
+            });
+            const headContext = !task.is_project_task && !adminAccess
                 ? await resolveSelectedHeadContext(
                     req,
                     actorId,
                     String(task.business_id)
                 )
                 : null;
-            if (!headContext) {
+            const canAssignProject = task.is_project_task
+                ? await canAssignProjectTaskActivities(task, actorId)
+                : false;
+            const canReassign = Boolean(adminAccess) || Boolean(
+                task.is_project_task
+                    ? canAssignProject && canChangeActivityStatus(task, currentActivity, actorId)
+                    : headContext && canChangeActivityStatus(task, currentActivity, actorId)
+            );
+            if (!canReassign) {
                 return NextResponse.json(
-                    { message: "An active HEAD role and selected domain are required", status: 403 },
+                    { message: "You do not have permission to manage this activity's assignments", status: 403 },
                     { status: 403 }
                 );
             }
 
-            const currentForwardedTo = currentActivity.forwarded_to
-                ? String(currentActivity.forwarded_to)
-                : "";
-            if (!body.forwarded_to) {
-                if (!currentForwardedTo) {
-                    return NextResponse.json({ message: "This activity has no reassignment to remove", status: 200 }, { status: 200 });
+            const action = body.assignment_action || (body.forwarded_to ? "add" : "remove");
+            const legacyForwardedId = String(currentActivity.forwarded_to || "");
+            const targetId = String(body.assignee_id || body.forwarded_to || (action === "remove" ? legacyForwardedId : ""));
+            if (!targetId) {
+                return NextResponse.json({ message: "Please select an activity member", status: 400 }, { status: 400 });
+            }
+
+            const currentAssigneeIds = getActivityAssigneeIds(currentActivity);
+            if (action === "add" && currentAssigneeIds.includes(targetId)) {
+                return NextResponse.json({ message: "This person is already assigned to the activity", status: 200 }, { status: 200 });
+            }
+            if (action === "remove" && !currentAssigneeIds.includes(targetId)) {
+                return NextResponse.json({ message: "This person is not assigned to the activity", status: 200 }, { status: 200 });
+            }
+
+            const targetUser: any = await Users.findById(targetId).select("name status");
+            if (action === "add") {
+                if (!targetUser || targetUser.status !== 1) {
+                    return NextResponse.json({ message: "Only active staff can be assigned", status: 403 }, { status: 403 });
                 }
-                await Task_Activities.findByIdAndUpdate(body.activity_id, {
-                    $set: { forwarded_to: null }
-                });
-                return NextResponse.json({ message: "Activity reassignment removed", status: 200 }, { status: 200 });
+                if (task.is_project_task) {
+                    const candidates = await getProjectTaskAssignmentCandidateIds(task, actorId);
+                    if (!candidates.includes(targetId)) {
+                        return NextResponse.json(
+                            { message: "Activities can only be assigned to active heads or members of the selected teams", status: 403 },
+                            { status: 403 }
+                        );
+                    }
+                } else if (adminAccess) {
+                    const activeStaff = await BusinessStaffs.exists({
+                        user_id: targetId,
+                        business_id: task.business_id,
+                        status: 1,
+                    });
+                    if (!activeStaff) {
+                        return NextResponse.json({ message: "The selected person is not active staff in this business", status: 403 }, { status: 403 });
+                    }
+                } else if (headContext) {
+                    const [subordinateIds, hierarchyHeads] = await Promise.all([
+                        getSelectedHeadDirectStaffIds(headContext),
+                        getHierarchyReassignmentHeads(headContext),
+                    ]);
+                    const hierarchyHeadIds = new Set(hierarchyHeads.map((head) => head._id));
+                    if (!subordinateIds.includes(targetId) && !hierarchyHeadIds.has(targetId)) {
+                        return NextResponse.json(
+                            { message: "The selected staff member is not in your reporting scope", status: 403 },
+                            { status: 403 }
+                        );
+                    }
+                }
             }
 
-            const [subordinateIds, hierarchyHeads, activeTarget] = await Promise.all([
-                getSelectedHeadDirectStaffIds(headContext),
-                getHierarchyReassignmentHeads(headContext),
-                Users.exists({ _id: body.forwarded_to, status: 1 }),
-            ]);
-            const hierarchyHeadIds = new Set(hierarchyHeads.map((head) => head._id));
-            const targetId = String(body.forwarded_to);
-            const isEligibleTarget =
-                subordinateIds.includes(targetId) || hierarchyHeadIds.has(targetId);
-            if (!activeTarget || !isEligibleTarget) {
-                return NextResponse.json(
-                    { message: "The selected staff member is not in your reporting scope", status: 403 },
-                    { status: 403 }
-                );
-            }
-            if (currentForwardedTo === String(body.forwarded_to)) {
-                return NextResponse.json({ message: "Activity is already reassigned to this staff member", status: 200 }, { status: 200 });
-            }
-
-            await Task_Activities.findByIdAndUpdate(body.activity_id, {
-                $set: { forwarded_to: body.forwarded_to },
+            const nextAssigneeIds = action === "add"
+                ? [...currentAssigneeIds, targetId]
+                : currentAssigneeIds.filter((id) => id !== targetId);
+            const updateFields: Record<string, any> = {};
+            if (action === "remove" && String(currentActivity.assigned_to || "") === targetId) updateFields.assigned_to = null;
+            if (action === "remove" && legacyForwardedId === targetId) updateFields.forwarded_to = null;
+            if (Object.prototype.hasOwnProperty.call(body, "assigned_skill")) updateFields.assigned_skill = body.assigned_skill;
+            const assignmentUpdate: Record<string, any> = {
                 $push: {
                     reassignment_history: {
-                        action: "reassigned",
+                        action: action === "add" ? "assigned" : "removed",
                         actor_id: actor._id,
-                        recipient_id: body.forwarded_to,
-                        previous_recipient_id: currentActivity.forwarded_to || null,
+                        recipient_id: targetId,
+                        previous_recipient_id: null,
                         createdAt: new Date(),
                     }
                 }
+            };
+            if (Object.keys(updateFields).length) assignmentUpdate.$set = updateFields;
+            if (action === "add") assignmentUpdate.$addToSet = { assignees: { $each: nextAssigneeIds } };
+            else assignmentUpdate.$pull = { assignees: targetId };
+            await inTransaction(async dbSession => {
+                await Task_Activities.findByIdAndUpdate(body.activity_id, assignmentUpdate, { session: dbSession });
+                await notifyTaskActivityAssignmentChange({
+                    taskId: String(currentActivity.task_id),
+                    activityId: String(currentActivity._id),
+                    activityTitle: currentActivity.activity,
+                    action: action === "add" ? "assigned" : "removed",
+                    targetName: targetUser?.name,
+                    participantIds: action === "add" ? nextAssigneeIds : [...nextAssigneeIds, targetId],
+                    actorId,
+                    eventKey: `activity:${currentActivity._id}:assignment:${action}:${targetId}:${randomUUID()}`,
+                    dbSession,
+                });
+                return true;
             });
 
-            return NextResponse.json({ message: "Activity reassigned successfully", status: 200 }, { status: 200 });
+            return NextResponse.json({
+                message: action === "add" ? "Person added to activity" : "Person removed from activity",
+                status: 200,
+            }, { status: 200 });
         }
 
         if (body.is_status) {

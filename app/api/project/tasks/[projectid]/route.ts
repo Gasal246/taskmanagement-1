@@ -101,7 +101,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ proj
           .select("_id")
           .lean(),
         TaskActivities.distinct("task_id", {
-        $or: [{ assigned_to: userObjectId }, { forwarded_to: userObjectId }],
+        $or: [{ assigned_to: userObjectId }, { forwarded_to: userObjectId }, { assignees: userObjectId }],
         }),
       ]);
     const headedTeamIds = headedTeams.map((team: any) => team._id);
@@ -137,6 +137,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ proj
             { task_id: { $in: fullVisibleTaskIds } },
             { assigned_to: userObjectId },
             { forwarded_to: userObjectId },
+            { assignees: userObjectId },
           ],
         };
     const [nameActivities, personActivities] = await Promise.all([
@@ -146,7 +147,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ proj
       personId
         ? TaskActivities.find({
             $and: [
-              { $or: [{ assigned_to: oid(personId) }, { forwarded_to: oid(personId) }] },
+              { $or: [{ assigned_to: oid(personId) }, { forwarded_to: oid(personId) }, { assignees: oid(personId) }] },
               visibleActivityScope,
             ],
           }).select("task_id").lean()
@@ -183,6 +184,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ proj
                             { $in: ["$$taskId", fullVisibleTaskIds] },
                             { $eq: ["$assigned_to", userObjectId] },
                             { $eq: ["$forwarded_to", userObjectId] },
+                            { $in: [userObjectId, { $ifNull: ["$assignees", []] }] },
                           ],
                         },
                       ],
@@ -265,6 +267,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ proj
                 { task_id: { $in: fullRowTaskIds } },
                 { assigned_to: userObjectId },
                 { forwarded_to: userObjectId },
+                { assignees: userObjectId },
               ],
             })
       : [];

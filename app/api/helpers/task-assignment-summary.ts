@@ -23,6 +23,7 @@ export async function addTaskAssignmentSummaries(
             $or: [
               { assigned_to: viewer.userId },
               { forwarded_to: viewer.userId },
+              { assignees: viewer.userId },
             ],
           },
         ],
@@ -31,10 +32,10 @@ export async function addTaskAssignmentSummaries(
   const activities = await Task_Activities.find({
     $and: [
       visibilityScope,
-      { $or: [{ assigned_to: { $ne: null } }, { forwarded_to: { $ne: null } }] },
+      { $or: [{ assigned_to: { $ne: null } }, { forwarded_to: { $ne: null } }, { "assignees.0": { $exists: true } }] },
     ],
   })
-    .select("task_id assigned_to forwarded_to createdAt")
+    .select("task_id assigned_to forwarded_to assignees createdAt")
     .sort({ createdAt: 1 })
     .lean();
 
@@ -46,12 +47,18 @@ export async function addTaskAssignmentSummaries(
   }
   for (const activity of activities) {
     const taskId = activity.task_id?.toString();
-    const userId = (activity.forwarded_to || activity.assigned_to)?.toString();
-    if (!taskId || !userId) continue;
+    if (!taskId) continue;
+    const activityUserIds = [
+      ...(Array.isArray(activity.assignees) ? activity.assignees : []),
+      activity.assigned_to,
+      activity.forwarded_to,
+    ].map((userId) => userId?.toString()).filter(Boolean);
     const ids = activityAssignees.get(taskId) || [];
-    if (!ids.includes(userId)) ids.push(userId);
+    for (const userId of activityUserIds) {
+      if (!ids.includes(userId)) ids.push(userId);
+      userIds.add(userId);
+    }
     activityAssignees.set(taskId, ids);
-    userIds.add(userId);
   }
 
   const users = await Users.find({ _id: { $in: Array.from(userIds) } })

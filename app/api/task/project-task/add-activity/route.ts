@@ -115,6 +115,7 @@ export async function POST(req: NextRequest) {
                 created_by: session?.user?.id || null,
                 assigned_to: assignedTo || null,
                 forwarded_to: null,
+                assignees: assignedTo ? [assignedTo] : [],
                 assigned_skill: assignedSkill,
                 documents: documents || [],
             });

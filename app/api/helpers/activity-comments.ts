@@ -11,6 +11,12 @@ import { normalizeProjectTaskTeamIds, resolveProjectTaskStaffAccess } from "@/ap
 import mongoose from "mongoose";
 import { resolveSelectedHeadContext, getSelectedHeadDirectStaffIds } from "@/app/api/helpers/head-reassignment-scope";
 
+const activityAssigneeIds = (activity: any) => Array.from(new Set([
+  ...(Array.isArray(activity?.assignees) ? activity.assignees : []),
+  activity?.assigned_to,
+  activity?.forwarded_to,
+].map((value) => String(value?._id || value || "")).filter(Boolean)));
+
 export async function authorizeActivityViewer(userId: string, activityId: string, req: Request) {
   const activity: any = await TaskActivities.findById(activityId).lean();
   if (!activity) return { status: 404 as const, activity: null, task: null, isAdmin: false };
@@ -25,8 +31,7 @@ export async function authorizeActivityViewer(userId: string, activityId: string
   const activeUser = await Users.exists({ _id: userId, status: 1 });
   const isAdmin = Boolean(activeUser && adminAssignment);
   const isAssignedStaff =
-    Boolean(activeUser && staffAssignment) && [activity.assigned_to, activity.forwarded_to]
-      .some((assignedUserId) => String(assignedUserId || "") === String(userId));
+    Boolean(activeUser && staffAssignment) && activityAssigneeIds(activity).includes(String(userId));
   const projectTaskAccess = task.is_project_task
     ? await resolveProjectTaskStaffAccess(task, userId)
     : null;
@@ -39,7 +44,7 @@ export async function authorizeActivityViewer(userId: string, activityId: string
     ? await resolveSelectedHeadContext(req, userId, String(task.business_id)) : null;
   const supervisedIds = headContext ? await getSelectedHeadDirectStaffIds(headContext) : [];
   const isSupervisedViewer = (!task.is_project_task && supervisedIds.includes(String(task.assigned_to))) ||
-    [activity.assigned_to, activity.forwarded_to].some((id) => supervisedIds.includes(String(id || "")));
+    activityAssigneeIds(activity).some((id) => supervisedIds.includes(id));
 
   if (!isAdmin && !isAssignedStaff && !canViewProjectActivity && !isTaskViewer && !isSupervisedViewer) {
     return { status: 403 as const, activity: null, task: null, isAdmin: false };
@@ -55,7 +60,7 @@ export async function getActivityViewerIds(task: any, activity: any) {
   const adminIds = new Set(admins.map((row: any) => String(row.user_id || "")).filter(Boolean));
   const staffCandidateIds = new Set<string>();
 
-  const activityStaffIds = [activity.assigned_to, activity.forwarded_to,
+  const activityStaffIds = [...activityAssigneeIds(activity),
     ...(!task.is_project_task ? [task.assigned_to, task.creator] : [])]
     .map((userId) => String(userId || ""))
     .filter(Boolean);

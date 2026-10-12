@@ -84,6 +84,7 @@ import axios from "axios";
 import ProjectTaskHeaderSummary from "@/components/tasks/ProjectTaskHeaderSummary";
 import ActivityDocuments from "@/components/task/ActivityDocuments";
 import type { ActivityDocument } from "@/lib/activityDocuments";
+import ActivityAssignees from "@/components/task/ActivityAssignees";
 
 const statusStyles: Record<string, string> = {
   Completed: "border-emerald-500/40 bg-emerald-500/15 text-emerald-200",
@@ -188,6 +189,7 @@ const TaskDetailPage = () => {
   const [staffSearch, setStaffSearch] = useState("");
   const [selectedSkill, setSelectedSkill] = useState<any>(null);
   const [selectedStaff, setSelectedStaff] = useState<any>(null);
+  const [removingAssigneeId, setRemovingAssigneeId] = useState<string | null>(null);
   const [statusConfirmOpen, setStatusConfirmOpen] = useState(false);
   const [pendingStatusActivity, setPendingStatusActivity] = useState<any>(null);
   const [pendingStatusValue, setPendingStatusValue] = useState<boolean | null>(null);
@@ -343,7 +345,7 @@ const TaskDetailPage = () => {
   const handleOpenAssignDialog = (activity: any) => {
     setActiveActivity(activity);
     setSelectedSkill(activity?.assigned_skill || null);
-    setSelectedStaff(activity?.assigned_to || null);
+    setSelectedStaff(null);
     setSkillSearch("");
     setStaffSearch("");
     setAssignDialogOpen(true);
@@ -396,17 +398,33 @@ const TaskDetailPage = () => {
     }
     const res = await UpdateTaskActivity({
       activity_id: activeActivity._id,
-      assigned_to: selectedStaff._id,
+      assignment_action: "add",
+      assignee_id: selectedStaff._id,
       assigned_skill: selectedSkill._id,
       is_status: false,
     });
     if (res?.status === 200) {
-      toast.success(res?.message || "Activity assigned successfully.");
+      toast.success(res?.message || "Person added to activity.");
       handleCloseAssignDialog();
 
     } else {
-      toast.error(res?.message || "Failed to assign activity.");
+      toast.error(res?.message || "Failed to add person to activity.");
     }
+  };
+
+  const handleRemoveAssignee = async (activity: any, person: any) => {
+    const assigneeId = String(person?._id || "");
+    if (!activity?._id || !assigneeId) return;
+    setRemovingAssigneeId(assigneeId);
+    const res = await UpdateTaskActivity({
+      activity_id: activity._id,
+      assignment_action: "remove",
+      assignee_id: assigneeId,
+      is_status: false,
+    });
+    if (res?.status === 200) toast.success(res?.message || "Person removed from activity.");
+    else toast.error(res?.message || "Failed to remove person from activity.");
+    setRemovingAssigneeId(null);
   };
 
   const onActivitySubmit = async (values: z.infer<typeof activitySchema>) => {
@@ -625,9 +643,12 @@ const TaskDetailPage = () => {
               <span className="rounded-md border border-slate-700/70 bg-slate-900/60 px-2 py-1">
                 Skill: {activity?.assigned_skill?.skill_name || "Not set"}
               </span>
-              <span className="rounded-md border border-slate-700/70 bg-slate-900/60 px-2 py-1">
-                Staff: {activity?.assigned_to?.name || "Unassigned"}
-              </span>
+              <ActivityAssignees
+                assignees={activity.assignees || []}
+                canRemove={Boolean(activity.canReassign)}
+                removingId={removingAssigneeId}
+                onRemove={(person) => handleRemoveAssignee(activity, person)}
+              />
             </div>
             {activity?.is_done && activity?.completed_in && (
               <p className="text-xs text-slate-400 mt-2">
@@ -667,15 +688,15 @@ const TaskDetailPage = () => {
               <History size={12} />
               History
             </motion.button>
-            <motion.button
+            {activity.canReassign && <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               className="p-2 px-4 rounded-lg border border-slate-700 hover:border-slate-500 bg-gradient-to-tr from-slate-900 to-slate-800 cursor-pointer text-xs font-medium flex gap-1 items-center"
               onClick={() => handleOpenAssignDialog(activity)}
             >
               <UserPlus size={12} />
-              {activity?.assigned_to ? "Change Assignment" : "Assign"}
-            </motion.button>
+              Assign more
+            </motion.button>}
             {activity?.is_done ? (
               <motion.button
                 whileHover={{ scale: 1.02 }}
@@ -963,12 +984,18 @@ const TaskDetailPage = () => {
       >
         <DialogContent className="sm:max-w-[520px]">
           <DialogHeader>
-            <DialogTitle>Assign Activity</DialogTitle>
+            <DialogTitle>Assign more people</DialogTitle>
             <DialogDescription>
-              Assign a skill and staff member to {activeActivity?.activity || "this activity"}.
+              Add another staff member to {activeActivity?.activity || "this activity"}.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
+            <ActivityAssignees
+              assignees={activeActivity?.assignees || []}
+              canRemove={Boolean(activeActivity?.canReassign)}
+              removingId={removingAssigneeId}
+              onRemove={(person) => handleRemoveAssignee(activeActivity, person)}
+            />
             <div className="rounded-lg border border-slate-800/70 bg-slate-900/60 p-3">
               <div className="flex items-center justify-between gap-3">
                 <div>
@@ -1020,8 +1047,8 @@ const TaskDetailPage = () => {
             <Button variant="ghost" onClick={handleCloseAssignDialog}>
               Cancel
             </Button>
-            <Button onClick={handleAssignActivity} disabled={isUpdatingActivity}>
-              {isUpdatingActivity ? "Assigning..." : "Assign"}
+            <Button onClick={handleAssignActivity} disabled={isUpdatingActivity || !selectedStaff?._id}>
+              {isUpdatingActivity ? "Adding..." : "Add person"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1091,26 +1118,31 @@ const TaskDetailPage = () => {
                 <p className="text-xs text-slate-400">No matching staff found.</p>
               </div>
             )}
-            {filteredStaffs.map((staff: any) => (
-              <motion.div
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                key={staff?._id}
-                className="p-2 bg-gradient-to-br group from-slate-900/60 to-slate-800/60 rounded-lg cursor-pointer text-sm font-medium flex items-center gap-2 px-4 border border-slate-700 hover:border-cyan-600 justify-between mt-2 relative"
-                onClick={() => handleSelectStaff(staff)}
-              >
-                <div className="flex items-center gap-2">
-                  <Avatar src={staff?.user_id?.avatar_url || "/avatar.png"} size={30} />
-                  <div>
-                    <p className="text-xs text-slate-200">{staff?.user_id?.name}</p>
-                    <p className="text-xs text-slate-400">{staff?.user_id?.email}</p>
+            {filteredStaffs.map((staff: any) => {
+              const staffId = String(staff?.user_id?._id || "");
+              const alreadyAssigned = (activeActivity?.assignees || [])
+                .some((person: any) => String(person?._id) === staffId);
+              return (
+                <motion.div
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  key={staff?._id}
+                  className={`p-2 bg-gradient-to-br group from-slate-900/60 to-slate-800/60 rounded-lg text-sm font-medium flex items-center gap-2 px-4 border justify-between mt-2 relative ${alreadyAssigned ? "cursor-not-allowed border-slate-800 opacity-55" : "cursor-pointer border-slate-700 hover:border-cyan-600"}`}
+                  onClick={() => !alreadyAssigned && handleSelectStaff(staff)}
+                >
+                  <div className="flex items-center gap-2">
+                    <Avatar src={staff?.user_id?.avatar_url || "/avatar.png"} size={30} />
+                    <div>
+                      <p className="text-xs text-slate-200">{staff?.user_id?.name}</p>
+                      <p className="text-xs text-slate-400">{staff?.user_id?.email}</p>
+                    </div>
                   </div>
-                </div>
-                {selectedStaff?._id === staff?.user_id?._id && (
-                  <Check className="text-cyan-600" strokeWidth={3} size={16} />
-                )}
-              </motion.div>
-            ))}
+                  {alreadyAssigned
+                    ? <span className="text-[10px] text-cyan-300">Assigned</span>
+                    : selectedStaff?._id === staff?.user_id?._id && <Check className="text-cyan-600" strokeWidth={3} size={16} />}
+                </motion.div>
+              );
+            })}
           </div>
         </DialogContent>
       </Dialog>

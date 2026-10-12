@@ -23,6 +23,11 @@ const ForgetPassword = () => {
         },
     })
 
+    useEffect(() => {
+        const email = new URLSearchParams(window.location.search).get("email");
+        if (email) form.setValue("email", email, { shouldValidate: true });
+    }, [form]);
+
     async function onSubmit(values: z.infer<typeof formSchema>) {
         try {
             const response: any = await sendMagicLink({ email: values.email });

@@ -9,8 +9,9 @@ interface ITask_Activities extends Document{
     created_by: Types.ObjectId | null,
     assigned_to: Types.ObjectId | null,
     forwarded_to: Types.ObjectId | null,
+    assignees: Types.ObjectId[],
     reassignment_history: Array<{
-        action: "reassigned",
+        action: "reassigned" | "assigned" | "removed",
         actor_id: Types.ObjectId,
         recipient_id: Types.ObjectId,
         previous_recipient_id: Types.ObjectId | null,
@@ -29,7 +30,7 @@ interface ITask_Activities extends Document{
 }
 
 const ReassignmentHistorySchema: Schema = new Schema({
-    action: { type: String, enum: ["reassigned"], required: true },
+    action: { type: String, enum: ["reassigned", "assigned", "removed"], required: true },
     actor_id: { type: Schema.Types.ObjectId, ref: "users", required: true },
     recipient_id: { type: Schema.Types.ObjectId, ref: "users", required: true },
     previous_recipient_id: { type: Schema.Types.ObjectId, ref: "users", default: null },
@@ -53,6 +54,7 @@ const Task_ActivitiesSchema: Schema = new Schema({
     created_by: {type: Schema.Types.ObjectId, ref: "users", default: null},
     assigned_to: {type: Schema.Types.ObjectId, ref: "users", default: null},
     forwarded_to: {type: Schema.Types.ObjectId, ref: "users", default: null},
+    assignees: {type: [{ type: Schema.Types.ObjectId, ref: "users" }], default: []},
     reassignment_history: { type: [ReassignmentHistorySchema], default: [] },
     schedule_history: { type: [ScheduleHistorySchema], default: [] },
     assigned_skill: {type: Schema.Types.ObjectId, ref: "business_skills", default: null},
@@ -71,8 +73,19 @@ const Task_ActivitiesSchema: Schema = new Schema({
 Task_ActivitiesSchema.index({ "documents.storagePath": 1 }, { sparse: true });
 Task_ActivitiesSchema.index({ assigned_to: 1, task_id: 1 });
 Task_ActivitiesSchema.index({ forwarded_to: 1, task_id: 1 });
+Task_ActivitiesSchema.index({ assignees: 1, task_id: 1 });
 Task_ActivitiesSchema.index({ task_id: 1, createdAt: 1, _id: 1 });
 Task_ActivitiesSchema.index({ task_id: 1, updatedAt: -1, _id: -1 });
 
-const Task_Activities = mongoose.models?.task_activities || mongoose.model<ITask_Activities>("task_activities", Task_ActivitiesSchema);
+// Next.js keeps compiled Mongoose models across development hot reloads. When a
+// schema gains a path, update the cached model too so populate() does not throw
+// a StrictPopulateError until the dev server is restarted.
+const cachedTaskActivities = mongoose.models?.task_activities;
+if (cachedTaskActivities && !cachedTaskActivities.schema.path("assignees")) {
+    cachedTaskActivities.schema.add({
+        assignees: { type: [{ type: Schema.Types.ObjectId, ref: "users" }], default: [] },
+    });
+}
+
+const Task_Activities = cachedTaskActivities || mongoose.model<ITask_Activities>("task_activities", Task_ActivitiesSchema);
 export default Task_Activities;

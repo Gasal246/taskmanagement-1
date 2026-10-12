@@ -94,7 +94,7 @@ export async function GET(req: NextRequest) {
     const headStaffIds = headContext ? await getSelectedHeadDirectStaffIds(headContext) : [];
     const supervisedActivityTaskIds = headStaffIds.length
       ? await Task_Activities.distinct("task_id", {
-          $or: [{ assigned_to: { $in: headStaffIds } }, { forwarded_to: { $in: headStaffIds } }],
+          $or: [{ assigned_to: { $in: headStaffIds } }, { forwarded_to: { $in: headStaffIds } }, { assignees: { $in: headStaffIds } }],
         })
       : [];
     const userObjectId = toObjectId(userId);
@@ -110,7 +110,7 @@ export async function GET(req: NextRequest) {
         ],
       }).select("_id").lean(),
       Task_Activities.distinct("task_id", {
-        $or: [{ assigned_to: userId }, { forwarded_to: userId }],
+        $or: [{ assigned_to: userId }, { forwarded_to: userId }, { assignees: userId }],
       }),
     ]);
 
@@ -211,8 +211,10 @@ export async function GET(req: NextRequest) {
         { task_id: { $in: fullActivityTaskIds } },
         { assigned_to: userObjectId },
         { forwarded_to: userObjectId },
+        { assignees: userObjectId },
         { assigned_to: { $in: supervisedStaffObjectIds } },
         { forwarded_to: { $in: supervisedStaffObjectIds } },
+        { assignees: { $in: supervisedStaffObjectIds } },
       ],
     };
 
@@ -241,8 +243,10 @@ export async function GET(req: NextRequest) {
                     { $in: ["$$taskId", fullActivityTaskIds.map(toObjectId)] },
                     { $in: ["$assigned_to", supervisedStaffObjectIds] },
                     { $in: ["$forwarded_to", supervisedStaffObjectIds] },
+                    { $gt: [{ $size: { $setIntersection: [{ $ifNull: ["$assignees", []] }, supervisedStaffObjectIds] } }, 0] },
                     { $eq: ["$assigned_to", userObjectId] },
                     { $eq: ["$forwarded_to", userObjectId] },
+                    { $in: [userObjectId, { $ifNull: ["$assignees", []] }] },
                   ],
                 },
               },
@@ -348,8 +352,10 @@ export async function GET(req: NextRequest) {
             { task_id: { $in: fullTaskIds } },
             { assigned_to: userObjectId },
             { forwarded_to: userObjectId },
+            { assignees: userObjectId },
             { assigned_to: { $in: supervisedStaffObjectIds } },
             { forwarded_to: { $in: supervisedStaffObjectIds } },
+            { assignees: { $in: supervisedStaffObjectIds } },
           ],
         })
       : [];

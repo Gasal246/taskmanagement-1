@@ -1,0 +1,23 @@
+[Unit]
+Description=Taskmanager notification and background job worker
+Wants=network-online.target
+After=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/var/www/taskmanagement
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node /var/www/taskmanagement/scripts/run-background-jobs.mjs
+Restart=always
+RestartSec=5
+TimeoutStopSec=60
+KillSignal=SIGTERM
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+SyslogIdentifier=taskmanager-notifications
+
+[Install]
+WantedBy=multi-user.target

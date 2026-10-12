@@ -95,7 +95,7 @@ export async function resolveProjectTaskStaffAccess(
         : Promise.resolve(null),
       TaskActivities.exists({
         task_id: task._id,
-        $or: [{ assigned_to: userId }, { forwarded_to: userId }],
+        $or: [{ assigned_to: userId }, { forwarded_to: userId }, { assignees: userId }],
       }),
     ]);
 

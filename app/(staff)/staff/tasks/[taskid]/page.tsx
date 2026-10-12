@@ -86,6 +86,7 @@ import axios from "axios";
 import ProjectTaskHeaderSummary from "@/components/tasks/ProjectTaskHeaderSummary";
 import ActivityDocuments from "@/components/task/ActivityDocuments";
 import type { ActivityDocument } from "@/lib/activityDocuments";
+import ActivityAssignees from "@/components/task/ActivityAssignees";
 
 const statusStyles: Record<string, string> = {
   Completed: "border-emerald-500/40 bg-emerald-500/15 text-emerald-200",
@@ -214,8 +215,7 @@ const TaskDetails = () => {
   const [staffSearch, setStaffSearch] = useState("");
   const [loadingStaffs, setLoadingStaffs] = useState(false);
   const [activeActivity, setActiveActivity] = useState<any>(null);
-  const [removeReassignmentOpen, setRemoveReassignmentOpen] = useState(false);
-  const [reassignmentToRemove, setReassignmentToRemove] = useState<any>(null);
+  const [removingAssigneeId, setRemovingAssigneeId] = useState<string | null>(null);
   const [historySheetOpen, setHistorySheetOpen] = useState(false);
   const [historyActivityId, setHistoryActivityId] = useState<string | null>(null);
 
@@ -228,7 +228,6 @@ const TaskDetails = () => {
   const historyActivity = taskData?.activities?.find((activity: any) => String(activity._id) === historyActivityId) || null;
   const isHead = HEAD_ROLES.includes(roleName);
   const canManageActivities = Boolean(taskData?.permissions?.canManageActivities);
-  const canAssignActivities = Boolean(taskData?.permissions?.canAssignActivities);
   const canAddActivity = taskData?.is_project_task ? canManageActivities && isCreator : isCreator || (isHead && canManageActivities);
   const visibleActivities = Array.isArray(taskData?.activities) ? taskData.activities : [];
   const visibleActivityCount = taskData?.activitySummary?.total || 0;
@@ -393,27 +392,17 @@ const TaskDetails = () => {
     }
     const res = await UpdateTaskActivity({
       activity_id: activeActivity._id,
-      forwarded_to: selectedStaff._id,
+      assignment_action: "add",
+      assignee_id: selectedStaff._id,
       is_status: false,
     });
     if (res?.status === 200) {
-      toast.success(res?.message || "Activity reassigned successfully.");
+      toast.success(res?.message || "Person added to activity.");
       handleCloseAssignDialog();
 
     } else {
-      toast.error(res?.message || "Failed to reassign activity.");
+      toast.error(res?.message || "Failed to add person to activity.");
     }
-  };
-
-  const handleOpenRemoveReassignment = (activity: any) => {
-    if (!activity?.forwarded_to?._id) return;
-    setReassignmentToRemove(activity);
-    setRemoveReassignmentOpen(true);
-  };
-
-  const handleCloseRemoveReassignment = () => {
-    setRemoveReassignmentOpen(false);
-    setReassignmentToRemove(null);
   };
 
   const handleOpenHistory = (activity: any) => {
@@ -426,20 +415,19 @@ const TaskDetails = () => {
     setHistoryActivityId(null);
   };
 
-  const handleConfirmRemoveReassignment = async () => {
-    if (!reassignmentToRemove?._id) return;
+  const handleRemoveAssignee = async (activity: any, person: any) => {
+    const assigneeId = String(person?._id || "");
+    if (!activity?._id || !assigneeId) return;
+    setRemovingAssigneeId(assigneeId);
     const res = await UpdateTaskActivity({
-      activity_id: reassignmentToRemove._id,
-      forwarded_to: null,
+      activity_id: activity._id,
+      assignment_action: "remove",
+      assignee_id: assigneeId,
       is_status: false,
     });
-    if (res?.status === 200) {
-      toast.success(res?.message || "Activity reassignment removed.");
-      handleCloseRemoveReassignment();
-
-    } else {
-      toast.error(res?.message || "Failed to remove activity reassignment.");
-    }
+    if (res?.status === 200) toast.success(res?.message || "Person removed from activity.");
+    else toast.error(res?.message || "Failed to remove person from activity.");
+    setRemovingAssigneeId(null);
   };
 
   const onActivitySubmit = async (values: z.infer<typeof activitySchema>) => {
@@ -807,30 +795,12 @@ const TaskDetails = () => {
                             Skill: {activity.assigned_skill.skill_name}
                           </span>
                         )}
-                        {activity?.forwarded_to?._id && (
-                          (activity.canChangeStatus && (taskData.is_project_task ? canAssignActivities : isHead)) ? (
-                            <button
-                              type="button"
-                              onClick={() => handleOpenRemoveReassignment(activity)}
-                              className="flex items-center gap-2 rounded-md border border-cyan-700/60 bg-cyan-950/30 px-2 py-1 text-left transition-colors hover:border-cyan-400 hover:bg-cyan-900/30"
-                              title="Remove reassignment"
-                            >
-                              <Avatar src={activity.forwarded_to.avatar_url || "/avatar.png"} size={24} />
-                              <span className="leading-tight">
-                                <span className="block text-xs text-slate-200">{activity.forwarded_to.name || "Staff"}</span>
-                                <span className="block text-[10px] text-slate-500">{activity.forwarded_to.email || ""}</span>
-                              </span>
-                            </button>
-                          ) : (
-                            <div className="flex items-center gap-2 rounded-md border border-cyan-700/60 bg-cyan-950/30 px-2 py-1">
-                              <Avatar src={activity.forwarded_to.avatar_url || "/avatar.png"} size={24} />
-                              <span className="leading-tight">
-                                <span className="block text-xs text-slate-200">{activity.forwarded_to.name || "Staff"}</span>
-                                <span className="block text-[10px] text-slate-500">{activity.forwarded_to.email || ""}</span>
-                              </span>
-                            </div>
-                          )
-                        )}
+                        <ActivityAssignees
+                          assignees={activity.assignees || []}
+                          canRemove={Boolean(activity.canReassign)}
+                          removingId={removingAssigneeId}
+                          onRemove={(person) => handleRemoveAssignee(activity, person)}
+                        />
                       </div>
                       {activity?.is_done && activity?.completed_in && (
                         <p className="text-xs text-slate-400 mt-2">
@@ -868,7 +838,7 @@ const TaskDetails = () => {
                         <History size={12} />
                         History
                       </motion.button>
-                      {(activity.canChangeStatus && (taskData.is_project_task ? canAssignActivities : isHead)) && (
+                      {activity.canReassign && (
                         <motion.button
                           whileHover={{ scale: 1.02 }}
                           whileTap={{ scale: 0.98 }}
@@ -876,7 +846,7 @@ const TaskDetails = () => {
                           onClick={() => handleOpenAssignDialog(activity)}
                         >
                           <UserPlus size={12} />
-                          Reassign
+                          Assign more
                         </motion.button>
                       )}
                       {activity.canChangeStatus && (activity?.is_done ? (
@@ -944,20 +914,26 @@ const TaskDetails = () => {
         </div>
       </div>
 
-      {/* Reassign Activity Dialog */}
+      {/* Assign More Activity Members Dialog */}
       <Dialog
         open={assignDialogOpen}
         onOpenChange={(open) => (open ? setAssignDialogOpen(true) : handleCloseAssignDialog())}
       >
         <DialogContent className="overflow-hidden border-slate-800 bg-slate-950 sm:max-w-[680px]">
           <DialogHeader>
-            <DialogTitle>Reassign Activity</DialogTitle>
+            <DialogTitle>Assign more people</DialogTitle>
             <DialogDescription>
               {taskData?.is_project_task
-                ? `Reassign ${activeActivity?.activity || "this activity"} to a head or member of the selected teams.`
-                : `Reassign ${activeActivity?.activity || "this activity"} to one of your staffs or another department HEAD.`}
+                ? `Add a head or selected-team member to ${activeActivity?.activity || "this activity"}.`
+                : `Add one of your staff or another department HEAD to ${activeActivity?.activity || "this activity"}.`}
             </DialogDescription>
           </DialogHeader>
+          <ActivityAssignees
+            assignees={activeActivity?.assignees || []}
+            canRemove={Boolean(activeActivity?.canReassign)}
+            removingId={removingAssigneeId}
+            onRemove={(person) => handleRemoveAssignee(activeActivity, person)}
+          />
           <Tabs value={assignTab} onValueChange={handleAssignTabChange}>
             <TabsList className={`grid h-auto w-full gap-2 bg-transparent p-0 ${taskData?.is_project_task ? "grid-cols-1" : "grid-cols-2"}`}>
               <TabsTrigger
@@ -1003,16 +979,20 @@ const TaskDetails = () => {
                   {!loadingStaffs &&
                     filteredStaffs.map((staff: any) => {
                       const selected = selectedStaff?._id === staff._id;
+                      const alreadyAssigned = (activeActivity?.assignees || []).some((person: any) => String(person?._id) === String(staff._id));
                       return (
                         <button
                           key={staff._id}
                           type="button"
                           aria-pressed={selected}
-                          onClick={() => setSelectedStaff(selected ? null : staff)}
+                          onClick={() => !alreadyAssigned && setSelectedStaff(selected ? null : staff)}
+                          disabled={alreadyAssigned}
                           className={`flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors ${
                             selected
                               ? "border-cyan-500/60 bg-cyan-500/10"
-                              : "border-slate-800 bg-slate-950/30 hover:border-slate-600"
+                              : alreadyAssigned
+                                ? "cursor-not-allowed border-slate-800 bg-slate-950/20 opacity-55"
+                                : "border-slate-800 bg-slate-950/30 hover:border-slate-600"
                           }`}
                         >
                           <Avatar src={staff?.avatar_url || "/avatar.png"} size={34} />
@@ -1029,6 +1009,7 @@ const TaskDetails = () => {
                           >
                             {selected && <Check className="size-4" />}
                           </span>
+                          {alreadyAssigned && <span className="text-[10px] text-cyan-300">Assigned</span>}
                         </button>
                       );
                     })}
@@ -1069,6 +1050,7 @@ const TaskDetails = () => {
                     !hierarchyHeadsError &&
                     filteredHierarchyHeads.map((head: any) => {
                       const selected = selectedStaff?._id === head._id;
+                      const alreadyAssigned = (activeActivity?.assignees || []).some((person: any) => String(person?._id) === String(head._id));
                       const domainNames = (head?.domains || [])
                         .map((domain: any) => domain?.name)
                         .filter(Boolean);
@@ -1077,11 +1059,14 @@ const TaskDetails = () => {
                           key={head._id}
                           type="button"
                           aria-pressed={selected}
-                          onClick={() => setSelectedStaff(selected ? null : head)}
+                          onClick={() => !alreadyAssigned && setSelectedStaff(selected ? null : head)}
+                          disabled={alreadyAssigned}
                           className={`flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors ${
                             selected
                               ? "border-cyan-500/60 bg-cyan-500/10"
-                              : "border-slate-800 bg-slate-950/30 hover:border-slate-600"
+                              : alreadyAssigned
+                                ? "cursor-not-allowed border-slate-800 bg-slate-950/20 opacity-55"
+                                : "border-slate-800 bg-slate-950/30 hover:border-slate-600"
                           }`}
                         >
                           <Avatar src={head?.avatar_url || "/avatar.png"} size={36} />
@@ -1103,6 +1088,7 @@ const TaskDetails = () => {
                           >
                             {selected && <Check className="size-4" />}
                           </span>
+                          {alreadyAssigned && <span className="text-[10px] text-cyan-300">Assigned</span>}
                         </button>
                       );
                     })}
@@ -1115,7 +1101,7 @@ const TaskDetails = () => {
               Cancel
             </Button>
             <Button onClick={handleAssignActivity} disabled={isUpdatingActivity || !selectedStaff?._id}>
-              {isUpdatingActivity ? "Reassigning..." : "Reassign"}
+              {isUpdatingActivity ? "Adding..." : "Add person"}
             </Button>
           </DialogFooter>
         </DialogContent>

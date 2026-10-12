@@ -121,7 +121,7 @@ export async function GET(req:NextRequest){
         }
         if (staffId) {
             const matchingActivities = await Task_Activities.find({
-                $or: [{ assigned_to: staffId }, { forwarded_to: staffId }],
+                $or: [{ assigned_to: staffId }, { forwarded_to: staffId }, { assignees: staffId }],
             }).select("task_id").lean();
             const activityTaskIds = matchingActivities.map((item: any) => item.task_id).filter(Boolean);
             query.$and = [...(query.$and || []), { $or: [{ assigned_to: staffId }, { _id: { $in: activityTaskIds } }] }];

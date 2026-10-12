@@ -7,6 +7,7 @@ import NextAuth, { type NextAuthConfig } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { allowAuthAttempt } from "@/lib/auth-rate-limit";
 import { authAvailabilityBoundary, authClientFailureResponse, authStorageFailed, markAuthStorageFailure, temporarilyUnavailableResponse } from "@/lib/auth-availability";
+import { findActiveUserByEmail } from "@/lib/users/find-active-user-by-email";
 
 export const authConfig: NextAuthConfig = {
   trustHost: true,
@@ -26,9 +27,8 @@ export const authConfig: NextAuthConfig = {
           if (!email || email.length > 254 || typeof credentials?.password !== "string" || credentials.password.length > 128) return null;
           if (!await allowAuthAttempt(`login:${credentials?.isSuper}:${email}`, 20, 5 * 60 * 1000)) return null;
           if (credentials?.isSuper === "false") {
-            const user = await Users.findOne({ email }).select("+password +session_version");
+            const user = await findActiveUserByEmail(email, "+password +session_version");
             if (!user) throw new Error("User not found.");
-            if (user?.status == 0) throw new Error("User is blocked.");
             const passwordMatch = await compare(
               credentials?.password,
               user?.password

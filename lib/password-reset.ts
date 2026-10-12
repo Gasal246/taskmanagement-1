@@ -5,6 +5,7 @@ import { z } from "zod";
 import connectDB from "@/lib/mongo";
 import { allowAuthAttempt } from "@/lib/auth-rate-limit";
 import { transporter } from "@/lib/nodemailer";
+import { findActiveUserByEmail } from "@/lib/users/find-active-user-by-email";
 import PasswordReset from "@/models/password_reset.model";
 import Users from "@/models/users.model";
 
@@ -21,7 +22,7 @@ export async function issuePasswordReset(emailInput: unknown, kind: "otp" | "lin
   if (!await allowAuthAttempt(`reset-send:${email}`, 5, 15 * 60 * 1000)) {
     return NextResponse.json({ status: false, message: "Too many requests. Try again later." }, { status: 429 });
   }
-  const user = await Users.findOne({ email, status: 1 }).select("_id email").lean();
+  const user = await findActiveUserByEmail(email, "_id email");
   if (user) {
     const token = kind === "otp" ? String(randomInt(100000, 1000000)) : randomBytes(32).toString("hex");
     // Use only the configured canonical origin, never a caller-controlled header.
@@ -50,7 +51,7 @@ export async function verifyPasswordReset(emailInput: unknown, tokenInput: unkno
   if (!await allowAuthAttempt(`reset-verify:${parsed.data}`, 10, 15 * 60 * 1000)) {
     return NextResponse.json({ status: false, message: "Too many attempts. Request a new code later." }, { status: 429 });
   }
-  const user = await Users.findOne({ email: parsed.data, status: 1 }).select("_id").lean();
+  const user = await findActiveUserByEmail(parsed.data, "_id");
   if (!user) return NextResponse.json({ status: false, message: "Invalid or expired recovery code" }, { status: 400 });
   const grant = randomBytes(32).toString("hex");
   const reset = await PasswordReset.findOneAndUpdate({
@@ -76,7 +77,7 @@ export async function completePasswordReset(body: unknown) {
   if (!await allowAuthAttempt(`reset-complete:${email}`, 10, 15 * 60 * 1000)) {
     return NextResponse.json({ status: false, message: "Too many attempts. Try again later." }, { status: 429 });
   }
-  const user = await Users.findOne({ email, status: 1 }).select("_id").lean();
+  const user = await findActiveUserByEmail(email, "_id");
   const invalid = () => NextResponse.json({ status: false, message: "Recovery link is invalid, expired, or already used. Request a new one." }, { status: 400 });
   if (!user) return invalid();
   const filter = { user_id: (user as any)._id, token_hash: resetTokenHash(token), kind: { $in: ["link", "grant"] }, expires_at: { $gt: new Date() } };

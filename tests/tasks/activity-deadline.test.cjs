@@ -224,10 +224,12 @@ test('history merges existing events and schedule events, preserving actor snaps
   assert.equal(result.length, 4);
   assert.equal(result[0].event_label, 'Deadline extended');
   assert.equal(result[0].event_user.name, 'Deleted Editor');
-  assert.equal(result[1].event_type, 'reassigned');
+  assert.equal(result[1].event_type, 'assigned_more');
   assert.equal(result[2].event_type, 'assigned');
   assert.equal(result[3].event_type, 'created');
   assert.equal(buildActivityHistory({ _id: 'legacy' }, null).length, 0);
+  activity.reassignment_history.push({ _id: 'removed', action: 'removed', createdAt: '2030-01-04', recipient_id: { _id: 'recipient' } });
+  assert.equal(buildActivityHistory(activity, null)[0].event_label, 'Removed from activity');
   activity.schedule_history.push({ ...activity.schedule_history[0], _id: 'new', createdAt: '2030-01-05' });
   assert.equal(buildActivityHistory(activity, null)[0]._id, 'new');
 });

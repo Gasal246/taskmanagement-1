@@ -52,7 +52,11 @@ export async function GET(req:NextRequest, context: {params: Promise<{taskid:str
                     await BusinessStaffs.exists({ user_id: userId, business_id: task.business_id, status: 1 }) &&
                     (supervisesTaskOwner || await Task_Activities.exists({
                         task_id: taskid,
-                        $or: [{ assigned_to: { $in: task.is_project_task ? supervisedStaffIds : visibleStaffIds } }, { forwarded_to: { $in: task.is_project_task ? supervisedStaffIds : visibleStaffIds } }],
+                        $or: [
+                            { assigned_to: { $in: task.is_project_task ? supervisedStaffIds : visibleStaffIds } },
+                            { forwarded_to: { $in: task.is_project_task ? supervisedStaffIds : visibleStaffIds } },
+                            { assignees: { $in: task.is_project_task ? supervisedStaffIds : visibleStaffIds } },
+                        ],
                     }))
                 )
                 : false;
@@ -74,6 +78,7 @@ export async function GET(req:NextRequest, context: {params: Promise<{taskid:str
                     $or: [
                         { assigned_to: { $in: visibleStaffIds } },
                         { forwarded_to: { $in: visibleStaffIds } },
+                        { assignees: { $in: visibleStaffIds } },
                     ],
                 }
                 : null;
@@ -91,18 +96,37 @@ export async function GET(req:NextRequest, context: {params: Promise<{taskid:str
                 .populate({ path: "created_by", select: "name email avatar_url" })
                 .populate({ path: "assigned_to", select: "name email avatar_url" })
                 .populate({ path: "forwarded_to", select: "name email avatar_url" })
+                .populate({ path: "assignees", select: "name email avatar_url" })
                 .populate({ path: "schedule_history.actor_id", select: "name avatar_url" })
                 .populate({ path: "reassignment_history.actor_id", select: "name email avatar_url" })
                 .populate({ path: "reassignment_history.recipient_id", select: "name email avatar_url" })
                 .populate({ path: "reassignment_history.previous_recipient_id", select: "name email avatar_url" })
                 .populate({ path: "assigned_skill", select: "skill_name" }).lean();
             const activitiesWithUnread = await addUnreadCommentCounts(activities, userId);
-            taskObj.activities = activitiesWithUnread.map((activity: any) => ({
-                ...activity,
-                schedule_history: activity.schedule_history || [],
-                canEditSchedule,
-                canChangeStatus: !isAssignedActivityScope || canChangeActivityStatus(task, activity, userId),
-            }));
+            taskObj.activities = activitiesWithUnread.map((activity: any) => {
+                const canChangeStatus = !isAssignedActivityScope || canChangeActivityStatus(task, activity, userId);
+                const assigneeMap = new Map<string, any>();
+                for (const person of [
+                    ...(Array.isArray(activity.assignees) ? activity.assignees : []),
+                    activity.assigned_to,
+                    activity.forwarded_to,
+                ]) {
+                    const personId = String(person?._id || person || "");
+                    if (personId) assigneeMap.set(personId, person);
+                }
+                return {
+                    ...activity,
+                    assignees: Array.from(assigneeMap.values()),
+                    schedule_history: activity.schedule_history || [],
+                    canEditSchedule,
+                    canChangeStatus,
+                    canReassign: task.is_project_task
+                        ? canChangeStatus && canAssignActivities
+                        : isAssignedActivityScope
+                            ? Boolean(headContext) && canChangeStatus
+                            : canAssignActivities,
+                };
+            });
             taskObj.creator_details = await Users.findById(task.creator).select("name email avatar_url");
             taskObj.permissions = {
                 canManageActivities,

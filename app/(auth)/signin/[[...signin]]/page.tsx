@@ -13,15 +13,21 @@ import { signIn, useSession } from "next-auth/react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { CircleCheckBig, ExternalLink, ShieldAlert } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 
 const formSchema = z.object({
-  email: z.string().min(2).max(50),
-  password: z.string().min(6, "minimum charecters length not satisfied."),
+  email: z.string().trim().email("Enter a valid email address").max(254),
+  password: z.string().max(128),
 });
+
+type AccountState = "idle" | "checking" | "password" | "setup" | "missing" | "error";
 
 const LoginPage = () => {
   const [loading, setLoading] = useState(false);
+  const [accountState, setAccountState] = useState<AccountState>("idle");
+  const [accountMessage, setAccountMessage] = useState("");
+  const [sendingSetup, setSendingSetup] = useState(false);
+  const [setupSent, setSetupSent] = useState(false);
   const session = useSession();
   const router = useRouter();
 
@@ -40,7 +46,55 @@ const LoginPage = () => {
     },
   });
 
+  const email = form.watch("email");
+
+  useEffect(() => {
+    setAccountState("idle");
+    setAccountMessage("");
+    setSetupSent(false);
+    form.setValue("password", "");
+
+    const parsedEmail = z.string().trim().email().max(254).safeParse(email);
+    if (!parsedEmail.success) return;
+
+    const controller = new AbortController();
+    const timeout = window.setTimeout(async () => {
+      setAccountState("checking");
+      try {
+        const response = await fetch("/api/auth/password-status", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: parsedEmail.data }),
+          signal: controller.signal,
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result?.message || "Unable to check this account.");
+
+        if (!result.exists) {
+          setAccountState("missing");
+          setAccountMessage("No active account was found for this email address.");
+        } else {
+          setAccountState(result.hasPassword ? "password" : "setup");
+        }
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        setAccountState("error");
+        setAccountMessage(error instanceof Error ? error.message : "Unable to check this account.");
+      }
+    }, 400);
+
+    return () => {
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [email, form]);
+
   async function onSubmit(values: z.infer<typeof formSchema>) {
+    if (accountState !== "password") return;
+    if (values.password.length < 6) {
+      form.setError("password", { message: "Enter your password (at least 6 characters)." });
+      return;
+    }
     setLoading(true);
     try {
       const response = await signIn("credentials", {
@@ -64,6 +118,28 @@ const LoginPage = () => {
       toast("Unable to sign in", { description: "Please check your connection and try again." });
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function sendSetPasswordEmail() {
+    if (accountState !== "setup") return;
+    setSendingSetup(true);
+    try {
+      const response = await fetch("/api/users/verification/send-mail", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, kind: "link" }),
+      });
+      const result = await response.json();
+      if (!response.ok || result?.status === false) throw new Error(result?.message || "Unable to send the email.");
+      setSetupSent(true);
+      toast.success("Set-password email sent", { description: "Please check your inbox and spam folder." });
+    } catch (error) {
+      toast.error("Email not sent", {
+        description: error instanceof Error ? error.message : "Please try again.",
+      });
+    } finally {
+      setSendingSetup(false);
     }
   }
 
@@ -111,7 +187,11 @@ const LoginPage = () => {
               )}
             />
 
-            {(
+            {accountState === "checking" && (
+              <p className="text-sm text-slate-400">Checking your account…</p>
+            )}
+
+            {accountState === "password" && (
               <FormField
                 control={form.control}
                 name="password"
@@ -131,14 +211,33 @@ const LoginPage = () => {
               />
             )}
 
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-              {<Link href="/forgetpassword" className="text-sm text-cyan-300 hover:text-cyan-200">
-                Forgot password?
-              </Link>}
+            {(accountState === "missing" || accountState === "error") && (
+              <p role="alert" className="text-sm text-rose-300">{accountMessage}</p>
+            )}
 
-              <Button type="submit" disabled={loading}>{loading ? "Signing in..." : "Sign in"}</Button>
-              <Link href="/forgetpassword" className="text-sm text-cyan-300">Set up your password</Link>
-            </div>
+            {accountState === "setup" && setupSent && (
+              <p className="text-sm text-emerald-300">Check your email for the link to set your password.</p>
+            )}
+
+            {accountState === "password" && (
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                <Link
+                  href={`/forgetpassword?email=${encodeURIComponent(email)}`}
+                  className="text-sm text-cyan-300 hover:text-cyan-200"
+                >
+                  Forgot password?
+                </Link>
+                <Button type="submit" disabled={loading}>{loading ? "Signing in..." : "Sign in"}</Button>
+              </div>
+            )}
+
+            {accountState === "setup" && (
+              <div className="flex justify-end pt-2">
+                <Button type="button" onClick={sendSetPasswordEmail} disabled={sendingSetup || setupSent}>
+                  {sendingSetup ? "Sending…" : setupSent ? "Email sent" : "Set password"}
+                </Button>
+              </div>
+            )}
           </form>
         </Form>
       </div>

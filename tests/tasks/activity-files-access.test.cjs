@@ -24,9 +24,9 @@ const activityId = '6968016c4a13368c30eb7dfd';
 const commentId = '6968016c4a13368c30eb7df1';
 const chain = value => ({ lean: async () => value });
 
-function accessFixture({ userId = 'viewer', active = true, member = true, admin = false, project = false, fullProject = false, supervised = [], assigned = 'other', forwarded, owner = 'owner', creator = 'creator' } = {}) {
+function accessFixture({ userId = 'viewer', active = true, member = true, admin = false, project = false, fullProject = false, supervised = [], assigned = 'other', forwarded, assignees = [], owner = 'owner', creator = 'creator' } = {}) {
   const task = { _id: taskId, business_id: 'business', assigned_to: owner, creator, is_project_task: project };
-  const activity = { _id: activityId, task_id: taskId, assigned_to: assigned, forwarded_to: forwarded };
+  const activity = { _id: activityId, task_id: taskId, assigned_to: assigned, forwarded_to: forwarded, assignees };
   const blank = { default: {} };
   const helper = load('app/api/helpers/activity-comments.ts', {
     mongoose: { default: mongoose },
@@ -50,7 +50,7 @@ function accessFixture({ userId = 'viewer', active = true, member = true, admin 
 
 test('every supported activity viewer can access comments, including personal task owners and reporting heads', async () => {
   for (const options of [
-    { admin: true }, { assigned: 'viewer' }, { forwarded: 'viewer' },
+    { admin: true }, { assigned: 'viewer' }, { forwarded: 'viewer' }, { assignees: ['viewer', 'another'] },
     { owner: 'viewer' }, { creator: 'viewer' }, { project: true, fullProject: true },
     { supervised: ['other'] }, { supervised: ['owner'] },
     { project: true, supervised: ['other'] },
