@@ -1,5 +1,6 @@
 "use client";
 
+import { useActionPending } from "@/hooks/use-action-pending";
 import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -49,6 +50,7 @@ const AgentDocumentsModal = ({ agentId, trigger, existingDocs = [], onUploaded }
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [queuedDocs, setQueuedDocs] = useState<PendingDoc[]>([]);
   const [uploading, setUploading] = useState(false);
+  useActionPending(uploading);
   const { mutateAsync: addUserDoc } = useAddUserDoc();
 
   const resetForm = () => {
@@ -165,11 +167,14 @@ const AgentDocumentsModal = ({ agentId, trigger, existingDocs = [], onUploaded }
       prev.forEach((doc) => doc.preview && URL.revokeObjectURL(doc.preview));
       return [];
     });
-    setUploading(false);
-    setOpen(false);
-    resetForm();
-    if (onUploaded) {
-      await onUploaded();
+    try {
+      await onUploaded?.();
+      setOpen(false);
+      resetForm();
+    } catch {
+      toast.error("Documents were saved, but the list could not be refreshed. Please try refreshing the page.");
+    } finally {
+      setUploading(false);
     }
   };
 

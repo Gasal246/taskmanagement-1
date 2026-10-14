@@ -1,5 +1,6 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 "use-client"
+import { useActionPending } from "@/hooks/use-action-pending";
 import React, { useCallback, useState } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, } from "@/components/ui/dialog";
 import { useDropzone } from 'react-dropzone'
@@ -14,6 +15,7 @@ const ChangeDpDialog = ({ trigger, userid, prevAvatar }: { trigger: React.ReactN
     const [file, setFile] = useState<File[]>([]);
     const [fileUrl, setFileUrl] = useState<any>(prevAvatar);
     const [loading, setLoading] = useState(false);
+  useActionPending(loading);
     const { mutateAsync: updatePfp, isPending: updateIsPending } = useUpdatePfp()
     const onDrop = useCallback(
         (acceptedFiles: any) => {

@@ -1,4 +1,5 @@
 "use client"
+import { useActionPending } from "@/hooks/use-action-pending";
 import {  } from "next-auth/react";
 import { notificationSignOut as signOut } from "@/lib/notifications/sign-out";
 import ProfilPageSkeleton from '@/components/skeletons/ProfilPageSkeleton'
@@ -134,6 +135,7 @@ const ProfilPage = () => {
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  useActionPending(uploadingAvatar);
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
 
   //Api

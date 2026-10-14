@@ -14,7 +14,7 @@ export default function ActivityScheduleFields({ disabled = false }: { disabled?
             <FormItem>
               <FormLabel>{name === "start_date" ? "Start date and time" : "End date and time"} *</FormLabel>
               <FormControl>
-                <Input type="datetime-local" step="0.001" className="min-w-0 border-slate-700" {...field} value={field.value || ""} disabled={disabled} />
+                <Input type="datetime-local" step="60" className="min-w-0 border-slate-700" {...field} value={field.value || ""} disabled={disabled} />
               </FormControl>
               <FormMessage />
             </FormItem>

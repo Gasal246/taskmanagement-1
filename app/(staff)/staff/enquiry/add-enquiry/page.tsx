@@ -1,5 +1,6 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 "use client";
+import { useActionPending } from "@/hooks/use-action-pending";
 import HeadOfficeManager from "@/components/enquiries/HeadOfficeManager";
 import EnquiryActionChoices from "@/components/enquiries/EnquiryActionChoices";
 import EnquiryCapacityFields from "@/components/enquiries/EnquiryCapacityFields";
@@ -169,6 +170,7 @@ export default function AddEnquiry() {
     }, [docPreview]);
     const [docType, setDocType] = useState<string>('');
     const [uploadingDoc, setUploadingDoc] = useState(false);
+  useActionPending(uploadingDoc);
     const [uploadedDoc, setUploadedDoc] = useState<{ url: string; name: string; type?: string; storagePath?: string } | null>(null);
     const [removingDoc, setRemovingDoc] = useState(false);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);

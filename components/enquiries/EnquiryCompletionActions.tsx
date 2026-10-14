@@ -3,7 +3,7 @@ import { ENQUIRY_ACTIONS } from "@/lib/enquiries/action-types.mjs";
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { CheckCircle2, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -49,12 +49,22 @@ function ActionsDialog({ enquiryId, basePath, onClose }: { enquiryId: string; ba
 }
 function ActionsContent({ enquiry, basePath, onClose }: { enquiry: any; basePath: string; onClose: () => void }) {
   const router = useRouter();
-  const client = useQueryClient();
   const [filter, setFilter] = useState('all');
   const [selected, setSelected] = useState<{ action: any; part: any; operation: string } | null>(null);
   const [performed, setPerformed] = useState('Call');
   const [notes, setNotes] = useState('');
-  const [saving, setSaving] = useState(false);
+  const actionMutation = useMutation({
+    mutationFn: async ({ method, payload }: { method: string; payload: Record<string, unknown> }) => {
+      const response = await fetch('/api/enquiries/actions', {
+        method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || 'Unable to update action');
+      return result;
+    },
+    onError: () => {}, // Keep the actionable error beside the user's notes.
+  });
+  const saving = actionMutation.isPending;
   const [error, setError] = useState('');
   const [recordId, setRecordId] = useState('');
   const actions = (enquiry.actions || []).filter((a: any) => filter === 'all' || a.action_assignments.some((p: any) => p.status === filter));
@@ -65,22 +75,17 @@ function ActionsContent({ enquiry, basePath, onClose }: { enquiry: any; basePath
   };
   const save = async (scheduleNext = false) => {
     if (!selected || saving || !notes.trim()) return;
-    setSaving(true); setError('');
+    setError('');
     try {
       const record = selected.operation === 'record';
-      const response = await fetch('/api/enquiries/actions', {
-        method: record ? 'POST' : 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enquiry_id: enquiry._id, action_id: selected.action?._id,
+      const result = await actionMutation.mutateAsync({ method: record ? 'POST' : 'PUT',
+        payload: { enquiry_id: enquiry._id, action_id: selected.action?._id,
           assignee_id: idOf(selected.part?.user_id), expected_revision: selected.part?.revision || 0,
-          operation: selected.operation, performed_action: performed, notes, request_id: recordId }),
+          operation: selected.operation, performed_action: performed, notes, request_id: recordId },
       });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.message || 'Unable to update action');
-      await client.invalidateQueries({ predicate: q => ['enquiries', 'enquiry', 'histories', 'history', 'action', 'enquiry-actions', 'user_logs'].includes(String(q.queryKey[0])) });
       toast.success(result.message); setSelected(null);
       if (scheduleNext) { onClose(); router.push(`${basePath}/${enquiry._id}/forward-enquiry`); }
     } catch (err) { setError(err instanceof Error ? err.message : 'Unable to update action'); }
-    finally { setSaving(false); }
   };
   return <div className="space-y-4">
     {!enquiry.is_active && <p className="rounded-lg border border-amber-800 bg-amber-950/30 p-3 text-sm text-amber-200">Admin approval is required before completing or scheduling actions.</p>}

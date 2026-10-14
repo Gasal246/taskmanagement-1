@@ -120,6 +120,7 @@ export const useDeleteContactCard = () => {
 
 export const useClientOnView = () => {
   return useMutation({
+    meta: { background: true, refresh: false },
     mutationFn: async (clientId: string) => {
       const res = await axios.post("/api/client/action/onview", { clientId });
       return res.data;

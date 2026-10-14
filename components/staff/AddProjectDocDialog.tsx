@@ -1,4 +1,5 @@
 "use client"
+import { useActionPending } from "@/hooks/use-action-pending";
 import React, { useState } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, } from "@/components/ui/dialog"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -37,6 +38,7 @@ const AddProjectDocDialog = ({ trigger, projectId, users, creatorid, adminid, do
     const [file, setFile] = useState<File | null>(null);
     const [docnameExist, setDocnameExist] = useState(false);
     const [loading, setLoading] = useState(false);
+  useActionPending(loading);
     const { mutateAsync: addProjectDocument, isPending: addingProjectDoc } = useAddProjectDocument();
 
     const form = useForm<z.infer<typeof formSchema>>({

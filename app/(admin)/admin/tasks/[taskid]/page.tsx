@@ -3,11 +3,13 @@
 import ListPagination from "@/components/shared/ListPagination";
 import { useActivityPaging } from "@/hooks/use-activity-paging";
 
+import { useSession } from "next-auth/react";
+import ActivityDetailsSheet from "@/components/task/ActivityDetailsSheet";
 import ActivityHistorySheet from "@/components/task/ActivityHistorySheet";
 import ChangeActivityDeadlineDialog from "@/components/task/ChangeActivityDeadlineDialog";
 
 import ActivityScheduleFields from "@/components/task/ActivityScheduleFields";
-import { activityScheduleFields, isScheduleOrdered, scheduleOrderError, toLocalDateTimeInput, formatScheduleDate } from "@/lib/activity-schedule";
+import { activityScheduleFields, isScheduleOrdered, scheduleOrderError, toLocalDateTimeInput, resolveActivityDateTime, formatScheduleDate } from "@/lib/activity-schedule";
 
 import React, { useEffect, useMemo, useState } from "react";
 import {
@@ -145,6 +147,7 @@ const taskSchema = z.object({
 
 const TaskDetailPage = () => {
   const router = useRouter();
+  const { data: session } = useSession();
   const params = useParams<{ taskid: string }>();
   const searchParams = useSearchParams();
   const { businessData } = useSelector((state: RootState) => state.user);
@@ -194,7 +197,9 @@ const TaskDetailPage = () => {
   const [pendingStatusActivity, setPendingStatusActivity] = useState<any>(null);
   const [pendingStatusValue, setPendingStatusValue] = useState<boolean | null>(null);
 
+  const [viewActivityId, setViewActivityId] = useState<string | null>(null);
   const taskData = task?.data;
+  const viewedActivity = taskData?.activities?.find((activity: any) => String(activity._id) === viewActivityId) || null;
   const historyActivity = taskData?.activities?.find((activity: any) => String(activity._id) === historyActivityId) || null;
   const isProjectTask = Boolean(taskData?.is_project_task);
   const progress = getProgressValue(
@@ -432,8 +437,8 @@ const TaskDetailPage = () => {
       values.start_date !== toLocalDateTimeInput(editingActivity?.start_date) ||
       values.end_date !== toLocalDateTimeInput(editingActivity?.end_date);
     const schedule = scheduleChanged ? {
-      start_date: new Date(values.start_date).toISOString(),
-      end_date: new Date(values.end_date).toISOString(),
+      start_date: resolveActivityDateTime(values.start_date, editActivityDialog ? editingActivity?.start_date : null),
+      end_date: resolveActivityDateTime(values.end_date, editActivityDialog ? editingActivity?.end_date : null),
       ...(editActivityDialog ? {
         expected_start_date: editingActivity.start_date ?? null,
         expected_end_date: editingActivity.end_date ?? null,
@@ -626,47 +631,17 @@ const TaskDetailPage = () => {
   const pendingActivities = activities.filter((activity: any) => !activity?.is_done);
   const completedActivities = activities.filter((activity: any) => activity?.is_done);
 
-  const renderActivityCard = (activity: any) => (
-    <div key={activity._id} className="w-full py-1" style={{ contentVisibility: "auto", containIntrinsicSize: "auto 350px" }}>
-      <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg border border-slate-700 hover:border-cyan-800">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-base font-semibold text-slate-100">{activity.activity}</p>
-            <p className="text-xs text-slate-400">
-              {activity.description || "No description."}
-            </p>
-            <p className="mt-2 text-xs text-slate-400">
-              Start: {formatScheduleDate(activity.start_date)}<br />
-              End: {formatScheduleDate(activity.end_date)}
-            </p>
-            <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
-              <span className="rounded-md border border-slate-700/70 bg-slate-900/60 px-2 py-1">
-                Skill: {activity?.assigned_skill?.skill_name || "Not set"}
-              </span>
-              <ActivityAssignees
-                assignees={activity.assignees || []}
-                canRemove={Boolean(activity.canReassign)}
-                removingId={removingAssigneeId}
-                onRemove={(person) => handleRemoveAssignee(activity, person)}
-              />
-            </div>
-            {activity?.is_done && activity?.completed_in && (
-              <p className="text-xs text-slate-400 mt-2">
-                Completed In:{" "}
-                <span className="font-semibold">{formatDuration(activity.completed_in)}</span>
-              </p>
-            )}
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
+  const renderActivityActions = (activity: any, inDetails = false) => (
+<div className="flex flex-wrap items-center gap-2">
             <ActivityCommentsSheet
               activity={activity}
               taskId={params.taskid}
-              initiallyOpen={
+              initiallyOpen={!inDetails &&
                 searchParams.get("comments") === "open" &&
                 searchParams.get("activityId") === String(activity._id)
               }
             />
-            {Array.isArray(activity.documents) && activity.documents.length > 0 && (
+            {!inDetails && Array.isArray(activity.documents) && activity.documents.length > 0 && (
               <ActivityDocuments
                 taskId={params.taskid}
                 documents={activity.documents}
@@ -718,23 +693,60 @@ const TaskDetailPage = () => {
                 Mark as Completed
               </motion.button>
             )}
-            <motion.div
+            <motion.button type="button" aria-label="Edit activity"
               whileHover={{ scale: 1.04 }}
               whileTap={{ scale: 0.95 }}
               className="p-1 rounded-full hover:bg-slate-800 cursor-pointer flex items-center"
               onClick={() => handleEditActivity(activity)}
             >
-              <PencilRuler size={14} />
-            </motion.div>
-            <motion.div
+              <PencilRuler size={14} />{inDetails && <span className="ml-1 text-xs">Edit</span>}
+            </motion.button>
+            <motion.button type="button" aria-label="Delete activity"
               whileHover={{ scale: 1.04 }}
               whileTap={{ scale: 0.95 }}
               className="p-1 rounded-full hover:bg-slate-800 cursor-pointer flex items-center"
               onClick={() => handleDeleteActivity(activity._id)}
             >
-              <Trash2 size={14} className="text-red-500" />
-            </motion.div>
+              <Trash2 size={14} className="text-red-500" />{inDetails && <span className="ml-1 text-xs text-red-300">Delete</span>}
+            </motion.button>
           </div>
+  );
+
+  const renderActivityCard = (activity: any) => (
+    <div key={activity._id} className="w-full py-1" style={{ contentVisibility: "auto", containIntrinsicSize: "auto 350px" }}>
+      <div onClick={event => {
+                    if ((event.target as HTMLElement).closest('button, a, input, [role="dialog"], [role="button"]') || window.getSelection()?.toString()) return;
+                    setViewActivityId(String(activity._id));
+                  }} className="cursor-pointer bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg border border-slate-700 hover:border-cyan-800">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <button type="button" aria-haspopup="dialog" onClick={() => setViewActivityId(String(activity._id))} className="rounded text-left text-base font-semibold text-slate-100 hover:text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">{activity.activity}</button>
+            <p className="text-xs text-slate-400">
+              {activity.description || "No description."}
+            </p>
+            <p className="mt-2 text-xs text-slate-400">
+              Start: {formatScheduleDate(activity.start_date)}<br />
+              End: {formatScheduleDate(activity.end_date)}
+            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
+              <span className="rounded-md border border-slate-700/70 bg-slate-900/60 px-2 py-1">
+                Skill: {activity?.assigned_skill?.skill_name || "Not set"}
+              </span>
+              <ActivityAssignees
+                assignees={activity.assignees || []}
+                canRemove={Boolean(activity.canReassign)}
+                removingId={removingAssigneeId}
+                onRemove={(person) => handleRemoveAssignee(activity, person)}
+              />
+            </div>
+            {activity?.is_done && activity?.completed_in && (
+              <p className="text-xs text-slate-400 mt-2">
+                Completed In:{" "}
+                <span className="font-semibold">{formatDuration(activity.completed_in)}</span>
+              </p>
+            )}
+          </div>
+          {renderActivityActions(activity)}
         </div>
       </div>
     </div>
@@ -1146,6 +1158,8 @@ const TaskDetailPage = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ActivityDetailsSheet activity={viewedActivity} taskId={params.taskid} currentUserId={session?.user?.id} taskCreator={taskData?.creator_details} onClose={() => setViewActivityId(null)} actions={viewedActivity ? renderActivityActions(viewedActivity, true) : null} />
 
       <ActivityHistorySheet
         activity={historyActivity}

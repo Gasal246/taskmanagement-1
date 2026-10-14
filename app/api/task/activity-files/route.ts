@@ -20,6 +20,14 @@ const failure = (message: string, status: number) => NextResponse.json({ message
 // Use the app session for storage operations. NextAuth does not sign the browser
 // into Firebase, and fetching token URLs from the browser also depends on CORS.
 export async function POST(req: NextRequest) {
+  try { return await uploadFile(req); }
+  catch (error) {
+    console.error("Activity upload request failed", error);
+    return failure(req.signal.aborted ? "The upload was interrupted. Please try again." : "The upload service is temporarily unavailable. Please try again.", req.signal.aborted ? 400 : 503);
+  }
+}
+
+async function uploadFile(req: NextRequest) {
   const userId = resolveSessionUserId(await auth());
   if (!userId) return failure("Unauthorized", 401);
   const taskId = req.nextUrl.searchParams.get("taskId") || "";

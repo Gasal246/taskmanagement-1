@@ -1,4 +1,5 @@
 "use client"
+import { useActionPending } from "@/hooks/use-action-pending";
 import React, { use, useState } from 'react'
 import { ConfigProvider, DatePicker, DatePickerProps, Input, Space, Upload, UploadProps } from 'antd';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, } from "@/components/ui/dialog"
@@ -17,6 +18,7 @@ const AddAdminDocumentsDialog = ({ trigger, adminId, updateTrigger }: { trigger:
     const [rmdDate, setRmdDate] = useState('');
     const [file, setFile] = useState<File | null>(null);
     const [loading, setLoading] = useState(false);
+  useActionPending(loading);
     const { mutateAsync: addAdminDocument, isPending: addingAdminDoc } = useAddAdminDoc()
     
     const onChangeExipiry: DatePickerProps['onChange'] = (date: any, dateString) => {

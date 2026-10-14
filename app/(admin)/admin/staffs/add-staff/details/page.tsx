@@ -1,5 +1,6 @@
 
 "use client"
+import { useActionPending } from "@/hooks/use-action-pending";
 import React from 'react'
 import { useSelector } from 'react-redux'
 import { RootState } from '@/redux/store'
@@ -335,6 +336,7 @@ const AddBusinessStaffDetails = () => {
   const [docPreview, setDocPreview] = React.useState<string | null>(null);
   const [docType, setDocType] = React.useState<string>('');
   const [uploadingDoc, setUploadingDoc] = React.useState(false);
+  useActionPending(uploadingDoc);
   const [docToDelete, setDocToDelete] = React.useState<any | null>(null);
   const [deleteDocDialogOpen, setDeleteDocDialogOpen] = React.useState(false);
 

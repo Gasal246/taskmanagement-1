@@ -42,18 +42,21 @@ import { USER_KEYS } from "./keys";
 
 export const useGetUserByEmail = () => {
     return useMutation({
+        meta: { background: true, refresh: false },
         mutationFn: (email: string) => getUserByEmail(email)
     })
 };
 
 export const useGetUserByUserId = () => {
     return useMutation({
+        meta: { background: true, refresh: false },
         mutationFn: (userid: string) => getUserByUserId(userid)
     })
 }
 
 export const useGetUserByUserIdWithMeta = () => {
     return useMutation({
+        meta: { background: true, refresh: false },
         mutationFn: (payload: { user_id: string; roleLabel: string }) => getUserByUserIdWithMeta(payload)
     })
 }
@@ -87,6 +90,7 @@ export const useGetUserRolesAndDomains = (userid: string) => {
 
 export const useGetUserDomainByRole = () => {
     return useMutation({
+        meta: { background: true, refresh: false },
         mutationFn: ({userid, role}: {userid: string, role: string}) => getUserDomainByRole(userid, role)
     })
 }
@@ -149,6 +153,7 @@ export const useAddBusinessStaff = () => {
 
 export const useGetUserCompleteProfile = () => {
     return useMutation({
+        meta: { background: true, refresh: false },
         mutationFn: (userId: string) => getUserCompleteProfileFunc(userId)
     })
 }
@@ -256,6 +261,7 @@ export function useFindUserById(userId:string) {
 //Get Staff Profile.
 export const useGetStaffProfile = () => {
     return useMutation({
+        meta: { background: true, refresh: false },
         mutationFn: ({role_id, org_id}: {role_id:string, org_id:string}) => GetFullStaffProfile(role_id, org_id),
     })
 }

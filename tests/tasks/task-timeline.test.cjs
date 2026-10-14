@@ -39,13 +39,18 @@ test('activity schedules require two valid offset timestamps and permit equal en
   ]) assert.equal(schedule.activityScheduleSchema.safeParse(value).success, false, JSON.stringify(value));
 });
 
-test('local input round trips preserve timestamps, including inherited seconds and milliseconds', () => {
+test('minute-only local inputs preserve unchanged timestamps, including legacy seconds and milliseconds', () => {
   const previous = process.env.TZ;
   try {
     for (const zone of ['Asia/Dubai', 'America/New_York', 'UTC']) {
       process.env.TZ = zone;
       for (const timestamp of [pair.start_date, '2026-12-10T13:14:15.123Z']) {
-        assert.equal(new Date(schedule.toLocalDateTimeInput(timestamp)).toISOString(), timestamp);
+        const input = schedule.toLocalDateTimeInput(timestamp);
+        assert.match(input, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
+        assert.equal(schedule.resolveActivityDateTime(input, timestamp), timestamp);
+        const changed = input.slice(0, 14) + '30';
+        assert.equal(schedule.resolveActivityDateTime(changed, timestamp), new Date(changed).toISOString());
+        assert.equal(schedule.resolveActivityDateTime(input), new Date(input).toISOString());
       }
     }
     assert.equal(schedule.toLocalDateTimeInput(null), '');

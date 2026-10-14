@@ -3,11 +3,12 @@
 import ListPagination from "@/components/shared/ListPagination";
 import { useActivityPaging } from "@/hooks/use-activity-paging";
 
+import ActivityDetailsSheet from "@/components/task/ActivityDetailsSheet";
 import ActivityHistorySheet from "@/components/task/ActivityHistorySheet";
 import ChangeActivityDeadlineDialog from "@/components/task/ChangeActivityDeadlineDialog";
 
 import ActivityScheduleFields from "@/components/task/ActivityScheduleFields";
-import { activityScheduleFields, isScheduleOrdered, scheduleOrderError, toLocalDateTimeInput, formatScheduleDate } from "@/lib/activity-schedule";
+import { activityScheduleFields, isScheduleOrdered, scheduleOrderError, toLocalDateTimeInput, resolveActivityDateTime, formatScheduleDate } from "@/lib/activity-schedule";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -223,7 +224,9 @@ const TaskDetails = () => {
   const [pendingStatusActivity, setPendingStatusActivity] = useState<any>(null);
   const [pendingStatusValue, setPendingStatusValue] = useState<boolean | null>(null);
 
+  const [viewActivityId, setViewActivityId] = useState<string | null>(null);
   const taskData = task?.data;
+  const viewedActivity = taskData?.activities?.find((activity: any) => String(activity._id) === viewActivityId) || null;
   const isCreator = Boolean(taskData?.creator && session?.user?.id === taskData.creator);
   const historyActivity = taskData?.activities?.find((activity: any) => String(activity._id) === historyActivityId) || null;
   const isHead = HEAD_ROLES.includes(roleName);
@@ -435,8 +438,8 @@ const TaskDetails = () => {
       values.start_date !== toLocalDateTimeInput(editingActivity?.start_date) ||
       values.end_date !== toLocalDateTimeInput(editingActivity?.end_date);
     const schedule = scheduleChanged ? {
-      start_date: new Date(values.start_date).toISOString(),
-      end_date: new Date(values.end_date).toISOString(),
+      start_date: resolveActivityDateTime(values.start_date, editActivityDialog ? editingActivity?.start_date : null),
+      end_date: resolveActivityDateTime(values.end_date, editActivityDialog ? editingActivity?.end_date : null),
       ...(editActivityDialog ? {
         expected_start_date: editingActivity.start_date ?? null,
         expected_end_date: editingActivity.end_date ?? null,
@@ -573,6 +576,105 @@ const TaskDetails = () => {
       router.push(`/staff/projects/${taskData.project_id}?section=tasks`);
     }
   };
+
+  const renderActivityActions = (activity: any, inDetails = false) => (
+<div className="flex flex-wrap items-center gap-2">
+                      <ActivityCommentsSheet
+                        activity={activity}
+                        taskId={params.taskid}
+                        initiallyOpen={!inDetails && searchParams.get("comments") === "open" && searchParams.get("activityId") === String(activity._id)}
+                      />
+                      {!inDetails && Array.isArray(activity.documents) && activity.documents.length > 0 && (
+                        <ActivityDocuments
+                          taskId={params.taskid}
+                          documents={activity.documents}
+                          variant="chip"
+                          editable={isCreator}
+                          onChange={async (documents) => {
+                            if (!isCreator) return;
+                            const res = await UpdateTaskActivity({ activity_id: activity._id, documents, is_status: false });
+                            if (res?.status !== 200) throw new Error(res?.message || "Failed to update documents");
+                            toast.success("Documents updated");
+
+                          }}
+                        />
+                      )}
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        className="p-2 px-3 rounded-lg border border-slate-700 hover:border-slate-500 bg-gradient-to-tr from-slate-900 to-slate-800 cursor-pointer text-xs font-medium flex gap-1 items-center"
+                        onClick={() => handleOpenHistory(activity)}
+                      >
+                        <History size={12} />
+                        History
+                      </motion.button>
+                      {activity.canReassign && (
+                        <motion.button
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          className="p-2 px-4 rounded-lg border border-slate-700 hover:border-slate-500 bg-gradient-to-tr from-slate-900 to-slate-800 cursor-pointer text-xs font-medium flex gap-1 items-center"
+                          onClick={() => handleOpenAssignDialog(activity)}
+                        >
+                          <UserPlus size={12} />
+                          Assign more
+                        </motion.button>
+                      )}
+                      {activity.canChangeStatus && (activity?.is_done ? (
+                        <motion.button
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          className="p-2 px-4 rounded-lg border border-red-600/60 hover:border-red-400 bg-gradient-to-tr from-red-950/60 to-red-900/40 text-red-100 cursor-pointer text-xs font-medium flex gap-1 items-center"
+                          onClick={() => handleOpenStatusConfirm(activity, false)}
+                        >
+                          <CheckCircle2 size={12} />
+                          Mark Not Completed
+                        </motion.button>
+                      ) : (
+                        <motion.button
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          className="p-2 px-4 rounded-lg border border-emerald-600/60 hover:border-emerald-400 bg-gradient-to-tr from-emerald-950/60 to-emerald-900/40 text-emerald-100 cursor-pointer text-xs font-medium flex gap-1 items-center"
+                          onClick={() => handleOpenStatusConfirm(activity, true)}
+                        >
+                          <CheckCircle size={12} />
+                          Mark Completed
+                        </motion.button>
+                      ))}
+                      {isCreator && (
+                        <>
+                          <motion.button type="button" aria-label="Edit activity"
+                            whileHover={{ scale: 1.04 }}
+                            whileTap={{ scale: 0.95 }}
+                            className="p-1 rounded-full hover:bg-slate-800 cursor-pointer flex items-center"
+                            onClick={() => {
+                              setEditingActivity(activity);
+                              setActivityDocuments(Array.isArray(activity.documents) ? activity.documents : []);
+                              activityForm.reset({
+                                activity_name: activity.activity,
+                                description: activity.description || "",
+                                start_date: toLocalDateTimeInput(activity.start_date),
+                                end_date: toLocalDateTimeInput(activity.end_date),
+                              });
+                              setEditActivityDialog(true);
+                            }}
+                          >
+                            <PencilRuler size={14} />{inDetails && <span className="ml-1 text-xs">Edit</span>}
+                          </motion.button>
+                          <motion.button type="button" aria-label="Delete activity"
+                            whileHover={{ scale: 1.04 }}
+                            whileTap={{ scale: 0.95 }}
+                            className="p-1 rounded-full hover:bg-slate-800 cursor-pointer flex items-center"
+                            onClick={() => {
+                              setSelectedActivityId(activity._id);
+                              setDeleteActivityDialog(true);
+                            }}
+                          >
+                            <Trash2 size={14} className="text-red-500" />{inDetails && <span className="ml-1 text-xs text-red-300">Delete</span>}
+                          </motion.button>
+                        </>
+                      )}
+                    </div>
+  );
 
   if (isLoading) {
     return (
@@ -778,10 +880,13 @@ const TaskDetails = () => {
           {visibleActivities.length > 0 ? (
             visibleActivities.map((activity: any) => (
               <div key={activity._id} className="w-full p-1" style={{ contentVisibility: "auto", containIntrinsicSize: "auto 350px" }}>
-                <div className="bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg border border-slate-700 hover:border-cyan-800">
+                <div onClick={event => {
+                    if ((event.target as HTMLElement).closest('button, a, input, [role="dialog"], [role="button"]') || window.getSelection()?.toString()) return;
+                    setViewActivityId(String(activity._id));
+                  }} className="cursor-pointer bg-gradient-to-tr from-slate-950/50 to-slate-900/50 p-3 rounded-lg border border-slate-700 hover:border-cyan-800">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <p className="text-sm text-slate-200">{activity.activity}</p>
+                      <button type="button" aria-haspopup="dialog" onClick={() => setViewActivityId(String(activity._id))} className="rounded text-left text-base font-semibold text-slate-100 hover:text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">{activity.activity}</button>
                       <p className="text-xs text-slate-400">
                         {activity.description || "No description."}
                       </p>
@@ -808,102 +913,7 @@ const TaskDetails = () => {
                         </p>
                       )}
                     </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <ActivityCommentsSheet
-                        activity={activity}
-                        taskId={params.taskid}
-                        initiallyOpen={searchParams.get("comments") === "open" && searchParams.get("activityId") === String(activity._id)}
-                      />
-                      {Array.isArray(activity.documents) && activity.documents.length > 0 && (
-                        <ActivityDocuments
-                          taskId={params.taskid}
-                          documents={activity.documents}
-                          variant="chip"
-                          editable={isCreator}
-                          onChange={async (documents) => {
-                            if (!isCreator) return;
-                            const res = await UpdateTaskActivity({ activity_id: activity._id, documents, is_status: false });
-                            if (res?.status !== 200) throw new Error(res?.message || "Failed to update documents");
-                            toast.success("Documents updated");
-
-                          }}
-                        />
-                      )}
-                      <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        className="p-2 px-3 rounded-lg border border-slate-700 hover:border-slate-500 bg-gradient-to-tr from-slate-900 to-slate-800 cursor-pointer text-xs font-medium flex gap-1 items-center"
-                        onClick={() => handleOpenHistory(activity)}
-                      >
-                        <History size={12} />
-                        History
-                      </motion.button>
-                      {activity.canReassign && (
-                        <motion.button
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                          className="p-2 px-4 rounded-lg border border-slate-700 hover:border-slate-500 bg-gradient-to-tr from-slate-900 to-slate-800 cursor-pointer text-xs font-medium flex gap-1 items-center"
-                          onClick={() => handleOpenAssignDialog(activity)}
-                        >
-                          <UserPlus size={12} />
-                          Assign more
-                        </motion.button>
-                      )}
-                      {activity.canChangeStatus && (activity?.is_done ? (
-                        <motion.button
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                          className="p-2 px-4 rounded-lg border border-red-600/60 hover:border-red-400 bg-gradient-to-tr from-red-950/60 to-red-900/40 text-red-100 cursor-pointer text-xs font-medium flex gap-1 items-center"
-                          onClick={() => handleOpenStatusConfirm(activity, false)}
-                        >
-                          <CheckCircle2 size={12} />
-                          Mark Not Completed
-                        </motion.button>
-                      ) : (
-                        <motion.button
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                          className="p-2 px-4 rounded-lg border border-emerald-600/60 hover:border-emerald-400 bg-gradient-to-tr from-emerald-950/60 to-emerald-900/40 text-emerald-100 cursor-pointer text-xs font-medium flex gap-1 items-center"
-                          onClick={() => handleOpenStatusConfirm(activity, true)}
-                        >
-                          <CheckCircle size={12} />
-                          Mark Completed
-                        </motion.button>
-                      ))}
-                      {isCreator && (
-                        <>
-                          <motion.div
-                            whileHover={{ scale: 1.04 }}
-                            whileTap={{ scale: 0.95 }}
-                            className="p-1 rounded-full hover:bg-slate-800 cursor-pointer flex items-center"
-                            onClick={() => {
-                              setEditingActivity(activity);
-                              setActivityDocuments(Array.isArray(activity.documents) ? activity.documents : []);
-                              activityForm.reset({
-                                activity_name: activity.activity,
-                                description: activity.description || "",
-                                start_date: toLocalDateTimeInput(activity.start_date),
-                                end_date: toLocalDateTimeInput(activity.end_date),
-                              });
-                              setEditActivityDialog(true);
-                            }}
-                          >
-                            <PencilRuler size={14} />
-                          </motion.div>
-                          <motion.div
-                            whileHover={{ scale: 1.04 }}
-                            whileTap={{ scale: 0.95 }}
-                            className="p-1 rounded-full hover:bg-slate-800 cursor-pointer flex items-center"
-                            onClick={() => {
-                              setSelectedActivityId(activity._id);
-                              setDeleteActivityDialog(true);
-                            }}
-                          >
-                            <Trash2 size={14} className="text-red-500" />
-                          </motion.div>
-                        </>
-                      )}
-                    </div>
+                    {renderActivityActions(activity)}
                   </div>
                 </div>
               </div>
@@ -1106,6 +1116,8 @@ const TaskDetails = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ActivityDetailsSheet activity={viewedActivity} taskId={params.taskid} currentUserId={session?.user?.id} taskCreator={taskData?.creator_details} onClose={() => setViewActivityId(null)} actions={viewedActivity ? renderActivityActions(viewedActivity, true) : null} />
 
       <ActivityHistorySheet
         activity={historyActivity}

@@ -28,7 +28,7 @@ export function toLocalDateTimeInput(value?: string | Date | null): string {
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) return "";
   const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
-  return local.toISOString().slice(0, 23);
+  return local.toISOString().slice(0, 16);
 }
 
 export function formatScheduleDate(value?: string | Date | null): string {
@@ -38,4 +38,10 @@ export function formatScheduleDate(value?: string | Date | null): string {
   return date.toLocaleString(undefined, {
     day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit",
   });
+}
+
+// Minute-only controls should not silently round an untouched legacy timestamp.
+export function resolveActivityDateTime(value: string, original?: string | Date | null): string {
+  if (original && value === toLocalDateTimeInput(original)) return new Date(original).toISOString();
+  return new Date(value).toISOString();
 }

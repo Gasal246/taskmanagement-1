@@ -1,4 +1,5 @@
 "use client"
+import { useActionPending } from "@/hooks/use-action-pending";
 import {  } from "next-auth/react";
 import { notificationSignOut as signOut } from "@/lib/notifications/sign-out";
 import ProfilPageSkeleton from '@/components/skeletons/ProfilPageSkeleton'
@@ -96,6 +97,7 @@ const ProfilPage = () => {
   const [showPassword, setShowPassword] = React.useState(false);
   const [businessPlan, setBusinessPlan] = useState<any>(null);
   const [isSendingPush, setIsSendingPush] = useState(false);
+  useActionPending(isSendingPush);
 
   //Api
   const {data: userData, isLoading: loadingUser, refetch} = useGetAdminProfile(businessData?._id);

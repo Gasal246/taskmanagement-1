@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { formatScheduleDate, toLocalDateTimeInput } from "@/lib/activity-schedule";
+import { formatScheduleDate, toLocalDateTimeInput, resolveActivityDateTime } from "@/lib/activity-schedule";
 import { getScheduleChange, scheduleTimestamp } from "@/lib/activity-deadline";
 import { useChangeActivityDeadline } from "@/query/business/queries";
 
@@ -22,7 +22,7 @@ export default function ChangeActivityDeadlineDialog({ activity, onChanged }: {
   if (!activity.canEditSchedule) return null;
   const unavailable = activity.is_done ? "Reopen this activity before changing its deadline." :
     (!activity.start_date || !activity.end_date) ? "Set its schedule through Edit Activity first." : "";
-  const newEnd = endValue && Number.isFinite(new Date(endValue).getTime()) ? new Date(endValue).toISOString() : null;
+  const newEnd = endValue && Number.isFinite(new Date(endValue).getTime()) ? resolveActivityDateTime(endValue, snapshot?.end_date) : null;
   const preview = snapshot ? getScheduleChange(snapshot, { start_date: snapshot.start_date, end_date: newEnd }) : null;
   const unchanged = scheduleTimestamp(newEnd) === scheduleTimestamp(snapshot?.end_date);
   const label = newEnd && snapshot?.end_date && new Date(newEnd) < new Date(snapshot.end_date) ? "Shorten Deadline" : "Extend Deadline";
@@ -68,7 +68,7 @@ export default function ChangeActivityDeadlineDialog({ activity, onChanged }: {
           </div>
           <div className="space-y-2">
             <label htmlFor={`deadline-${activity._id}`} className="text-sm font-medium">New end date and time</label>
-            <Input id={`deadline-${activity._id}`} type="datetime-local" step="0.001" value={endValue} onChange={event => { setEndValue(event.target.value); setError(""); }} disabled={change.isPending} required />
+            <Input id={`deadline-${activity._id}`} type="datetime-local" step="60" value={endValue} onChange={event => { setEndValue(event.target.value); setError(""); }} disabled={change.isPending} required />
             <p className="text-xs text-slate-400">Times use your local timezone. The new deadline must be in the future.</p>
           </div>
           {newEnd && <div className="rounded-lg border border-cyan-900 p-3 text-sm text-slate-300">

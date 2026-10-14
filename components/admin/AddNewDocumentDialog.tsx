@@ -1,4 +1,5 @@
 "use client"
+import { useActionPending } from "@/hooks/use-action-pending";
 import React, { useState } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, } from "@/components/ui/dialog";
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -20,6 +21,7 @@ const formSchema = z.object({
 
 const AddNewDocumentDialog = ({ trigger, staffid }: { trigger: React.ReactNode, staffid: string }) => {
     const [loading, setLoading] = useState(false)
+  useActionPending(loading);
     const { mutateAsync: addNewDocument, isPending: addingNewDocument } = useAddNewStaffDocument();
     const [file, setFile] = useState<File | null>(null);
     const form = useForm<z.infer<typeof formSchema>>({

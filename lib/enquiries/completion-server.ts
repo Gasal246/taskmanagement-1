@@ -32,7 +32,13 @@ export async function actionsForEnquiries(entries: any[]) {
   return histories;
 }
 export async function enrichEnquiries(entries: any[], actor: EnquiryActor) {
-  const actions = await actionsForEnquiries(entries);
+  // Resolve creators once per page without replacing IDs used by access checks.
+  const creatorIds = [...new Set(entries.map(entry => idOf(entry.createdBy)).filter(id => mongoose.isValidObjectId(id)))];
+  const [actions, creators] = await Promise.all([
+    actionsForEnquiries(entries),
+    creatorIds.length ? Users.find({ _id: { $in: creatorIds } }).select('name').lean() : Promise.resolve([]),
+  ]);
+  const creatorNames = new Map(creators.map(creator => [idOf(creator), creator.name]));
   const byEnquiry = new Map<string, any[]>();
   for (const action of actions) {
     const key = idOf(action.enquiry_id);
@@ -53,7 +59,7 @@ export async function enrichEnquiries(entries: any[], actor: EnquiryActor) {
     const completed = list.flatMap(action => action.action_assignments.filter((p: any) => p.status === 'completed').map((part: any) => ({ ...part, action: part.performed_action || action.action, action_id: action._id })))
       .sort((a, b) => +new Date(b.completed_at) - +new Date(a.completed_at));
     const canSchedule = manages || idOf(entry.createdBy) === actor.actorId || list.some(a => a.action_assignments.some((p: any) => idOf(p.user_id) === actor.actorId));
-    return { ...entry, actions: list, latest_forward: list.find(a => a.change_type === 'FORWARD' || !a.change_type) || null,
+    return { ...entry, createdByName: creatorNames.get(idOf(entry.createdBy)) || null, actions: list, latest_forward: list.find(a => a.change_type === 'FORWARD' || !a.change_type) || null,
       latest_action: list[0] || null, last_completed_action: completed[0] || null,
       pending_action_parts: list.reduce((sum, a) => sum + a.progress.pending, 0),
       canScheduleAction: Boolean(entry.is_active && canSchedule), canRecordAction: Boolean(entry.is_active && canSchedule),

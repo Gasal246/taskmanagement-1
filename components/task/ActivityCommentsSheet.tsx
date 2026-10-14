@@ -1,5 +1,6 @@
 "use client";
 
+import { requestJson } from "@/lib/request-json";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -75,13 +76,6 @@ type PendingAttachment = {
 };
 
 type CommentsResponse = { comments: ActivityComment[] };
-
-const requestJson = async (url: string, init?: RequestInit) => {
-  const response = await fetch(url, init);
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data?.message || "Something went wrong");
-  return data;
-};
 
 const formatCommentDate = (value: string) =>
   new Intl.DateTimeFormat(undefined, {

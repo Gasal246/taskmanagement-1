@@ -1,5 +1,6 @@
 "use client";
 
+import { useActionPending } from "@/hooks/use-action-pending";
 import { ChangeEvent, useEffect, useState } from "react";
 import Image from "next/image";
 import { useSession } from "next-auth/react";
@@ -62,6 +63,7 @@ export default function DocsSection({
   const [preview, setPreview] = useState("");
   const [selectedViewers, setSelectedViewers] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
+  useActionPending(uploading);
 
   useEffect(
     () => () => {

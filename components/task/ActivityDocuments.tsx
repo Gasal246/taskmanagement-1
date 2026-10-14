@@ -1,5 +1,7 @@
 "use client";
 
+import { requestJson } from "@/lib/request-json";
+import { useActionPending } from "@/hooks/use-action-pending";
 import { useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import { FileText, Loader2, Paperclip, Plus, Trash2 } from "lucide-react";
@@ -23,10 +25,11 @@ export default function ActivityDocuments({ taskId, documents = [], onChange, ed
   const { data: session } = useSession();
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
+  useActionPending(busy);
 
   const chooseFiles = () => inputRef.current?.click();
   const upload = async (files: FileList | null) => {
-    if (!files?.length) return;
+    if (!files?.length || busy) return;
     const userId = String(session?.user?.id || "");
     if (!userId) return toast.error("Your session could not be verified. Please sign in again.");
     if (documents.length + files.length > 20) return toast.error("An activity can have up to 20 documents.");
@@ -39,19 +42,25 @@ export default function ActivityDocuments({ taskId, documents = [], onChange, ed
     }
     setBusy(true);
     const uploaded: ActivityDocument[] = [];
+    const failed: string[] = [];
     try {
       for (const file of selected) {
-        const form = new FormData();
-        form.append("file", file);
-        const response = await fetch(`/api/task/activity-files?taskId=${taskId}`, { method: "POST", body: form });
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.message || "Unable to upload document");
-        uploaded.push(result.file);
+        try {
+          const form = new FormData();
+          form.append("file", file);
+          const result = await requestJson(`/api/task/activity-files?taskId=${taskId}`, { method: "POST", body: form });
+          if (!result.file?.storagePath) throw new Error("The server did not confirm the upload. Please try again.");
+          uploaded.push(result.file);
+        } catch (error) {
+          failed.push(`${file.name}: ${error instanceof Error ? error.message : "Upload failed"}`);
+        }
       }
-      await onChange([...documents, ...uploaded]);
+      // Keep successful files when another file in the selection fails.
+      if (uploaded.length) await onChange([...documents, ...uploaded]);
+      if (failed.length) toast.error(uploaded.length ? `${uploaded.length} file(s) uploaded; ${failed.length} failed.` : "Files could not be uploaded", { description: failed.join("\n") });
     } catch (error) {
       // A failed response can follow a committed save; never delete possibly attached files here.
-      toast.error(error instanceof Error ? error.message : "Unable to upload documents");
+      toast.error(error instanceof Error ? error.message : "Unable to save documents");
     } finally {
       setBusy(false);
       if (inputRef.current) inputRef.current.value = "";
@@ -91,5 +100,5 @@ export default function ActivityDocuments({ taskId, documents = [], onChange, ed
     </Dialog>
   );
 
-  return <div className="shrink-0 space-y-3 rounded-xl border border-dashed border-slate-700 bg-slate-900/30 p-3">{input}<div className="flex items-center justify-between"><p className="text-xs font-semibold text-slate-300">Attachments</p><Button type="button" variant="ghost" size="sm" disabled={busy} onClick={chooseFiles}>{busy ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Paperclip className="mr-2 size-4" />}Attach files</Button></div>{documents.length > 0 && list}</div>;
+  return <div className="shrink-0 space-y-3 rounded-xl border border-dashed border-slate-700 bg-slate-900/30 p-3">{editable && input}<div className="flex items-center justify-between"><p className="text-xs font-semibold text-slate-300">Attachments</p>{editable && <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={chooseFiles}>{busy ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Paperclip className="mr-2 size-4" />}Attach files</Button>}</div>{list}</div>;
 }

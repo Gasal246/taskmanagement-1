@@ -21,7 +21,10 @@
     "migrate:camp-map-points": "node scripts/migrate-camp-map-points.mjs",
     "db:performance-indexes": "node scripts/create-performance-indexes.mjs",
     "migrate:enquiry-ownership": "node scripts/migrate-enquiry-ownership.mjs",
-    "worker:jobs": "node scripts/run-background-jobs.mjs"
+    "worker:jobs": "node scripts/run-background-jobs.mjs",
+    "test:mutations": "node --test tests/query/*.test.cjs",
+    "test:mutation-ui": "node scripts/check-mutation-ui.mjs",
+    "test:activity-view-ui": "node scripts/check-activity-view-ui.mjs"
   },
   "dependencies": {
     "@google-cloud/storage": "^8.2.0",

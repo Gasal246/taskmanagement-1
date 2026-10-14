@@ -223,6 +223,7 @@ export const useRemoveBusinessAdmin = () => {
 
 export const useGetBusinessRegions = () => {
     return useMutation({
+        meta: { background: true, refresh: false },
         mutationFn: ({ business_id }: { business_id: string }) => getBusinessRegionsFunc(business_id)
     })
 }
@@ -247,12 +248,14 @@ export const useAddRegionArea = () => {
 
 export const useGetRegionAreas = () => {
     return useMutation({
+        meta: { background: true, refresh: false },
         mutationFn: ({ region_ids }: { region_ids: string[] }) => getRegionAreasFunc(region_ids)
     })
 }
 
 export const useGetAreaLocations = () => {
     return useMutation({
+        meta: { background: true, refresh: false },
         mutationFn: ({ area_ids }: { area_ids: string[] }) => getAreaLocationsFunc(area_ids)
     })
 }
@@ -277,12 +280,14 @@ export const useRemoveRegionHead = () => {
 
 export const useGetRegionHeads = () => {
     return useMutation({
+        meta: { background: true, refresh: false },
         mutationFn: (region_ids: string[]) => getRegionHeadsFunc(region_ids)
     })
 }
 
 export const useGetRegionUsers = () => {
     return useMutation({
+        meta: { background: true, refresh: false },
         mutationFn: (region_ids: string[]) => getRegionUsersFunc(region_ids)
     })
 }
@@ -295,6 +300,7 @@ export const useAddBusinessSkill = () => {
 
 export const useGetBusinessSkills = () => {
     return useMutation({
+        meta: { background: true, refresh: false },
         mutationFn: (business_id: string) => getBusinessSkillsFunc(business_id)
     })
 }
@@ -319,6 +325,7 @@ export const useAddBusinessDepartment = () => {
 
 export const useGetBusinessDepartments = () => {
     return useMutation({
+        meta: { background: true, refresh: false },
         mutationFn: (business_id: string) => getBusinessDepartmentsFunc(business_id)
     })
 }
@@ -419,12 +426,14 @@ export const useRemoveRegionStaff = () => {
 
 export const useGetBusinessClients = () => {
     return useMutation({
+        meta: { background: true, refresh: false },
         mutationFn: (business_id: string) => getBusinessClientsFunc(business_id)
     })
 }
 
 export const useGetBusinessClientCompleteDataById = () => {
     return useMutation({
+        meta: { background: true, refresh: false },
         mutationFn: (client_id: string) => getBusinessClientCompleteDataByIdFunc(client_id)
     })
 }
@@ -548,6 +557,7 @@ export const useRemoveAreaDepartment = () => {
 
 export const useGetAreaUsers = () => {
     return useMutation({
+        meta: { background: true, refresh: false },
         mutationFn: (area_ids: string[]) => getAreaUsersFunc(area_ids)
     })
 }
@@ -592,6 +602,7 @@ export const useRemoveLocationDepartment = () => {
 
 export const useGetLocationUsers = () => {
     return useMutation({
+        meta: { background: true, refresh: false },
         mutationFn: (loc_id: string) => getLocationUsersFunc(loc_id)
     })
 }
@@ -934,6 +945,7 @@ export const useDeleteTaskActivity = () => {
 //Flows
 export const useGetFlowsByProject = () => {
     return useMutation({
+        meta: { background: true, refresh: false },
         mutationFn: (project_id:string) => GetFlowsByProjectFunc(project_id)
     })
 }
@@ -948,6 +960,7 @@ export const useGetBusinessStaffsWithSkills = (business_id:string) => {
 
 export const useGetBusinessStaffsBySkill = () => {
     return useMutation({
+        meta: { background: true, refresh: false },
         mutationFn: ({ business_id, skill_id }: { business_id: string; skill_id: string }) =>
             GetBusinessStaffsBySkill(business_id, skill_id)
     })
@@ -955,6 +968,7 @@ export const useGetBusinessStaffsBySkill = () => {
 
 export const useGetStaffsByDepartment = () => {
     return useMutation({
+        meta: { background: true, refresh: false },
         mutationFn: (department_id:string) => GetStaffsByDepartment(department_id)
     })
 }
@@ -970,6 +984,7 @@ export const useGetStaffsByDepartment = () => {
 
 export const useGetUserDetails = () => {
     return useMutation({
+        meta: { background: true, refresh: false },
             mutationFn: ({ role_id, org_id }: { role_id: string; org_id: string }) =>
       GetUserDetails(role_id, org_id),
     })
@@ -1024,6 +1039,7 @@ export const useGetStaffProjects = (queryParams: Record<string, string | undefin
 //Get Business Details for Staff
 export const useGetStaffBusinessDetails = () => {
     return useMutation({
+        meta: { background: true, refresh: false },
         mutationFn: (domain_id:string) => GetBusinessForStaff(domain_id),
     })
 }
@@ -1031,12 +1047,14 @@ export const useGetStaffBusinessDetails = () => {
 //Get All Staffs in StaffsView
 export const useGetAllStaffsForStaff = () => {
     return useMutation({
+        meta: { background: true, refresh: false },
         mutationFn: (payload: { role_id: string; domain_id: string }) => GetAllStaffsForStaff(payload),
     })
 }
 
 export const useGetHierarchyHeadsForReassignment = () => {
     return useMutation({
+        meta: { background: true, refresh: false },
         mutationFn: () => GetHierarchyHeadsForReassignment(),
     })
 }
@@ -1053,6 +1071,7 @@ export const useGetSingleStaffById = (user_id:string, role_id:string) => {
 //Get Departments for Staff Heads
 export const useGetDepartmentsForHeads = () => {
    return useMutation({
+        meta: { background: true, refresh: false },
     mutationFn: (role_id:string) => GetDepartmentsforHeads(role_id),
    })
 }
@@ -1060,6 +1079,7 @@ export const useGetDepartmentsForHeads = () => {
 //Get Areas for Staff Heads
 export const useGetAreasForHeads = () => {
     return useMutation({
+        meta: { background: true, refresh: false },
      mutationFn: () => GetAreasForHeads(),
     })
 }
@@ -1067,6 +1087,7 @@ export const useGetAreasForHeads = () => {
 //Get areas and depts under a region
 export const useGetAreasandDeptsForRegion = () => {
     return useMutation({
+        meta: { background: true, refresh: false },
         mutationFn: (region_id:string) => GetAreasandDeptsUnderRegion(region_id),
     })
 }
@@ -1074,6 +1095,7 @@ export const useGetAreasandDeptsForRegion = () => {
 //Get Locations and depts for area
 export const useGetLocationsandDeptsForArea = () => {
     return useMutation({
+        meta: { background: true, refresh: false },
         mutationFn: (area_id:string) => GetLocationsandDeptsUnderArea(area_id),
     })
 }
@@ -1081,6 +1103,7 @@ export const useGetLocationsandDeptsForArea = () => {
 //Get Depts for Location
 export const useGetDeptsforLoation = () => {
     return useMutation({
+        meta: { background: true, refresh: false },
         mutationFn: (location_id:string) => GetDepartmentsforLocations(location_id),
     })
 }
@@ -1104,6 +1127,7 @@ export const useAddNewProjectByStaff = () => {
 //Get Departments for Staffs
 export const useGetDepartmentsForStaffs = () => {
   return useMutation({
+        meta: { background: true, refresh: false },
     mutationFn: ({ role_id, org_id }: { role_id: string; org_id: string }) => 
       GetDepartmentsForStaffs(role_id, org_id),
   });

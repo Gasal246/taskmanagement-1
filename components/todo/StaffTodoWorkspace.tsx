@@ -1,5 +1,6 @@
 "use client";
 
+import { useActionPending } from "@/hooks/use-action-pending";
 import { useCallback, useEffect, useState } from "react";
 import { CloudUpload, Loader2, RotateCcw } from "lucide-react";
 import { useSession } from "next-auth/react";
@@ -36,6 +37,7 @@ const StaffTodoWorkspace = () => {
   const [importTodos, setImportTodos] = useState<Todo[]>([]);
   const [showImport, setShowImport] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  useActionPending(isImporting);
 
   const loadStorageMode = useCallback(async () => {
     if (!userId) return;

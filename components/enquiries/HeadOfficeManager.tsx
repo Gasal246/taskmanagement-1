@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -19,28 +19,30 @@ function Details({ value }: { value: any }) {
 export default function HeadOfficeManager({ enquiryId, campId, draft = false, onChange, queueOnly = false, hideWithoutPending = false }: {
   enquiryId?: string; campId?: string; draft?: boolean; onChange?: (value: any) => void; queueOnly?: boolean; hideWithoutPending?: boolean;
 }) {
-  const client = useQueryClient();
   const query = useQuery({ queryKey: ["head-office-requests", enquiryId || "", campId || ""], queryFn: () => api(`${endpoint}?${new URLSearchParams(enquiryId ? { enquiry_id: enquiryId } : campId ? { camp_id: campId } : {})}`) });
   const data = query.data;
   const [input, setInput] = useState<any>({ operation: "keep", proposed: empty });
   const [editing, setEditing] = useState<any>(null);
-  const [busy, setBusy] = useState(false);
+  const mutation = useMutation({
+    mutationFn: (options: RequestInit) => api(endpoint, options),
+    onError: () => {}, // The handlers below show the server's error.
+  });
+  const busy = mutation.isPending;
   const change = (value: any) => { setInput(value); onChange?.(value); };
-  const refresh = async () => { await client.invalidateQueries({ queryKey: ["head-office-requests"] }); await client.invalidateQueries({ predicate: query => /enquiry|camp|head.?office/i.test(String(query.queryKey[0])) }); };
   const submit = async () => {
-    setBusy(true);
+    if (busy) return;
     try {
-      const result = await api(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...input,
+      const result = await mutation.mutateAsync({ method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...input,
         business_id: data.business_id, enquiry_id: enquiryId || editing?.enquiry_id?._id,
         camp_ids: editing?.camp_ids?.map((camp: any) => camp._id), detach_camp_ids: editing?.detach_camp_ids?.map((camp: any) => camp._id || camp),
         request_id: editing?._id, revision: editing?.revision }) });
-      toast.success(result.message); setEditing(null); change({ operation: "keep", proposed: empty }); await refresh();
-    } catch (error: any) { toast.error(error.message); } finally { setBusy(false); }
+      toast.success(result.message); setEditing(null); change({ operation: "keep", proposed: empty });
+    } catch (error: any) { toast.error(error.message); }
   };
   const review = async (request: any, values: any) => {
-    setBusy(true);
-    try { await api(endpoint, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ request_id: request._id, revision: request.revision, ...values }) }); toast.success("Head office request updated"); await refresh(); }
-    catch (error: any) { toast.error(error.message); } finally { setBusy(false); }
+    if (busy) return;
+    try { await mutation.mutateAsync({ method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ request_id: request._id, revision: request.revision, ...values }) }); toast.success("Head office request updated"); }
+    catch (error: any) { toast.error(error.message); }
   };
   if (query.isLoading && hideWithoutPending) return null;
   if (query.isLoading) return <p className="text-xs text-slate-400">Loading head office details…</p>;

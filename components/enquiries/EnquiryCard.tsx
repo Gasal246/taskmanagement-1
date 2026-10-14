@@ -34,7 +34,7 @@ export default function EnquiryCard({ enquiry: e, number, basePath, staff = fals
     </dl>
     <div className="relative z-10 space-y-3 border-t border-slate-800 pt-3">
       <EnquiryCompletionActions enquiry={e} basePath={basePath} />
-      <div className="flex flex-wrap gap-x-5 gap-y-1 text-[11px] text-slate-400"><span>Created at: {enquiryDate(e.createdAt)}</span><span>Recent Update At: {enquiryDate(e.updatedAt)}</span></div>
+      <div className="flex flex-wrap gap-x-5 gap-y-1 text-[11px] text-slate-400"><span className="min-w-0 break-words">Brought By: <span className="font-medium text-slate-200">{e.createdByName || e.createdBy?.name || "Unknown"}</span></span><span>Created at: {enquiryDate(e.createdAt)}</span><span>Recent Update At: {enquiryDate(e.updatedAt)}</span></div>
     </div>
   </article>;
 }

@@ -1,10 +1,12 @@
 "use client";
+import { useActionPending } from "@/hooks/use-action-pending";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { registerNotificationDevice } from "@/lib/notifications/device";
 export default function NotificationSettings() {
   const [preferences, setPreferences] = useState<any>(null); const [busy, setBusy] = useState(false);
+  useActionPending(busy);
   const [permission, setPermission] = useState("unsupported");
   const [deviceReady, setDeviceReady] = useState(false);
   useEffect(() => {

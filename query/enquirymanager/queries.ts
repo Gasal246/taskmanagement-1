@@ -80,6 +80,7 @@ export const useUpdateEnquiryCatalogueItem = () => {
 //Get Countries
 export const useGetEqCountries = () => {
     return useMutation({
+        meta: { background: true, refresh: false },
         mutationFn: () => GetEqCountries(),
     })
 };
@@ -459,7 +460,7 @@ export const useGetEnquiriesByAgent = () => {
 //Get Agents with search
 export const useGetAgentsByBusiness = (business_id: string, search: string) => {
     return useQuery({
-        queryKey: ["agents", search],
+        queryKey: ["agents", business_id, search],
         queryFn: () => GetAgentsByBusiness(business_id, search),
         enabled: !!business_id,
     })
@@ -478,6 +479,7 @@ export const useGetEnquiriesWithFilters = (queryParams: Record<string, string | 
 //Export Enquiries (selected or filtered)
 export const useExportEnquiries = () => {
     return useMutation({
+        meta: { refresh: false },
         mutationFn: (payload: any) => ExportEnquiries(payload),
     })
 }
@@ -607,7 +609,7 @@ export const useUpdateEqCamp = () => {
 //Get Area by Id
 export const useGetEqAreaById = (area_id: string) => {
     return useQuery({
-        queryKey: ["area", area_id],
+        queryKey: ["area-detail", area_id],
         queryFn: () => GetEqAreaById(area_id),
         enabled: !!area_id
     })
@@ -616,7 +618,7 @@ export const useGetEqAreaById = (area_id: string) => {
 //Get Camp by Id
 export const useGetEqCampById = (enquiry_id: string, is_new:boolean) => {
     return useQuery({
-        queryKey: ["camp", is_new],
+        queryKey: ["camp", "enquiry", enquiry_id, is_new],
         queryFn: () => GetEqCampsByEnquiry(enquiry_id, is_new),
         enabled: !!enquiry_id
     })
@@ -739,7 +741,7 @@ export const usePutEnquiryEditReq = () => {
 //Get Enquiry Edit
 export const useGetEqEdit = (enquiry_id: string) => {
     return useQuery({
-        queryKey: ["enquiry", enquiry_id],
+        queryKey: ["enquiry-edit", enquiry_id],
         queryFn: () => GetEqEdit(enquiry_id),
         enabled: !!enquiry_id
     })
