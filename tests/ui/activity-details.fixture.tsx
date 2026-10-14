@@ -12,7 +12,7 @@ const initial = {
   created_by: { _id: 'creator', name: 'Original Creator' },
   assignees: [person, { _id: 'other', name: 'Jordan Lee', email: 'jordan@example.invalid' }],
   reassignment_history: [{ action: 'assigned', actor_id: { _id: 'head', name: 'Sam Taylor' }, recipient_id: person, createdAt: '2026-10-14T10:00:00Z' }],
-  documents: [{ storagePath: 'document', name: 'Installation plan.pdf', extension: 'pdf', mimeType: 'application/pdf', url: '', size: 400 }],
+  documents: [{ storagePath: 'document', name: 'Installation plan.pdf', extension: 'pdf', mimeType: 'application/pdf', url: '', size: 400 }, { storagePath: 'photo', name: 'Installation photo.png', extension: 'png', mimeType: 'image/png', url: '', size: 100 }],
 };
 function Fixture() {
   const [open, setOpen] = useState(false);

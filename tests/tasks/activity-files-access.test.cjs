@@ -73,6 +73,7 @@ function filesFixture({ status = 200, editor = true, deleted = false, missing = 
   const doc = { storagePath, name: 'Report résumé.pdf', mimeType: 'application/pdf' };
   let saves = [], downloads = [];
   const route = load('app/api/task/activity-files/route.ts', {
+    '@/lib/http-byte-range': load('lib/http-byte-range.ts'),
     'node:crypto': require('node:crypto'), mongoose: { default: mongoose }, 'next/server': { NextRequest, NextResponse },
     '@/auth': { auth: async () => ({ user: { id: userId } }) },
     '@/lib/utils': { resolveSessionUserId: session => session.user.id },
@@ -210,4 +211,44 @@ test('comment list and posting pass the reporting context and return authenticat
   assert.equal(posted.status, 201);
   assert.equal(created, 1);
   assert.deepEqual(authorized, [['viewer', activityId, 'verified-head'], ['viewer', activityId, 'verified-head']]);
+});
+
+test('voice uploads use Firebase objects and metadata validated against storage', async () => {
+  for (const [extension, mime] of [['webm', 'audio/webm'], ['m4a', 'audio/mp4'], ['ogg', 'audio/ogg'], ['mp3', 'audio/mpeg']]) {
+    const { route, saves } = filesFixture();
+    const response = await upload(route, { comment: true, name: `voice.${extension}`, bytes: 128 });
+    assert.equal(response.status, 201);
+    const { file } = await response.json();
+    assert.equal(file.mimeType, mime);
+    assert.equal(saves[0].options.metadata.contentType, mime);
+    assert.equal(saves[0].bytes.length, 128);
+    assert.match(file.storagePath, /^task-activity-comments\//);
+    const validator = load('app/api/helpers/activity-comment-attachments.ts', {
+      '@/lib/activityCommentAttachments': attachments,
+      '@/lib/firebaseAdmin': { getAdminStorageBucket: () => ({ name: 'test-bucket', file: () => ({ getMetadata: async () => [{ ...saves[0].options.metadata, size: 128 }] }) }) },
+    });
+    assert.equal((await validator.validateActivityCommentAttachment(file, { taskId, activityId, userId: 'viewer' })).storagePath, file.storagePath);
+    await assert.rejects(validator.validateActivityCommentAttachment(file, { taskId, activityId, userId: 'other' }), /storage path/);
+  }
+  assert.equal(attachments.isMimeTypeAllowedForExtension('audio/webm;codecs=opus', 'webm'), true);
+  assert.equal(attachments.isMimeTypeAllowedForExtension('video/webm', 'webm'), false);
+  assert.equal(attachments.isAudioAttachment({ extension: 'm4a' }), true);
+});
+
+test('authenticated media supports byte ranges without bypassing access checks', async () => {
+  const { route } = filesFixture();
+  for (const [header, expected, contentRange] of [['bytes=0-3', 'file', 'bytes 0-3/10'], ['bytes=5-', 'bytes', 'bytes 5-9/10'], ['bytes=-5', 'bytes', 'bytes 5-9/10']]) {
+    const response = await route.GET(new NextRequest(`http://localhost/api/task/activity-files?commentId=${commentId}`, { headers: { range: header } }));
+    assert.equal(response.status, 206);
+    assert.equal(response.headers.get('content-range'), contentRange);
+    assert.equal(await response.text(), expected);
+  }
+  for (const range of ['bytes=11-', 'bytes=5-2', 'bytes=-0', 'bytes=0-1,3-5', 'invalid']) {
+    const response = await route.GET(new NextRequest(`http://localhost/api/task/activity-files?commentId=${commentId}`, { headers: { range } }));
+    assert.equal(response.status, 416);
+  }
+  const denied = filesFixture({ status: 403 });
+  const response = await denied.route.GET(new NextRequest(`http://localhost/api/task/activity-files?commentId=${commentId}`, { headers: { range: 'bytes=0-3' } }));
+  assert.equal(response.status, 403);
+  assert.equal(denied.downloads.length, 0);
 });

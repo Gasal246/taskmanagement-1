@@ -1,3 +1,4 @@
+import { parseByteRange } from "@/lib/http-byte-range";
 import { randomUUID } from "node:crypto";
 import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
@@ -125,11 +126,22 @@ export async function GET(req: NextRequest) {
   try {
     const [bytes] = await getAdminStorageBucket().file(file.storagePath).download();
     const disposition = req.nextUrl.searchParams.get("download") === "1" ? "attachment" : "inline";
-    return new Response(new Uint8Array(bytes), { headers: {
+    const headers: Record<string, string> = {
       "Content-Type": file.mimeType || "application/octet-stream",
       "Content-Disposition": `${disposition}; filename="${sanitizeActivityDocumentName(file.name)}"; filename*=UTF-8''${encodeURIComponent(file.name).replace(/['()*]/g, c => `%${c.charCodeAt(0).toString(16)}`)}`,
       "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff",
-    } });
+      "Accept-Ranges": "bytes",
+    };
+    const rangeHeader = req.headers.get("range");
+    if (rangeHeader) {
+      const range = parseByteRange(rangeHeader, bytes.length);
+      if (!range) return new Response(null, { status: 416, headers: { ...headers, "Content-Range": `bytes */${bytes.length}` } });
+      headers["Content-Range"] = `bytes ${range.start}-${range.end}/${bytes.length}`;
+      headers["Content-Length"] = String(range.end - range.start + 1);
+      return new Response(new Uint8Array(bytes.subarray(range.start, range.end + 1)), { status: 206, headers });
+    }
+    headers["Content-Length"] = String(bytes.length);
+    return new Response(new Uint8Array(bytes), { headers });
   } catch (error: any) {
     console.error("Activity file download failed", error);
     return failure(error?.code === 404 ? "File not found" : "Could not download the file", error?.code === 404 ? 404 : 502);

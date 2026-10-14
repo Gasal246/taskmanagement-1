@@ -11,6 +11,7 @@ export const ACTIVITY_COMMENT_ATTACHMENT_ACCEPT = [
   ".docx",
   ".xls",
   ".xlsx",
+  ".webm", ".m4a", ".ogg", ".mp3",
 ].join(",");
 
 export type ActivityCommentAttachment = {
@@ -25,7 +26,13 @@ export type ActivityCommentAttachmentPayload = ActivityCommentAttachment & {
   storagePath: string;
 };
 
+export const ACTIVITY_VOICE_MAX_SECONDS = 180;
+
 const MIME_TYPES_BY_EXTENSION: Record<string, readonly string[]> = {
+  webm: ["audio/webm"],
+  m4a: ["audio/mp4", "audio/x-m4a"],
+  ogg: ["audio/ogg"],
+  mp3: ["audio/mpeg", "audio/mp3"],
   jpg: ["image/jpeg"],
   jpeg: ["image/jpeg"],
   png: ["image/png"],
@@ -51,7 +58,7 @@ export const getCanonicalAttachmentMimeType = (extension: string) =>
 
 export const isMimeTypeAllowedForExtension = (mimeType: string, extension: string) => {
   if (!mimeType) return true;
-  return MIME_TYPES_BY_EXTENSION[extension.toLowerCase()]?.includes(mimeType.toLowerCase()) || false;
+  return MIME_TYPES_BY_EXTENSION[extension.toLowerCase()]?.includes(mimeType.toLowerCase().split(";")[0].trim()) || false;
 };
 
 export const isImageAttachment = (attachment: Pick<ActivityCommentAttachment, "extension" | "mimeType">) =>
@@ -75,3 +82,6 @@ export const sanitizeAttachmentFileName = (name: string) => {
     .replace(/^[-.]+|[-.]+$/g, "");
   return (cleaned || "attachment").slice(-180);
 };
+
+export const isAudioAttachment = (attachment: Pick<ActivityCommentAttachment, "extension">) =>
+  ["webm", "m4a", "ogg", "mp3"].includes(attachment.extension.toLowerCase());

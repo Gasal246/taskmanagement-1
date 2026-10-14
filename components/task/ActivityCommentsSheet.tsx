@@ -1,5 +1,7 @@
 "use client";
 
+import VoiceMessageRecorder from "./VoiceMessageRecorder";
+import AudioCommentAttachment from "./AudioCommentAttachment";
 import { requestJson } from "@/lib/request-json";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
@@ -46,6 +48,7 @@ import {
   getCanonicalAttachmentMimeType,
   isAllowedAttachmentExtension,
   isExcelAttachment,
+  isAudioAttachment,
   isImageAttachment,
   isMimeTypeAllowedForExtension,
   isPdfAttachment,
@@ -94,6 +97,7 @@ function AttachmentTile({
   onRemove?: () => void;
   disabled?: boolean;
 }) {
+  if (isAudioAttachment(attachment)) return <AudioCommentAttachment attachment={attachment} onRemove={onRemove} disabled={disabled} />;
   const image = isImageAttachment(attachment);
   const pdf = isPdfAttachment(attachment);
   const word = isWordAttachment(attachment);
@@ -318,6 +322,7 @@ export default function ActivityCommentsSheet({
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(initiallyOpen);
   const [draft, setDraft] = useState("");
+  const [recordingBusy, setRecordingBusy] = useState(false);
   const [replyTo, setReplyTo] = useState<ActivityComment | null>(null);
   const [pendingAttachment, setPendingAttachment] = useState<PendingAttachment | null>(null);
   const [viewerAttachment, setViewerAttachment] = useState<ActivityCommentAttachment | null>(null);
@@ -477,7 +482,7 @@ export default function ActivityCommentsSheet({
     const extension = getAttachmentExtension(file.name);
     if (!isAllowedAttachmentExtension(extension) || !isMimeTypeAllowedForExtension(file.type, extension)) {
       toast.error("Unsupported file type", {
-        description: "Choose an image, PDF, Word, or Excel file.",
+        description: "Choose an image, audio, PDF, Word, or Excel file.",
       });
       return;
     }
@@ -494,7 +499,7 @@ export default function ActivityCommentsSheet({
       extension,
       size: file.size,
     };
-    const previewUrl = isImageAttachment(baseAttachment) ? URL.createObjectURL(file) : null;
+    const previewUrl = (isImageAttachment(baseAttachment) || isAudioAttachment(baseAttachment)) ? URL.createObjectURL(file) : null;
     setPendingAttachment({
       file,
       previewUrl,
@@ -557,7 +562,7 @@ export default function ActivityCommentsSheet({
 
   const submit = () => {
     const body = draft.trim();
-    if ((!body && !pendingAttachment) || addComment.isPending) return;
+    if ((!body && !pendingAttachment) || addComment.isPending || recordingBusy) return;
     addComment.mutate({ body, parent: replyTo, pending: pendingAttachment });
   };
 
@@ -660,6 +665,7 @@ export default function ActivityCommentsSheet({
                 />
               </div>
             )}
+            {pendingAttachment && isAudioAttachment(pendingAttachment.attachment) && <p className="px-2 text-[11px] text-slate-500">Listen before sending. Remove the recording to record again.</p>}
             <Textarea
               value={draft}
               disabled={addComment.isPending}
@@ -673,12 +679,17 @@ export default function ActivityCommentsSheet({
               className="max-h-40 min-h-[72px] resize-none border-0 bg-transparent px-2 py-2 text-sm shadow-none focus-visible:ring-0"
             />
             <div className="flex items-center justify-between gap-2 border-t border-slate-800/80 px-1 pt-2">
-              <div className="flex min-w-0 items-center gap-2 text-[10px] text-slate-600">
+              <div className="flex min-w-0 flex-1 items-center gap-2 text-[10px] text-slate-600">
+                {open && <VoiceMessageRecorder disabled={addComment.isPending || Boolean(pendingAttachment)} onBusyChange={setRecordingBusy} onReady={file => {
+                  const previewUrl = URL.createObjectURL(file);
+                  setPendingAttachment({ file, previewUrl, attachment: { url: previewUrl, name: file.name, mimeType: file.type, extension: getAttachmentExtension(file.name), size: file.size } });
+                }} />}
+
                 <button
                   type="button"
-                  disabled={addComment.isPending}
+                  disabled={addComment.isPending || recordingBusy}
                   onClick={() => fileInputRef.current?.click()}
-                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-800 hover:text-cyan-300 disabled:opacity-50"
+                  className={`${recordingBusy ? "hidden" : "inline-flex"} h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-800 hover:text-cyan-300 disabled:opacity-50`}
                   aria-label={pendingAttachment ? "Replace attachment" : "Attach a file"}
                   title={pendingAttachment ? "Replace attachment" : "Attach a file"}
                 >
@@ -688,16 +699,16 @@ export default function ActivityCommentsSheet({
                   ref={fileInputRef}
                   type="file"
                   accept={ACTIVITY_COMMENT_ATTACHMENT_ACCEPT}
-                  disabled={addComment.isPending}
+                  disabled={addComment.isPending || recordingBusy}
                   onChange={handleFileChange}
                   className="hidden"
                 />
-                <span className="shrink-0">{draft.length}/2000</span>
-                <span className="hidden truncate sm:inline">Ctrl/⌘ + Enter to send</span>
+                {!recordingBusy && <span className="shrink-0">{draft.length}/2000</span>}
+                {!recordingBusy && <span className="hidden truncate sm:inline">Ctrl/⌘ + Enter to send</span>}
               </div>
               <Button
                 type="button"
-                disabled={(!draft.trim() && !pendingAttachment) || addComment.isPending}
+                disabled={(!draft.trim() && !pendingAttachment) || addComment.isPending || recordingBusy}
                 onClick={submit}
                 className="h-9 rounded-xl bg-cyan-700 px-3.5 text-xs font-semibold text-white shadow-[0_6px_20px_rgba(8,145,178,0.2)] hover:bg-cyan-600 disabled:shadow-none"
                 aria-label="Send comment"

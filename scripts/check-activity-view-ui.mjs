@@ -28,7 +28,8 @@ try {
   execFileSync(process.execPath, [require.resolve('tailwindcss/lib/cli.js'), '-i', path.join(root, 'app/globals.css'), '-o', path.join(temp, 'style.css')], { cwd: root, stdio: 'pipe' });
   const css = await fs.readFile(path.join(temp, 'style.css'), 'utf8');
   server = http.createServer(async (req, res) => {
-    if (req.url === "/fixture.js") { res.setHeader("Content-Type", "text/javascript; charset=utf-8"); res.end(await fs.readFile(path.join(temp, "fixture.js"))); }
+    if (req.url?.startsWith("/api/task/activity-files?")) { res.setHeader("Content-Type", "image/png"); res.end(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aD1sAAAAASUVORK5CYII=", "base64")); }
+    else if (req.url === "/fixture.js") { res.setHeader("Content-Type", "text/javascript; charset=utf-8"); res.end(await fs.readFile(path.join(temp, "fixture.js"))); }
     else if (req.url === "/style.css") { res.setHeader("Content-Type", "text/css"); res.end(css); }
     else if (req.url === "/") res.end('<!doctype html><html class="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/style.css"><style>body{background:#020617;color:#eee;padding:12px}button{border:1px solid #555;padding:6px;margin:4px}main{max-width:900px;margin:auto}</style></head><body><div id="root"></div><script src="/fixture.js"></script></body></html>');
     else { res.statusCode = 404; res.end(); }
@@ -74,6 +75,12 @@ try {
   await check('document.querySelector("[data-activity-detail-body]").textContent.includes("Sam Taylor") && document.querySelector("[data-activity-detail-body]").textContent.includes("Alex Morgan")', 'assignment actor and activity people are shown');
   await check('document.querySelectorAll("[role=dialog] input, [role=dialog] textarea").length === 0 && !document.querySelector("[role=dialog]").textContent.includes("Attach files")', 'view is read-only, including attachments');
   await check('document.querySelector("[data-activity-detail-body] a")?.getAttribute("href").includes("/api/task/activity-files?")', 'attachment downloads use the authorized file endpoint');
+  await evaluate(`document.querySelector('button[aria-label="Preview Installation photo.png"]').click()`);
+  await until('document.querySelectorAll("[role=dialog]").length === 2 && Array.from(document.querySelectorAll("[role=dialog] img")).some(image => image.alt === "Installation photo.png" && image.naturalWidth > 0 && getComputedStyle(image).objectFit === "contain")');
+  await check('Array.from(document.querySelectorAll("[role=dialog] a")).some(link => link.textContent.includes("Download") && link.href.includes("storagePath=photo") && link.href.includes("download=1"))', 'image preview loads through authenticated route and retains download');
+  await command('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+  await until('document.querySelectorAll("[role=dialog]").length === 1');
+  await check('document.activeElement?.getAttribute("aria-label") === "Preview Installation photo.png"', 'closing image preview restores its document tile and keeps the activity open');
   const before = await evaluate('document.querySelector("[data-activity-detail-footer]").getBoundingClientRect().top');
   await evaluate('document.querySelector("[data-activity-detail-body]").scrollTop = 10000');
   await check(`Math.abs(document.querySelector("[data-activity-detail-footer]").getBoundingClientRect().top - ${before}) < 2`, 'footer stays fixed while details scroll');
