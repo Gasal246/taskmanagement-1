@@ -1,12 +1,10 @@
 import mongoose from "mongoose";
 import { canReadEnquiry, enrichEnquiries, enquiryActor, canScheduleAction } from "@/lib/enquiries/completion-server";
-import { forwardHistoryFilter, historyOrder } from "@/lib/enquiries/completion";
 import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
 import Eq_camp_contacts from "@/models/eq_camp_contacts.model";
 import Eq_camp_headoffice from "@/models/eq_camp_headoffice.model";
 import Eq_enquiry from "@/models/eq_enquiries.model";
-import Eq_enquiry_histories from "@/models/eq_enquiry_histories";
 import Eq_enquiry_wifi_external from "@/models/eq_enquiry_wifi_external.model";
 import Eq_enquiry_wifi_personal from "@/models/eq_enquiry_wifi_personal.model";
 import { NextRequest, NextResponse } from "next/server";
@@ -60,22 +58,9 @@ export async function GET(req:NextRequest){
             personal_provider = await Eq_enquiry_wifi_personal.findOne({enquiry_id: enquiry?._id});
         }
 
-        const isAssigned:any = await Eq_enquiry_histories.findOne({enquiry_id: enquiry_id, ...forwardHistoryFilter}).sort(historyOrder).lean();
-
-        const assignedList = Array.isArray(isAssigned?.assigned_to)
-            ? isAssigned.assigned_to
-            : isAssigned?.assigned_to
-                ? [isAssigned.assigned_to]
-                : [];
         const hasAssignedAction = enriched.actions.some((action: any) => action.action_assignments.some((part: any) => String(part.user_id?._id || part.user_id) === actor.actorId));
-        const broughtByList = Array.isArray(enquiry?.enquiry_brought_by)
-        ? enquiry.enquiry_brought_by
-        : [];
-        const isCreatedByCurrentUser = String(enquiry?.createdBy?._id ?? enquiry?.createdBy ?? "") === String(session?.user?.id);
         const canForward = Boolean(enquiry.is_active && await canScheduleAction(enquiry, actor));
-        const canEdit = isCreatedByCurrentUser
-            || assignedList.some((id: any) => String(id) === actor.actorId)
-            || broughtByList.some((id: any) => String(id) === String(session?.user?.id));
+        const canEdit = enriched.canEdit;
 
         return NextResponse.json({enquiry: { ...enriched, enquiry_solutions: enquirySolutions, facility_solutions: facilitySolutions }, contacts, head_office, external_provider, personal_provider, canForward, hasAssignedAction, canEdit, status: 200}, {status: 200});
 

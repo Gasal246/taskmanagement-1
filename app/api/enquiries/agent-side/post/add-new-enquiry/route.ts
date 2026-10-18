@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
     let savedEnquiryId = "";
 
     await dbSession.withTransaction(async () => {
-      let areaId: any = facility.area_input_mode === "existing" ? body.area : null;
+      let areaId: any = facility.area_input_mode === "existing" ? facility.area : null;
       let campId: any = facility.camp_input_mode === "existing" && facility.area_input_mode === "existing" ? facility.camp : null;
       let projectSectorKey = facility.project_sector || "";
 

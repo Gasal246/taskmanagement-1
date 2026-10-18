@@ -1,3 +1,4 @@
+import Targets from "@/models/eq_enquiry_targets.model";
 import mongoose from "mongoose";
 import Enquiries from "@/models/eq_enquiries.model";
 import Access from "@/models/eq_enquiry_access.model";
@@ -15,6 +16,13 @@ export function staffEnquiryVisibilityStages(actorId: mongoose.Types.ObjectId, f
         pipeline: [{ $match: filter }], as: "_enquiry" } },
       { $unwind: "$_enquiry" },
       { $replaceWith: "$_enquiry" },
+    ] } },
+    { $unionWith: { coll: Targets.collection.name, pipeline: [
+      { $match: { assigned_user_ids: actorId } },
+      { $unwind: '$enquiry_ids' },
+      { $lookup: { from: Enquiries.collection.name, localField: 'enquiry_ids', foreignField: '_id', let: { business: '$business_id' },
+        pipeline: [{ $match: filter }, { $match: { $expr: { $eq: ['$business_id', '$$business'] } } }], as: '_enquiry' } },
+      { $unwind: '$_enquiry' }, { $replaceWith: '$_enquiry' },
     ] } },
     { $group: { _id: "$_id", _enquiry: { $first: "$$ROOT" } } },
     { $replaceWith: "$_enquiry" },

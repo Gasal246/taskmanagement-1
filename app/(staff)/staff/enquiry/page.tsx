@@ -387,7 +387,8 @@ export default function EnquiriesPage() {
           <PanelsTopLeft size={16} /> Enquiries
         </h1>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" className="text-xs" onClick={() => router.push("/staff/enquiry/targets")}>My Targets</Button>
           <Button variant="ghost" className="text-xs" onClick={() => router.push("/staff/enquiry/add-enquiry")}>
             Add Enquiry
           </Button>

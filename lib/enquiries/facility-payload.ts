@@ -11,6 +11,7 @@ const coordinate = (minimum: number, maximum: number, label: string) => z.prepro
 
 const baseFacilityPayloadSchema = z.object({
   area_input_mode: z.enum(["existing", "new"]).default("existing"),
+  area: optionalId,
   camp_input_mode: z.enum(["existing", "new"]).default("existing"),
   area_name_request: z.string().trim().max(200).optional().default(""),
   camp_name_request: z.string().trim().max(250).optional().default(""),
@@ -35,6 +36,8 @@ const baseFacilityPayloadSchema = z.object({
 export async function validateEnquiryFacilityPayload(input: unknown) {
   const parsed = baseFacilityPayloadSchema.parse(input);
   const requestingFacility = parsed.area_input_mode === "new" || parsed.camp_input_mode === "new";
+  if (parsed.area_input_mode === "new" && !parsed.area_name_request) throw new z.ZodError([{ code: "custom", path: ["area_name_request"], message: "New area name is required" }]);
+  if (requestingFacility && parsed.area_input_mode === "existing" && !/^[a-f\d]{24}$/i.test(parsed.area)) throw new z.ZodError([{ code: "custom", path: ["area"], message: "Select a valid Area" }]);
   if (requestingFacility && !parsed.camp_name_request) throw new z.ZodError([{ code: "custom", path: ["camp_name_request"], message: "Facility name is required" }]);
   if (!requestingFacility && !parsed.camp) throw new z.ZodError([{ code: "custom", path: ["camp"], message: "Select a Facility" }]);
   const catalogue = await getEnquiryCatalogue({ fresh: true });

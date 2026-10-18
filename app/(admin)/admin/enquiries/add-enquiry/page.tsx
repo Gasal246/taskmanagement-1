@@ -139,6 +139,8 @@ const enquirySchema = z.object({
 
 }).superRefine((values, ctx) => {
     const newFacility = values.area_input_mode === "new" || values.camp_input_mode === "new";
+    if (values.area_input_mode === "existing" && !/^[a-f\d]{24}$/i.test(values.area?.trim() || "")) ctx.addIssue({ code: "custom", path: ["area"], message: "Select an Area" });
+    if (values.area_input_mode === "new" && !values.area_name_request?.trim()) ctx.addIssue({ code: "custom", path: ["area_name_request"], message: "New area name is required" });
     if (newFacility && !values.camp_name_request?.trim()) ctx.addIssue({ code: "custom", path: ["camp_name_request"], message: "Facility name is required" });
     if (newFacility && !values.project_sector) ctx.addIssue({ code: "custom", path: ["project_sector"], message: "Select a project sector" });
     if (newFacility && !values.facility_type) ctx.addIssue({ code: "custom", path: ["facility_type"], message: "Select a facility type" });
@@ -575,6 +577,7 @@ export default function AddEnquiry() {
                                                         </SelectContent>
                                                     </Select>
                                                 </div>
+                                                <FormMessage />
                                             </FormItem>
                                         )} />
                                     )}
@@ -584,6 +587,7 @@ export default function AddEnquiry() {
                                             <FormItem className="w-full">
                                                 <FormLabel className="text-xs text-slate-300 font-semibold">New Area Name</FormLabel>
                                                 <FormControl><Input placeholder="Enter area name to request" {...field} value={field.value ?? ""} className="bg-slate-950/40" /></FormControl>
+                                                <FormMessage />
                                             </FormItem>
                                         )} />
                                     )}

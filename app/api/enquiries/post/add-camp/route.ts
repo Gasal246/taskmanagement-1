@@ -7,6 +7,7 @@ import Eq_camp_client_company from "@/models/eq_camp_client_company.model";
 import Eq_camp_landlord from "@/models/eq_camp_landlord.model";
 import Eq_camp_realestate from "@/models/eq_camp_realestate.model";
 import Eq_camps from "@/models/eq_camps.model";
+import mongoose from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
 
 
@@ -39,6 +40,10 @@ export async function POST(req:NextRequest){
         if (!actor) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
         const businessId = await resolveEnquiryCreationBusiness(req, actor, body.business_id);
         if (!actor.admin || !businessId) return NextResponse.json({ message: "Select a business you administer" }, { status: 403 });
+        if (typeof body.area_id !== "string" || !mongoose.isObjectIdOrHexString(body.area_id.trim())) {
+            return NextResponse.json({ message: "Select a valid Area", status: 400 }, { status: 400 });
+        }
+        body.area_id = body.area_id.trim();
         const classification = await validateDynamicClassification(body);
         const supporting = projectSupportingFieldsSchema.safeParse(body);
         if (!supporting.success) return NextResponse.json({ message: supporting.error.issues[0].message, status: 400 }, { status: 400 });

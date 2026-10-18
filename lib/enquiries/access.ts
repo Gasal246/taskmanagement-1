@@ -1,3 +1,4 @@
+import { hasTargetAccess, targetVisibilityLookup } from "./target-access";
 import mongoose from "mongoose";
 import { auth } from "@/auth";
 import Enquiries from "@/models/eq_enquiries.model";
@@ -37,15 +38,16 @@ export function enquiryManagementFilter(actor: EnquiryActor) {
 }
 export async function canReadEnquiry(enquiry: any, actor: EnquiryActor) {
   if (canAdministerEnquiry(enquiry, actor) || idOf(enquiry.createdBy) === actor.actorId || (enquiry.enquiry_brought_by || []).some((id: any) => idOf(id) === actor.actorId)) return true;
-  const [shared, assigned] = await Promise.all([
+  const [targeted, shared, assigned] = await Promise.all([
+    hasTargetAccess(enquiry, actor.actorId),
     Access.exists({ enquiry_id: enquiry._id, user_id: actor.actorId }),
     Histories.exists({ enquiry_id: enquiry._id, assigned_to: actor.actorId, ...actionHistoryFilter }),
   ]);
-  return Boolean(shared || assigned);
+  return Boolean(shared || assigned || targeted);
 }
 export async function canScheduleAction(enquiry: any, actor: EnquiryActor) {
   if (canAdministerEnquiry(enquiry, actor) || idOf(enquiry.createdBy) === actor.actorId) return true;
-  return Boolean(await Histories.exists({ enquiry_id: enquiry._id, assigned_to: actor.actorId, ...actionHistoryFilter }));
+  return await hasTargetAccess(enquiry, actor.actorId) || Boolean(await Histories.exists({ enquiry_id: enquiry._id, assigned_to: actor.actorId, ...actionHistoryFilter }));
 }
 export async function canEditEnquiry(enquiry: any, actor: EnquiryActor) {
   return canAdministerEnquiry(enquiry, actor) || (enquiry.enquiry_brought_by || []).some((id: any) => idOf(id) === actor.actorId) || await canScheduleAction(enquiry, actor);
@@ -99,6 +101,10 @@ export async function editableEnquiryForCamp(campId: unknown, actor: EnquiryActo
   if (managed && actor.admin) return managed;
   const own: any = await Enquiries.findOne({ camp_id: campId, $or: [{ createdBy: actor.actorId }, { enquiry_brought_by: actor.actorId }] }).select("_id camp_id").lean();
   if (own) return own;
+  const Targets = (await import('@/models/eq_enquiry_targets.model')).default;
+  const targetedIds = await Targets.find({ assigned_user_ids: actor.actorId }).distinct('enquiry_ids');
+  const targeted: any = await Enquiries.findOne({ camp_id: campId, _id: { $in: targetedIds } }).select('_id camp_id business_id').lean();
+  if (targeted && await hasTargetAccess(targeted, actor.actorId)) return targeted;
   const assignedIds = await Histories.find({ camp_id: campId, assigned_to: actor.actorId, ...actionHistoryFilter }).distinct("enquiry_id");
   return Enquiries.findOne({ camp_id: campId, _id: { $in: assignedIds } }).select("_id camp_id").lean();
 }
@@ -123,10 +129,11 @@ export function enquiryVisibilityStages(actor: EnquiryActor): any[] {
   if (actor.isSuper) return [];
   const userId = new mongoose.Types.ObjectId(actor.actorId);
   return [
+    targetVisibilityLookup(userId),
     { $lookup: { from: Access.collection.name, localField: "_id", foreignField: "enquiry_id", pipeline: [{ $match: { user_id: userId } }, { $limit: 1 }, { $project: { _id: 1 } }], as: "_recordAccess" } },
     { $lookup: { from: Histories.collection.name, localField: "_id", foreignField: "enquiry_id", pipeline: [{ $match: { assigned_to: userId, ...actionHistoryFilter } }, { $limit: 1 }, { $project: { _id: 1 } }], as: "_recordAssignment" } },
-    { $match: { $or: [enquiryManagementFilter(actor), { createdBy: userId }, { enquiry_brought_by: userId }, { "_recordAccess.0": { $exists: true } }, { "_recordAssignment.0": { $exists: true } }] } },
-    { $unset: ["_recordAccess", "_recordAssignment"] },
+    { $match: { $or: [enquiryManagementFilter(actor), { createdBy: userId }, { enquiry_brought_by: userId }, { "_targetAccess.0": { $exists: true } }, { "_recordAccess.0": { $exists: true } }, { "_recordAssignment.0": { $exists: true } }] } },
+    { $unset: ["_recordAccess", "_recordAssignment", "_targetAccess"] },
   ];
 }
 export async function countReadableEnquiries(filter: Record<string, any>, actor: EnquiryActor) {

@@ -494,7 +494,8 @@ export default function EnquiriesPage() {
         <h1 className="font-semibold text-sm text-slate-300 flex items-center gap-1">
           <PanelsTopLeft size={16} /> Enquiries List
         </h1>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" className="text-xs" onClick={() => router.push("/admin/enquiries/targets")}>Targets</Button>
           <Button variant="outline"
             className="text-xs border-slate-700 bg-slate-900/40 text-slate-100 hover:bg-slate-800/60"
             onClick={() => router.push("/admin/enquiries")}>

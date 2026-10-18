@@ -146,6 +146,7 @@ export default function EnquiriesDashboardPage() {
   ];
 
   const tools: ToolCard[] = [
+    { title: 'Targets', description: 'Assign shared enquiry work by region, month, and week.', href: '/admin/enquiries/targets', icon: ClipboardList },
     {
       title: "Facility Map",
       description: "Review facility coverage visually across regions and provinces.",

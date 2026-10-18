@@ -1,3 +1,4 @@
+import { targetEnquiryIds } from "./target-access";
 import { ENQUIRY_ACTIONS } from "./action-types.mjs";
 import mongoose from 'mongoose';
 import Eq_enquiry from '@/models/eq_enquiries.model';
@@ -34,9 +35,10 @@ export async function actionsForEnquiries(entries: any[]) {
 export async function enrichEnquiries(entries: any[], actor: EnquiryActor) {
   // Resolve creators once per page without replacing IDs used by access checks.
   const creatorIds = [...new Set(entries.map(entry => idOf(entry.createdBy)).filter(id => mongoose.isValidObjectId(id)))];
-  const [actions, creators] = await Promise.all([
+  const [actions, creators, targetedIds] = await Promise.all([
     actionsForEnquiries(entries),
     creatorIds.length ? Users.find({ _id: { $in: creatorIds } }).select('name').lean() : Promise.resolve([]),
+    targetEnquiryIds(entries, actor.actorId),
   ]);
   const creatorNames = new Map(creators.map(creator => [idOf(creator), creator.name]));
   const byEnquiry = new Map<string, any[]>();
@@ -58,7 +60,7 @@ export async function enrichEnquiries(entries: any[], actor: EnquiryActor) {
     })).sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
     const completed = list.flatMap(action => action.action_assignments.filter((p: any) => p.status === 'completed').map((part: any) => ({ ...part, action: part.performed_action || action.action, action_id: action._id })))
       .sort((a, b) => +new Date(b.completed_at) - +new Date(a.completed_at));
-    const canSchedule = manages || idOf(entry.createdBy) === actor.actorId || list.some(a => a.action_assignments.some((p: any) => idOf(p.user_id) === actor.actorId));
+    const canSchedule = targetedIds.has(idOf(entry)) || manages || idOf(entry.createdBy) === actor.actorId || list.some(a => a.action_assignments.some((p: any) => idOf(p.user_id) === actor.actorId));
     return { ...entry, createdByName: creatorNames.get(idOf(entry.createdBy)) || null, actions: list, latest_forward: list.find(a => a.change_type === 'FORWARD' || !a.change_type) || null,
       latest_action: list[0] || null, last_completed_action: completed[0] || null,
       pending_action_parts: list.reduce((sum, a) => sum + a.progress.pending, 0),

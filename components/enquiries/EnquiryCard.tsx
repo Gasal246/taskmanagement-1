@@ -1,4 +1,5 @@
 "use client";
+import { type ReactNode } from "react";
 import Link from "next/link";
 import { ArrowUpRight, Building2 } from "lucide-react";
 import EnquiryCompletionActions, { enquiryDate } from "./EnquiryCompletionActions";
@@ -6,7 +7,7 @@ import { EMPTY_ENQUIRY_CATALOGUE, getCatalogueClassificationLabels } from "@/lib
 import { useGetEnquiryCatalogue } from "@/query/enquirymanager/queries";
 
 
-export default function EnquiryCard({ enquiry: e, number, basePath, staff = false }: { enquiry: any; number: number; basePath: string; staff?: boolean }) {
+export default function EnquiryCard({ enquiry: e, number, basePath, staff = false, targetNote, targetControls }: { enquiry: any; number: number; basePath: string; staff?: boolean; targetNote?: string; targetControls?: ReactNode }) {
   const complete = e.actions?.length > 0 && e.actions.every((a: any) => a.progress?.status === "completed");
   const { data: catalogueData, isLoading: isCatalogueLoading } = useGetEnquiryCatalogue();
   const catalogue = catalogueData?.catalogue || EMPTY_ENQUIRY_CATALOGUE;
@@ -24,7 +25,8 @@ export default function EnquiryCard({ enquiry: e, number, basePath, staff = fals
         <div className="flex items-center gap-2 text-xs text-slate-400"><Building2 size={15} /><span>{String(number).padStart(2, "0")} · {e.enquiry_uuid || "Enquiry"}</span></div>
         <h2 className="mt-2 break-words text-base font-semibold text-slate-100 group-hover:text-cyan-100">{e.camp_id?.camp_name || "Facility not linked"} <ArrowUpRight size={16} className="inline text-slate-500" /></h2>
       </Link>
-      <div className="flex flex-wrap gap-2 text-[11px] font-semibold">
+      <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold">
+        {targetControls && <div className="relative z-10 flex gap-2">{targetControls}</div>}
         {!e.is_active && <span className="rounded-full border border-amber-500/40 bg-amber-950/50 px-2.5 py-1 text-amber-200">Awaiting approval</span>}
         <span className={`rounded-full border px-2.5 py-1 ${complete ? "border-emerald-700 bg-emerald-950/60 text-emerald-200" : "border-slate-700 bg-slate-800 text-slate-300"}`}>{complete ? "All actions completed" : e.actions?.length ? "Actions in progress" : "No action"}</span>
       </div>
@@ -32,6 +34,7 @@ export default function EnquiryCard({ enquiry: e, number, basePath, staff = fals
     <dl className="my-4 grid grid-cols-2 gap-x-5 gap-y-3 text-xs sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
       {[["Status", e.status || "Not set"], ["Priority", staff ? e.forwarded_priority ?? e.priority : e.priority], ["Project Sector", projectSector], ["Facility Type", facilityType], ["Occupancy", e.camp_id?.camp_occupancy ?? "Not specified"], ["WiFi", e.wifi_available === true ? "Yes" : e.wifi_available === false ? "No" : "Not specified"], ["Due date", enquiryDate(e.due_date)]].map(([label, value]) => <div key={label}><dt className="mb-1 text-slate-500">{label}</dt><dd className="break-words font-medium text-slate-200">{value || "Not set"}</dd></div>)}
     </dl>
+    {targetNote && <div className="relative z-10 mb-4 rounded-lg border border-slate-700 bg-slate-900/50 p-3 text-sm"><p className="mb-1 font-medium text-slate-300">Note</p><p className="whitespace-pre-wrap break-words text-slate-200">{targetNote}</p></div>}
     <div className="relative z-10 space-y-3 border-t border-slate-800 pt-3">
       <EnquiryCompletionActions enquiry={e} basePath={basePath} />
       <div className="flex flex-wrap gap-x-5 gap-y-1 text-[11px] text-slate-400"><span className="min-w-0 break-words">Brought By: <span className="font-medium text-slate-200">{e.createdByName || e.createdBy?.name || "Unknown"}</span></span><span>Created at: {enquiryDate(e.createdAt)}</span><span>Recent Update At: {enquiryDate(e.updatedAt)}</span></div>

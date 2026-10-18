@@ -67,6 +67,18 @@ async function review(request, values = {}, who = admin) {
 }
 const fails = (fn, status) => assert.rejects(fn, err => err.status === status);
 
+test('head office directory loads requests linked to enquiries', async () => {
+  const f = await fixture();
+  const request = await submit(f);
+  global.enquiryTestSession = { user: { id: String(creator) } };
+  const response = await routes.GET(new NextRequest(`http://local/api/enquiries/head-office-requests?enquiry_id=${f.enquiry._id}`));
+  const body = await response.json();
+  assert.equal(response.status, 200, body.message);
+  const loaded = body.requests.find(row => row._id === String(request._id));
+  assert.equal(loaded.enquiry_id._id, String(f.enquiry._id));
+  assert.equal(loaded.enquiry_id.camp_id, String(f.camp._id));
+});
+
 test('staff proposals never modify approved office or facility; shared approval changes all linked views', async () => {
   const f = await fixture(); const second = await Camps.create({ business_id: f.business._id, camp_name: 'Facility B', headoffice_id: f.office._id });
   const request = await submit(f);
@@ -213,6 +225,32 @@ test('adding a staff enquiry stores its new facility and head office proposal at
   const before = await Eq.countDocuments();
   const denied = await route.POST(new NextRequest('http://local/api/enquiries/agent-side/post/add-new-enquiry', { method: 'POST', body: JSON.stringify({ ...body, head_office_request: { operation: 'link', selected_office_id: String(oid()) } }) }));
   assert.equal(denied.status, 404); assert.equal(await Eq.countDocuments(), before);
+});
+test('invalid enquiry area input returns 400 without creating related records', async () => {
+  const f = await fixture(); global.enquiryTestSession = { user: { id: String(creator) } };
+  const route = require('../../app/api/enquiries/agent-side/post/add-new-enquiry/route.ts');
+  const Areas = require('../../models/eq_area.model.ts').default;
+  const Landlords = require('../../models/eq_camp_landlord.model.ts').default;
+  const counts = () => Promise.all([Eq, Camps, Areas, Landlords, Requests].map(model => model.countDocuments()));
+  const before = await counts();
+  const body = { business_id: String(f.business._id), country: String(oid()), region: String(oid()), area_input_mode: 'existing', camp_input_mode: 'new', camp_name_request: 'Invalid area facility', project_sector: 'WFA', facility_type: 'WFA-01', solutions_required: [], followup_status: 'Lead Received', landlord: 'Must not be saved' };
+  for (const input of [{ area: '' }, { area: 'invalid' }, { area_input_mode: 'new', area_name_request: '   ' }]) {
+    const response = await route.POST(new NextRequest('http://local/api/enquiries/agent-side/post/add-new-enquiry', { method: 'POST', body: JSON.stringify({ ...body, ...input }) }));
+    const result = await response.json();
+    assert.equal(response.status, 400, JSON.stringify(result));
+    assert.match(result.message, /area/i);
+    assert.deepEqual(await counts(), before);
+  }
+});
+test('admin facility creation rejects blank and malformed area IDs before saving', async () => {
+  const f = await fixture(); global.enquiryTestSession = { user: { id: admin.actorId, is_super: true } };
+  const route = require('../../app/api/enquiries/post/add-camp/route.ts');
+  const before = await Camps.countDocuments();
+  for (const area_id of [undefined, '', '   ', 'invalid']) {
+    const response = await route.POST(new NextRequest('http://local/api/enquiries/post/add-camp', { method: 'POST', body: JSON.stringify({ business_id: String(f.business._id), area_id, camp_name: 'Invalid area facility' }) }));
+    assert.equal(response.status, 400, JSON.stringify(await response.json()));
+    assert.equal(await Camps.countDocuments(), before);
+  }
 });
 test('staff enquiry edit with legacy head office fields submits a proposal without changing live details', async () => {
   const f = await fixture(); global.enquiryTestSession = { user: { id: String(creator) } };
