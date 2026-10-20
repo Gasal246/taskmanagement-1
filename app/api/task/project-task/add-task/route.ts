@@ -1,7 +1,7 @@
 import { inTransaction } from "@/lib/jobs/transaction";
 import { enqueueNotifications } from "@/lib/jobs/enqueue";
 import { canAccessBusiness, canAdministerBusiness } from "@/lib/server-access";
-import { resolveSelectedHeadContext, getSelectedHeadDirectStaffIds } from "@/app/api/helpers/head-reassignment-scope";
+import { resolveSelectedHeadContext } from "@/app/api/helpers/head-reassignment-scope";
 import Staff from "@/models/business_staffs.model";
 import { auth } from "@/auth";
 import connectDB from "@/lib/mongo";
@@ -85,8 +85,8 @@ export async function POST(req:NextRequest){
                 if (!target || !member) return NextResponse.json({ message: "Assignee must be active staff in this business" }, { status: 400 });
                 if (String(body.assigned_to) !== String(session.user.id) && !await canAdministerBusiness(session.user.id, body.business_id)) {
                     const head = await resolveSelectedHeadContext(req, session.user.id, body.business_id);
-                    const staffIds = head ? await getSelectedHeadDirectStaffIds(head) : [];
-                    if (!staffIds.includes(body.assigned_to)) return NextResponse.json({ message: "Assignee is outside your reporting scope" }, { status: 403 });
+                    // Verified heads may assign tasks across departments within this business.
+                    if (!head) return NextResponse.json({ message: "Only heads and business administrators can assign tasks to other staff" }, { status: 403 });
                 }
             }
         }
