@@ -335,7 +335,7 @@ export async function GetEqCampsFiltered(queryParams:any){
 }
 
 //Get Camps for map
-export async function GetEqCampsForMap(queryParams:any, signal?: AbortSignal){
+export async function GetEqCampsForMap(queryParams:any, signal?: AbortSignal, audience: "admin" | "staff" = "admin"){
     try{
         const safeParams: Record<string, string> = {};
 
@@ -348,7 +348,8 @@ export async function GetEqCampsForMap(queryParams:any, signal?: AbortSignal){
         }
 
         const queryString = new URLSearchParams(safeParams).toString();
-        const res = await axios.get(`/api/enquiries/get/camps/map?${queryString}`, { signal, timeout: 15_000 });
+        const endpoint = audience === "staff" ? "/api/enquiries/staff-side/get/camps/map" : "/api/enquiries/get/camps/map";
+        const res = await axios.get(`${endpoint}?${queryString}`, { signal, timeout: 15_000 });
         return res.data;
     }catch(err){
         throw err;

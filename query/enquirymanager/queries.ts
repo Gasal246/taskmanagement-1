@@ -382,16 +382,16 @@ export const useGetEqCampsFiltered = (queryParams: Record<string, string | numbe
 }
 
 //Get Camps for map
-export const useGetEqCampsForMap = (queryParams: Record<string, string | number | undefined>, enabled = true) => {
+export const useGetEqCampsForMap = (queryParams: Record<string, string | number | undefined>, enabled = true, audience: "admin" | "staff" = "admin") => {
     const { data: session } = useSession();
     return useQuery({
-        queryKey: ["camps-map", session?.user?.id, queryParams],
-        queryFn: ({ signal }) => GetEqCampsForMap(queryParams, signal),
+        queryKey: ["camps-map", session?.user?.id, queryParams, audience],
+        queryFn: ({ signal }) => GetEqCampsForMap(queryParams, signal, audience),
         enabled: enabled && Boolean(session?.user?.id),
         gcTime: queryParams.mode === "viewport" ? 30_000 : 300_000,
         placeholderData: (previous, previousQuery) => {
             const previousParams = previousQuery?.queryKey[2] as typeof queryParams | undefined;
-            return queryParams.mode === "viewport" && previousQuery?.queryKey[1] === session?.user?.id
+            return queryParams.mode === "viewport" && previousQuery?.queryKey[1] === session?.user?.id && previousQuery?.queryKey[3] === audience
                 && ["mode", "country_id", "region_id", "province_id"].every(key => previousParams?.[key] === queryParams[key])
                 ? previous : undefined;
         },
@@ -399,9 +399,10 @@ export const useGetEqCampsForMap = (queryParams: Record<string, string | number 
 }
 
 //Get custom map pins
-export const useGetEqCustomMapPins = () => {
+export const useGetEqCustomMapPins = (enabled = true) => {
     return useQuery({
         queryKey: ["custom-map-pins"],
+        enabled,
         queryFn: () => GetEqCustomMapPins(),
     })
 }

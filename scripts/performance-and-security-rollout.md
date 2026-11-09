@@ -265,19 +265,21 @@ Before enabling production traffic, use staging to verify a real inbox/push noti
 
 ## Facility map and calendar pagination rollout
 
-The map API now has three modes, all requiring a signed-in session:
+The Admin Map API has three modes, all requiring an administrator session and persisted enquiry business ownership. Business admins see facilities linked to enquiries in their active administered businesses; superadmins see all enquiries. Pending facilities are included as `Just Added`. One marker represents one facility; the newest enquiry within that authorized scope supplies its status and coordinates when legacy duplicates exist.
 
-- `mode=overview` computes status totals and initial bounds over all approved facilities with indexed coordinates in the selected country/region/province. It returns no facility documents.
-- `mode=viewport&south=…&west=…&north=…&east=…&zoom=…` queries only the visible rectangle. Bounds crossing the date line split into two rectangles. Adaptive grid aggregation produces fewer than 500 cells without collecting arrays of facility IDs; single-facility cells alone are populated. A cluster count includes every matching facility in its cell. This reduces client marker work while retaining full coverage, including coincident facilities that can be opened in the location list.
+- `mode=overview` computes status totals and initial bounds over the authorized enquiries' facilities with valid coordinates in the selected country/region/province. It returns no facility documents. `unmappedTotal` counts facilities that need valid coordinates, and the page displays that count.
+- `mode=viewport&south=…&west=…&north=…&east=…&zoom=…` returns only the visible rectangle. Bounds crossing the date line split into two longitude ranges. Adaptive grid aggregation produces fewer than 500 cells without collecting arrays of facility IDs; single-facility cells alone are populated. A cluster count includes every matching facility in its cell. This reduces client marker work while retaining full coverage, including coincident facilities that can be opened in the location list.
 - `mode=list&page=…&limit=…&search=…` searches the selected geography or cluster rectangle before pagination. The default page is 50, maximum 100. Names, location names and coordinates are searched literally; only page records are populated. This list preserves access to facilities outside the visible map area.
 
-Approved facility geography remains a shared catalogue, as before. The map API does not return enquiry records, grant enquiry access or change enquiry business ownership rules. Personal custom-pin management remains unchanged; only the selected custom pin is rendered on this map.
+The directory remains a shared catalogue, but the Admin Map is scoped through enquiry ownership rather than returning the entire directory. It exposes only facility presentation fields. Personal custom-pin management remains unchanged; only the selected custom pin is rendered on this map.
+
+The map validates the enquiry's latitude/longitude pair first, falling back to the facility's source coordinate pair if needed. It never mixes coordinates from different sources. Geography follows the enquiry with a fallback for missing location IDs. Marker colours derive from enquiry sales statuses through the shared status mapping; pending enquiries or facilities remain `Just Added` until approval.
 
 Facility `latitude`/`longitude` strings remain the source fields. The additive `map_point` is a numeric `[longitude, latitude]` pair derived by document validation; zero is valid, blank/non-finite/out-of-range coordinates are excluded. Projected name/status saves preserve existing points. Coordinate changes through query updates are rejected: load both source fields and use `save()`, so the source and derived pair change together. Raw database/import writers must maintain the pair or rerun the migration.
 
-The `2d` index supports these rectangular `$geoWithin/$box` queries; this is viewport containment, not a spherical distance calculation ([MongoDB rectangular queries](https://www.mongodb.com/docs/manual/reference/operator/query/box/)). The index script now includes facility geography and filter indexes.
+The Admin Map starts with the indexed enquiry business scope, resolves each facility's coordinates in MongoDB, then applies numeric viewport containment and clustering. It does not depend on the facility `2d` index or pre-existing `map_point` data. Facility index declarations and the backfill remain available for other catalogue consumers.
 
-**Existing facilities will not appear on the new map until their points are backfilled.** Use a staging copy first, review the invalid-coordinate count and retain a database backup. In a controlled cutover, pause facility coordinate changes while applying the backfill and switching all writers to this release, then rerun the dry run until `changed` is zero. Alternatively, keep map traffic closed until the new writers, backfill and indexes are ready. The migration preserves source fields, streams records and writes batches of 500; each write checks that its source coordinates have not changed during the scan. It is safe to rerun and defaults to reporting only:
+**Missing `map_point` no longer hides existing facilities from the Admin Map.** The optional backfill maintains the derived catalogue fields. The migration preserves source fields, streams records and writes batches of 500; each write checks that its source coordinates have not changed during the scan. It is safe to rerun and defaults to reporting only:
 
 ```sh
 npm run migrate:camp-map-points
@@ -286,7 +288,7 @@ npm run db:performance-indexes -- --apply
 npm run migrate:camp-map-points
 ```
 
-These commands use the configured `MONGO_URI`; they were not run against production during implementation. Index declarations were checked locally with `--plan`, and migration/index behavior was exercised against isolated temporary databases.
+These commands use the configured `MONGO_URI`. On 2026-11-08, the authorized map-point backfill scanned 304 facilities, found 251 valid coordinate pairs, and updated 243 derived points in the configured database. The verification dry run reported `changed: 0`. No source coordinates were changed. Index creation was not run as part of that fix. Map scope, pending visibility, coordinate precedence/fallback, pagination, clustering and migration behavior were verified with an isolated database, including a 10,000-facility fixture.
 
 The map reports bounds on idle, debounces them by 250 ms and cancels obsolete requests with a 15-second timeout. Previous viewport results remain visible while refreshing within the same filters; session/filter changes cannot reuse those results. Viewport cache entries expire after 30 seconds of inactivity. Markers are reconciled by identity/content rather than rebuilt wholesale, and data refreshes do not refit the camera. Filter selection fits the full geographic scope once; explicit facility/custom-pin selection still focuses that point. Errors have retry controls and are not converted to successful empty results.
 

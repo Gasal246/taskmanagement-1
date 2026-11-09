@@ -65,7 +65,7 @@ const AdminLayoutShell = ({ children }: AdminLayoutShellProps) => {
         </div>
       </aside>
 
-      <div className="relative z-10 flex h-[100dvh] min-h-0 flex-col">
+      <div className="relative z-10 flex h-[100dvh] min-h-0 flex-col has-[[data-map-fullscreen=true]]:z-[60]">
         <div className="sticky top-0 z-40 border-b border-slate-800/60 bg-slate-950/70 backdrop-blur">
           <AdminTopbar onMobileMenuClick={() => setIsMobileSidebarOpen(true)} />
         </div>
@@ -94,8 +94,8 @@ const AdminLayoutShell = ({ children }: AdminLayoutShellProps) => {
             </div>
           </aside>
 
-          <main className="relative z-0 flex-1 min-h-0 min-w-0 overflow-y-auto px-4 pb-10 pt-4 md:px-6">
-            <div className="mx-auto w-full max-w-[1400px]">
+          <main className="relative z-0 flex-1 min-h-0 min-w-0 overflow-y-auto px-4 pb-10 pt-4 md:px-6 has-[[data-map-fullscreen=true]]:z-[60]">
+            <div className={pathname === "/admin/enquiries/map" ? "w-full" : "mx-auto w-full max-w-[1400px]"}>
               {children}
             </div>
           </main>

@@ -22,7 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 import { DatePicker, Space } from "antd";
-import { ChevronDown, ChevronUp, PanelsTopLeft, Search, SlidersHorizontal } from "lucide-react";
+import { ChevronDown, ChevronUp, MapPinned, PanelsTopLeft, Search, SlidersHorizontal } from "lucide-react";
 import LoaderSpin from "@/components/shared/LoaderSpin";
 import { useGetAccessEnquiriesForStaffs, useGetEnquiryCatalogue, useGetEqAreas, useGetEqCampsByArea, useGetEqCities, useGetEqCountries, useGetEqProvince, useGetEqRegions } from "@/query/enquirymanager/queries";
 import EnquiryUserFilterField from "@/components/enquiries/EnquiryUserFilterField";
@@ -394,6 +394,9 @@ export default function EnquiriesPage() {
           </Button>
           <Button variant="ghost" className="text-xs" onClick={() => router.push("/staff/enquiry/head-quaters")}>
             Head Offices
+          </Button>
+          <Button variant="ghost" className="gap-1.5 text-xs" onClick={() => router.push("/staff/enquiry/map")}>
+            <MapPinned size={14} aria-hidden="true" /> EQ Map
           </Button>
         </div>
       </div>

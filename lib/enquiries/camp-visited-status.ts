@@ -8,27 +8,21 @@ export const CAMP_VISITED_STATUS_VALUES = [
 
 export type CampVisitedStatus = (typeof CAMP_VISITED_STATUS_VALUES)[number];
 
+// Shared by enquiry writes and the map aggregation so marker colours follow
+// the owning business's enquiry, including legacy status spellings.
+export const ENQUIRY_MAP_STATUS_GROUPS: ReadonlyArray<{ status: CampVisitedStatus; values: readonly string[] }> = [
+    { status: "To Visit", values: ["To Visit", "Lead Received", "Lead Recieved"] },
+    { status: "Visited", values: ["Visited", "Initial Meeting Over", "Survey Completed", "Proposal Submitted", "Waiting For Client Response"] },
+    { status: "Cancelled", values: ["Cancelled", "On Hold", "On hold", "On Hold / Cancelled"] },
+    { status: "Awarded", values: ["Project Awarded", "Awarded", "Awareded"] },
+    { status: "Just Added", values: ["Just Added"] },
+];
+
 export const getCampVisitedStatusFromEnquiryStatus = (
     enquiryStatus?: string | null
 ): CampVisitedStatus | null => {
-    switch ((enquiryStatus || "").trim()) {
-        case "Lead Received":
-        case "Lead Recieved":
-            return "To Visit";
-        case "Initial Meeting Over":
-        case "Survey Completed":
-        case "Proposal Submitted":
-        case "Waiting For Client Response":
-            return "Visited";
-        case "On Hold":
-            return "Cancelled";
-        case "Project Awarded":
-        case "Awarded":
-        case "Awareded":
-            return "Awarded";
-        default:
-            return null;
-    }
+    const value = (enquiryStatus || "").trim();
+    return ENQUIRY_MAP_STATUS_GROUPS.find(group => group.values.includes(value))?.status || null;
 };
 
 export const normalizeCampVisitedStatusForMap = (value?: string | null) => {

@@ -8,6 +8,7 @@ const { NextRequest } = require('next/server');
 const model = name => require(`../../models/${name}.ts`).default;
 const Camps = model('eq_camps.model'), Country = model('eq_countries.model'), Regions = model('eq_region.model'), Cities = model('eq_city.model');
 const Users = model('users.model'), Business = model('business.model'), Staff = model('business_staffs.model'), Admins = model('admin_assign_business.model');
+const Roles = model('roles.model'), UserRoles = model('user_roles.model');
 const Tasks = model('business_tasks.model'), Teams = model('project_team.model'), Members = model('project_team_members.model'), Events = model('calendar_events.model');
 const Enquiries = model('eq_enquiries.model'), Histories = model('eq_enquiry_histories');
 const mapRoute = require('../../app/api/enquiries/get/camps/map/route.ts').GET;
@@ -29,7 +30,11 @@ async function fixture(admin = true) {
   const business = await Business.create({ business_name: 'Large view business', status: 1 });
   const [user, colleague] = await Users.create(['Viewer', 'Search Person'].map((name, i) => ({ email: `large-${i}@fixture.test`, name, status: 1 })));
   await Staff.create([user, colleague].map(user => ({ business_id: business._id, user_id: user._id, status: 1 })));
-  if (admin) await Admins.create({ business_id: business._id, user_id: user._id, status: 1 });
+  if (admin) {
+    await Admins.create({ business_id: business._id, user_id: user._id, status: 1 });
+    const role = await Roles.create({ role_name: 'BUSINESS_ADMIN' });
+    await UserRoles.create({ business_id: business._id, user_id: user._id, role_id: role._id, status: 1 });
+  }
   global.enquiryTestSession = { user: { id: String(user._id) } };
   return { business, user, colleague };
 }
@@ -60,7 +65,7 @@ mongoTest('facility map points follow saves, handle zero and clear invalid coord
   assert.equal((await migrateCampMapPoints(mongoose.connection.db, true)).changed, 0);
 });
 mongoTest('map geography, date-line bounds, summary totals and paged location-name searches stay accurate', async () => {
-  await fixture();
+  const f = await fixture();
   const country = await Country.create({ country_name: 'Fixture country' });
   const region = await Regions.create({ country_id: country._id, region_name: 'Search Region' });
   const city = await Cities.create({ city_name: 'Special [City]' });
@@ -70,8 +75,9 @@ mongoTest('map geography, date-line bounds, summary totals and paged location-na
     { camp_name: 'Middle', longitude: '0', latitude: '10', country_id: country._id, is_active: true },
     { camp_name: 'Inactive', longitude: '0', latitude: '10', country_id: country._id, is_active: false },
   ]);
+  await Enquiries.create(rows.map((camp, i) => ({ business_id: f.business._id, camp_id: camp._id, country_id: country._id, status: ['Survey Completed', 'Project Awarded', 'Pending', 'Lead Received'][i], is_active: camp.is_active })));
   const overview = await (await mapRoute(mapRequest({ mode: 'overview', country_id: String(country._id) }))).json();
-  assert.deepEqual(overview.summary, { total: 3, visited: 1, awarded: 1, toVisit: 0, cancelled: 0, justAdded: 1 });
+  assert.deepEqual(overview.summary, { total: 4, visited: 1, awarded: 1, toVisit: 0, cancelled: 0, justAdded: 2 });
   const viewport = await (await mapRoute(mapRequest({ mode: 'viewport', country_id: String(country._id), south: '9', north: '11', west: '179', east: '-179', zoom: '10' }))).json();
   assert.equal(viewport.visibleTotal, 2);
   assert.equal(viewport.camps.length + viewport.clusters.reduce((sum, row) => sum + row.count, 0), 2);
@@ -79,12 +85,77 @@ mongoTest('map geography, date-line bounds, summary totals and paged location-na
   assert.deepEqual(names.camps.map(row => row._id), [String(rows[0]._id)]);
   assert.equal(names.pagination.total, 1);
   const page = await (await mapRoute(mapRequest({ mode: 'list', country_id: String(country._id), page: '2', limit: '1' }))).json();
-  assert.equal(page.camps.length, 1); assert.equal(page.pagination.total, 3);
+  assert.equal(page.camps.length, 1); assert.equal(page.pagination.total, 4);
   const explain = await Camps.find({ map_point: { $geoWithin: { $box: [[179, 9], [180, 11]] } } }).explain('queryPlanner');
   assert.match(JSON.stringify(explain.queryPlanner.winningPlan), /map_point_2d/);
   for (const params of [{ mode: 'viewport' }, { mode: 'viewport', south: '0', north: '91', west: '0', east: '1' }, { country_id: 'invalid' }, { mode: 'list', limit: '101' }]) assert.equal((await mapRoute(mapRequest(params))).status, 400);
   global.enquiryTestSession = null;
   assert.equal((await mapRoute(mapRequest({}))).status, 401);
+});
+mongoTest('admin map scopes enquiries, includes pending facilities and resolves coordinates without a backfill', async () => {
+  const f = await fixture();
+  const country = await Country.create({ country_name: 'Scoped country' });
+  const region = await Regions.create({ country_id: country._id, region_name: 'Enquiry region' });
+  const foreignBusiness = await Business.create({ business_name: 'Other business', status: 1 });
+  const legacyId = id();
+  // Simulate the old documents that caused the production map to show one pin.
+  await Camps.collection.insertOne({ _id: legacyId, camp_name: 'Legacy', country_id: country._id, is_active: true, latitude: ' 24.5 ', longitude: '46.5', visited_status: 'Awarded' });
+  const [pending, enquiryOnly, invalid, hidden, shared, fallback] = await Camps.create([
+    { camp_name: 'Pending', country_id: country._id, is_active: false, latitude: '25', longitude: '47' },
+    { camp_name: 'Enquiry coordinates', country_id: country._id, is_active: true },
+    { camp_name: 'No valid coordinates', country_id: country._id, is_active: true, latitude: '91', longitude: '0' },
+    { camp_name: 'Foreign', country_id: country._id, is_active: true, latitude: '26', longitude: '48' },
+    { camp_name: 'Shared', country_id: country._id, is_active: true, latitude: '27', longitude: '49', visited_status: 'Awarded' },
+    { camp_name: 'Fallback pair', country_id: country._id, is_active: true, latitude: '28', longitude: '50' },
+  ]);
+  const own = { business_id: f.business._id, country_id: country._id, is_active: true };
+  await Enquiries.create([
+    { ...own, camp_id: legacyId, status: 'Lead Received' },
+    { ...own, camp_id: pending._id, is_active: false, status: 'Lead Received' },
+    { ...own, camp_id: enquiryOnly._id, status: 'Project Awarded', latitude: '0', longitude: '0', region_id: region._id },
+    { ...own, camp_id: invalid._id, status: 'Lead Received', latitude: '', longitude: '0' },
+    { ...own, camp_id: shared._id, status: 'Survey Completed', latitude: '29', longitude: '51' },
+    { ...own, camp_id: fallback._id, status: 'On Hold', latitude: '1', longitude: 'bad' },
+    { ...own, camp_id: hidden._id, business_id: foreignBusiness._id, status: 'Project Awarded' },
+    // A newer foreign enquiry cannot override the own enquiry for a shared facility.
+    { ...own, camp_id: shared._id, business_id: foreignBusiness._id, status: 'Project Awarded', latitude: '30', longitude: '52', createdAt: new Date('2035-01-01') },
+    { ...own, camp_id: legacyId, status: 'Project Awarded', createdAt: new Date('2000-01-01') },
+  ]);
+  const response = await mapRoute(mapRequest({ mode: 'overview', country_id: String(country._id), business_id: String(foreignBusiness._id) }));
+  assert.equal(response.status, 200, await response.clone().text());
+  const overview = await response.json();
+  assert.deepEqual(overview.summary, { total: 5, justAdded: 1, toVisit: 1, visited: 1, awarded: 1, cancelled: 1 });
+  assert.equal(overview.unmappedTotal, 1);
+  const list = await (await mapRoute(mapRequest({ mode: 'list', country_id: String(country._id) }))).json();
+  assert.equal(list.pagination.total, overview.summary.total);
+  const byName = Object.fromEntries(list.camps.map(camp => [camp.camp_name, camp]));
+  assert.equal(byName.Foreign, undefined);
+  assert.equal(byName.Legacy.visited_status, 'To Visit');
+  assert.equal(byName.Legacy.latitude, 24.5);
+  assert.equal(byName.Pending.visited_status, 'Just Added');
+  assert.equal(byName['Enquiry coordinates'].latitude, 0);
+  assert.equal(byName['Enquiry coordinates'].longitude, 0);
+  assert.equal(byName.Shared.latitude, 29);
+  assert.equal(byName.Shared.visited_status, 'Visited');
+  assert.equal(byName['Fallback pair'].latitude, 28, 'invalid enquiry pair falls back together');
+  assert.equal(byName['Fallback pair'].longitude, 50);
+  assert.equal((await Camps.findById(legacyId)).map_point, undefined, 'map reads do not mutate the facility');
+  const filtered = await (await mapRoute(mapRequest({ mode: 'list', region_id: String(region._id) }))).json();
+  assert.deepEqual(filtered.camps.map(c => c._id), [String(enquiryOnly._id)]);
+  const viewport = await (await mapRoute(mapRequest({ mode: 'viewport', south: '28.5', north: '29.5', west: '50.5', east: '51.5', zoom: '15' }))).json();
+  assert.equal(viewport.visibleTotal, 1);
+  assert.equal(viewport.camps[0]._id, String(shared._id));
+  assert.equal(viewport.camps[0].latitude, 29, 'viewport uses enquiry coordinates, not facility coordinates');
+  const search = await (await mapRoute(mapRequest({ mode: 'list', search: '29, 51' }))).json();
+  assert.deepEqual(search.camps.map(c => c._id), [String(shared._id)]);
+  global.enquiryTestSession = { user: { id: String(f.colleague._id) } };
+  assert.equal((await mapRoute(mapRequest({}))).status, 403);
+  // An assignment without the admin role also cannot read the map.
+  await Admins.create({ user_id: f.colleague._id, business_id: f.business._id, status: 1 });
+  assert.equal((await mapRoute(mapRequest({}))).status, 403);
+  global.enquiryTestSession = { user: { id: String(f.user._id), is_super: true } };
+  const superOverview = await (await mapRoute(mapRequest({ mode: 'overview' }))).json();
+  assert.equal(superOverview.summary.total, 6);
 });
 mongoTest('calendar keyset pages preserve every source, stable ties, full counts and legacy initial deduplication', async () => {
   const f = await fixture();
@@ -135,7 +206,8 @@ mongoTest('large fixture bounds map markers and calendar payloads; reports respo
   const f = await fixture();
   const country = await Country.create({ country_name: 'Large fixture country' });
   const facilities = Array.from({ length: 10000 }, (_, i) => ({ country_id: country._id, camp_name: `Facility ${i}`, latitude: String(24 + (i % 100) * 0.01), longitude: String(54 + Math.floor(i / 100) * 0.01), is_active: true }));
-  await Camps.insertMany(facilities);
+  const camps = await Camps.insertMany(facilities);
+  await Enquiries.insertMany(camps.map(camp => ({ business_id: f.business._id, camp_id: camp._id, country_id: country._id, status: 'Lead Received', is_active: true })));
   const oldStart = performance.now();
   const oldRows = await Camps.find({ is_active: true, country_id: country._id }).populate('country_id', 'country_name').populate('region_id', 'region_name').populate('province_id', 'province_name').populate('city_id', 'city_name').populate('area_id', 'area_name').sort({ camp_name: 1 }).lean();
   const oldMap = oldRows.map(camp => ({ _id: String(camp._id), camp_name: camp.camp_name, camp_type: '', camp_capacity: '', camp_occupancy: null, visited_status: normalizeCampVisitedStatusForMap(camp.visited_status), latitude: Number(camp.latitude), longitude: Number(camp.longitude), country: camp.country_id.country_name, region: '', province: '', city: '', area: '' }));

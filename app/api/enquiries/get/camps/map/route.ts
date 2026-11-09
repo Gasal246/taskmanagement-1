@@ -1,15 +1,16 @@
 import { temporaryDatabaseFailureResponse } from "@/lib/auth-availability";
-import { auth } from "@/auth";
+import { enquiryActor, enquiryManagementFilter } from "@/lib/enquiries/access";
 import connectDB from "@/lib/mongo";
 import { campMapPage, MapQueryError } from "@/lib/maps/camp-page";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(req: NextRequest) {
   try {
-    if (!(await auth())?.user?.id) return NextResponse.json({ message: "Sign in to continue" }, { status: 401 });
-    await connectDB();
-    // Approved facility geography is a shared catalogue; enquiry access is checked by its own routes.
-    return NextResponse.json(await campMapPage(req.nextUrl.searchParams));
+    await connectDB({ throwOnError: true });
+    const actor = await enquiryActor();
+    if (!actor) return NextResponse.json({ message: "Sign in to continue" }, { status: 401 });
+    if (!actor.admin) return NextResponse.json({ message: "Administrator access is required" }, { status: 403 });
+    return NextResponse.json(await campMapPage(req.nextUrl.searchParams, enquiryManagementFilter(actor)));
   } catch (error) {
     const unavailable = temporaryDatabaseFailureResponse(error);
     if (unavailable) return unavailable;
