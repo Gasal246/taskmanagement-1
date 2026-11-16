@@ -35,7 +35,7 @@ window.fetch = async (url, init) => {
   }
   if (method === 'PATCH') {
     const body = JSON.parse(String(init?.body)); state.saved.push(body);
-    if (body.operation === 'period') { target.month = body.month; target.week = body.week; }
+    if (body.operation === 'period') { target.month = body.month; target.week = body.week; if (body.title !== undefined) target.title = body.title; }
     if (body.operation === 'add_enquiries') { target.enquiry_ids.push(...body.enquiry_ids); for (const id of body.enquiry_ids) target.enquiry_notes[id] = body.note; }
     if (body.operation === 'edit_note') target.enquiry_notes[body.enquiry_id] = body.note.trim();
     if (body.operation === 'remove_enquiry') { target.enquiry_ids = target.enquiry_ids.filter((id: string) => id !== body.enquiry_id); delete target.enquiry_notes[body.enquiry_id]; }

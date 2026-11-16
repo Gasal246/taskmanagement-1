@@ -1,5 +1,6 @@
 "use client";
 
+import { TaskTagChips } from "@/components/task/TaskTagChips";
 import { formatScheduleDate } from "@/lib/activity-schedule";
 import { useRouter } from "next/navigation";
 import { Clock3, MessageCircle } from "lucide-react";
@@ -263,6 +264,8 @@ export function TaskOverviewCard({
         </div>
       </div>
 
+
+      <TaskTagChips tags={task.tags} />
 
       <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-400">
         <span className="rounded-md border border-slate-800/60 bg-slate-900/60 px-2 py-1">Activities: {task.activity_count}</span>

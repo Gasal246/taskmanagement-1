@@ -22,7 +22,7 @@ export class TargetError extends Error {
 }
 const objectId = z.string().regex(/^[a-f\d]{24}$/i).transform(value => value.toLowerCase());
 const ids = z.array(objectId).min(1).max(1000).transform(value => [...new Set(value)]);
-const period = { month: z.string().refine(validTargetMonth), week: z.number().int().min(1).max(4).nullable() };
+const period = { title: z.string().trim().max(200).optional(), month: z.string().refine(validTargetMonth), week: z.number().int().min(1).max(4).nullable() };
 const inputSchema = z.object({ business_id: objectId, ...period }).strict();
 const note = z.string().trim().max(5000);
 const changeSchema = z.discriminatedUnion('operation', [
@@ -35,12 +35,12 @@ const changeSchema = z.discriminatedUnion('operation', [
 ]);
 export function parseTargetInput(body: unknown): TargetInput {
   const result = inputSchema.safeParse(body);
-  if (!result.success) throw new TargetError(400, 'Select a valid business, month and optional week.');
+  if (!result.success) throw new TargetError(400, 'Select a valid business, month and optional week, and keep the title within 200 characters.');
   return result.data;
 }
 export function parseTargetChange(body: unknown): TargetChange {
   const result = changeSchema.safeParse(body);
-  if (!result.success) throw new TargetError(400, 'Invalid target change. Select valid enquiries or members and keep notes within 5,000 characters.');
+  if (!result.success) throw new TargetError(400, 'Invalid target change. Select valid enquiries or members and keep titles within 200 characters and notes within 5,000 characters.');
   return result.data;
 }
 function oid(id: string) {
@@ -71,6 +71,7 @@ export async function prepareTargetChange(existing: any, body: unknown, actor: E
     case 'period':
       Object.assign(update.$set, { month: change.month, week: change.week });
       Object.assign(proposed, { month: change.month, week: change.week });
+      if (change.title !== undefined) { update.$set.title = change.title; proposed.title = change.title; }
       break;
     case 'add_enquiries': {
       const [country, region, count] = await Promise.all([

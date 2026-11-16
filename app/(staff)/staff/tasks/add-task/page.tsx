@@ -1,5 +1,6 @@
 "use client";
 
+import { TaskTagsInput, useTaskTags } from "@/components/task/TaskTagsInput";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -116,6 +117,8 @@ const AddTask = () => {
 
   const [activityMap, setActivityMap] = useState<Record<string, any[]>>({});
   const [loadingActivities, setLoadingActivities] = useState(false);
+
+  const taskTags = useTaskTags();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -347,6 +350,7 @@ const AddTask = () => {
     const newTask = {
       task_name: data.task_name,
       task_description: data.task_description,
+      tags: taskTags.getTags(),
       priority: data.priority || undefined,
       comments: data.comments || undefined,
       status: data.status,
@@ -360,6 +364,7 @@ const AddTask = () => {
       const response = await addTask(newTask);
       if (response?.status === 201) {
         toast.success(response?.data?.message || "Task added successfully");
+        taskTags.reset();
         form.reset();
         setSelectedStaff(null);
         setStaffSearch("");
@@ -492,6 +497,8 @@ const AddTask = () => {
                     </FormItem>
                   )}
                 />
+                <TaskTagsInput input={taskTags} />
+
                 <FormField
                   control={form.control}
                   name="comments"

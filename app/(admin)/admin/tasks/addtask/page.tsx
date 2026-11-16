@@ -13,6 +13,7 @@ import { RootState } from "@/redux/store";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { TaskTagsInput, useTaskTags } from "@/components/task/TaskTagsInput";
 import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useSelector } from "react-redux";
@@ -27,11 +28,9 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { useRouter } from "next/navigation";
-import {
-  useAddBusinessTask,
-  useGetBusinessSkills,
-  useGetBusinessStaffsBySkill,
-} from "@/query/business/queries";
+import { useAddBusinessTask } from "@/query/business/queries";
+import { useTaskAssignmentOptions } from "@/query/business/task-assignment";
+import type { AssignmentDepartment, AssignmentStaff } from "@/types/task-assignment";
 import { TASK_STATUS } from "@/lib/constants";
 import { Check, Search, Sparkles } from "lucide-react";
 import LoaderSpin from "@/components/shared/LoaderSpin";
@@ -41,16 +40,19 @@ const AddTask = () => {
   const router = useRouter();
   const { businessData } = useSelector((state: RootState) => state.user);
   const { mutateAsync: addTask, isPending: addingTask } = useAddBusinessTask();
-  const { mutateAsync: getSkills, isPending: loadingSkills } = useGetBusinessSkills();
-  const { mutateAsync: getStaffsBySkill, isPending: loadingStaffsBySkill } =
-    useGetBusinessStaffsBySkill();
-
-  const [skills, setSkills] = useState<any[]>([]);
-  const [skillSearch, setSkillSearch] = useState("");
-  const [staffOptions, setStaffOptions] = useState<any[]>([]);
+  const [regionId, setRegionId] = useState("");
+  const [areaId, setAreaId] = useState("");
+  const [locationId, setLocationId] = useState("");
+  const [departmentSearch, setDepartmentSearch] = useState("");
   const [staffSearch, setStaffSearch] = useState("");
-  const [selectedSkill, setSelectedSkill] = useState<any>(null);
-  const [selectedStaff, setSelectedStaff] = useState<any>(null);
+  const [selectedDepartment, setSelectedDepartment] = useState<AssignmentDepartment | null>(null);
+  const [selectedStaff, setSelectedStaff] = useState<AssignmentStaff | null>(null);
+  const { regions, options, staffs } = useTaskAssignmentOptions(businessData?._id, regionId, areaId, locationId, selectedDepartment);
+  const loadingOptions = regions.isFetching || options.isFetching;
+  const optionsError = regions.isError || options.isError;
+  const loadingStaffs = staffs.isFetching;
+  const assignmentOptions = options.data;
+  const staffOptions = staffs.data || [];
 
   const formSchema = z.object({
     task_name: z.string().min(1, "Task name is required"),
@@ -61,6 +63,8 @@ const AddTask = () => {
     status: z.enum(["To Do", "In Progress", "Completed", "Cancelled"]),
     business_id: z.string(),
   });
+
+  const taskTags = useTaskTags();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -81,56 +85,49 @@ const AddTask = () => {
   }, [businessData?._id, form]);
 
   useEffect(() => {
-    if (!businessData?._id) return;
-    const fetchSkills = async () => {
-      const res = await getSkills(businessData._id);
-      if (res?.status === 200) {
-        setSkills(res?.data || []);
-      } else {
-        setSkills([]);
-      }
-    };
-    fetchSkills();
-  }, [businessData?._id, getSkills]);
-
-  useEffect(() => {
-    if (!selectedSkill?._id || !businessData?._id) {
-      setStaffOptions([]);
-      return;
-    }
-    const fetchStaffs = async () => {
-      const res = await getStaffsBySkill({
-        business_id: businessData._id,
-        skill_id: selectedSkill._id,
-      });
-      if (res?.status === 200) {
-        setStaffOptions(res?.data || []);
-      } else {
-        setStaffOptions([]);
-      }
-    };
-    fetchStaffs();
-  }, [selectedSkill?._id, businessData?._id, getStaffsBySkill]);
-
-  const handleSelectSkill = (skill: any) => {
-    setSelectedSkill(skill);
-    setSkillSearch("");
-    setStaffSearch("");
+    setRegionId("");
+    setAreaId("");
+    setLocationId("");
+    setSelectedDepartment(null);
     setSelectedStaff(null);
-    setStaffOptions([]);
-    form.setValue("assigned_user_id", "", { shouldValidate: true });
+    setDepartmentSearch("");
+    setStaffSearch("");
+    form.setValue("assigned_user_id", "");
+  }, [businessData?._id, form]);
+
+  const clearAssignment = () => {
+    setSelectedDepartment(null);
+    setSelectedStaff(null);
+    setDepartmentSearch("");
+    setStaffSearch("");
+    form.setValue("assigned_user_id", "");
+    form.clearErrors("assigned_user_id");
   };
 
-  const handleSelectStaff = (staff: any) => {
+  const handleSelectDepartment = (department: AssignmentDepartment) => {
+    setSelectedDepartment(department);
+    setStaffSearch("");
+    setSelectedStaff(null);
+    form.setValue("assigned_user_id", "");
+    form.clearErrors("assigned_user_id");
+  };
+
+  const handleSelectStaff = (staff: AssignmentStaff) => {
     if (!staff?.user_id?._id) return;
     setSelectedStaff(staff);
     form.setValue("assigned_user_id", staff.user_id._id, { shouldValidate: true });
   };
 
   const handleSubmit = async (data: z.infer<typeof formSchema>) => {
+    if (!regionId || !selectedDepartment || !selectedStaff || optionsError || staffs.isError ||
+      !staffOptions.some(staff => staff.user_id._id === data.assigned_user_id)) {
+      form.setError("assigned_user_id", { message: "Choose a department and a staff member from that department" });
+      return;
+    }
     const newTask = {
       task_name: data.task_name,
       task_description: data.task_description,
+      tags: taskTags.getTags(),
       priority: data.priority || undefined,
       comments: data.comments || undefined,
       status: data.status,
@@ -144,6 +141,7 @@ const AddTask = () => {
       const response = await addTask(newTask);
       if (response?.status === 201) {
         toast.success(response?.data?.message || "Task added successfully");
+        taskTags.reset();
         form.reset({
           task_name: "",
           task_description: "",
@@ -153,11 +151,13 @@ const AddTask = () => {
           status: "To Do",
           business_id: businessData?._id || "",
         });
-        setSelectedSkill(null);
+        setSelectedDepartment(null);
+        setRegionId("");
+        setAreaId("");
+        setLocationId("");
         setSelectedStaff(null);
-        setSkillSearch("");
+        setDepartmentSearch("");
         setStaffSearch("");
-        setStaffOptions([]);
         router.push(`/admin/tasks/${response?.data?.data?._id}`);
       } else {
         toast.error(response?.data?.message || "Failed to add task");
@@ -169,14 +169,12 @@ const AddTask = () => {
   };
 
 
-  const skillSearchTerm = skillSearch.trim().toLowerCase();
-  const filteredSkills = skills.filter((skill: any) => {
-    const name = skill?.skill_name || "";
-    return name.toLowerCase().includes(skillSearchTerm);
-  });
+  const departmentSearchTerm = departmentSearch.trim().toLowerCase();
+  const filteredDepartments = (assignmentOptions?.departments || []).filter(department =>
+    `${department.dep_name} ${department.scope}`.toLowerCase().includes(departmentSearchTerm));
 
   const staffSearchTerm = staffSearch.trim().toLowerCase();
-  const filteredStaffs = staffOptions.filter((staff: any) => {
+  const filteredStaffs = staffOptions.filter(staff => {
     const name = staff?.user_id?.name || "";
     const email = staff?.user_id?.email || "";
     const phone = staff?.user_id?.phone || "";
@@ -280,6 +278,8 @@ const AddTask = () => {
                   )}
                 />
 
+                <TaskTagsInput input={taskTags} className="md:col-span-2" />
+
                 <FormField
                   control={form.control}
                   name="comments"
@@ -374,7 +374,7 @@ const AddTask = () => {
                     Assignment
                   </p>
                   <p className="text-sm text-slate-300">
-                    Select a skill first, then choose the right staff member.
+                    Select a region and department, then choose a staff member.
                   </p>
                 </div>
                 <span className="text-[11px] text-emerald-200 border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 rounded-full">
@@ -389,61 +389,118 @@ const AddTask = () => {
                       <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
                         Step 1
                       </p>
-                      <p className="text-sm text-slate-200">Choose a skill</p>
+                      <p className="text-sm text-slate-200">Choose a department</p>
                     </div>
                     <span className="text-xs text-slate-400">
-                      {selectedSkill?.skill_name || "No skill selected"}
+                      {selectedDepartment?.dep_name || "No department selected"}
                     </span>
                   </div>
-                  <div className="relative">
-                    <Search
-                      size={16}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"
-                    />
-                    <Input
-                      placeholder="Search skills..."
-                      value={skillSearch}
-                      onChange={(e) => setSkillSearch(e.target.value)}
-                      className="pl-9 bg-slate-950/50 text-slate-100 placeholder:text-slate-500 border-slate-800/80 focus:border-emerald-400 focus-visible:ring-0 focus-visible:ring-offset-0"
-                    />
-                  </div>
-                  <div className="max-h-[220px] overflow-y-auto pr-1 space-y-2">
-                    {loadingSkills && (
-                      <div className="h-[120px] flex items-center justify-center">
-                        <LoaderSpin size={22} />
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-1">
+                      <label htmlFor="task-region" className="text-xs text-slate-300">Region *</label>
+                      <select
+                        id="task-region"
+                        value={regionId}
+                        onChange={(event) => {
+                          setRegionId(event.target.value);
+                          setAreaId("");
+                          setLocationId("");
+                          clearAssignment();
+                        }}
+                        disabled={!businessData?._id || regions.isPending}
+                        className="w-full rounded-md border border-slate-800/80 bg-slate-950 text-slate-100 p-2 text-sm"
+                      >
+                        <option value="">Select region</option>
+                        {regions.data?.map(region => <option key={region._id} value={region._id}>{region.region_name}</option>)}
+                      </select>
+                    </div>
+                    {regionId && (
+                      <div className="space-y-1">
+                        <label htmlFor="task-area" className="text-xs text-slate-300">Area (optional)</label>
+                        <select
+                          id="task-area"
+                          value={areaId}
+                          onChange={(event) => {
+                            setAreaId(event.target.value);
+                            setLocationId("");
+                            clearAssignment();
+                          }}
+                          disabled={loadingOptions || optionsError}
+                          className="w-full rounded-md border border-slate-800/80 bg-slate-950 text-slate-100 p-2 text-sm"
+                        >
+                          <option value="">All areas</option>
+                          {assignmentOptions?.areas.map(area => <option key={area._id} value={area._id}>{area.area_name}</option>)}
+                        </select>
                       </div>
                     )}
-                    {!loadingSkills && filteredSkills.length === 0 && (
-                      <p className="text-xs text-slate-500">
-                        No skills found. Try a different search term.
-                      </p>
-                    )}
-                    {!loadingSkills &&
-                      filteredSkills.map((skill: any) => (
-                        <button
-                          key={skill?._id}
-                          type="button"
-                          onClick={() => handleSelectSkill(skill)}
-                          className={`w-full rounded-lg border px-3 py-2 text-left text-xs font-medium transition ${
-                            selectedSkill?._id === skill?._id
-                              ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-200"
-                              : "border-slate-800/80 bg-slate-950/50 text-slate-200 hover:border-emerald-500/40 hover:bg-emerald-500/10"
-                          }`}
+                    {areaId && (
+                      <div className="space-y-1 sm:col-span-2">
+                        <label htmlFor="task-location" className="text-xs text-slate-300">Location (optional)</label>
+                        <select
+                          id="task-location"
+                          value={locationId}
+                          onChange={(event) => {
+                            setLocationId(event.target.value);
+                            clearAssignment();
+                          }}
+                          disabled={loadingOptions || optionsError}
+                          className="w-full rounded-md border border-slate-800/80 bg-slate-950 text-slate-100 p-2 text-sm"
                         >
-                          <div className="flex items-center justify-between">
-                            <span>{skill?.skill_name}</span>
-                            {selectedSkill?._id === skill?._id && (
-                              <Check size={14} className="text-emerald-300" />
-                            )}
-                          </div>
-                        </button>
-                      ))}
+                          <option value="">All locations</option>
+                          {assignmentOptions?.locations.map(location => <option key={location._id} value={location._id}>{location.location_name}</option>)}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                  {regionId && (
+                    <div className="relative">
+                      <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                      <Input
+                        aria-label="Search departments"
+                        placeholder="Search departments..."
+                        value={departmentSearch}
+                        onChange={(event) => setDepartmentSearch(event.target.value)}
+                        className="pl-9 bg-slate-950/50 text-slate-100 placeholder:text-slate-500 border-slate-800/80 focus:border-emerald-400 focus-visible:ring-0 focus-visible:ring-offset-0"
+                      />
+                    </div>
+                  )}
+                  <div className="max-h-[260px] overflow-y-auto pr-1 space-y-2">
+                    {loadingOptions ? (
+                      <div className="h-[120px] flex items-center justify-center"><LoaderSpin size={22} /></div>
+                    ) : optionsError ? (
+                      <div role="alert" className="text-xs text-red-300 space-y-2">
+                        <p>Unable to load departments and locations.</p>
+                        <Button type="button" variant="outline" size="sm" onClick={() => void (regions.isError ? regions.refetch() : options.refetch())}>Retry</Button>
+                      </div>
+                    ) : !regionId ? (
+                      <p className="text-xs text-slate-500">Select a region to see its departments. Area and location are optional.</p>
+                    ) : filteredDepartments.length === 0 ? (
+                      <p className="text-xs text-slate-500">No departments found for this selection. Try a different filter or search.</p>
+                    ) : filteredDepartments.map(department => (
+                      <button
+                        key={`${department.kind}:${department._id}`}
+                        type="button"
+                        aria-pressed={selectedDepartment?._id === department._id && selectedDepartment?.kind === department.kind}
+                        onClick={() => handleSelectDepartment(department)}
+                        className={`w-full rounded-lg border px-3 py-2 text-left text-xs font-medium transition ${
+                          selectedDepartment?._id === department._id && selectedDepartment?.kind === department.kind
+                            ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-200"
+                            : "border-slate-800/80 bg-slate-950/50 text-slate-200 hover:border-emerald-500/40 hover:bg-emerald-500/10"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span>{department.dep_name}</span>
+                          {selectedDepartment?._id === department._id && selectedDepartment?.kind === department.kind && <Check size={14} className="text-emerald-300" />}
+                        </div>
+                        <p className="mt-1 text-[11px] text-slate-400">{department.scope}</p>
+                      </button>
+                    ))}
                   </div>
                 </div>
 
                 <div
                   className={`rounded-xl border border-slate-800/70 bg-slate-900/40 p-4 space-y-3 ${
-                    !selectedSkill ? "opacity-60" : ""
+                    !selectedDepartment ? "opacity-60" : ""
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2">
@@ -464,33 +521,39 @@ const AddTask = () => {
                     />
                     <Input
                       placeholder={
-                        selectedSkill ? "Search staff by name, email, or phone..." : "Select a skill first"
+                        selectedDepartment ? "Search staff by name, email, or phone..." : "Select a department first"
                       }
                       value={staffSearch}
                       onChange={(e) => setStaffSearch(e.target.value)}
-                      disabled={!selectedSkill}
+                      disabled={!selectedDepartment}
                       className="pl-9 bg-slate-950/50 text-slate-100 placeholder:text-slate-500 border-slate-800/80 focus:border-emerald-400 focus-visible:ring-0 focus-visible:ring-offset-0 disabled:opacity-60"
                     />
                   </div>
                   <div className="max-h-[260px] overflow-y-auto pr-1 space-y-3">
-                    {!selectedSkill && (
+                    {!selectedDepartment && (
                       <p className="text-xs text-slate-500">
-                        Select a skill to see matching staff members.
+                        Select a department to see its staff members.
                       </p>
                     )}
-                    {selectedSkill && loadingStaffsBySkill && (
+                    {selectedDepartment && loadingStaffs && (
                       <div className="h-[120px] flex items-center justify-center">
                         <LoaderSpin size={22} />
                       </div>
                     )}
-                    {selectedSkill && !loadingStaffsBySkill && filteredStaffs.length === 0 && (
+                    {selectedDepartment && staffs.isError && (
+                      <div role="alert" className="text-xs text-red-300 space-y-2">
+                        <p>Unable to load staff for this department.</p>
+                        <Button type="button" variant="outline" size="sm" onClick={() => void staffs.refetch()}>Retry</Button>
+                      </div>
+                    )}
+                    {selectedDepartment && !staffs.isError && !loadingStaffs && filteredStaffs.length === 0 && (
                       <p className="text-xs text-slate-500">
-                        No staff found for this skill.
+                        No staff found for this department.
                       </p>
                     )}
-                    {selectedSkill &&
-                      !loadingStaffsBySkill &&
-                      filteredStaffs.map((staff: any) => {
+                    {selectedDepartment &&
+                      !staffs.isError && !loadingStaffs &&
+                      filteredStaffs.map(staff => {
                         const staffName = staff?.user_id?.name || "Unknown";
                         const staffEmail = staff?.user_id?.email || "No email";
                         const staffPhone = staff?.user_id?.phone || "No phone";
@@ -501,6 +564,7 @@ const AddTask = () => {
                           <button
                             key={staff?._id}
                             type="button"
+                            aria-pressed={isSelected}
                             onClick={() => handleSelectStaff(staff)}
                             className={`w-full rounded-xl border px-3 py-3 text-left transition ${
                               isSelected
@@ -594,7 +658,7 @@ const AddTask = () => {
               <Button
                 type="submit"
                 className="px-5 py-2 bg-emerald-500 hover:bg-emerald-400 rounded-md text-slate-950 text-sm font-semibold"
-                disabled={addingTask || loadingSkills || loadingStaffsBySkill}
+                disabled={addingTask || loadingOptions || loadingStaffs || !regionId || !selectedDepartment || !selectedStaff || optionsError || staffs.isError}
               >
                 {addingTask ? "Saving..." : "Add Task"}
               </Button>

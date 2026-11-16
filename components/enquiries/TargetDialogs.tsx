@@ -51,13 +51,16 @@ function TargetForm({ title, description, target, input, ready, children, onClos
   </DialogContent></Dialog>;
 }
 export function TargetPeriodDialog({ target, businessId, onClose }: { target?: any; businessId: string; onClose: () => void }) {
+  const [title, setTitle] = useState(target?.title || '');
   const [month, setMonth] = useState(target?.month || currentTargetMonth());
   const [week, setWeek] = useState<number | null>(target?.week ?? null);
-  const input: TargetInput | TargetChange = target ? { operation: 'period', month, week } : { business_id: businessId, month, week };
-  return <TargetForm title={target ? 'Edit target period' : 'Add target'} description="Choose the target period. Enquiries and members are added separately." target={target} input={input} ready={Boolean(month && (target || businessId))} onClose={onClose}>
+  const input: TargetInput | TargetChange = target ? { operation: 'period', title, month, week } : { business_id: businessId, title, month, week };
+  return <TargetForm title={target ? 'Edit target' : 'Add target'} description="Choose a title and target period. Enquiries and members are added separately." target={target} input={input} ready={Boolean(month && (target || businessId))} onClose={onClose}>
+    <TargetField label="Title"><Input aria-label="Target title" maxLength={200} placeholder={targetTitle(month, week)} value={title} onChange={e => setTitle(e.target.value)} /></TargetField>
+    <p className="text-xs text-slate-400">Leave the title blank to use the target period.</p>
     <TargetField label="Target month"><Input required className="[color-scheme:dark]" type="month" min="1900-01" max="2199-12" value={month} onChange={e => setMonth(e.target.value)} /></TargetField>
     <TargetField label="Week (optional)"><select className={targetFieldClass} value={week ?? ''} onChange={e => setWeek(e.target.value ? Number(e.target.value) : null)}><TargetWeekOptions month={month} /></select></TargetField>
-    <p className="text-sm text-cyan-200">Target title: {targetTitle(month, week)}</p>
+    <p className="text-sm text-cyan-200">Target title: {targetTitle(month, week, title)}</p>
   </TargetForm>;
 }
 export function TargetEnquiriesDialog({ target, onClose }: { target: any; onClose: () => void }) {
@@ -74,7 +77,7 @@ export function TargetEnquiriesDialog({ target, onClose }: { target: any; onClos
   useEffect(() => { const timer = setTimeout(() => { setSearchTerm(search); setPage(1); }, 250); return () => clearTimeout(timer); }, [search]);
   const input: TargetChange = { operation: 'add_enquiries', country_id: country, region_id: region, enquiry_ids: selected, note };
   const available = options.data || {};
-  return <TargetForm title="Add enquiries" description={`Add enquiries to ${targetTitle(target.month, target.week)}. The optional note is added to each selected enquiry.`} target={target} input={input} ready={Boolean(region && selected.length)} onClose={onClose}>
+  return <TargetForm title="Add enquiries" description={`Add enquiries to ${targetTitle(target.month, target.week, target.title)}. The optional note is added to each selected enquiry.`} target={target} input={input} ready={Boolean(region && selected.length)} onClose={onClose}>
     <div className="grid gap-3 sm:grid-cols-2">
       <TargetField label="Country"><select required className={targetFieldClass} value={country} onChange={e => { setCountry(e.target.value); setRegion(''); setSelected([]); setPage(1); }}><option value="">Select country</option>{(available.countries || []).map((c: any) => <option key={c._id} value={c._id}>{c.country_name}</option>)}</select></TargetField>
       <TargetField label="Region"><select required className={targetFieldClass} disabled={!country} value={region} onChange={e => { setRegion(e.target.value); setSelected([]); setPage(1); }}><option value="">Select region</option>{(available.regions || []).filter((r: any) => r.country_id === country).map((r: any) => <option key={r._id} value={r._id}>{r.region_name}</option>)}</select></TargetField>
@@ -132,5 +135,5 @@ export function TargetRemoveDialog({ target, enquiry, member, onClose }: { targe
       onClose();
     } catch (err) { setError(err); }
   }
-  return <Dialog open onOpenChange={open => { if (!open && !busy) onClose(); }}><DialogContent className="border-slate-700 bg-slate-950 text-slate-100"><DialogHeader><DialogTitle>{title}</DialogTitle><DialogDescription>{enquiry ? `Remove ${enquiry.enquiry_uuid || 'this enquiry'} and its target note from ${targetTitle(target.month, target.week)}? The enquiry and its history will remain.` : member ? `Remove ${member.name || member.email || 'this member'} from this target? Their other assignments and access will remain.` : `Delete ${targetTitle(target.month, target.week)}, containing ${target.enquiry_count} enquiries and ${target.members.length} members? Enquiries and their histories will remain.`}</DialogDescription></DialogHeader><TargetErrorMessage error={error} /><div className="flex justify-end gap-2"><Button variant="ghost" disabled={busy} onClick={onClose}>Cancel</Button><Button variant="destructive" disabled={busy} onClick={() => void confirm()}>{busy ? 'Removing…' : enquiry ? 'Confirm remove enquiry' : member ? 'Confirm remove member' : 'Confirm delete target'}</Button></div></DialogContent></Dialog>;
+  return <Dialog open onOpenChange={open => { if (!open && !busy) onClose(); }}><DialogContent className="border-slate-700 bg-slate-950 text-slate-100"><DialogHeader><DialogTitle>{title}</DialogTitle><DialogDescription>{enquiry ? `Remove ${enquiry.enquiry_uuid || 'this enquiry'} and its target note from ${targetTitle(target.month, target.week, target.title)}? The enquiry and its history will remain.` : member ? `Remove ${member.name || member.email || 'this member'} from this target? Their other assignments and access will remain.` : `Delete ${targetTitle(target.month, target.week, target.title)}, containing ${target.enquiry_count} enquiries and ${target.members.length} members? Enquiries and their histories will remain.`}</DialogDescription></DialogHeader><TargetErrorMessage error={error} /><div className="flex justify-end gap-2"><Button variant="ghost" disabled={busy} onClick={onClose}>Cancel</Button><Button variant="destructive" disabled={busy} onClick={() => void confirm()}>{busy ? 'Removing…' : enquiry ? 'Confirm remove enquiry' : member ? 'Confirm remove member' : 'Confirm delete target'}</Button></div></DialogContent></Dialog>;
 }

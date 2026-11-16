@@ -224,3 +224,31 @@ test('API checks authentication and target ownership on every entry point', asyn
   assert.equal((await request('update', { operation: 'period', month: '2027-01', week: 1 }, String(foreignTarget._id))).status, 404);
   await Targets.deleteMany({});
 });
+
+test('custom titles persist on creation and edits, preserve membership, and support legacy fallback', async () => {
+  asAdmin();
+  assert.equal(periods.targetTitle('2026-11', 1), 'November 2026 - 1st Week');
+  assert.equal(periods.targetTitle('2026-11', 1, '   '), 'November 2026 - 1st Week');
+  assert.equal(periods.targetTitle('2026-11', 1, '  Outreach  '), 'Outreach');
+  for (const title of [null, 123, 'x'.repeat(201)]) {
+    assert.equal((await request('create', { ...periodInput(), title })).status, 400);
+    assert.throws(() => server.parseTargetChange({ operation: 'period', month: '2026-11', week: 1, title }), { status: 400 });
+  }
+  const created = await request('create', { ...periodInput(), title: '  Outreach  ' });
+  assert.equal(created.status, 201); assert.equal(created.data.target.title, 'Outreach');
+  const id = created.data.target._id;
+  await request('update', { operation: 'add_members', user_ids: [String(staff._id)] }, id);
+  await request('update', addInput(), id);
+  await request('update', { operation: 'period', month: '2026-11', week: 1, title: '  Priority visits  ' }, id);
+  let detail = (await request('detail', null, id)).data.target;
+  assert.equal(detail.title, 'Priority visits');
+  assert.equal(detail.enquiry_ids.length, 2); assert.equal(detail.assigned_user_ids.length, 1);
+  const staffRows = await server.listTargets(new URLSearchParams('view=staff&month=2026-11'), actor(staff));
+  assert.equal(staffRows.data.find(t => String(t._id) === id).title, 'Priority visits');
+  await request('update', { operation: 'period', month: '2026-11', week: 2 }, id);
+  assert.equal((await request('detail', null, id)).data.target.title, 'Priority visits');
+  await request('update', { operation: 'period', month: '2026-11', week: 2, title: '   ' }, id);
+  detail = (await request('detail', null, id)).data.target;
+  assert.equal(periods.targetTitle(detail.month, detail.week, detail.title), 'November 2026 - 2nd Week');
+  await Targets.deleteOne({ _id: id });
+});

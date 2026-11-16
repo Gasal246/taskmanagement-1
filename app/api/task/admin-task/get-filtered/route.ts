@@ -1,3 +1,4 @@
+import { taskTagSearchFilter } from "@/lib/task-tags";
 import { temporaryDatabaseFailureResponse } from "@/lib/auth-availability";
 import { taskActivityFilterStages } from "@/lib/tasks/filter-pipeline";
 import { pageBounds, escapeSearch } from "@/lib/search";
@@ -110,7 +111,9 @@ export async function GET(req: NextRequest) {
       query.$and = [...(query.$and || []), { creator: assignedByObjectId }];
     }
 
-    const nameRegex = nameQuery ? new RegExp(escapeSearch(nameQuery), "i") : null;
+    const tagFilter = taskTagSearchFilter(nameQuery);
+    if (tagFilter) Object.assign(query, tagFilter);
+    const nameRegex = nameQuery && !tagFilter ? new RegExp(escapeSearch(nameQuery), "i") : null;
     const activityFilterStages = taskActivityFilterStages(nameRegex, staffObjectId);
 
     const now = new Date();
@@ -139,6 +142,7 @@ export async function GET(req: NextRequest) {
                 __nameActivityMatched: 1,
                 __staffActivityMatched: 1,
                 task_description: 1,
+                tags: 1,
                 end_date: 1,
                 is_project_task: 1,
                 priority: 1,
@@ -194,6 +198,7 @@ export async function GET(req: NextRequest) {
           _id: taskId,
           task_name: task.task_name || "",
           task_description: task.task_description || "",
+          tags: task.tags || [],
           end_date: task.end_date || null,
           is_project_task: Boolean(task.is_project_task),
           priority: task.priority || null,

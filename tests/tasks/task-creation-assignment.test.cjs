@@ -1,3 +1,4 @@
+require('../enquiries/register.cjs');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -20,6 +21,7 @@ function fixture({ headRole = null, admin = false, access = true, active = true,
   const notifications = [];
   const headChecks = [];
   const mocks = {
+    '@/lib/task-tags': require('../../lib/task-tags.ts'),
     '@/auth': { auth: async () => authenticated ? { user: { id: actorId } } : null },
     '@/lib/mongo': { default: async () => {} },
     '@/lib/jobs/transaction': { inTransaction: async work => work({}) },
@@ -49,14 +51,14 @@ function fixture({ headRole = null, admin = false, access = true, active = true,
     'next/server': { NextResponse },
   };
   const exports = {};
-  vm.runInNewContext(compiled, { exports, console, require: name => {
+  vm.runInNewContext(compiled, { exports, console, Error, require: name => {
     assert.ok(name in mocks, `Unexpected dependency: ${name}`);
     return mocks[name];
   } }, { filename });
   return {
     saved, notifications, headChecks,
-    create: (assignedTo = targetId) => exports.POST(new NextRequest('http://localhost/api/task/project-task/add-task', {
-      method: 'POST', body: JSON.stringify({ task_name: 'Cross department task', task_description: 'Example', business_id: businessId, is_project_task: false, assigned_to: assignedTo, project_id: null }),
+    create: (assignedTo = targetId, extra = {}) => exports.POST(new NextRequest('http://localhost/api/task/project-task/add-task', {
+      method: 'POST', body: JSON.stringify({ task_name: 'Cross department task', task_description: 'Example', business_id: businessId, is_project_task: false, assigned_to: assignedTo, project_id: null, ...extra }),
     })),
   };
 }
@@ -99,4 +101,16 @@ test('HEAD assignment still requires authentication, active users and membership
     assert.equal(setup.saved.length, 0);
     assert.equal(setup.notifications.length, 0);
   }
+});
+
+
+test('task creation stores normalized tags and rejects malformed tag payloads', async () => {
+  const setup = fixture({ admin: true });
+  const response = await setup.create(targetId, { tags: ['#Gasal', ' Muhammed   Gasal ', 'gasal'] });
+  assert.equal(response.status, 201);
+  assert.deepEqual(setup.saved[0].tags, ['Gasal', 'Muhammed Gasal']);
+  for (const tags of ['#Gasal', [1], null, ['x'.repeat(201)]]) {
+    assert.equal((await setup.create(targetId, { tags })).status, 400);
+  }
+  assert.equal(setup.saved.length, 1);
 });

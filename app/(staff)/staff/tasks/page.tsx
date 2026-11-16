@@ -58,7 +58,6 @@ const StaffTasks = () => {
   const [page, setPage] = useState(1);
   const [nameSearch, setNameSearch] = useState("");
   const [appliedNameSearch, setAppliedNameSearch] = useState("");
-  const [showNameFilter, setShowNameFilter] = useState(false);
   const [showStaffFilter, setShowStaffFilter] = useState(false);
   const [showPeriodFilter, setShowPeriodFilter] = useState(false);
   const [showPriorityFilter, setShowPriorityFilter] = useState(false);
@@ -274,10 +273,29 @@ const StaffTasks = () => {
           </div>
 
           <div className="flex min-w-0 flex-wrap items-end gap-2">
+            <div className="relative min-w-0 w-full sm:w-[230px]">
+              <Input
+                value={nameSearch}
+                onChange={(event) => setNameSearch(event.target.value)}
+                aria-label="Search tasks, activities or hashtags" maxLength={200} placeholder="Task, activity or #hashtags"
+                className="border-slate-700 bg-slate-900 pr-9 text-slate-100"
+              />
+              <button
+                type="button"
+                aria-label="Clear task search"
+                onClick={() => {
+                  setNameSearch("");
+                  setAppliedNameSearch("");
+                  setPage(1);
+                }}
+                className="absolute right-2 top-2 text-slate-400 hover:text-slate-100"
+              >
+                <X size={16} />
+              </button>
+            </div>
             <Select
               value=""
               onValueChange={(value) => {
-                if (value === "name") setShowNameFilter(true);
                 if (value === "staff") setShowStaffFilter(true);
                 if (value === "period") setShowPeriodFilter(true);
                 if (value === "priority") setShowPriorityFilter(true);
@@ -287,7 +305,6 @@ const StaffTasks = () => {
                 <SelectValue placeholder="Add search filter" />
               </SelectTrigger>
               <SelectContent>
-                {!showNameFilter && <SelectItem value="name">By task or activity</SelectItem>}
                 {canAdd && !showStaffFilter && <SelectItem value="staff">By staff</SelectItem>}
                 {!showPeriodFilter && <SelectItem value="period">Within period</SelectItem>}
                 {!showPriorityFilter && <SelectItem value="priority">Priority</SelectItem>}
@@ -313,30 +330,6 @@ const StaffTasks = () => {
                   </SelectContent>
                 </Select>
                 <button type="button" aria-label="Remove priority filter" onClick={() => { setShowPriorityFilter(false); setSelectedPriority(undefined); setPage(1); }} className="text-slate-400 hover:text-slate-100"><X size={16} /></button>
-              </div>
-            )}
-
-            {showNameFilter && (
-              <div className="relative min-w-0 w-full sm:w-[230px]">
-                <Input
-                  value={nameSearch}
-                  onChange={(event) => setNameSearch(event.target.value)}
-                  placeholder="Task or activity name"
-                  className="border-slate-700 bg-slate-900 pr-9 text-slate-100"
-                />
-                <button
-                  type="button"
-                  aria-label="Remove task or activity filter"
-                  onClick={() => {
-                    setShowNameFilter(false);
-                    setNameSearch("");
-                    setAppliedNameSearch("");
-                    setPage(1);
-                  }}
-                  className="absolute right-2 top-2 text-slate-400 hover:text-slate-100"
-                >
-                  <X size={16} />
-                </button>
               </div>
             )}
 

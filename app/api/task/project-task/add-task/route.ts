@@ -1,3 +1,4 @@
+import { validateTaskTags } from "@/lib/task-tags";
 import { inTransaction } from "@/lib/jobs/transaction";
 import { enqueueNotifications } from "@/lib/jobs/enqueue";
 import { canAccessBusiness, canAdministerBusiness } from "@/lib/server-access";
@@ -18,6 +19,7 @@ interface Body{
     assigned_to: string | string[] | null,
     task_name:string,
     task_description: string,
+    tags?: string[],
     status: string,
     business_id: string,
     is_project_task: boolean
@@ -37,6 +39,7 @@ export async function POST(req:NextRequest){
             (body.task_description != null && (typeof body.task_description !== "string" || body.task_description.length > 5000))) {
             return NextResponse.json({ message: "Provide a task title of 2–200 characters and a description up to 5000 characters" }, { status: 400 });
         }
+        const tags = validateTaskTags(body.tags);
         body.task_name = body.task_name.trim();
         body.status = body.status || "To Do";
 
@@ -101,6 +104,7 @@ export async function POST(req:NextRequest){
                 creator: session?.user?.id,
                 task_name: body.task_name,
                 task_description: body.task_description,
+                tags,
                 start_date: null,
                 end_date: null,
                 status: body.is_project_task ? "To Do" : body.status,
@@ -179,6 +183,9 @@ export async function POST(req:NextRequest){
 
         return NextResponse.json({message:"Task Created", data:Task}, {status: 201});
     }catch(err){
+        if (err instanceof Error && err.message.startsWith("Invalid tags:")) {
+            return NextResponse.json({ message: err.message }, { status: 400 });
+        }
         console.error("Task creation failed");
         return NextResponse.json({message:"Internal Server Error"}, {status:500});
         

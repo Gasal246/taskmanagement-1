@@ -11,6 +11,8 @@ import ChangeActivityDeadlineDialog from "@/components/task/ChangeActivityDeadli
 import ActivityScheduleFields from "@/components/task/ActivityScheduleFields";
 import { activityScheduleFields, isScheduleOrdered, scheduleOrderError, toLocalDateTimeInput, resolveActivityDateTime, formatScheduleDate } from "@/lib/activity-schedule";
 
+import { TaskTagChips } from "@/components/task/TaskTagChips";
+import { TaskTagsInput, useTaskTags } from "@/components/task/TaskTagsInput";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Breadcrumb,
@@ -226,6 +228,9 @@ const TaskDetailPage = () => {
   });
 
   // Task form
+  const taskTags = useTaskTags();
+  const resetTaskTags = taskTags.reset;
+
   const taskForm = useForm<z.infer<typeof taskSchema>>({
     resolver: zodResolver(taskSchema),
     defaultValues: {
@@ -251,6 +256,7 @@ const TaskDetailPage = () => {
     if (!taskData) return;
     taskForm.setValue("task_name", taskData.task_name);
     taskForm.setValue("task_description", taskData.task_description || "");
+    resetTaskTags(taskData.tags || []);
     taskForm.setValue("priority", taskData.priority || "");
 
     if (!taskData.is_project_task && loadedStaffs) {
@@ -266,7 +272,7 @@ const TaskDetailPage = () => {
       setSelectedUser(null);
       setSearchTerm("");
     }
-  }, [taskData, loadedStaffs, taskForm]);
+  }, [resetTaskTags, taskData, loadedStaffs, taskForm]);
 
   useEffect(() => {
     if (!selectSkillDialogOpen || !businessData?._id) return;
@@ -335,6 +341,7 @@ const TaskDetailPage = () => {
   };
 
   const handleEditTask = () => {
+    resetTaskTags(taskData?.tags || []);
     setEditTaskDialog(true);
   };
 
@@ -490,6 +497,7 @@ const TaskDetailPage = () => {
       task_id: params.taskid,
       task_name: values.task_name,
       task_description: values.task_description,
+      tags: taskTags.getTags(),
       priority: values.priority || undefined,
       is_project_task: taskData?.is_project_task,
       ...(!taskData?.is_project_task ? { assigned_to: assignedTo } : {}),
@@ -795,6 +803,7 @@ const TaskDetailPage = () => {
             <p className="text-xs text-slate-400 max-w-2xl">
               {taskData.task_description || "No description added."}
             </p>
+            <TaskTagChips tags={taskData.tags} />
             {taskData?.comments && (
               <div className="rounded-lg border border-slate-800/70 bg-slate-900/50 p-3 max-w-2xl">
                 <p className="text-[11px] uppercase tracking-wide text-slate-500">Comments</p>
@@ -1428,6 +1437,7 @@ const TaskDetailPage = () => {
                   </FormItem>
                 )}
               />
+              <TaskTagsInput input={taskTags} />
               <FormField
                 control={taskForm.control}
                 name="priority"

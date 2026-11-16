@@ -1,3 +1,4 @@
+import { validateTaskTags } from "@/lib/task-tags";
 import connectDB from "@/lib/mongo";
 import Business_Tasks from "@/models/business_tasks.model";
 import { NextRequest, NextResponse } from "next/server";
@@ -7,6 +8,7 @@ import { canManageProjectTaskActivities } from "@/app/api/helpers/project-task-t
 interface Body{
     task_name: string,
     task_description: string,
+    tags?: string[],
     priority?: "high" | "medium" | "normal",
     assigned_to: string,
     status: string,
@@ -29,6 +31,9 @@ export async function PUT(req:NextRequest){
             task_name: body.task_name,
             task_description: body.task_description,
         };
+        if (Object.prototype.hasOwnProperty.call(body, "tags")) {
+            updates.tags = validateTaskTags(body.tags);
+        }
         if (["high", "medium", "normal"].includes(String(body.priority || ""))) {
             updates.priority = body.priority;
         }
@@ -53,6 +58,9 @@ export async function PUT(req:NextRequest){
         }
 
     }catch(err){
+        if (err instanceof Error && err.message.startsWith("Invalid tags:")) {
+            return NextResponse.json({ message: err.message }, { status: 400 });
+        }
         console.log("error while updating task", err);
         return NextResponse.json({message: "Internal Server Error"}, {status:500});
     }

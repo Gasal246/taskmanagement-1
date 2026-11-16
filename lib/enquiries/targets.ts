@@ -17,12 +17,13 @@ export function targetMonthLabel(month: string): string {
 export function targetPeriodsOverlap(a: number | null, b: number | null): boolean {
   return a === null || b === null || a === b;
 }
-export function targetTitle(month: string, week: number | null): string {
+export function targetTitle(month: string, week: number | null, title?: string): string {
+  if (title?.trim()) return title.trim();
   return `${targetMonthLabel(month)}${week === null ? '' : ` - ${['1st', '2nd', '3rd', '4th'][week - 1]} Week`}`;
 }
-export type TargetInput = { business_id: string; month: string; week: number | null };
+export type TargetInput = { business_id: string; title?: string; month: string; week: number | null };
 export type TargetChange =
-  | { operation: 'period'; month: string; week: number | null }
+  | { operation: 'period'; title?: string; month: string; week: number | null }
   | { operation: 'add_enquiries'; country_id: string; region_id: string; enquiry_ids: string[]; note: string }
   | { operation: 'edit_note'; enquiry_id: string; note: string }
   | { operation: 'remove_enquiry'; enquiry_id: string }
