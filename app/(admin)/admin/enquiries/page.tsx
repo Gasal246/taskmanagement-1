@@ -10,6 +10,7 @@ import {
   EarthIcon,
   HandPlatter,
   LandPlot,
+  ListOrdered,
   MapPinned,
   PanelsTopLeft,
   Plus,
@@ -146,6 +147,7 @@ export default function EnquiriesDashboardPage() {
   ];
 
   const tools: ToolCard[] = [
+    { title: "Manage Enquiry Stages", description: "Configure enquiry workflow stages and responsible roles.", href: "/admin/enquiries/manage-stages", icon: ListOrdered },
     { title: 'Targets', description: 'Assign shared enquiry work by region, month, and week.', href: '/admin/enquiries/targets', icon: ClipboardList },
     {
       title: "Facility Map",
