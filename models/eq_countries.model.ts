@@ -2,12 +2,14 @@ import mongoose, { Document, Types, Schema } from "mongoose";
 
 export interface IEq_Countries extends Document{
     _id: Types.ObjectId,
+    business_id?: Types.ObjectId,
     country_name: String,
     createdAt: Date,
     updatedAt: Date
 }
 
 const Eq_CountriesSchema : Schema = new Schema({
+    business_id: { type: Schema.Types.ObjectId, ref: "business", immutable: true, index: true },
     country_name: {type: String}
 }, {timestamps: true})
 

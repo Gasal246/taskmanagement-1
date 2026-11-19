@@ -1,4 +1,4 @@
-import { enquiryActor, resolveEnquiryCreationBusiness } from "@/lib/enquiries/access";
+import { enquiryLocationScope, validateLocationParents } from "@/lib/enquiries/location-scope";
 import connectDB from "@/lib/mongo";
 import Eq_area from "@/models/eq_area.model";
 import { NextRequest, NextResponse } from "next/server";
@@ -18,10 +18,11 @@ export async function POST(req:NextRequest){
         await connectDB();
         const body: Body = await req.json();
 
-        const actor = await enquiryActor();
-        if (!actor) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-        const businessId = await resolveEnquiryCreationBusiness(req, actor, body.business_id);
-        if (!actor.admin || !businessId) return NextResponse.json({ message: "Select a business you administer" }, { status: 403 });
+        const scope = await enquiryLocationScope(req, true, body.business_id);
+        if (scope instanceof NextResponse) return scope;
+        const businessId = scope.businessId!;
+        const invalidParents = await validateLocationParents({country_id: body.country, region_id: body.region, province_id: body.province, city_id: body.city}, businessId);
+        if (invalidParents) return invalidParents;
         const newArea = new Eq_area({
             business_id: businessId,
             country_id: body.country,

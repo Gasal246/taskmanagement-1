@@ -17,3 +17,17 @@ npm run migrate:enquiry-catalogue -- --apply
 The migration uses stable keys and insert-only catalogue upserts, so reruns preserve administrator edits. It backfills generic Facility and solution detail values without replacing values already present.
 
 For deployment, apply the catalogue seed before deploying runtime consumers. Pause Facility and enquiry writes while applying the legacy backfill, then deploy the application and rerun the migration as a final idempotency check.
+
+## Enquiry location ownership
+
+Countries, regions, provinces, cities, areas and Facilities are private to their business.
+Backfill the existing unowned directory records for the explicitly selected business:
+
+```sh
+node scripts/migrate-enquiry-location-ownership.mjs --business-email info@tektontechnology.com
+node scripts/migrate-enquiry-location-ownership.mjs --business-email info@tektontechnology.com --apply
+```
+
+The first command reports counts without writing. The apply command sets only missing
+or null `business_id` fields. It preserves existing ownership and is safe to rerun.
+Deploy the application changes so lists, dropdowns and profiles enforce the ownership.

@@ -60,7 +60,7 @@ const AddAdmin = () => {
                 duration: 3000,
                 description: "Complete the business details to add admins.",
             });
-            dispatch(loadAdminBusiness(res));
+            dispatch(loadAdminBusiness(res.data));
             router.push(`/superadmin/admins/add-admin/business`);
         } catch (error) {
             toast.error("Failed to add business", {

@@ -1,3 +1,4 @@
+import { enquiryLocationScope } from "@/lib/enquiries/location-scope";
 import { countReadableEnquiries, enquiryActor } from "@/lib/enquiries/access";
 import connectDB from "@/lib/mongo";
 import Eq_area from "@/models/eq_area.model";
@@ -9,6 +10,8 @@ import { NextRequest, NextResponse } from "next/server";
 export async function GET(req: NextRequest) {
   try {
         await connectDB();
+        const scope = await enquiryLocationScope(req);
+        if (scope instanceof NextResponse) return scope;
         const actor = await enquiryActor();
         if (!actor) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     const { searchParams } = new URL(req.url);
@@ -21,7 +24,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const city = await Eq_city.findById(city_id)
+    const city = await Eq_city.findOne({ _id: city_id, ...scope.filter })
       .populate("country_id")
       .populate("region_id")
       .populate("province_id")
@@ -34,8 +37,8 @@ export async function GET(req: NextRequest) {
     }
 
     const [areaCount, campCount, enquiryCount] = await Promise.all([
-      Eq_area.countDocuments({ city_id }),
-      Eq_camps.countDocuments({ city_id }),
+      Eq_area.countDocuments({ ...scope.filter, city_id }),
+      Eq_camps.countDocuments({ ...scope.filter, city_id }),
       countReadableEnquiries({ city_id }, actor),
     ]);
 

@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
       let projectSectorKey = facility.project_sector || "";
 
       if (campId) {
-        const existingCamp: any = await Eq_camps.findOne({ _id: campId, is_active: true }).session(dbSession).lean();
+        const existingCamp: any = await Eq_camps.findOne({ _id: campId, business_id: businessId, is_active: true }).session(dbSession).lean();
         if (!existingCamp) throw new RequestError(400, "Select an active Facility");
         if (await Eq_enquiry.exists({ camp_id: campId, business_id: businessId }).session(dbSession)) throw new RequestError(409, "Enquiry already added for this Facility");
         areaId = existingCamp.area_id;

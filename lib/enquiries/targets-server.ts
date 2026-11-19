@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { enquiryLocationScope } from './location-scope';
 import { z } from 'zod';
 import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/lib/mongo';
@@ -182,13 +183,13 @@ export async function listTargets(params: URLSearchParams, actor: EnquiryActor) 
     enquiries: pages[i].data, enquiryPagination: pages[i].pagination,
   })), pagination: { page, limit, totalRecords, totalPages: Math.ceil(totalRecords / limit) } };
 }
-async function options(params: URLSearchParams, actor: EnquiryActor) {
+async function options(params: URLSearchParams, actor: EnquiryActor, locationFilter: Record<string, any>) {
   const staff = params.get('view') === 'staff' || !actor.admin;
   const businessId = params.get('business_id');
   if (businessId) oid(businessId);
   if (!staff && businessId) requireTargetAdmin(actor, businessId);
   const businesses = staff ? [] : await Businesses.find({ status: 1, ...(actor.isSuper ? {} : { _id: { $in: actor.adminBusinessIds || [] } }) }).select('business_name').sort({ business_name: 1 }).lean();
-  const [countries, regions] = await Promise.all([Countries.find().select('country_name').sort({ country_name: 1 }).lean(), Regions.find().select('region_name country_id').sort({ region_name: 1 }).lean()]);
+  const [countries, regions] = await Promise.all([Countries.find(locationFilter).select('country_name').sort({ country_name: 1 }).lean(), Regions.find(locationFilter).select('region_name country_id').sort({ region_name: 1 }).lean()]);
   const memberIds = !staff ? await EqUsers.find({ business_id: businessId || { $in: businesses.map((b: any) => b._id) } }).distinct('user_id') : [];
   const users = await Users.find({ _id: { $in: memberIds }, status: 1 }).select('name email').sort({ name: 1 }).lean();
   return { businesses, countries, regions, users };
@@ -214,7 +215,11 @@ export async function targetHandler(req: NextRequest, operation: 'list' | 'creat
     if (!actor) throw new TargetError(401, 'Unauthorized');
     const params = req.nextUrl.searchParams;
     if (operation === 'list') return NextResponse.json(await listTargets(params, actor));
-    if (operation === 'options') return NextResponse.json(await options(params, actor));
+    if (operation === 'options') {
+      const scope = await enquiryLocationScope(req);
+      if (scope instanceof NextResponse) return scope;
+      return NextResponse.json(await options(params, actor, scope.filter));
+    }
     if (operation === 'candidates') return NextResponse.json(await candidates(params, actor));
     let existing: any;
     if (id) {

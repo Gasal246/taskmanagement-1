@@ -1,3 +1,4 @@
+import { enquiryLocationScope } from "@/lib/enquiries/location-scope";
 import connectDB from "@/lib/mongo";
 import Eq_province from "@/models/eq_province.model";
 import { NextRequest, NextResponse } from "next/server";
@@ -5,10 +6,12 @@ import { NextRequest, NextResponse } from "next/server";
 export async function GET(req:NextRequest){
     try{
         await connectDB();
+        const scope = await enquiryLocationScope(req);
+        if (scope instanceof NextResponse) return scope;
         const {searchParams} = new URL(req.url);
         const region_id = searchParams.get("region_id");
 
-        const provinces = await Eq_province.find({region_id: region_id}).lean();
+        const provinces = await Eq_province.find({ ...scope.filter,region_id: region_id}).lean();
 
         return NextResponse.json({provinces, status: 200}, {status: 200});
     }catch(err){

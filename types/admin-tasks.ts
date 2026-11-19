@@ -39,3 +39,23 @@ export type AdminTaskFilterOptionsResponse = {
   data: AdminTaskFilterOption[];
   status: number;
 };
+
+export type AdminTaskListState = {
+  businessId: string;
+  activeTab: AdminTaskTab;
+  draftRange: { start: string; end: string };
+  appliedRange: { start: string; end: string };
+  page: number;
+  nameSearch: string;
+  appliedNameSearch: string;
+  showStaffFilter: boolean;
+  showAssignedByFilter: boolean;
+  showPeriodFilter: boolean;
+  showPriorityFilter: boolean;
+  staffSearch: string;
+  selectedStaffId: string;
+  assignedBySearch: string;
+  selectedAssignedById: string;
+  selectedStatus?: StaffTaskStatusFilter;
+  selectedPriority?: TaskPriorityFilter;
+};

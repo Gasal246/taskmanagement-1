@@ -1,5 +1,8 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
+import type { AdminTaskListState } from "@/types/admin-tasks";
+import type { StaffTaskListState } from "@/types/staff-tasks";
+
 interface ApplicationState {
     businessAdded: any;
     businessPlan: any;
@@ -14,6 +17,8 @@ interface ApplicationState {
     filteredStaffs: any[] | null;
     staffFilterValues: any;
     enquiriesListPage: number;
+    adminTaskListState: AdminTaskListState | null;
+    staffTaskListState: StaffTaskListState | null;
     adminEnquiriesListState: any;
     staffEnquiriesListState: any;
 };
@@ -32,6 +37,8 @@ const initialState: ApplicationState = {
     filteredStaffs: null,
     staffFilterValues: null,
     enquiriesListPage: 1,
+    adminTaskListState: null,
+    staffTaskListState: null,
     adminEnquiriesListState: null,
     staffEnquiriesListState: null,
 };
@@ -80,6 +87,12 @@ const applicationSlice = createSlice({
         loadEnquiriesListPage: (state, action: PayloadAction<number>) => {
             state.enquiriesListPage = Math.max(1, Number(action.payload) || 1)
         },
+        loadStaffTaskListState: (state, action: PayloadAction<StaffTaskListState>) => {
+            state.staffTaskListState = action.payload
+        },
+        loadAdminTaskListState: (state, action: PayloadAction<AdminTaskListState>) => {
+            state.adminTaskListState = action.payload
+        },
         loadAdminEnquiriesListState: (state, action: PayloadAction<any>) => {
             state.adminEnquiriesListState = action.payload
         },
@@ -103,6 +116,8 @@ export const {
     loadFilteredStaffs,
     loadStaffFilterValues,
     loadEnquiriesListPage,
+    loadAdminTaskListState,
+    loadStaffTaskListState,
     loadAdminEnquiriesListState,
     loadStaffEnquiriesListState
     ,resetApplication

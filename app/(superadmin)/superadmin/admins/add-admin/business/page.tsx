@@ -31,7 +31,7 @@ const AdminBusinessDetails = () => {
 
     const { businessAdded, businessPlan, businessAdmins, businessDocs } = useSelector((state: RootState) => state.application);
     useEffect(() => {
-        if (!businessAdded) {
+        if (!businessAdded?._id) {
             router.back();
         }
         if (businessPlan) {
@@ -124,7 +124,10 @@ const AdminBusinessDetails = () => {
     }
 
     const handleAddToBusiness = async () => {
-        setLoading(true);
+        if (!businessAdded?._id) {
+            toast.error("Business details are missing. Please reopen the business and try again.");
+            return;
+        }
         if (!selectedPlan) {
             toast.error("Please select a plan", {
                 duration: 3000,
@@ -132,6 +135,7 @@ const AdminBusinessDetails = () => {
             })
             return;
         }
+        setLoading(true);
 
         const docFileList = docList.filter((doc) => doc?.doc_file);
         let doclist: any[] = []

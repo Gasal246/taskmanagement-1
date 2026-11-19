@@ -1,3 +1,4 @@
+import { enquiryLocationScope } from "@/lib/enquiries/location-scope";
 import connectDB from "@/lib/mongo";
 import Eq_countries from "@/models/eq_countries.model";
 import { NextRequest, NextResponse } from "next/server";
@@ -5,6 +6,8 @@ import { NextRequest, NextResponse } from "next/server";
 export async function GET(req: NextRequest) {
   try {
         await connectDB();
+        const scope = await enquiryLocationScope(req);
+        if (scope instanceof NextResponse) return scope;
     const { searchParams } = new URL(req.url);
     const search = searchParams.get("search")?.trim() || "";
     const pageParam = Number(searchParams.get("page"));
@@ -16,7 +19,7 @@ export async function GET(req: NextRequest) {
         : 15;
     const skip = (page - 1) * limit;
 
-    const query: any = {};
+    const query: any = { ...scope.filter };
 
     if (search) {
       query.country_name = new RegExp(search, "i");

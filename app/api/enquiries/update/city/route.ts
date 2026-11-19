@@ -1,3 +1,4 @@
+import { enquiryLocationScope, validateLocationParents } from "@/lib/enquiries/location-scope";
 import connectDB from "@/lib/mongo";
 import Eq_city from "@/models/eq_city.model";
 import { NextRequest, NextResponse } from "next/server";
@@ -14,6 +15,12 @@ export async function PUT(req: NextRequest) {
   try {
         await connectDB();
     const body: Body = await req.json();
+    const scope = await enquiryLocationScope(req, true);
+    if (scope instanceof NextResponse) return scope;
+    const existing: any = await Eq_city.findOne({ _id: body.city_id, ...scope.filter }).lean();
+    if (!existing) return NextResponse.json({ message: "Location not found" }, { status: 404 });
+    const invalidParents = await validateLocationParents({country_id: body.country || existing.country_id?.toString(), region_id: body.region || existing.region_id?.toString(), province_id: body.province || existing.province_id?.toString()}, scope.businessId!);
+    if (invalidParents) return invalidParents;
 
     if (!body.city_id) {
       return NextResponse.json(
@@ -40,7 +47,7 @@ export async function PUT(req: NextRequest) {
       updatePayload.province_id = body.province;
     }
 
-    await Eq_city.findByIdAndUpdate(body.city_id, {
+    await Eq_city.findOneAndUpdate({ _id: body.city_id, ...scope.filter }, {
       $set: updatePayload,
     });
 

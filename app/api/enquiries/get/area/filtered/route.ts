@@ -1,3 +1,4 @@
+import { enquiryLocationScope } from "@/lib/enquiries/location-scope";
 import connectDB from "@/lib/mongo";
 import Eq_area from "@/models/eq_area.model";
 import Eq_countries from "@/models/eq_countries.model";
@@ -9,6 +10,8 @@ import { NextRequest, NextResponse } from "next/server";
 export async function GET(req:NextRequest){
     try{
         await connectDB();
+        const scope = await enquiryLocationScope(req);
+        if (scope instanceof NextResponse) return scope;
         const {searchParams} = new URL(req.url);
 
         const country_id = searchParams.get("country_id");
@@ -25,7 +28,7 @@ export async function GET(req:NextRequest){
             : 15;
         const skip = (page - 1) * limit;
 
-        const query:any = {};
+        const query:any = { ...scope.filter };
 
         if(country_id) query.country_id = country_id;
         if(region_id) query.region_id = region_id;
@@ -37,10 +40,10 @@ export async function GET(req:NextRequest){
         if (search) {
           const regex = new RegExp(search, "i");
           const [countries, regions, provinces, cities] = await Promise.all([
-            Eq_countries.find({ country_name: regex }).select("_id").lean(),
-            Eq_region.find({ region_name: regex }).select("_id").lean(),
-            Eq_province.find({ province_name: regex }).select("_id").lean(),
-            Eq_city.find({ city_name: regex }).select("_id").lean(),
+            Eq_countries.find({ ...scope.filter, country_name: regex }).select("_id").lean(),
+            Eq_region.find({ ...scope.filter, region_name: regex }).select("_id").lean(),
+            Eq_province.find({ ...scope.filter, province_name: regex }).select("_id").lean(),
+            Eq_city.find({ ...scope.filter, city_name: regex }).select("_id").lean(),
           ]);
 
           const orConditions: any[] = [{ area_name: regex }];

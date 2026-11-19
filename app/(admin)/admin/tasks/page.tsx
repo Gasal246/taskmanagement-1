@@ -2,10 +2,12 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarPlus, ListTodo, RefreshCw, X } from "lucide-react";
+import { CalendarPlus, ListTodo, RefreshCw, RotateCcw, X } from "lucide-react";
 import { DatePicker } from "antd";
-import { useSelector } from "react-redux";
+import dayjs from "dayjs";
+import { useDispatch, useSelector } from "react-redux";
 import { RootState } from "@/redux/store";
+import { loadAdminTaskListState } from "@/redux/slices/application";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -48,26 +50,79 @@ const PAGE_SIZE = 9;
 type RangeState = { start: string; end: string };
 
 const TasksPage = () => {
-  const router = useRouter();
   const { businessData } = useSelector((state: RootState) => state.user);
   const businessId = businessData?._id || "";
-  const [activeTab, setActiveTab] = useState<AdminTaskTab>("all");
-  const [rangeValue, setRangeValue] = useState<any>(null);
-  const [draftRange, setDraftRange] = useState<RangeState>({ start: "", end: "" });
-  const [appliedRange, setAppliedRange] = useState<RangeState>({ start: "", end: "" });
-  const [page, setPage] = useState(1);
-  const [nameSearch, setNameSearch] = useState("");
-  const [appliedNameSearch, setAppliedNameSearch] = useState("");
-  const [showStaffFilter, setShowStaffFilter] = useState(false);
-  const [showAssignedByFilter, setShowAssignedByFilter] = useState(false);
-  const [showPeriodFilter, setShowPeriodFilter] = useState(false);
-  const [showPriorityFilter, setShowPriorityFilter] = useState(false);
-  const [staffSearch, setStaffSearch] = useState("");
-  const [selectedStaffId, setSelectedStaffId] = useState("");
-  const [assignedBySearch, setAssignedBySearch] = useState("");
-  const [selectedAssignedById, setSelectedAssignedById] = useState("");
-  const [selectedStatus, setSelectedStatus] = useState<StaffTaskStatusFilter>();
-  const [selectedPriority, setSelectedPriority] = useState<TaskPriorityFilter>();
+  return <TaskListing key={businessId} businessId={businessId} />;
+};
+
+const TaskListing = ({ businessId }: { businessId: string }) => {
+  const router = useRouter();
+  const dispatch = useDispatch();
+  const savedState = useSelector((state: RootState) => state.application.adminTaskListState);
+  const saved = savedState?.businessId === businessId ? savedState : null;
+  const [activeTab, setActiveTab] = useState<AdminTaskTab>(saved?.activeTab ?? "all");
+  const [rangeValue, setRangeValue] = useState<any>(() =>
+    saved?.draftRange.start && saved.draftRange.end
+      ? [dayjs(saved.draftRange.start), dayjs(saved.draftRange.end)]
+      : null
+  );
+  const [draftRange, setDraftRange] = useState<RangeState>(saved?.draftRange ?? { start: "", end: "" });
+  const [appliedRange, setAppliedRange] = useState<RangeState>(saved?.appliedRange ?? { start: "", end: "" });
+  const [page, setPage] = useState(saved?.page ?? 1);
+  const [nameSearch, setNameSearch] = useState(saved?.nameSearch ?? "");
+  const [appliedNameSearch, setAppliedNameSearch] = useState(saved?.appliedNameSearch ?? "");
+  const [showStaffFilter, setShowStaffFilter] = useState(saved?.showStaffFilter ?? false);
+  const [showAssignedByFilter, setShowAssignedByFilter] = useState(saved?.showAssignedByFilter ?? false);
+  const [showPeriodFilter, setShowPeriodFilter] = useState(saved?.showPeriodFilter ?? false);
+  const [showPriorityFilter, setShowPriorityFilter] = useState(saved?.showPriorityFilter ?? false);
+  const [staffSearch, setStaffSearch] = useState(saved?.staffSearch ?? "");
+  const [selectedStaffId, setSelectedStaffId] = useState(saved?.selectedStaffId ?? "");
+  const [assignedBySearch, setAssignedBySearch] = useState(saved?.assignedBySearch ?? "");
+  const [selectedAssignedById, setSelectedAssignedById] = useState(saved?.selectedAssignedById ?? "");
+  const [selectedStatus, setSelectedStatus] = useState<StaffTaskStatusFilter | undefined>(saved?.selectedStatus);
+  const [selectedPriority, setSelectedPriority] = useState<TaskPriorityFilter | undefined>(saved?.selectedPriority);
+
+  useEffect(() => {
+    if (!businessId) return;
+    dispatch(loadAdminTaskListState({
+      businessId, activeTab, draftRange, appliedRange, page, nameSearch,
+      appliedNameSearch, showStaffFilter, showAssignedByFilter, showPeriodFilter,
+      showPriorityFilter, staffSearch, selectedStaffId, assignedBySearch,
+      selectedAssignedById, selectedStatus, selectedPriority,
+    }));
+  }, [
+    dispatch, businessId, activeTab, draftRange, appliedRange, page, nameSearch,
+    appliedNameSearch, showStaffFilter, showAssignedByFilter, showPeriodFilter,
+    showPriorityFilter, staffSearch, selectedStaffId, assignedBySearch,
+    selectedAssignedById, selectedStatus, selectedPriority,
+  ]);
+
+  const hasFilters = Boolean(
+    nameSearch || appliedNameSearch || activeTab !== "all" || selectedStatus ||
+    selectedPriority || selectedStaffId || selectedAssignedById ||
+    appliedRange.start || appliedRange.end || showStaffFilter ||
+    showAssignedByFilter || showPeriodFilter || showPriorityFilter
+  );
+
+  const resetFilters = () => {
+    setActiveTab("all");
+    setNameSearch("");
+    setAppliedNameSearch("");
+    setSelectedStatus(undefined);
+    setSelectedPriority(undefined);
+    setStaffSearch("");
+    setSelectedStaffId("");
+    setAssignedBySearch("");
+    setSelectedAssignedById("");
+    setShowStaffFilter(false);
+    setShowAssignedByFilter(false);
+    setShowPeriodFilter(false);
+    setShowPriorityFilter(false);
+    setDraftRange({ start: "", end: "" });
+    setAppliedRange({ start: "", end: "" });
+    setRangeValue(null);
+    setPage(1);
+  };
 
   const staffOptionQuery = useGetAdminTaskFilterOptions(
     businessId,
@@ -132,12 +187,13 @@ const TasksPage = () => {
   } = useGetAdminTaskOverview(filters);
 
   useEffect(() => {
+    if (nameSearch.trim() === appliedNameSearch) return;
     const timeout = window.setTimeout(() => {
       setAppliedNameSearch(nameSearch.trim());
       setPage(1);
     }, 350);
     return () => window.clearTimeout(timeout);
-  }, [nameSearch]);
+  }, [nameSearch, appliedNameSearch]);
 
   useEffect(() => {
     const now = new Date();
@@ -283,7 +339,7 @@ const TasksPage = () => {
             {showPriorityFilter && (
               <div className="flex min-w-0 w-full items-center sm:w-[190px] gap-1 rounded-md border border-slate-700 bg-slate-900 pr-2">
                 <Select
-                  value={selectedPriority}
+                  value={selectedPriority ?? ""}
                   onValueChange={(value) => {
                     setSelectedPriority(value as TaskPriorityFilter);
                     setPage(1);
@@ -330,6 +386,16 @@ const TasksPage = () => {
                 <Button size="sm" disabled={!draftRange.start || !draftRange.end} className="h-9 border border-slate-700/80 bg-slate-100/10 text-slate-100 hover:bg-slate-100/20" onClick={() => { setAppliedRange(draftRange); setPage(1); }}>Apply</Button>
                 <Button variant="ghost" size="sm" className="h-9 text-slate-400 hover:text-slate-200" onClick={clearPeriod}>Clear</Button>
               </div>
+            )}
+            {hasFilters && (
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={resetFilters}
+                className="gap-2 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-100"
+              >
+                <RotateCcw size={14} aria-hidden="true" /> Reset filters
+              </Button>
             )}
           </div>
         </div>

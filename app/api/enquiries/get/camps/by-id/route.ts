@@ -1,3 +1,4 @@
+import { enquiryLocationScope } from "@/lib/enquiries/location-scope";
 import { enquiryActor, enquiryVisibilityStages } from "@/lib/enquiries/access";
 import Enquiries from "@/models/eq_enquiries.model";
 import mongoose from "mongoose";
@@ -21,10 +22,12 @@ import "@/models/eq_camp_realestate.model";
 export async function GET(req:NextRequest){
     try{
         await connectDB();
+        const scope = await enquiryLocationScope(req);
+        if (scope instanceof NextResponse) return scope;
         const {searchParams} = new URL(req.url);
         const camp_id = searchParams.get("camp_id");
 
-        const camp = await Eq_camps.findById(camp_id)
+        const camp = await Eq_camps.findOne({ _id: camp_id, ...scope.filter })
             .populate({
                 path:"country_id",
                 select: "country_name"
@@ -51,6 +54,7 @@ export async function GET(req:NextRequest){
             .populate("headoffice_id")
             .lean();
 
+            if (!camp) return NextResponse.json({ message: "Facility not found" }, { status: 404 });
             const actor = await enquiryActor();
             if (!actor) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
             if (!mongoose.isValidObjectId(camp_id)) return NextResponse.json({ message: "Provide a valid Facility ID" }, { status: 400 });

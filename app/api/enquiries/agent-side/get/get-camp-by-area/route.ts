@@ -1,3 +1,4 @@
+import { enquiryLocationScope } from "@/lib/enquiries/location-scope";
 import connectDB from "@/lib/mongo";
 import Eq_camps from "@/models/eq_camps.model";
 import Eq_camp_solutions from "@/models/eq_camp_solutions.model";
@@ -7,12 +8,14 @@ import { NextRequest, NextResponse } from "next/server";
 export async function GET(req:NextRequest){
     try{
         await connectDB();
+        const scope = await enquiryLocationScope(req);
+        if (scope instanceof NextResponse) return scope;
         const {searchParams} = new URL(req.url);
         const area_id = searchParams.get("area_id");
         if(!area_id) return NextResponse.json({message: "Please select area first", status: 400}, {status: 400});
 
-        const camps: any[] = await Eq_camps.find({area_id: area_id, is_active: true}).lean();
-        const mappings: any[] = await Eq_camp_solutions.find({ camp_id: { $in: camps.map(camp => camp._id) } }).lean();
+        const camps: any[] = await Eq_camps.find({ ...scope.filter,area_id: area_id, is_active: true}).lean();
+        const mappings: any[] = await Eq_camp_solutions.find({ ...scope.filter, camp_id: { $in: camps.map(camp => camp._id) } }).lean();
         const solutionsByCamp = new Map(mappings.map(mapping => [String(mapping.camp_id), mapping]));
         const enriched = camps.map(camp => {
             const mapping = solutionsByCamp.get(String(camp._id));

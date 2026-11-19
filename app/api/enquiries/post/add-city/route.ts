@@ -1,8 +1,10 @@
+import { enquiryLocationScope, validateLocationParents } from "@/lib/enquiries/location-scope";
 import connectDB from "@/lib/mongo";
 import Eq_city from "@/models/eq_city.model";
 import { NextRequest, NextResponse } from "next/server";
 
 interface Body {
+  business_id?: string;
   city_name: string;
   country: string;
   region: string;
@@ -13,6 +15,10 @@ export async function POST(req: NextRequest) {
   try {
         await connectDB();
     const body: Body = await req.json();
+    const scope = await enquiryLocationScope(req, true, body.business_id);
+    if (scope instanceof NextResponse) return scope;
+    const invalidParents = await validateLocationParents({country_id: body.country, region_id: body.region, province_id: body.province}, scope.businessId!);
+    if (invalidParents) return invalidParents;
 
     if (!body.country || !body.region || !body.province) {
       return NextResponse.json(
@@ -29,6 +35,7 @@ export async function POST(req: NextRequest) {
     }
 
     const newCity = new Eq_city({
+      business_id: scope.businessId,
       country_id: body.country,
       region_id: body.region,
       province_id: body.province,

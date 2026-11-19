@@ -3,6 +3,7 @@ import mongoose, { Document, Types, Schema } from "mongoose";
 
 export interface IEq_region extends Document{
     _id: Types.ObjectId,
+    business_id?: Types.ObjectId,
     region_name: String,
     country_id: Types.ObjectId,
     createdAt: Date,
@@ -10,6 +11,7 @@ export interface IEq_region extends Document{
 }
 
 const Eq_regionSchema: Schema = new Schema({
+    business_id: { type: Schema.Types.ObjectId, ref: "business", immutable: true, index: true },
     region_name: {type: String},
     country_id: {type: Schema.Types.ObjectId, ref: "eq_countries"}
 }, {timestamps: true});

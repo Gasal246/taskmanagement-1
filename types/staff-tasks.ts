@@ -72,3 +72,20 @@ export type StaffTasksResponse = {
   statusAsOf: string;
   status: number;
 };
+
+export type StaffTaskListState = {
+  scopeKey: string;
+  activeTab: StaffTaskQueryParams["taskType"];
+  draftRange: { start: string; end: string };
+  appliedRange: { start: string; end: string };
+  page: number;
+  nameSearch: string;
+  appliedNameSearch: string;
+  showStaffFilter: boolean;
+  showPeriodFilter: boolean;
+  showPriorityFilter: boolean;
+  staffSearch: string;
+  selectedStaffId: string;
+  selectedStatus?: StaffTaskStatusFilter;
+  selectedPriority?: TaskPriorityFilter;
+};

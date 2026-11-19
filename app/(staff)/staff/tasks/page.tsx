@@ -2,8 +2,12 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarPlus, ListTodo, RefreshCw, X } from "lucide-react";
+import { CalendarPlus, ListTodo, RefreshCw, RotateCcw, X } from "lucide-react";
 import { DatePicker } from "antd";
+import dayjs from "dayjs";
+import { useDispatch, useSelector } from "react-redux";
+import type { RootState } from "@/redux/store";
+import { loadStaffTaskListState } from "@/redux/slices/application";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -49,24 +53,72 @@ type TaskTab = StaffTaskQueryParams["taskType"];
 type RangeState = { start: string; end: string };
 
 const StaffTasks = () => {
+  const { currentUser, businessData, user_role } = useSelector((state: RootState) => state.user);
+  const scopeKey = JSON.stringify([currentUser?._id, businessData?._id, user_role?._id]);
+  return <StaffTaskListing key={scopeKey} scopeKey={scopeKey} />;
+};
+
+const StaffTaskListing = ({ scopeKey }: { scopeKey: string }) => {
+  const dispatch = useDispatch();
+  const savedState = useSelector((state: RootState) => state.application.staffTaskListState);
+  const saved = savedState?.scopeKey === scopeKey ? savedState : null;
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<TaskTab>("all");
-  const [rangeValue, setRangeValue] = useState<any>(null);
-  const [draftRange, setDraftRange] = useState<RangeState>({ start: "", end: "" });
-  const [appliedRange, setAppliedRange] = useState<RangeState>({ start: "", end: "" });
+  const [activeTab, setActiveTab] = useState<TaskTab>(saved?.activeTab ?? "all");
+  const [rangeValue, setRangeValue] = useState<any>(() =>
+    saved?.draftRange.start && saved.draftRange.end
+      ? [dayjs(saved.draftRange.start), dayjs(saved.draftRange.end)]
+      : null
+  );
+  const [draftRange, setDraftRange] = useState<RangeState>(saved?.draftRange ?? { start: "", end: "" });
+  const [appliedRange, setAppliedRange] = useState<RangeState>(saved?.appliedRange ?? { start: "", end: "" });
   const [canAdd, setCanAdd] = useState(false);
-  const [page, setPage] = useState(1);
-  const [nameSearch, setNameSearch] = useState("");
-  const [appliedNameSearch, setAppliedNameSearch] = useState("");
-  const [showStaffFilter, setShowStaffFilter] = useState(false);
-  const [showPeriodFilter, setShowPeriodFilter] = useState(false);
-  const [showPriorityFilter, setShowPriorityFilter] = useState(false);
-  const [staffSearch, setStaffSearch] = useState("");
-  const [selectedStaffId, setSelectedStaffId] = useState("");
-  const [selectedStatus, setSelectedStatus] = useState<StaffTaskStatusFilter>();
-  const [selectedPriority, setSelectedPriority] = useState<TaskPriorityFilter>();
+  const [page, setPage] = useState(saved?.page ?? 1);
+  const [nameSearch, setNameSearch] = useState(saved?.nameSearch ?? "");
+  const [appliedNameSearch, setAppliedNameSearch] = useState(saved?.appliedNameSearch ?? "");
+  const [showStaffFilter, setShowStaffFilter] = useState(saved?.showStaffFilter ?? false);
+  const [showPeriodFilter, setShowPeriodFilter] = useState(saved?.showPeriodFilter ?? false);
+  const [showPriorityFilter, setShowPriorityFilter] = useState(saved?.showPriorityFilter ?? false);
+  const [staffSearch, setStaffSearch] = useState(saved?.staffSearch ?? "");
+  const [selectedStaffId, setSelectedStaffId] = useState(saved?.selectedStaffId ?? "");
+  const [selectedStatus, setSelectedStatus] = useState<StaffTaskStatusFilter | undefined>(saved?.selectedStatus);
+  const [selectedPriority, setSelectedPriority] = useState<TaskPriorityFilter | undefined>(saved?.selectedPriority);
   const [staffOptions, setStaffOptions] = useState<Array<{ id: string; label: string }>>([]);
   const { mutateAsync: getStaffsForHead } = useGetAllStaffsForStaff();
+
+  useEffect(() => {
+    dispatch(loadStaffTaskListState({
+      scopeKey, activeTab, draftRange, appliedRange, page, nameSearch,
+      appliedNameSearch, showStaffFilter, showPeriodFilter, showPriorityFilter,
+      staffSearch, selectedStaffId, selectedStatus, selectedPriority,
+    }));
+  }, [
+    dispatch, scopeKey, activeTab, draftRange, appliedRange, page, nameSearch,
+    appliedNameSearch, showStaffFilter, showPeriodFilter, showPriorityFilter,
+    staffSearch, selectedStaffId, selectedStatus, selectedPriority,
+  ]);
+
+  const hasFilters = Boolean(
+    nameSearch || appliedNameSearch || activeTab !== "all" || selectedStatus ||
+    selectedPriority || selectedStaffId || appliedRange.start || appliedRange.end ||
+    showStaffFilter || showPeriodFilter || showPriorityFilter
+  );
+
+  const resetFilters = () => {
+    setActiveTab("all");
+    setNameSearch("");
+    setAppliedNameSearch("");
+    setSelectedStatus(undefined);
+    setSelectedPriority(undefined);
+    setStaffSearch("");
+    setSelectedStaffId("");
+    setShowStaffFilter(false);
+    setShowPeriodFilter(false);
+    setShowPriorityFilter(false);
+    setDraftRange({ start: "", end: "" });
+    setAppliedRange({ start: "", end: "" });
+    setRangeValue(null);
+    setPage(1);
+  };
 
   const filters = useMemo<StaffTaskQueryParams>(
     () => ({
@@ -106,12 +158,13 @@ const StaffTasks = () => {
   }, []);
 
   useEffect(() => {
+    if (nameSearch.trim() === appliedNameSearch) return;
     const timeout = window.setTimeout(() => {
       setAppliedNameSearch(nameSearch.trim());
       setPage(1);
     }, 350);
     return () => window.clearTimeout(timeout);
-  }, [nameSearch]);
+  }, [nameSearch, appliedNameSearch]);
 
   useEffect(() => {
     const now = new Date();
@@ -314,7 +367,7 @@ const StaffTasks = () => {
             {showPriorityFilter && (
               <div className="flex min-w-0 w-full items-center sm:w-[190px] gap-1 rounded-md border border-slate-700 bg-slate-900 pr-2">
                 <Select
-                  value={selectedPriority}
+                  value={selectedPriority ?? ""}
                   onValueChange={(value) => {
                     setSelectedPriority(value as TaskPriorityFilter);
                     setPage(1);
@@ -407,6 +460,16 @@ const StaffTasks = () => {
                   Clear
                 </Button>
               </div>
+            )}
+            {hasFilters && (
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={resetFilters}
+                className="gap-2 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-100"
+              >
+                <RotateCcw size={14} aria-hidden="true" /> Reset filters
+              </Button>
             )}
           </div>
         </div>

@@ -9,6 +9,7 @@ import Superadmin_plans from "@/models/super_admin_plans.model";
 import User_roles from "@/models/user_roles.model";
 import Users from "@/models/users.model";
 import { NextRequest, NextResponse } from "next/server";
+import { isObjectIdOrHexString } from "mongoose";
 
 interface Body {
     business_id: string;
@@ -41,7 +42,9 @@ export async function POST (req: NextRequest) {
         const { body } = Object.fromEntries(formData) as { body: string };
         const bodyData = await JSON.parse(body) as Body;
 
-        console.log(bodyData);
+        if (!isObjectIdOrHexString(bodyData?.business_id)) {
+            return new NextResponse("A valid business_id is required", { status: 400 });
+        }
 
         // assiging plan to business
         const business = await Business.findOne({ _id: bodyData?.business_id, status: 1 });
@@ -62,7 +65,7 @@ export async function POST (req: NextRequest) {
                 plan_name: bodyData?.business_plan?.plan_name,
                 deps_count: bodyData?.business_plan?.deps_count,
                 staff_count: bodyData?.business_plan?.staff_count,
-                region_count: bodyData?.business_plan?.region_count,
+                region_count: bodyData?.business_plan?.region_count ?? bodyData?.business_plan?.regions_count,
                 is_custom: true,
                 status: 1,
             })
