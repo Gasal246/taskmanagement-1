@@ -2,6 +2,9 @@ import mongoose, { Document, Decimal128, Types, Schema } from "mongoose";
 
 export interface IEq_enquiries extends Document{
     _id: Types.ObjectId,
+    workflow_current_stage?: number,
+    workflow_revision?: number,
+    workflow_assignments?: any[],
     business_id?: Types.ObjectId,
     country_id: Types.ObjectId,
     region_id: Types.ObjectId,
@@ -49,6 +52,9 @@ export interface IEq_enquiries extends Document{
 }
 
 const Eq_enquiriesSchema:Schema = new Schema({
+    workflow_current_stage: { type: Number, default: 1, min: 1 },
+    workflow_revision: { type: Number, default: 0 },
+    workflow_assignments: { type: [{ _id: false, role_id: { type: Schema.Types.ObjectId, required: true }, user_ids: [{ type: Schema.Types.ObjectId, ref: 'users' }] }], default: [] },
     business_id: { type: Schema.Types.ObjectId, ref: "business", immutable: true },
     is_completed: { type: Boolean, default: false },
     completed_at: { type: Date },
@@ -95,9 +101,11 @@ const Eq_enquiriesSchema:Schema = new Schema({
 }, {timestamps: true});
 
 // Refresh the cached development model when this additive schema is hot-reloaded.
-if (mongoose.models.eq_enquiry && (!mongoose.models.eq_enquiry.schema.path("completed_at") || !mongoose.models.eq_enquiry.schema.path("business_id"))) {
+if (mongoose.models.eq_enquiry && (!mongoose.models.eq_enquiry.schema.path("workflow_current_stage") || !mongoose.models.eq_enquiry.schema.path("business_id"))) {
     mongoose.deleteModel("eq_enquiry");
 }
+
+Eq_enquiriesSchema.index({ "workflow_assignments.user_ids": 1 });
 
 // Actual list ordering, approval filtering, staff ownership and identity checks.
 Eq_enquiriesSchema.index({ business_id: 1, createdAt: -1, _id: -1 });

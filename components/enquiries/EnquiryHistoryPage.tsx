@@ -18,6 +18,13 @@ const actorName = (actor: any) => actor?.name || actor?.email || "Unknown user";
 const assignedNames = (value: any) => (Array.isArray(value) ? value : value ? [value] : []).map(actorName).join(", ") || "Unassigned";
 const lifecycle = new Set(["ENQUIRY_COMPLETED", "ENQUIRY_REOPENED", "ACTION_COMPLETED", "ACTION_CANCELLED", "ACTION_REOPENED"]);
 const HistoryCard = memo(function HistoryCard({ history: h }: { history: any }) {
+  if (h.workflow_event) return <article className="space-y-2 rounded-xl border border-slate-700 bg-slate-900/50 p-4">
+    <h2 className="font-semibold">{({ WORKFLOW_COMPLETED: 'Workflow stage completed', WORKFLOW_SKIPPED: 'Workflow stage skipped', WORKFLOW_REOPENED: 'Workflow stage reopened', WORKFLOW_CONFIGURED: 'Enquiry workflow configured' } as Record<string, string>)[h.change_type]}</h2>
+    <p className="text-sm">Stage {h.workflow_event.number}: {h.workflow_event.stage_name} <span style={{ color: h.workflow_event.role_color }}>{h.workflow_event.role_subname}{h.workflow_event.role_name ? ` - ${h.workflow_event.role_name}` : ''}</span></p>
+    <p className="text-sm">Position: {h.workflow_event.previous_stage} → {h.workflow_event.new_stage}</p>
+    {h.change_type === 'WORKFLOW_CONFIGURED' && <div className="space-y-1 text-xs text-slate-400">{(h.workflow_event.assignments || []).map((a: any) => <p key={a.role_id}>{h.workflow_event.roles?.find((r: any) => r._id === a.role_id)?.subname}: {a.user_ids.join(', ') || 'Unassigned'}</p>)}</div>}
+    <p className="text-sm">Recorded by: <b>{actorName(h.changed_by)}</b></p><time className="text-xs text-slate-400">{new Date(h.createdAt).toLocaleString()}</time>
+  </article>;
   if (lifecycle.has(h.change_type)) return <EnquiryLifecycleHistory histories={[h]} />;
   const edited = h.change_type === "ENQUIRY_EDIT";
   return <article className="space-y-3 rounded-lg border border-slate-700 bg-slate-900/50 p-4">
@@ -72,7 +79,7 @@ export default function EnquiryHistoryPage({ mode }: { mode: "admin" | "staff" }
         ["Step Number", "Status", "Type", "Priority", "Assigned To", "Actor", "Changes", "Action", "Feedback", "Updated At"],
         ...records.map((h: any) => [h.step_number ?? "", h.is_finished ? "Completed" : "In Progress", h.change_type || "FORWARD", h.priority ?? "", assignedNames(h.assigned_to), actorName(h.changed_by || h.forwarded_by),
           (h.changed_fields || []).map((change: any) => `${change.label || change.field}: ${changeValue(change.from_value)} -> ${changeValue(change.to_value)}`).join(" | "),
-          h.previous_action && h.previous_action !== h.action ? `${h.previous_action} -> ${h.action}` : h.action || "", h.feedback || "", h.createdAt ? new Date(h.createdAt).toLocaleString() : ""]),
+          h.previous_action && h.previous_action !== h.action ? `${h.previous_action} -> ${h.action}` : h.action || "", h.workflow_event ? JSON.stringify(h.workflow_event) : h.feedback || "", h.createdAt ? new Date(h.createdAt).toLocaleString() : ""]),
       ]);
       worksheet["!cols"] = [12, 14, 20, 12, 30, 24, 60, 24, 40, 22].map(wch => ({ wch }));
       const workbook = XLSX.utils.book_new();
@@ -93,7 +100,7 @@ export default function EnquiryHistoryPage({ mode }: { mode: "admin" | "staff" }
     {exporting && <Button variant="outline" onClick={() => exportRequest.current?.abort()}>Cancel export</Button>}
     {enquiry && <EnquiryCompletionActions enquiry={enquiry} basePath={basePath} showFollowup={false} />}
     <div className="flex flex-wrap gap-2" aria-label="History filters">
-      {[["all", "All"], ["forwards", "Forwards"], ["updates", "Updates"], ["completion", "Completion"]].map(([kind, label]) => <Button key={kind} size="sm" variant={options.kind === kind ? "default" : "outline"} aria-pressed={options.kind === kind} onClick={() => setOptions({ page: 1, kind })}>{label}</Button>)}
+      {[["all", "All"], ["forwards", "Forwards"], ["updates", "Updates"], ["completion", "Completion"], ["workflow", "Workflow"]].map(([kind, label]) => <Button key={kind} size="sm" variant={options.kind === kind ? "default" : "outline"} aria-pressed={options.kind === kind} onClick={() => setOptions({ page: 1, kind })}>{label}</Button>)}
     </div>
     <p className="text-xs text-slate-400">Newest first. Full exports include up to 5,000 matching records.</p>
     <ListPagination pagination={data?.pagination} busy={isFetching || isPlaceholderData} onPage={page => setOptions(current => ({ ...current, page }))} label="history records" />

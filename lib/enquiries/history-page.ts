@@ -1,3 +1,4 @@
+import { WORKFLOW_EVENTS, workflowMember } from "./workflow-progress";
 import mongoose from "mongoose";
 import Histories from "@/models/eq_enquiry_histories";
 import Access from "@/models/eq_enquiry_access.model";
@@ -10,7 +11,7 @@ const lifecycle = ["ENQUIRY_COMPLETED", "ENQUIRY_REOPENED", "ACTION_COMPLETED", 
 export async function enquiryHistoryPage(enquiryId: string, params: URLSearchParams, userId?: string) {
   const bounds = pageBounds(params, 25, 100);
   const kind = params.get("kind") || "all";
-  if (!["all", "forwards", "updates", "completion"].includes(kind)) throw new Error("Invalid history filter");
+  if (!["all", "forwards", "updates", "completion", "workflow"].includes(kind)) throw new Error("Invalid history filter");
   const match: any = { enquiry_id: new mongoose.Types.ObjectId(enquiryId) };
   const asOf = params.get("asOf");
   if (asOf) {
@@ -19,13 +20,16 @@ export async function enquiryHistoryPage(enquiryId: string, params: URLSearchPar
   }
   if (kind === "updates") match.change_type = "ENQUIRY_EDIT";
   if (kind === "completion") match.change_type = { $in: lifecycle };
-  if (kind === "forwards") match.change_type = { $nin: ["ENQUIRY_EDIT", ...lifecycle] };
+  if (kind === "forwards") match.change_type = { $nin: ["ENQUIRY_EDIT", ...lifecycle, ...WORKFLOW_EVENTS] };
+  if (kind === "workflow") match.change_type = { $in: WORKFLOW_EVENTS };
+  const membership = userId ? await Enquiries.findById(enquiryId).select("workflow_assignments").lean() : null;
+  const member = userId && workflowMember(membership || {}, userId);
   const visibility: any[] = userId ? [
     { $lookup: { from: Access.collection.name, localField: "_id", foreignField: "history_id", pipeline: [
       { $match: { enquiry_id: new mongoose.Types.ObjectId(enquiryId), user_id: new mongoose.Types.ObjectId(userId) } },
       { $limit: 1 }, { $project: { _id: 1 } },
     ], as: "_access" } },
-    { $match: { "_access.0": { $exists: true } } },
+    { $match: { $or: [{ "_access.0": { $exists: true } }, ...(member ? [{ change_type: { $in: WORKFLOW_EVENTS } }] : [])] } },
   ] : [];
   const base: any[] = [{ $match: match }, ...visibility];
   const [counts, enquiry] = await Promise.all([

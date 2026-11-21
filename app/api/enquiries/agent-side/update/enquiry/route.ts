@@ -57,6 +57,7 @@ export async function PUT(req:NextRequest){
         const actor = await enquiryActor();
         if (!actor) return NextResponse.json({ message: "Unauthorized", status: 401 }, { status: 401 });
         const body: IBody & any = await req.json();
+        if (["workflow_setup", "workflow_current_stage", "workflow_assignments", "workflow_revision"].some(key => key in body)) return NextResponse.json({ message: "Only administrators can configure enquiry workflow" }, { status: 403 });
         if (!mongoose.isValidObjectId(body.enquiry_id)) return NextResponse.json({ message: "Provide a valid enquiry ID" }, { status: 400 });
         const enquiry: any = await Eq_enquiry.findById(body.enquiry_id);
         if (!enquiry) return NextResponse.json({ message: "Enquiry not found", status: 404 }, { status: 404 });

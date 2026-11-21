@@ -19,17 +19,17 @@ const statusLabel = (action: any) => {
   const progress = action.progress || actionProgress(action);
   return progress.overdue ? 'Overdue' : progress.status === 'resolved' ? 'Resolved with cancellations' : progress.status === 'completed' ? 'Completed' : progress.status === 'cancelled' ? 'Cancelled' : 'Pending';
 };
-export default function EnquiryCompletionActions({ enquiry, basePath, showFollowup = true }: { enquiry: any; basePath: string; showFollowup?: boolean }) {
+export default function EnquiryCompletionActions({ enquiry, basePath, showFollowup = true, compact = false }: { enquiry: any; basePath: string; showFollowup?: boolean; compact?: boolean }) {
   const [open, setOpen] = useState(false);
   const latest = enquiry.latest_action;
   return <>
     <div className="flex flex-wrap items-center gap-2">
-      <Button variant="outline" size="sm" onClick={() => setOpen(true)} className="gap-2 border-cyan-800/70 text-cyan-200 hover:bg-cyan-950">
-        <Phone size={14} />{showFollowup ? `Follow-up: ${latest?.action || 'Not recorded'}${latest ? ` · ${statusLabel(latest)}` : ''}` : 'Manage action assignments'}
+      <Button variant="outline" size="sm" onClick={() => setOpen(true)} className={`border-cyan-800/70 text-cyan-200 hover:bg-cyan-950 ${compact ? 'h-7 gap-1.5 px-2 text-[11px]' : 'gap-2'}`}>
+        <Phone size={compact ? 12 : 14} />{showFollowup ? `Follow-up: ${latest?.action || 'Not recorded'}${latest ? ` · ${statusLabel(latest)}` : ''}` : 'Manage action assignments'}
       </Button>
       {enquiry.pending_action_parts > 0 && <span className="text-xs text-amber-200">{enquiry.pending_action_parts} pending assignment{enquiry.pending_action_parts === 1 ? '' : 's'}</span>}
     </div>
-    {enquiry.last_completed_action && <p className="mt-2 text-xs text-slate-400">Last completed: {enquiry.last_completed_action.action} · {enquiryDate(enquiry.last_completed_action.completed_at)} · {userName(enquiry.last_completed_action.user_id)}</p>}
+    {enquiry.last_completed_action && <p className={`${compact ? 'mt-1 text-[10px]' : 'mt-2 text-xs'} text-slate-400`}>Last completed: {enquiry.last_completed_action.action} · {enquiryDate(enquiry.last_completed_action.completed_at)} · {userName(enquiry.last_completed_action.user_id)}</p>}
     <Dialog open={open} onOpenChange={setOpen}>
       {open && <ActionsDialog enquiryId={idOf(enquiry)} basePath={basePath} onClose={() => setOpen(false)} />}
     </Dialog>

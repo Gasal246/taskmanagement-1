@@ -8,7 +8,7 @@ import Access from "@/models/eq_enquiry_access.model";
 // cross-business shares. Duplicate history/access rows must not inflate counts.
 export function staffEnquiryVisibilityStages(actorId: mongoose.Types.ObjectId, filter: Record<string, any>): any[] {
   return [
-    { $match: { $and: [{ createdBy: actorId }, filter] } },
+    { $match: { $and: [{ $or: [{ createdBy: actorId }, { "workflow_assignments.user_ids": actorId }] }, filter] } },
     { $unionWith: { coll: Access.collection.name, pipeline: [
       { $match: { user_id: actorId } },
       { $group: { _id: "$enquiry_id" } },

@@ -83,7 +83,7 @@ function facilityStages(scope: Record<string, any>, geography: Record<string, an
     } },
     { $match: geography },
     { $project: {
-      _id: "$camp_id", enquiry_id: "$_id", camp_name: "$facility.camp_name", camp_type: "$facility.camp_type",
+      _id: "$camp_id", enquiry_id: "$_id", enquiry_status: { $ifNull: ["$status", null] }, camp_name: "$facility.camp_name", camp_type: "$facility.camp_type",
       camp_capacity: "$facility.camp_capacity", camp_occupancy: "$facility.camp_occupancy",
       map_point: 1, visited_status: 1, country_id: 1, region_id: 1, province_id: 1, city_id: 1, area_id: 1,
     } },
@@ -110,7 +110,7 @@ async function campItems(rows: any[]) {
   ]);
   return rows.map(camp => ({
     _id: String(camp._id), enquiry_id: String(camp.enquiry_id), camp_name: camp.camp_name || "Unnamed camp", camp_type: camp.camp_type || "", camp_capacity: camp.camp_capacity || "", camp_occupancy: camp.camp_occupancy ?? null,
-    visited_status: camp.visited_status, longitude: camp.map_point[0], latitude: camp.map_point[1],
+    visited_status: camp.visited_status, enquiry_status: camp.enquiry_status, longitude: camp.map_point[0], latitude: camp.map_point[1],
     country: camp.country_id?.country_name || "", region: camp.region_id?.region_name || "", province: camp.province_id?.province_name || "", city: camp.city_id?.city_name || "", area: camp.area_id?.area_name || "",
   }));
 }

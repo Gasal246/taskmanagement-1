@@ -1,3 +1,6 @@
+import { saveWorkflowEdit, validateWorkflowSetup } from "@/lib/enquiries/workflow-progress-server";
+import { WorkflowError } from "@/lib/enquiries/workflow";
+import type { WorkflowSetup } from "@/lib/enquiries/workflow-progress";
 import { canAdministerEnquiry } from "@/lib/enquiries/access";
 import { HeadOfficeError, enquiryOfficeInput, submitOfficeRequest, requestBusiness, officeInBusiness } from "@/lib/enquiries/head-office-requests";
 import { ZodError } from "zod";
@@ -390,7 +393,8 @@ export async function PUT(req: NextRequest) {
             return NextResponse.json({ message: "Unauthorized Access", status: 401 }, { status: 401 });
         }
 
-        const body: Body & { head_office_request?: any } = await req.json();
+        const body: Body & { head_office_request?: any; workflow_setup?: WorkflowSetup } = await req.json();
+    if (["workflow_current_stage", "workflow_assignments", "workflow_revision"].some(key => key in body)) throw new WorkflowError(403, "Use administrator workflow configuration to change workflow fields");
         const enquiryId = toIdOrNull(body.enquiry_id);
         let areaInputMode = body.area_input_mode === "new" ? "new" : "existing";
         let campInputMode = body.camp_input_mode === "new" ? "new" : "existing";
@@ -418,6 +422,8 @@ export async function PUT(req: NextRequest) {
 
         const actor = await enquiryActor();
         if (!actor || !await canEditEnquiry(enquiry, actor)) return NextResponse.json({ message: "You are not allowed to edit this enquiry" }, { status: 403 });
+
+        if (body.workflow_setup !== undefined) await validateWorkflowSetup(enquiry, body.workflow_setup, actor);
 
         const facilityId = campInputMode === "existing" && body.camp ? toIdOrNull(body.camp) : enquiry.camp_id;
         const existingFacility = facilityId ? await Eq_camps.findById(facilityId) : null;
@@ -733,7 +739,8 @@ export async function PUT(req: NextRequest) {
             enquiry.enquiry_user_notes = toTextOrNull(body.enquiry_user_notes);
         }
 
-        await enquiry.save();
+        if (body.workflow_setup !== undefined) await saveWorkflowEdit(enquiry, body.workflow_setup, actor);
+        else await enquiry.save();
         await saveEnquirySolutions(enquiry._id, solutionsResult);
         if (ENQUIRY_ACTIONS.some(action => action === String(enquiry.next_action)) &&
             (String(previousAction || "") !== String(enquiry.next_action) || String(previousActionDue || "") !== String(enquiry.next_action_due || ""))) {
@@ -892,7 +899,7 @@ export async function PUT(req: NextRequest) {
         }
         return NextResponse.json({ message: "Enquiry updated", status: 200 }, { status: 200 });
     } catch (err) {
-        if (err instanceof HeadOfficeError) return NextResponse.json({ message: err.message, status: err.status }, { status: err.status });
+        if (err instanceof WorkflowError || err instanceof HeadOfficeError) return NextResponse.json({ message: err.message, status: err.status }, { status: err.status });
         if (err instanceof EnquiryCapacityError || err instanceof CatalogueValidationError) return NextResponse.json({ message: err.message, status: 400 }, { status: 400 });
         if (err instanceof ZodError) return NextResponse.json({ message: err.issues[0]?.message || "Invalid Facility details", status: 400 }, { status: 400 });
         console.log("Error while updating enquiry: ", err);

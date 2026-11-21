@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
             case "users": {
                 const users = await Eq_enquiry_users.find({ business_id: business_id }).populate({
                     path: "user_id",
-                    select: "name email"
+                    select: "name email status"
                 });
 
                 return NextResponse.json({ users, status: 200 }, { status: 200 });

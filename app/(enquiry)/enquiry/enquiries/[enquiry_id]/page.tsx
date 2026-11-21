@@ -1,4 +1,5 @@
 "use client";
+import EnquiryWorkflowProgress from "@/components/enquiries/EnquiryWorkflowProgress";
 import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft, Mail, Phone, User, Clock, BadgeCheck, UserCircle2 } from "lucide-react";
@@ -57,6 +58,7 @@ export default function SingleEnquiryPage() {
         {/* CARD */}
         <div className="bg-gradient-to-tr from-slate-950/60 to-slate-900/60 p-5 rounded-xl border border-slate-800 space-y-5">
           <FacilityDetailsSummary camp={enquiry?.enquiry?.camp_id} enquirySolutions={enquiry?.enquiry?.enquiry_solutions} pending={!enquiry?.enquiry?.is_active} />
+          <EnquiryWorkflowProgress enquiry={enquiry?.enquiry} />
           {/* BASIC INFO */}
 
           {/* LOCATION DETAILS */}

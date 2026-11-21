@@ -1,3 +1,4 @@
+import { enrichWorkflow } from "./workflow-progress-server";
 import { targetEnquiryIds } from "./target-access";
 import { ENQUIRY_ACTIONS } from "./action-types.mjs";
 import mongoose from 'mongoose';
@@ -48,7 +49,7 @@ export async function enrichEnquiries(entries: any[], actor: EnquiryActor) {
     list.push(action);
     byEnquiry.set(key, list);
   }
-  return entries.map(entry => {
+  const enriched = entries.map(entry => {
     const manages = canAdministerEnquiry(entry, actor);
     const list = (byEnquiry.get(idOf(entry)) || []).map(action => ({
       ...action, progress: actionProgress(action),
@@ -69,6 +70,7 @@ export async function enrichEnquiries(entries: any[], actor: EnquiryActor) {
       canEdit: Boolean(canSchedule || (entry.enquiry_brought_by || []).some((id: any) => idOf(id) === actor.actorId)),
     };
   });
+  return enrichWorkflow(enriched, actor);
 }
 // Snapshot a legacy initial next-action before any edit changes its fields.
 export async function preserveInitialAction(enquiry: any, session?: mongoose.ClientSession) {

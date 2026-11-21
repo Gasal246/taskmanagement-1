@@ -1,3 +1,4 @@
+import { workflowMember } from "./workflow-progress";
 import { hasTargetAccess, targetVisibilityLookup } from "./target-access";
 import mongoose from "mongoose";
 import { auth } from "@/auth";
@@ -37,7 +38,7 @@ export function enquiryManagementFilter(actor: EnquiryActor) {
   return actor.isSuper ? {} : { business_id: { $in: (actor.adminBusinessIds || []).map(id => new mongoose.Types.ObjectId(id)) } };
 }
 export async function canReadEnquiry(enquiry: any, actor: EnquiryActor) {
-  if (canAdministerEnquiry(enquiry, actor) || idOf(enquiry.createdBy) === actor.actorId || (enquiry.enquiry_brought_by || []).some((id: any) => idOf(id) === actor.actorId)) return true;
+  if (workflowMember(enquiry, actor.actorId) || canAdministerEnquiry(enquiry, actor) || idOf(enquiry.createdBy) === actor.actorId || (enquiry.enquiry_brought_by || []).some((id: any) => idOf(id) === actor.actorId)) return true;
   const [targeted, shared, assigned] = await Promise.all([
     hasTargetAccess(enquiry, actor.actorId),
     Access.exists({ enquiry_id: enquiry._id, user_id: actor.actorId }),
@@ -66,7 +67,7 @@ export async function authorizeEnquiry(enquiryId: unknown, permission: "read" | 
   const actor = await enquiryActor();
   if (!actor) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   if (typeof enquiryId !== "string" || !mongoose.isValidObjectId(enquiryId)) return NextResponse.json({ message: "Provide a valid enquiry ID" }, { status: 400 });
-  const enquiry: any = await Enquiries.findById(enquiryId).select("business_id createdBy enquiry_brought_by camp_id").lean();
+  const enquiry: any = await Enquiries.findById(enquiryId).select("business_id createdBy enquiry_brought_by camp_id workflow_assignments").lean();
   if (!enquiry) return NextResponse.json({ message: "Enquiry not found" }, { status: 404 });
   const allowed = permission === "admin" ? canAdministerEnquiry(enquiry, actor) : permission === "edit" ? await canEditEnquiry(enquiry, actor) : await canReadEnquiry(enquiry, actor);
   return allowed ? null : NextResponse.json({ message: "You cannot access this enquiry" }, { status: 403 });
@@ -132,7 +133,7 @@ export function enquiryVisibilityStages(actor: EnquiryActor): any[] {
     targetVisibilityLookup(userId),
     { $lookup: { from: Access.collection.name, localField: "_id", foreignField: "enquiry_id", pipeline: [{ $match: { user_id: userId } }, { $limit: 1 }, { $project: { _id: 1 } }], as: "_recordAccess" } },
     { $lookup: { from: Histories.collection.name, localField: "_id", foreignField: "enquiry_id", pipeline: [{ $match: { assigned_to: userId, ...actionHistoryFilter } }, { $limit: 1 }, { $project: { _id: 1 } }], as: "_recordAssignment" } },
-    { $match: { $or: [enquiryManagementFilter(actor), { createdBy: userId }, { enquiry_brought_by: userId }, { "_targetAccess.0": { $exists: true } }, { "_recordAccess.0": { $exists: true } }, { "_recordAssignment.0": { $exists: true } }] } },
+    { $match: { $or: [enquiryManagementFilter(actor), { createdBy: userId }, { enquiry_brought_by: userId }, { "workflow_assignments.user_ids": userId }, { "_targetAccess.0": { $exists: true } }, { "_recordAccess.0": { $exists: true } }, { "_recordAssignment.0": { $exists: true } }] } },
     { $unset: ["_recordAccess", "_recordAssignment", "_targetAccess"] },
   ];
 }

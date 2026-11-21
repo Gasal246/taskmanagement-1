@@ -12,6 +12,7 @@ export type CampMapItem = {
   camp_capacity: string;
   camp_occupancy: number | null;
   visited_status: string;
+  enquiry_status?: string | null;
   latitude: number;
   longitude: number;
   country: string;
@@ -177,19 +178,48 @@ const createDirectionButton = (
   return button;
 };
 
+const createStatusIcon = (type: "map" | "info") => {
+  const namespace = "http://www.w3.org/2000/svg";
+  const icon = document.createElementNS(namespace, "svg");
+  icon.setAttribute("viewBox", "0 0 24 24");
+  icon.setAttribute("width", "12");
+  icon.setAttribute("height", "12");
+  icon.setAttribute("fill", "none");
+  icon.setAttribute("stroke", "currentColor");
+  icon.setAttribute("stroke-width", "2");
+  icon.setAttribute("stroke-linecap", "round");
+  icon.setAttribute("stroke-linejoin", "round");
+  icon.setAttribute("aria-hidden", "true");
+  const path = document.createElementNS(namespace, "path");
+  path.setAttribute("d", type === "map"
+    ? "m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3V6Zm6-3v15m6-12v15"
+    : "M12 8h.01M11 12h1v4h1M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0");
+  icon.appendChild(path);
+  return icon;
+};
+
 const createInfoWindowContent = (
   camp: CampMapItem,
   onDirectionsRequested: CampMapProps["onDirectionsRequested"],
   enquiryBasePath?: string
 ) => {
   const wrapper = createPopupShell(camp.camp_name);
+  const statuses = document.createElement("div");
+  statuses.className = "map-pin-popup__statuses";
   const statusMeta = STATUS_META[camp.visited_status] || STATUS_META["Just Added"];
   const status = document.createElement("span");
   status.className = "map-pin-popup__status";
-  status.textContent = camp.visited_status;
+  status.setAttribute("aria-label", `Map status: ${camp.visited_status}`);
+  status.append(createStatusIcon("map"), document.createTextNode(camp.visited_status));
   status.style.background = statusMeta.softColor;
   status.style.color = statusMeta.textColor;
-  wrapper.appendChild(status);
+  const enquiryStatus = document.createElement("span");
+  enquiryStatus.className = "map-pin-popup__status map-pin-popup__status--enquiry";
+  const enquiryStatusText = camp.enquiry_status?.trim() || "Not set";
+  enquiryStatus.setAttribute("aria-label", `Enquiry status: ${enquiryStatusText}`);
+  enquiryStatus.append(createStatusIcon("info"), document.createTextNode(enquiryStatusText));
+  statuses.append(status, enquiryStatus);
+  wrapper.appendChild(statuses);
 
   const location = document.createElement("div");
   location.className = "map-pin-popup__location";

@@ -76,7 +76,7 @@ export default function EnquiryUserMultiSelect({
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-3">
         <span className="text-xs text-slate-300 font-semibold">{label}</span>
-        <Button type="button" variant="outline" size="sm" onClick={() => setOpen(true)}>
+        <Button type="button" variant="outline" size="sm" aria-label={label} onClick={() => setOpen(true)}>
           Add User
         </Button>
       </div>

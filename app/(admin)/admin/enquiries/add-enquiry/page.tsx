@@ -1,5 +1,8 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 "use client";
+import { ENQUIRY_STATUS_OPTIONS } from "@/lib/enquiries/status";
+import EnquiryWorkflowFields from "@/components/enquiries/EnquiryWorkflowFields";
+import { workflowSetupSchema } from "@/lib/enquiries/workflow-progress";
 import { useActionPending } from "@/hooks/use-action-pending";
 import EnquiryActionChoices from "@/components/enquiries/EnquiryActionChoices";
 import EnquiryCapacityFields from "@/components/enquiries/EnquiryCapacityFields";
@@ -32,15 +35,6 @@ import EnquiryFacilityDetailsFields from "@/components/enquiries/EnquiryFacility
 import { sectorFieldValuesRecord, solutionDetailsRecord } from "@/lib/enquiries/catalogue";
 
 const priorityLevels = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"];
-const ENQUIRY_STATUS_OPTIONS = [
-    "Lead Received",
-    "Initial Meeting Over",
-    "Survey Completed",
-    "Proposal Submitted",
-    "Waiting For Client Response",
-    "On Hold",
-    "Project Awarded",
-] as const;
 
 const MAX_DOC_SIZE = 5 * 1024 * 1024; // 5MB
 
@@ -86,6 +80,7 @@ const enquirySchema = z.object({
     project_closed_by: z.array(z.string()).optional(),
     project_managed_by: z.array(z.string()).optional(),
     enquiry_user_notes: z.string().optional(),
+    workflow_setup: workflowSetupSchema.optional(),
 
     camp_capacity: z.string().optional(),
     camp_occupancy: z.string().optional(),
@@ -243,6 +238,7 @@ export default function AddEnquiry() {
                     id: String(user._id),
                     name: user?.name || "Unknown User",
                     email: user?.email || "",
+                    status: user.status,
                 };
             })
             .filter(Boolean);
@@ -1149,6 +1145,8 @@ export default function AddEnquiry() {
                                 )}
                             />
                         </div>
+
+                        <EnquiryWorkflowFields businessId={businessData?._id} options={userOptions} />
 
                         {/* IMAGES */}
                         <div className="grid gap-3 md:grid-cols-3 mt-2">

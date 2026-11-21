@@ -12,7 +12,7 @@ export type CampVisitedStatus = (typeof CAMP_VISITED_STATUS_VALUES)[number];
 // the owning business's enquiry, including legacy status spellings.
 export const ENQUIRY_MAP_STATUS_GROUPS: ReadonlyArray<{ status: CampVisitedStatus; values: readonly string[] }> = [
     { status: "To Visit", values: ["To Visit", "Lead Received", "Lead Recieved"] },
-    { status: "Visited", values: ["Visited", "Initial Meeting Over", "Survey Completed", "Proposal Submitted", "Waiting For Client Response"] },
+    { status: "Visited", values: ["Visited", "Initial Meeting Over", "Survey Completed", "Proposal Submitted", "Waiting For Client Response", "Draft Contract Submitted", "Client Contract Review", "Ready for Contract Signing"] },
     { status: "Cancelled", values: ["Cancelled", "On Hold", "On hold", "On Hold / Cancelled"] },
     { status: "Awarded", values: ["Project Awarded", "Awarded", "Awareded"] },
     { status: "Just Added", values: ["Just Added"] },

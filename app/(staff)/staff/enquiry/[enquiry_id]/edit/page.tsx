@@ -1,5 +1,6 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 "use client";
+import { ENQUIRY_STATUS_OPTIONS } from "@/lib/enquiries/status";
 import { useActionPending } from "@/hooks/use-action-pending";
 import HeadOfficeManager from "@/components/enquiries/HeadOfficeManager";
 import EnquiryActionChoices from "@/components/enquiries/EnquiryActionChoices";
@@ -48,15 +49,6 @@ import { EnquiryFacilityClassificationFields, EnquirySolutionsFields } from "@/c
 import { sectorFieldValuesRecord, solutionDetailsRecord } from "@/lib/enquiries/catalogue";
 
 const priorityLevels = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"];
-const ENQUIRY_STATUS_OPTIONS = [
-    "Lead Received",
-    "Initial Meeting Over",
-    "Survey Completed",
-    "Proposal Submitted",
-    "Waiting For Client Response",
-    "On Hold",
-    "Project Awarded",
-] as const;
 
 const MAX_DOC_SIZE = 5 * 1024 * 1024; // 5MB
 

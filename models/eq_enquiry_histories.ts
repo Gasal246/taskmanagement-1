@@ -8,6 +8,7 @@ export interface IEq_enquiry_histories extends Document {
     assigned_to: Types.ObjectId[],
     forwarded_by?: Types.ObjectId,
     changed_by?: Types.ObjectId,
+    workflow_event?: any,
     change_type?: String,
     source_forward_id?: Types.ObjectId,
     previous_action?: String,
@@ -37,7 +38,8 @@ const Eq_enquiry_historiesSchema: Schema = new Schema({
     assigned_to: { type: [Schema.Types.ObjectId], ref: "users", default: [] },
     forwarded_by: {type: Schema.Types.ObjectId, ref: "users"},
     changed_by: {type: Schema.Types.ObjectId, ref: "users"},
-    change_type: {type: String, enum: ["FORWARD", "ENQUIRY_EDIT", "ENQUIRY_COMPLETED", "ENQUIRY_REOPENED", "ACTION_SCHEDULED", "ACTION_COMPLETED", "ACTION_CANCELLED", "ACTION_REOPENED"], default: "FORWARD"},
+    workflow_event: { type: Schema.Types.Mixed },
+    change_type: {type: String, enum: ["WORKFLOW_COMPLETED", "WORKFLOW_SKIPPED", "WORKFLOW_REOPENED", "WORKFLOW_CONFIGURED", "FORWARD", "ENQUIRY_EDIT", "ENQUIRY_COMPLETED", "ENQUIRY_REOPENED", "ACTION_SCHEDULED", "ACTION_COMPLETED", "ACTION_CANCELLED", "ACTION_REOPENED"], default: "FORWARD"},
     action_origin: { type: String, enum: ["initial", "forward", "recorded", "enquiry_edit"] },
     action_assignments: { type: [{
         _id: false,
@@ -73,7 +75,7 @@ const Eq_enquiry_historiesSchema: Schema = new Schema({
 Eq_enquiry_historiesSchema.index({ assigned_to: 1, createdAt: 1 });
 Eq_enquiry_historiesSchema.index({ enquiry_id: 1, step_number: -1, createdAt: -1, _id: -1 });
 
-if (mongoose.models.eq_enquiry_histories && !mongoose.models.eq_enquiry_histories.schema.path("action_assignments")) {
+if (mongoose.models.eq_enquiry_histories && !mongoose.models.eq_enquiry_histories.schema.path("workflow_event")) {
     mongoose.deleteModel("eq_enquiry_histories");
 }
 

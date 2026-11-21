@@ -1,3 +1,5 @@
+import { configureWorkflow, validateWorkflowSetup } from "@/lib/enquiries/workflow-progress-server";
+import { WorkflowError } from "@/lib/enquiries/workflow";
 import { HeadOfficeError, enquiryOfficeInput, submitOfficeRequest, officeInBusiness } from "@/lib/enquiries/head-office-requests";
 import { enquiryActor, canAdministerEnquiry, resolveEnquiryCreationBusiness } from "@/lib/enquiries/access";
 import { reserveEnquiryUuid } from "@/lib/enquiries/sequence";
@@ -62,10 +64,12 @@ export async function POST(req: NextRequest) {
   const dbSession = await mongoose.startSession();
   try {
     const body: any = await req.json();
+    if (["workflow_current_stage", "workflow_assignments", "workflow_revision"].some(key => key in body)) throw new WorkflowError(403, "Use administrator workflow configuration to change workflow fields");
     const actor = await enquiryActor();
     const businessId = actor && await resolveEnquiryCreationBusiness(req, actor, body.business_id);
     if (!businessId) throw new RequestError(403, "Select an active business you belong to before creating an enquiry");
     if (body.followup_status === "Closed") throw new RequestError(400, "Create the enquiry first, then record completed actions");
+    if (body.workflow_setup !== undefined) await validateWorkflowSetup({ business_id: businessId }, body.workflow_setup, actor!);
     const facility = await validateEnquiryFacilityPayload(body);
     const solutions = solutionFields(facility);
     const requestingFacility = facility.area_input_mode === "new" || facility.camp_input_mode === "new";
@@ -159,6 +163,7 @@ export async function POST(req: NextRequest) {
         project_managed_by: Array.isArray(body.project_managed_by) ? body.project_managed_by : [],
         enquiry_user_notes: body.enquiry_user_notes || null,
       }], { session: dbSession });
+      if (body.workflow_setup !== undefined) await configureWorkflow(enquiry, body.workflow_setup, actor!, dbSession, true);
       savedEnquiryId = String(enquiry._id);
       if (!canAdministerEnquiry({ business_id: businessId }, actor!) || (body.head_office_request && body.head_office_request.operation !== "keep")) {
         const camp: any = await Eq_camps.findById(campId).session(dbSession).lean();
@@ -194,7 +199,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ message: "Enquiry created successfully", enquiry_id: savedEnquiryId, status: 201 }, { status: 201 });
   } catch (error: any) {
-    if (error instanceof RequestError || error instanceof HeadOfficeError) return NextResponse.json({ message: error.message, status: error.status }, { status: error.status });
+    if (error instanceof WorkflowError || error instanceof RequestError || error instanceof HeadOfficeError) return NextResponse.json({ message: error.message, status: error.status }, { status: error.status });
     if (error instanceof CatalogueValidationError) return NextResponse.json({ message: error.message, status: 400 }, { status: 400 });
     if (error instanceof ZodError) return NextResponse.json({ message: error.issues[0]?.message || "Invalid Facility details", errors: error.flatten().fieldErrors, status: 400 }, { status: 400 });
     console.error("Error while adding new enquiry:", error);

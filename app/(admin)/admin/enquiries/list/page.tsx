@@ -1,4 +1,5 @@
 "use client";
+import { ENQUIRY_STATUS_OPTIONS } from "@/lib/enquiries/status";
 import { ENQUIRY_ACTIONS } from "@/lib/enquiries/action-types.mjs";
 import { periodBounds } from "@/lib/enquiries/period";
 import EnquiryCard from "@/components/enquiries/EnquiryCard";
@@ -39,13 +40,7 @@ const NEXT_ACTION_OPTIONS = [
 
 const STATUS_OPTIONS = [
   { _id: "all", name: "All" },
-  { _id: "Lead Received", name: "Lead Received" },
-  { _id: "Initial Meeting Over", name: "Initial Meeting Over" },
-  { _id: "Survey Completed", name: "Survey Completed" },
-  { _id: "Proposal Submitted", name: "Proposal Submitted" },
-  { _id: "Waiting For Client Response", name: "Waiting For Client Response" },
-  { _id: "On Hold", name: "On Hold" },
-  { _id: "Project Awarded", name: "Project Awarded" },
+  ...ENQUIRY_STATUS_OPTIONS.map(status => ({ _id: status, name: status })),
 ];
 
 const PRIORITY_OPTIONS = [

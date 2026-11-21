@@ -16,6 +16,7 @@ const stage = new Schema({
 const schema = new Schema({
   // Tenant business ID, not a customer from the clients catalogue.
   client_id: { type: Schema.Types.ObjectId, ref: 'business', required: true, immutable: true },
+  progress_serial: { type: Number, default: 0 },
   revision: { type: Number, required: true, default: 0 },
   roles: { type: [role], default: [] },
   stages: { type: [stage], default: [] },
@@ -24,7 +25,7 @@ schema.index({ client_id: 1 }, { unique: true });
 // Next.js hot reload can retain a compiled model from before role colors existed.
 // Refresh it so strict schema casting does not silently discard color_code on save.
 const cached = mongoose.models.eq_enquiry_workflow;
-if (cached && !cached.schema.path<Schema.Types.DocumentArray>('roles')?.schema.path('color_code')) {
+if (cached && (!cached.schema.path('progress_serial') || !cached.schema.path<Schema.Types.DocumentArray>('roles')?.schema.path('color_code'))) {
   mongoose.deleteModel('eq_enquiry_workflow');
 }
 export default mongoose.models.eq_enquiry_workflow || mongoose.model('eq_enquiry_workflow', schema);

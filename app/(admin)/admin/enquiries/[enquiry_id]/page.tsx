@@ -1,4 +1,5 @@
 "use client";
+import EnquiryWorkflowProgress from "@/components/enquiries/EnquiryWorkflowProgress";
 import HeadOfficeManager from "@/components/enquiries/HeadOfficeManager";
 import EnquiryCompletionActions from "@/components/enquiries/EnquiryCompletionActions";
 import React, { useMemo, useState } from "react";
@@ -328,6 +329,7 @@ export default function SingleEnquiryPage() {
         {/* CARD */}
         <div className="bg-gradient-to-tr from-slate-950/60 to-slate-900/60 p-5 rounded-xl border border-slate-800 space-y-6">
           <FacilityDetailsSummary camp={camp} enquirySolutions={enquiry?.enquiry?.enquiry_solutions} pending={!enquiry?.enquiry?.is_active} />
+          <EnquiryWorkflowProgress enquiry={enquiry?.enquiry} />
           <div className="rounded-lg border border-slate-800 bg-slate-900/40 p-4">
             <h2 className="text-sm font-semibold text-slate-300">At a glance</h2>
             <div className="mt-3 grid gap-2 md:grid-cols-2 lg:grid-cols-3">
